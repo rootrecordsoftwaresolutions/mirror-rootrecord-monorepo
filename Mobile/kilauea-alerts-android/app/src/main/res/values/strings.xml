@@ -1,0 +1,30 @@
+<resources>
+    <!-- Short label so home screen / recents do not truncate ("Kilauea …"). -->
+    <string name="app_name">Kīlauea</string>
+    <string name="disclaimer_short">Independent app. Not endorsed by USGS. Data from official agencies.</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_earthquakes">Earthquakes</string>
+    <string name="nav_weather">Weather</string>
+    <string name="nav_live_feeds">Live Feeds</string>
+    <string name="nav_alerts">Alerts</string>
+    <string name="nav_more">More</string>
+    <string name="watch_live">Watch Live</string>
+    <string name="view_usgs_webcams">View all official USGS webcams →</string>
+
+    <string name="welcome_tutorial_step0_title">E komo mai!</string>
+    <string name="welcome_tutorial_step0_body">Welcome to the Kilauea Alerts App,\n\nMahalo nui loa for joining us during this testing build. Your feedback helps us polish something genuinely useful for Hawaiʻi Island.</string>
+
+    <string name="welcome_tutorial_step1_title">Around the app</string>
+    <string name="welcome_tutorial_step1_body">The six tabs along the bottom take you everywhere: Home for Kīlauea status and quick reads, Earthquakes for recent activity, Weather for island forecasts, Live Feeds for cameras and streams, Alerts for official USGS volcano notices and NWS alerts, and More for notifications and settings.</string>
+
+    <string name="welcome_tutorial_step2_title">Premium &amp; your account</string>
+    <string name="welcome_tutorial_step2_body">Optional accounts and premium features may be added later. For now, this build focuses on timely official alerts and a clear overview.</string>
+
+    <string name="welcome_tutorial_step3_title">Mahalo — you\'re set</string>
+    <string name="welcome_tutorial_step3_body">Explore safely, stay informed, and tell us what would help you most. We appreciate you.</string>
+
+    <string name="welcome_tutorial_next">Next</string>
+    <string name="welcome_tutorial_back">Back</string>
+    <string name="welcome_tutorial_begin">Begin</string>
+    <string name="welcome_tutorial_skip">Skip intro</string>
+</resources>

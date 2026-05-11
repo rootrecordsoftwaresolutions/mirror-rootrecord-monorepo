@@ -1,0 +1,18 @@
+{
+  "name": "rr-weather-manager-mobile",
+  "private": true,
+  "description": "Root Record Weather Manager — mobile client (React) and optional local API (Python).",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RootRecord/rootrecord-weather-manager-mobile.git"
+  },
+  "scripts": {
+    "changelog:stamp": "node scripts/changelog-stamp.mjs",
+    "start": "pnpm -C \"..\" --filter rrweather-mobile start",
+    "build": "pnpm -C \"..\" --filter rrweather-mobile run build",
+    "test": "pnpm -C \"..\" --filter rrweather-mobile test",
+    "install:frontend": "pnpm -C \"..\" install",
+    "ci:frontend": "pnpm -C \"..\" install --frozen-lockfile",
+    "install:frontend:verbose": "powershell -NoProfile -ExecutionPolicy Bypass -File \"frontend/scripts/npm-install-with-progress.ps1\""
+  }
+}

@@ -1,0 +1,57 @@
+---
+description: RootRecord workspace rules (Mobile + Web + Workers + Pages)
+alwaysApply: true
+---
+
+# Rules for working in this workspace
+
+## Branch / repo rules
+
+- Two separate repos: `Mobile-Development-2026` and `Web-Development-2026`. Don’t assume one git root.
+- Mobile branches: `main` is canonical. Use `weather-work` for Weather changes and `business-work` for Business changes. Merge back with normal PRs.
+- Don’t create `app/*` subtree branches again.
+
+## Safety (secrets + env)
+
+- Never commit: `credentials.env`, `.env*` (except `.env.example` / `*.example`), Android keystores, `local.properties`, Firebase service account JSON, Stripe keys, API tokens.
+- Env edits must be surgical: only add/adjust the specific keys requested; don’t rewrite whole files.
+
+## Keep commits clean
+
+- Keep changes scoped to the app branch you’re on (Weather vs Business).
+- Avoid unrelated refactors; minimal diffs.
+- Don’t commit build caches: `node_modules`, `.gradle`, `.wrangler`, `.next`, `build/`, `dist/`.
+
+## Source-of-truth locations
+
+- **Production API:** per-product Workers `rootrecord-api-weather`, `rootrecord-api-business`, `rootrecord-api-account`, `rootrecord-api-token`, `rootrecord-api-kilauea` (see `Web/cloudflare/API-SHARDS.md`). Prefer **`https://rootrecord-api-<product>.rootrecord.workers.dev`** or a **`*.rootrecord.info`** custom domain on each. **`api.rootrecord.info`** may still map to **`rootrecord-primary`** during migration — treat **`Web/cloudflare/rootrecord-primary`** as **legacy** for new features; implement in **`rootrecord-api-*`** and keep copies aligned until primary is retired.
+- Marketing site: `Web/main/` (Cloudflare Pages `rootrecord-website`).
+- App build request Worker: `Web/cloudflare/rootrecord-app-build` (Worker name `rootrecord-app-build`; marketing form POST `/api/app-build-request` on Pages proxies to this Worker).
+- **Solana Tools Next.js app (public site):** **only** **`RootRecord/solana-rootrecord-site`** — https://github.com/RootRecord/solana-rootrecord-site (`main`). Vercel runs on **`git push origin main`** from **that repo’s root** — same as any normal Next repo. **Forbidden:** edits or copies under `Web/solana/solana-rootrecord-site`, subtree deploy, `solana-site` remote on Web for shipping the site, `*-sync` / `*-tmp` trees, extra `git clone` per task, or worktree+robocopy “publish” pipelines (recovery-only, not routine).
+
+### Solana Tools — agents (do not rediscover)
+
+- **Read first:** `Web/solana/SOLANA-SITE-CANONICAL-REPO.md`
+- **Work:** exactly **one** existing local clone (ask user to open it in the workspace if missing). Shell cwd = that repo root before `git` / `pnpm`.
+- **Publish:** `git push origin main` from that repo. **Do not** claim **`solana.rootrecord.info`** updated unless that push succeeded.
+- **URLs:** **`solana.rootrecord.info`**; marketing is **`Web/main/`**.
+
+## Build expectations
+
+- **Release APK/AAB staging (all apps):** `Mobile/builds/<token-manager|account-hub|business-manager|weather-manager>/` — see `Mobile/docs/RELEASE-BUILD-OUTPUTS.md` and `Mobile/scripts/build-all-release-to-builds.ps1`. Prefer this layout in docs and when attaching or uploading binaries built in this repo.
+- Use `pnpm` in Mobile repo.
+- Use `npm ci` for Cloudflare Workers; for the Solana **site** use `pnpm` in the **user’s single clone** of `RootRecord/solana-rootrecord-site` (never under `Web/solana/`).
+- If something fails, capture the exact command + error output and fix root cause (don’t “work around” by skipping checks).
+
+## Communication
+
+- Always report: what changed, where, how to reproduce/build, and what branch to PR into.
+- If a change impacts deployed services (Workers / auth), call it out explicitly.
+
+## Assistant / chat efficiency (always)
+
+- **Default terse.** Prefer short answers; skip preamble, moralizing, and “here’s what you already know.”
+- **No repetition:** do not restate the user’s facts back to them, re-summarize prior turns, or replay deploy/push steps unless they explicitly ask for a recap or log.
+- **Net-new only:** each message should add something they don’t already have (a decision, a diff, a command result, a risk). If the only honest reply is “acknowledged,” say that in one line.
+- **Context cost:** avoid long bullet lists, duplicate headings, and quoting large tool output; link paths instead of pasting blocks when possible.
+- **Promises vs proof:** don’t claim on-chain outcomes, payouts, or production state without verifiable artifacts (signatures, stats fields, explorer)—otherwise say unknown / not verified.

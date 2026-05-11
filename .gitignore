@@ -1,0 +1,29 @@
+# Secrets and local env
+credentials.env
+credentials.env.*
+credentials.env.txt
+!.env.example
+!.env*.example
+.env
+.env.*
+
+# Existing repo-level secret patterns
+**/credentials.env
+**/credentials.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env*.example
+
+# Nested git repos should stay detached from monorepo history
+**/.git/
+
+# Caches and build outputs
+**/node_modules/
+**/.next/
+**/.wrangler/
+**/.gradle/
+**/dist/
+**/build/
+**/__pycache__/
+**/.venv/

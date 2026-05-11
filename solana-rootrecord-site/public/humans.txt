@@ -1,0 +1,12 @@
+# humanstxt.org — who built / where to learn more
+
+/* Product */
+  Name:           RootRecord Solana Tools
+  Site:           https://solana.rootrecord.info
+  Main brand:     https://rootrecord.info
+
+/* Documentation (canonical — AI / developers) */
+  GitHub:         https://github.com/RootRecord/Doc-Repo
+
+/* Standards */
+  Prefer verifying transactions in-wallet. Not financial advice.

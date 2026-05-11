@@ -1,0 +1,46 @@
+Token accounts to FREEZE (from RESERVE LIST.csv)
+=================================================
+Excluded (do NOT freeze) — both yours:
+  - 6yTvtzfXcCBeDaMhL3e8YE9BUT5ZrcnbhT68B4Fk3ADA  (your token account; CSV owner 3QG6gVk3… treasury)
+  - CKG82jmfaqkNsPRybCtKYtqhHNoXqGRYo21iqzuyjj2T  (your token account; CSV owner HLnpSz9…)
+
+Purpose: freeze all other RRESERVE token accounts so you can route liquidity / sales
+through your two unfrozen accounts above as you reclaim.
+
+----------------------------------------------------------------------
+Token accounts only (one per line — for scripts or manual freeze UI)
+----------------------------------------------------------------------
+9xvUs1eJfBXdPvVGYfiGs16EWkg9oXdoH8oaQF9muJ1B
+7awuUE5uCKbeRrxSwnAGFeCgzu8m8UghzUjGBczq5RjP
+Ayrp3EtZcvrGmGoZPiuuUTeza53mPBrVyhXrG6Ni7mth
+3nzMBMjWaVySuAD8kgVJecy54i83aGcVirm2rEYseTti
+Cd57J8qqjiNXYjDYDKAxFna4FVYHZ9bCXAaac6wgJZvz
+DRwn4xYx8Be54VxzE3FGwDWcs6yjDT1j76dMK6amvakf
+DqdxwexZHpS9CvjTh2eXToxsEKwra2nETt4X1xsHvjm6
+6zTW21rB5QxmAgMxq2egvhR1FFzxwWEuCkg6t517zXb9
+4WhBqJf9Z6aKLRNyB4rXA8ka6Na2R1UzTZE9L39S4rwR
+BQiswcmLkyXPsmdMzDtGpLQAKcnFGA1bgL4fRc4CCgJd
+
+Count: 10 token accounts.
+
+----------------------------------------------------------------------
+Full rows (Owner wallet | Token account | Quantity)
+----------------------------------------------------------------------
+BsoVmE9Xo84QhT6m5zEmiky4nTsYyCABf75s23VrFLtV | 9xvUs1eJfBXdPvVGYfiGs16EWkg9oXdoH8oaQF9muJ1B | 0.066907065
+EdcQWq625eHD18aCoBDvATxudXyr8qLN942KmJ9zqKKb | 7awuUE5uCKbeRrxSwnAGFeCgzu8m8UghzUjGBczq5RjP | 0.033936254
+GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL | Ayrp3EtZcvrGmGoZPiuuUTeza53mPBrVyhXrG6Ni7mth | 0.017440459
+CMLRz17fSBAitrjEYxGnm1dHfKfmiNxGEvy1p8grmYai | 3nzMBMjWaVySuAD8kgVJecy54i83aGcVirm2rEYseTti | 0.0136514
+FtjtJVQRTbH7fTf9eXSL8NHo4qfj4jcNxjM4JniTDUSi | Cd57J8qqjiNXYjDYDKAxFna4FVYHZ9bCXAaac6wgJZvz | 0.00233916
+GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL | DRwn4xYx8Be54VxzE3FGwDWcs6yjDT1j76dMK6amvakf | 0.001581079
+GQhp1metiEge237QfN6rLtFENiz9BW2RCV3s3KPEbWdJ | DqdxwexZHpS9CvjTh2eXToxsEKwra2nETt4X1xsHvjm6 | 0.001076109
+B9cfFyijuPZgZa6teR8ctSVZefXijMMDthqDyKhfeJDf | 6zTW21rB5QxmAgMxq2egvhR1FFzxwWEuCkg6t517zXb9 | 0.000179717
+FURrDAcbpHQVW3x4wzzNNKaJuQPqYN6aKHzbb211Dnzn | 4WhBqJf9Z6aKLRNyB4rXA8ka6Na2R1UzTZE9L39S4rwR | 7.31e-7
+GEUDKx63wXKrn7ognB2gkmy8YRNkVF1hgS4sBEg9nZVm | BQiswcmLkyXPsmdMzDtGpLQAKcnFGA1bgL4fRc4CCgJd | 5.85e-7
+
+----------------------------------------------------------------------
+Tooling note (Root Record Solana site)
+----------------------------------------------------------------------
+The bulk freeze tool on /tools accepts each line as EITHER a holder wallet OR a token
+account pubkey for the mint (auto-detected). You can paste the token account list from
+above directly. Use the full RRESERVE mint address (43–44 characters). Remove broken
+lines (e.g. accidental fragments like “seTti”).

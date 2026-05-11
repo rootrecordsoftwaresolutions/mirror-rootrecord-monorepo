@@ -1,0 +1,11 @@
+{
+  "appId": "com.rootrecord.tokenmanager",
+  "appName": "RootRecord Token Manager",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": false }
+  }
+}

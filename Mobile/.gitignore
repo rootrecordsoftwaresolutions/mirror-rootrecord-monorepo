@@ -1,0 +1,67 @@
+# Workspace dependencies (pnpm)
+node_modules/
+.pnpm-debug.log
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+*.iml
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env and credentials (never commit real secrets)
+.env
+.env.*
+!.env.example
+credentials.env
+credentials.json
+*.pem
+*.key
+.credentials
+*adminsdk*.json
+*-service-account*.json
+
+# CRA / frontend build output
+**/build/
+**/dist/
+
+# Tool caches
+**/.cache/
+**/.eslintcache
+
+# Staged release APK/AAB copies (see docs/RELEASE-BUILD-OUTPUTS.md)
+/builds/**/*.apk
+/builds/**/*.aab
+# Legacy in-app release/ trees (use Mobile/builds/ per docs)
+**/frontend/release/*.aab
+**/frontend/release/*.apk
+
+# Never commit GitHub recovery codes or local photos dropped in app folders
+**/github-recovery-codes.txt
+kilauea-alerts-android/*.jpg
+kilauea-alerts-android/*.jpeg
+
+# Local junk at repo root (never ship)
+/*.zip
+/Adobe*
+/Screenshot*.jpg
+/image*
+
+# Android (Capacitor / Gradle)
+**/android/.gradle/
+**/android/**/build/
+**/android/**/.cxx/
+**/android/local.properties
+**/android/captures/
+
+# Python (weather backend)
+**/.venv/
+**/__pycache__/
+*.pyc
+
+# Test / coverage
+coverage/

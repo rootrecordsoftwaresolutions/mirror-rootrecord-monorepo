@@ -1,0 +1,18 @@
+**/node_modules/
+**/build/output/
+*.log
+.DS_Store
+Thumbs.db
+# Too large for GitHub; build locally or pull from Releases
+**/RootRecordBusinessManager.exe
+rootrecord-business-manager-mobile-*-release.apk
+rootrecord-business-manager-mobile-*-release.aab
+
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials

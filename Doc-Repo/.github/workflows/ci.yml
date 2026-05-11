@@ -1,0 +1,22 @@
+# Lightweight validation so the default branch badge reflects real activity.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify doc repo layout
+        run: |
+          test -f README.md
+          test -f LICENSE
+          test -f solana.json
+          test -d docs
+      - name: Validate solana.json
+        run: python3 -c "import json; json.load(open('solana.json'))"

@@ -1,0 +1,197 @@
+package com.rootrecord.kilauea.alerts
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.rootrecord.kilauea.alerts.ui.KilaueaNavRoutes
+import com.rootrecord.kilauea.alerts.ui.screens.AlertsScreen
+import com.rootrecord.kilauea.alerts.ui.screens.EarthquakesScreen
+import com.rootrecord.kilauea.alerts.ui.screens.FeedbackScreen
+import com.rootrecord.kilauea.alerts.ui.screens.HomeScreen
+import com.rootrecord.kilauea.alerts.ui.screens.LiveFeedsScreen
+import com.rootrecord.kilauea.alerts.ui.screens.MoreScreen
+import com.rootrecord.kilauea.alerts.ui.screens.PhotosScreen
+import com.rootrecord.kilauea.alerts.ui.screens.WeatherDetailScreen
+import com.rootrecord.kilauea.alerts.ui.screens.WeatherScreen
+import com.rootrecord.kilauea.alerts.ui.theme.KilaueaTheme
+import com.rootrecord.kilauea.alerts.ui.welcome.WelcomeTutorialOverlay
+import com.rootrecord.kilauea.alerts.work.WorkEnqueue
+import dagger.hilt.android.AndroidEntryPoint
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        WorkEnqueue.schedulePeriodic(applicationContext)
+        setContent {
+            KilaueaTheme {
+                KilaueaApp(intent?.getStringExtra(EXTRA_OPEN_TAB))
+            }
+        }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_TAB = "open_tab"
+        const val TAB_ALERTS = "alerts"
+    }
+}
+
+private data class TabSpec(val route: String, val labelRes: Int, val icon: ImageVector)
+
+@Composable
+private fun KilaueaApp(initialTab: String?) {
+    val navController = rememberNavController()
+    LaunchedEffect(initialTab) {
+        if (initialTab == MainActivity.TAB_ALERTS) {
+            navController.navigate(KilaueaNavRoutes.Alerts) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
+    val ctx = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                WorkEnqueue.enqueueAlertPollIfDue(ctx)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
+    val tabs = listOf(
+        TabSpec(KilaueaNavRoutes.Home, R.string.nav_home, Icons.Default.Home),
+        TabSpec(KilaueaNavRoutes.Earthquakes, R.string.nav_earthquakes, Icons.Default.Map),
+        TabSpec(KilaueaNavRoutes.Weather, R.string.nav_weather, Icons.Default.Cloud),
+        TabSpec(KilaueaNavRoutes.LiveFeeds, R.string.nav_live_feeds, Icons.Default.LiveTv),
+        TabSpec(KilaueaNavRoutes.Alerts, R.string.nav_alerts, Icons.Default.Warning),
+        TabSpec(KilaueaNavRoutes.More, R.string.nav_more, Icons.Default.Menu),
+    )
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val current = navBackStackEntry?.destination
+
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    val itemColors = NavigationBarItemDefaults.colors()
+                    tabs.forEach { tab ->
+                        val selected = current?.hierarchy?.any { it.route == tab.route } == true
+                        val labelText = stringResource(tab.labelRes)
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = labelText,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = labelText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            },
+                            selected = selected,
+                            onClick = {
+                                navController.navigate(tab.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            alwaysShowLabel = false,
+                            colors = itemColors,
+                        )
+                    }
+                }
+            },
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = KilaueaNavRoutes.Home,
+                modifier = Modifier.padding(innerPadding),
+            ) {
+                composable(KilaueaNavRoutes.Home) { HomeScreen(navController = navController) }
+                composable(KilaueaNavRoutes.Earthquakes) { EarthquakesScreen() }
+                composable(KilaueaNavRoutes.Weather) {
+                    WeatherScreen(navController = navController)
+                }
+                composable(
+                    "weather_detail/{id}",
+                    arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                ) { entry ->
+                    val id = entry.arguments?.getString("id") ?: return@composable
+                    WeatherDetailScreen(
+                        locationId = id,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(KilaueaNavRoutes.LiveFeeds) { LiveFeedsScreen() }
+                composable(KilaueaNavRoutes.Alerts) { AlertsScreen() }
+                composable(KilaueaNavRoutes.More) { MoreScreen(navController = navController) }
+                composable("photos") {
+                    PhotosScreen(onBack = { navController.popBackStack() })
+                }
+                composable(KilaueaNavRoutes.Feedback) {
+                    FeedbackScreen(onBack = { navController.popBackStack() })
+                }
+            }
+        }
+        WelcomeTutorialOverlay()
+    }
+}

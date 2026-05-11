@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# React build output
+frontend/build/
+
+# Python
+backend/.venv/
+**/__pycache__/
+*.pyc
+
+# Local env and credentials (never commit)
+.env
+.env.*
+!.env.example
+*adminsdk*.json
+*-service-account*.json
+credentials.json
+*.pem
+*.key
+.credentials
+
+# Logs
+*.log
+*.err
+
+# OS / editor
+*.lnk
+.DS_Store
+
+# Scratch images at repo root (if any)
+/image.jpg
+/image (1).jpg
+/image (2).jpg
+/image (3).jpg
+/image (4).jpg
+/i1GHr.jpg

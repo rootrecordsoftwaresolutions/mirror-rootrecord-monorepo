@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RootRecord Token Manager</string>
+    <string name="title_activity_main">RootRecord Token Manager</string>
+    <string name="package_name">com.rootrecord.tokenmanager</string>
+    <string name="custom_url_scheme">com.rootrecord.tokenmanager</string>
+</resources>

@@ -1,0 +1,295 @@
+================================================================================
+DEV.TO — TITLE (paste into title field)
+================================================================================
+
+RootRecord: A Practitioner's Map of the Ecosystem — Accounts, Mobile Apps, the Primary API, and Solana Tools
+
+
+================================================================================
+DEV.TO — TAGS (up to 4)
+================================================================================
+
+rootrecord, solana, tutorial, cloudflare
+
+
+================================================================================
+DEV.TO — BODY (paste everything below the line into the editor as Markdown)
+================================================================================
+
+# RootRecord: A Practitioner's Map of the Ecosystem
+
+**RootRecord** builds multi-device software for people who want serious tools without unnecessary lock-in: mobile apps for weather and hazards, a full business office in your pocket, a central account hub, and browser-based Solana utilities for token creation and on-chain operations. A single **RootRecord account** ties licensing, cloud sync where applicable, and optional earn-style programs together. The public **primary API** lives at **`https://api.rootrecord.info`**. The marketing site and account portal are at **`https://rootrecord.info`**. The dedicated Solana tooling site is **`https://solana.rootrecord.info`**.
+
+This article is a **field guide**: what exists, how the pieces connect, and how to use them in a logical order.
+
+---
+
+## 1. What RootRecord is building (in one page)
+
+| Layer | What it is | Canonical URL or host |
+|-------|------------|------------------------|
+| **Marketing & accounts** | Static site on Cloudflare Pages; sign-in and billing handoff to Workers | `rootrecord.info` |
+| **Primary API** | Cloudflare Worker: auth (via licence integration), D1-backed features, weather, business data, earn, push, locations, feedback, Solana-related plumbing | `api.rootrecord.info` |
+| **Licence / auth Worker** | Companion Worker for signup, login, sessions, `/v1/me`, entitlement, Stripe webhooks | Deployed alongside the web stack (not the same process as the primary API) |
+| **Mobile apps** | React + Capacitor, Android-first; shared API and account model | Installed from Play / sideload per app; source in RootRecord's mobile monorepo |
+| **Solana Tools (web)** | Next.js app: wallet-connected SPL/Token-2022 flows, fees in SOL, optional referrals | `solana.rootrecord.info` |
+
+**Design principles that show up across the codebase:**
+
+- **One account, many apps** — Weather Manager, Business Manager, Account Hub, and Token Manager are meant to feel like one family: shared auth patterns and the same production API base where applicable.
+- **Cloudflare at the center** — The primary Worker holds auth bridging, **D1** SQL for per-user data (weather locations, business documents, earn balances, prefs), and integrations (weather providers, push, feedback webhooks, Solana-adjacent routes).
+- **Non-custodial Solana** — Normal flows never ask RootRecord servers for private keys; users sign in their own wallets.
+
+---
+
+## 2. Create and manage your RootRecord account
+
+### 2.1 Where to sign up and sign in
+
+1. Open **`https://rootrecord.info`** and use the **account** area (the site loads configuration such as API base from its Pages functions — production points at the real Worker base).
+2. Complete **signup** or **login**. The licence Worker exposes routes such as `POST /v1/auth/signup`, `POST /v1/auth/login`, `GET /v1/me`, `POST /v1/entitlement`, and billing webhook handling.
+3. For **subscription or lifetime access**, use the site's billing links; after Stripe updates, apps often call **`POST /api/auth/entitlement`** on the primary API to refresh `pro_unlocked`, `life_member`, and related fields.
+
+### 2.2 What "signed in" means in apps
+
+Mobile clients obtain a **Bearer token** (JWT) and send it as:
+
+```http
+Authorization: Bearer <token>
+```
+
+Guest-style usage may use a stable **`device_id`** or **`X-Guest-Id`** header depending on the flow — the Worker enforces `device_id` for several auth paths when required.
+
+### 2.3 Refreshing entitlements after billing
+
+After you change plans in the hosted billing portal (linked from `rootrecord.info` account UX), open any RootRecord app and use its **entitlement refresh** or re-login path so **`POST /api/auth/entitlement`** can sync **Pro** / **lifetime** state into the app.
+
+---
+
+## 3. The primary API: mental model and core routes
+
+Base URL: **`https://api.rootrecord.info`**. Paths below are under **`/api/...`** unless noted.
+
+### 3.1 Authentication and profile
+
+| Concern | Typical route | Notes |
+|--------|----------------|--------|
+| Login / signup (mobile-shaped) | `POST /api/auth/login`, `POST /api/auth/signup` | Bridges to licence Worker; upserts account rows in D1 |
+| Session info | `GET` or `POST /api/auth/me` | Returns email, `account_id`, `pro_unlocked`, `life_member`, subscription fields |
+| Logout | `POST /api/auth/logout` | Ends session server-side as implemented |
+| Entitlement refresh | `POST /api/auth/entitlement` | After billing changes |
+| Wipe Business cloud rows | `POST /api/auth/wipe-business-data` | Destructive; Business-specific |
+
+There is also a **`/v1/...`** surface on the same Worker for Stripe checkout and selected custodial or advanced account paths (for example linked-wallet and custodial-wallet flows used by reward / treasury features).
+
+### 3.2 Weather, hazards, and the dashboard bundle
+
+For latitude/longitude queries:
+
+- **`GET /api/weather/current?lat=&lon=`**
+- **`GET /api/weather/forecast?lat=&lon=`**
+- **`GET /api/weather/alerts?lat=&lon=`**
+
+Aggregated "everything at once" style data:
+
+- **`GET /api/dashboard?lat=&lon=`**
+
+Additional hazard feeds (examples from the router): Canadian alerts, USGS earthquakes / tsunami bulletins, NASA EONET cyclones and wildfires. These are designed for apps that show **multi-hazard** dashboards rather than a single generic forecast.
+
+### 3.3 Saved locations (Weather)
+
+Authenticated:
+
+- **`GET /api/locations`** — list
+- **`POST /api/locations`** — create (name, latitude, longitude)
+- **`PATCH /api/locations/:id`**, **`DELETE /api/locations/:id`**
+
+Stored per user in D1 (`rrwm_locations`).
+
+### 3.4 Preferences (Weather)
+
+- **`GET /api/me/prefs`**
+- **`POST /api/me/prefs`**
+
+Current implementation centers on **NOAA alert toggles** (`noaa_alerts_enabled`). Apps may expose this as "alert preferences."
+
+### 3.5 Push notifications
+
+- **`POST /api/me/push-token`** — register FCM token for the signed-in user
+- **`POST /api/internal/push-broadcast`** — operator-only broadcast (admin secret)
+
+### 3.6 Earn program (platform credits)
+
+Signed-in users participate via:
+
+- **`GET /api/earn/summary?app_id=`** — balance and daily caps
+- **`POST /api/earn/heartbeat`** — time-on-screen style accrual with server-enforced caps and anti-abuse gaps
+- **`POST /api/earn/checkin`** — daily check-in style credit
+
+Balances live in D1 (`rr_earn_balance`, per-app daily tracking). **Units** are integer credits; exact redemption semantics belong in product copy on the site or in-app, not duplicated here.
+
+### 3.7 Business Manager cloud sync
+
+Business data is stored as **JSON documents** in D1 table **`bm_owned_row`**, keyed by user and collection names such as:
+
+`categories`, `projects`, `quick-actions`, `time`, `money` (with `income` / `expenses`), `clients`, `invoices`, `products`, `supplies`, `schedule`, `debts`, `scheduled-expenses`, `resources`, `funds`, `businesses`, `settings`, `dashboard`.
+
+REST-shaped routes look like **`/api/categories`**, **`/api/projects`**, **`/api/time`**, etc., with **GET** (list), **POST** (create), **PATCH** / **DELETE** by id where implemented.
+
+**Important:** `GET /api/dashboard?lat=&lon=` is reserved for **Weather's** combined bundle. Business Manager uses paths like **`/api/dashboard/summary`** for business-specific summaries — the Worker explicitly avoids confusing the two.
+
+To delete all cloud business data for the account:
+
+- **`DELETE /api/account/business-data`** (or the wipe route mirrored under auth)
+
+### 3.8 Feedback
+
+- **`POST /api/feedback`** — authenticated; forwards to a configured Discord webhook for triage
+
+### 3.9 Mobile operations
+
+- **`GET /api/mobile/version-policy`** — minimum supported app versions and store URLs
+- **`GET /api/mobile/developer-messages`** — in-app messages
+
+### 3.10 Solana integration on the API
+
+The Worker includes routes for **Solana site logging**, **token-create Discord notify**, **linked wallets**, **custodial treasury mechanics**, and optional **forwarding** of selected `/api/ecosystem/*` calls to the Vercel-hosted Next app — so browser Solana features and server-side secrets can cooperate without exposing keys.
+
+---
+
+## 4. Mobile apps: how to use them (tutorial-style)
+
+All major RootRecord Android apps in this ecosystem share a common technical stack: **React 18**, **Tailwind**, **React Router** (often HashRouter for Capacitor), **Capacitor 6**, and **`pnpm`** workspaces. Production builds point **`REACT_APP_BACKEND_URL`** (or equivalent) at **`https://api.rootrecord.info`**.
+
+### 4.1 Weather Manager
+
+**Purpose:** Location-aware **weather**, **alerts**, and **hazard** information with a mobile-first UI.
+
+**Setup (developers):**
+
+```bash
+# From the Mobile monorepo root
+pnpm install
+pnpm weather:start
+```
+
+Configure `REACT_APP_BACKEND_URL` to your API base (no trailing `/api` — the client appends `/api` paths).
+
+**Typical user flow:**
+
+1. Install the APK or Play build.
+2. Allow location or add **saved locations** (synced via `/api/locations` when signed in).
+3. Open the **dashboard** to pull **`/api/dashboard`** with your coordinates.
+4. Toggle **NOAA-related prefs** under **`/api/me/prefs`** if the UI exposes them.
+5. Register **push** token if you want alert pushes (**`/api/me/push-token`**).
+
+Public distribution for consumers may use a **separate public GitHub Releases** repo — builders work in the private monorepo.
+
+### 4.2 Business Manager
+
+**Purpose:** Time, money, clients, inventory, scheduling, work log, and reports — oriented toward **small operators** who want structured books.
+
+**User flow:**
+
+1. Sign in with the same RootRecord account.
+2. Create **categories**, **projects**, **clients**, and **time entries** — each syncs to the Worker under the **`bm_*`** collections.
+3. Use **reports** (client-side PDF generation in-app) for exports.
+4. If you need a clean slate in the cloud, use the **wipe business data** action (calls the API wipe).
+
+Optional **local FastAPI** backends exist in-repo for development; **shipping APKs** talk to **`api.rootrecord.info`** directly.
+
+### 4.3 Account Hub
+
+**Purpose:** **Home + account + subscription + security + connected apps** — not a duplicate of Weather or Business feature depth.
+
+MVP screens wire to:
+
+- **`/api/auth/me`**, **`/api/earn/summary`**
+- **`POST /api/auth/entitlement`**
+- **`/api/me/prefs`** (shared shape with Weather where keys overlap)
+- Deep links to sibling apps via custom URL schemes (`weathermanager://`, `businessmanager://`) with store fallbacks
+
+Some advanced endpoints (password change, session list) may be **progressively enhanced** when the Worker exposes them; the app degrades gracefully with "coming soon" if a route is absent.
+
+### 4.4 Token Manager (Solana mobile)
+
+**Purpose:** **Non-custodial** Solana: Phantom connect, watch-only mode, balances, send/receive, history, contacts.
+
+**Security model:** Never collect seed phrases. Phantom connects through **`window.solana`** in WebView or deep links.
+
+**Backend (local/dev):** FastAPI + Mongo for prefs, contacts, SOL price proxy — **wallet identity is the public key**, not the RootRecord password.
+
+**Note:** Heavy **token mint creation** and advanced web-only tooling remain centered on **`solana.rootrecord.info`** in the browser.
+
+---
+
+## 5. Solana Tools (web) — what you can do from the browser
+
+Canonical public URL: **`https://solana.rootrecord.info`**.
+
+Machine-readable overview for citations and definitions: **`/llms.txt`** on the deployed site, and **`/operations/reference`** for precise terminology.
+
+**Capabilities (high level):**
+
+- **Create** SPL and Token-2022 mints with optional Metaplex metadata and **Pinata IPFS** uploads (`/create`).
+- **Manage** authorities and supply: revoke mint/freeze authority, mint more, burn, update metadata, Token-2022 fee operations (`/tools`).
+- **Liquidity** with **Raydium CPMM** (`/liquidity`).
+- **Bulk sends** of SOL or SPL (`/bulk`).
+- **Paper wallet** generator (`/wallet-generator`).
+- **Token stats** and referral routes (`/token-stats`, `/ref/[mint]`).
+- **Referral query param** **`?ref=`** — a share of **platform fees** can route to a referrer wallet in the same transaction (basis points configured in deployment).
+
+**Fees:** Flat **SOL** platform fees per paid action; live amounts are on **`/pricing`**. No subscription for the Solana site itself.
+
+**Architecture:** Next.js (App Router), `@solana/web3.js`, wallet adapters. Sensitive keys such as **Pinata JWT** stay in **server route handlers** so they never ship to the browser bundle.
+
+---
+
+## 6. For developers: running the Worker locally
+
+From the Web repo:
+
+```bash
+cd cloudflare/rootrecord-primary
+npm ci
+npm run dev
+```
+
+Copy **`.dev.vars.example`** to **`.dev.vars`** and fill secrets. Apply **D1 migrations** with the scripts in that package before expecting DB-backed routes to work.
+
+The **licence Worker** is a separate package under `cloudflare/rootrecord-license`.
+
+---
+
+## 7. Security and privacy — practical summary
+
+- **Passwords and JWTs** are handled by the auth/licence layer; mobile apps must store tokens in **platform secure storage** (Keychain/Keystore) in production builds, not treat web `localStorage` as the final answer for native.
+- **Solana**: User keys stay in the wallet app; RootRecord's servers don't replace Phantom or Solflare signing.
+- **Custodial and treasury** features exist in the Worker for specific **RRTT / rewards** flows — treat these as **advanced** and subject to on-chain verification; read explorer details before asserting balances.
+- **Feedback** may leave your message in Discord for staff — don't send secrets in feedback text.
+
+---
+
+## 8. FAQ
+
+**Q: What is the "one true" API base for mobile?**
+A: **`https://api.rootrecord.info`** for shipping builds unless you're deliberately hitting staging.
+
+**Q: Does RootRecord replace QuickBooks or a national weather service?**
+A: No — Business Manager is a structured productivity and bookkeeping-style companion; Weather combines multiple **public feeds** and provider data behind one API shape.
+
+**Q: Where is Solana "creation" best done?**
+A: Full-featured **browser** flows on **`solana.rootrecord.info`**. Mobile Token Manager targets **day-to-day wallet** tasks.
+
+**Q: How does RootRecord fund infrastructure?**
+A: Subscriptions / licensing on `rootrecord.info` for pro apps, and **flat SOL fees** on the Solana tools site — see **`/pricing`** for current numbers.
+
+---
+
+## Closing
+
+RootRecord is building a **coherent utility layer** — **accounts and billing** on the web, **data and sync** on Cloudflare Workers and D1, **field apps** on Android, and **chain utilities** in the browser — without pretending users must trust a single vendor with their keys. If you're integrating as a developer, start from **`api.rootrecord.info`**, read **`GET /api`** or health responses on deploys you control, and ship **`Authorization: Bearer`** from real sessions. If you're a user, start at **`rootrecord.info`**, pick **Weather**, **Business**, or **Solana Tools**, and sign in once.
+
+---
+
+*Last reviewed against engineering docs and Worker sources — May 2026. URLs and fee schedules may change; confirm production behavior before relying on any figures in production systems.*

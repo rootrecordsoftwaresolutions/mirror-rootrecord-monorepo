@@ -1,0 +1,54 @@
+{
+  "app": "RootRecord Token Manager",
+  "platform": "mobile-first PWA + Capacitor (Android first)",
+  "archetype": "Phosphor Terminal (Solana-native, non-custodial)",
+  "design_intent": "A sober, terminal-inspired Solana companion that feels like an instrument, not a casino. Avoids the typical violet-on-white crypto trope. Information-dense yet calm; mono numerics for trust; hot-magenta accents reserved for wallet/sign moments only.",
+  "typography": {
+    "heading_font": "IBM Plex Sans",
+    "body_font": "IBM Plex Sans",
+    "data_font": "JetBrains Mono",
+    "rationale": "IBM Plex Sans gives the design a modern, slightly engineered character with personality where Inter feels generic. JetBrains Mono on every numeric/address surface reinforces the technical, on-chain feel."
+  },
+  "colors": {
+    "background": {
+      "base": "#07090C",
+      "surface": "#0F141A",
+      "elevated": "#161D26",
+      "raised": "#1B2430"
+    },
+    "ink": {
+      "primary": "#E9F4F0",
+      "secondary": "#9BB2A9",
+      "tertiary": "#5C6F6A"
+    },
+    "accents": {
+      "phos": { "default": "#14F195", "dim": "#0DA66B", "deep": "#064E36", "glow": "rgba(20,241,149,0.18)" },
+      "magenta": { "default": "#DC1FFF", "dim": "#8C0FB8", "glow": "rgba(220,31,255,0.18)" },
+      "amber": "#FFB020",
+      "rose": "#FF5577"
+    },
+    "network_indicators": {
+      "mainnet-beta": "#14F195",
+      "devnet": "#FFB020",
+      "testnet": "#DC1FFF"
+    }
+  },
+  "patterns": {
+    "bottom_nav": "Fixed glass nav with 5 tabs (Home, Send, Receive, Activity, Settings). Active uses phosphor green with subtle fill; inactive is ink-tertiary outline.",
+    "balance_card": "Hero card with diffuse phosphor + magenta blur halos and large mono numerics. SOL displayed prominently with USD subtitle and 24h change pill.",
+    "signing_screen": "Distinct 'signing-bg' with subtle phosphor scanlines + green border + glow shadow to make signing feel deliberate and safe.",
+    "network_pill": "Pill-shaped chip with colored dot per network. Magenta=testnet, amber=devnet, phosphor=mainnet."
+  },
+  "motion": {
+    "transitions": "150ms ease for color/border, 75ms ease for tap scale.",
+    "active_state": "scale(0.98) + 0.92 opacity on tap.",
+    "success_pulse": "Pulsing phosphor ring on the 'sent' confirmation."
+  },
+  "principles": [
+    "Never prompt for seed phrase or private keys — say so visibly.",
+    "All numerics in JetBrains Mono; never let an address wrap awkwardly.",
+    "Color is meaning: phosphor for safe/confirmed, magenta for wallet moments, amber for devnet, rose for errors.",
+    "Touch targets >= 44px; sticky bottom nav respects safe-area.",
+    "data-testid on every interactive element."
+  ]
+}

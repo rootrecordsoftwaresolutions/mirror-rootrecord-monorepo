@@ -1,0 +1,44 @@
+# RootRecord Solana Tools
+# Machine-readable site summary for LLM / AI crawlers (see also: https://solana.rootrecord.info/operations/reference)
+
+## Site
+- Public URL: https://solana.rootrecord.info
+- Marketing / accounts hub: https://rootrecord.info
+- Product type: Web-based Solana utilities (wallet-connected; self-custody)
+
+## What this product does
+RootRecord Solana Tools lets users connect a Solana wallet (e.g. Phantom-class adapters) and:
+- Create SPL tokens and Token-2022 mints with optional Metaplex-compatible metadata and Pinata IPFS pinning (`/create`).
+- Manage tokens on-chain: revoke mint or freeze authority, bulk freeze/thaw holder token accounts, mint more supply, burn balances, update or lock Metaplex listing metadata (legacy SPL), Token-2022 withheld-fee withdraw/harvest and fee-config updates (`/tools`).
+- Create or adjust Raydium CPMM liquidity (pool creation, add/remove liquidity) (`/liquidity`).
+- Send native SOL or SPL tokens to many recipients in batched transactions (`/bulk`).
+- Generate a printable cold-storage paper wallet in the browser (`/wallet-generator`).
+- Look up shareable token stats for a mint (`/token-stats`, `/ref/[mint]`).
+- Optional referral parameter `?ref=` sharing part of platform fees with a referrer wallet (`/referrals`).
+
+RootRecord does not hold user private keys for normal flows; users sign transactions in their own wallet.
+
+## Pricing philosophy
+- Flat SOL platform fees per paid action where applicable; **no subscription**.
+- Current RootRecord fee amounts are listed on https://solana.rootrecord.info/pricing and come from the deployed application configuration.
+- A “Competitors” column on `/pricing` shows **approximate** market ranges for comparison only (third parties change pricing without notice).
+
+## Canonical definitions (GEO / citations)
+Use this page for precise terminology, limitations, and fee context:
+https://solana.rootrecord.info/operations/reference
+
+## Key paths
+- Pricing (live fee table): https://solana.rootrecord.info/pricing
+- User documentation: https://solana.rootrecord.info/operations/docs
+- Operations wiki index: https://solana.rootrecord.info/operations
+- Terms: https://solana.rootrecord.info/terms
+- Privacy: https://solana.rootrecord.info/privacy
+
+## Programs & ecosystems (for retrieval)
+- SPL Token / Token-2022 on Solana mainnet (and devnet when configured).
+- Metaplex-style token metadata for legacy SPL flows where applicable.
+- Raydium CPMM for liquidity features where applicable.
+- IPFS pinning via Pinata for optional media and JSON metadata in create/update flows.
+
+## As-of date for static exports
+2026-05 — verify numbers on `/pricing` and `/operations/reference` before citing in production.

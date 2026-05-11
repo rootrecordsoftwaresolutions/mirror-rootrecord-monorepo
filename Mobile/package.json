@@ -1,0 +1,25 @@
+{
+  "name": "rootrecord-mobile-workspace",
+  "private": true,
+  "description": "Root workspace for Root Record mobile apps: shared tooling via pnpm; add new apps under apps/ and list them in pnpm-workspace.yaml.",
+  "scripts": {
+    "install:all": "pnpm install",
+    "weather:start": "pnpm --filter rrweather-mobile start",
+    "weather:build": "pnpm --filter rrweather-mobile run build",
+    "weather:test": "pnpm --filter rrweather-mobile test",
+    "business:start": "pnpm --filter rootrecord-business-manager-mobile start",
+    "business:build": "pnpm --filter rootrecord-business-manager-mobile run build",
+    "pages:deploy:weather": "pnpm --filter rrweather-mobile run pages:deploy",
+    "pages:deploy:business": "pnpm --filter rootrecord-business-manager-mobile run pages:deploy",
+    "pages:deploy:account": "pnpm --filter rootrecord-account-hub-mobile run pages:deploy",
+    "pages:deploy:token": "pnpm --filter rootrecord-token-manager-mobile run pages:deploy",
+    "pages:deploy:kilauea": "pnpm --filter rootrecord-kilauea-alerts-web run pages:deploy"
+  },
+  "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["core-js", "core-js-pure"]
+  }
+}

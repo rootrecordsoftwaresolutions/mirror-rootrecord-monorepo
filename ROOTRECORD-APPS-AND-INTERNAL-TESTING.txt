@@ -1,0 +1,127 @@
+================================================================================
+ROOTRECORD — APPS + INTERNAL TESTING & REWARDS
+================================================================================
+Workspace: Mobile/ (pnpm) and Web/. Production API: https://api.rootrecord.info
+Marketing site: Web/main/ (Cloudflare Pages: rootrecord-website)
+
+================================================================================
+INTERNAL TESTING (PLAY STORE) & HOW TO JOIN
+================================================================================
+
+These links only work if you are an internal tester with RootRecord Software
+Systems.
+
+Join this Google group for permissions:
+https://groups.google.com/u/1/g/rootrecordtesting
+
+Business Manager (Play internal testing):
+https://play.google.com/apps/testing/com.rootrecord.businessmanager
+
+Weather Manager (Play internal testing):
+https://play.google.com/apps/testing/com.rootrecord.weathermanager
+
+Requirements:
+- Download from Google Play after being invited as a tester
+- Keep the app installed for 2 weeks
+- Provide feedback as you see fit
+Rewards to be determined on completion.
+
+Perks:
+RootRecord runs a usage-based rewards program for people who help test our
+Android apps. Rewards are tracked when you use a participating app while
+signed in with your rootrecord.info account.
+
+In test versions, you will see a line like "Beta Tester Rewards" with a number.
+That is your current usage reward balance for the program (one running total
+across all apps). You can open the rewards page from the app for full context.
+
+Rewards reflect real use of the app while signed in. To keep things fair there
+are daily limits per app and per-screen limits. All apps offer a daily
+check-in bonus. Rewards are tied to the same email you use for your RootRecord
+account. Subscriptions and billing are separate from rewards, but membership
+redemption is planned.
+
+If you use RootRecord Solana tools, we provide a custodial wallet for rewards.
+We cover network fees when you withdraw earned RRTT to your linked payout
+address. You pay on-chain fees if you move SOL, USDC, or other SPL tokens from
+that wallet. Details are on the rewards page.
+
+Cash out:
+https://solana.rootrecord.info/account
+
+================================================================================
+MOBILE APPS (ANDROID — CAPACITOR + REACT)
+================================================================================
+Stack: React 18, CRA, Capacitor 6. API: https://api.rootrecord.info (where used).
+
+1) Weather Manager
+   Repo path: Mobile/weather-manager-mobile/frontend
+   npm name: rrweather-mobile  |  Version: 1.0.13
+   Play: com.rootrecord.weathermanager
+   Maps (Leaflet), push notifications, weather API client.
+   Optional FastAPI: Mobile/weather-manager-mobile/backend/
+   Optional Worker: Mobile/weather-manager-mobile/cloudflare/rr-weather-manager-api
+   From Mobile/: pnpm weather:start | weather:build | weather:test
+
+2) Business Manager
+   Repo path: Mobile/business-manager-app/frontend
+   npm name: rootrecord-business-manager-mobile  |  Version: 1.0.2
+   Play: com.rootrecord.businessmanager
+   Business workflows, charts, PDF export, forms.
+   Optional FastAPI: Mobile/business-manager-app/backend/
+   From Mobile/: pnpm business:start | business:build
+
+3) Account Hub
+   Repo path: Mobile/account-hub-app/frontend
+   npm name: rootrecord-account-hub-mobile  |  Version: 0.1.1
+   Account, subscription, security, connected apps; deep links to Weather/Business.
+
+4) Token Manager (Solana, on-device wallet flows)
+   Repo path: Mobile/token-manager-app/frontend
+   npm name: rootrecord-token-manager-mobile  |  Version: 0.1.0
+   Solana SPL + Phantom-style connect, send/receive, QR, history.
+   Backend: Mobile/token-manager-app/backend/ (FastAPI + MongoDB)
+
+Mobile workspace root: Mobile/package.json  |  pnpm-workspace.yaml lists the four apps.
+
+================================================================================
+CLOUDFLARE WORKERS (DEPLOYED SERVICES)
+================================================================================
+
+rootrecord-primary
+  Path: Web/cloudflare/rootrecord-primary
+  URL: https://api.rootrecord.info
+  Main API: auth, weather, earn, business, push, prefs, D1, crons, Solana custodial/RRTT.
+
+rootrecord-license
+  Path: Web/cloudflare/rootrecord-license
+  Licence / billing webhook companion; same D1 as primary.
+
+rootrecord-app-build
+  Path: Web/cloudflare/rootrecord-app-build
+  App build request form (Discord); called from the marketing site via Pages Functions.
+
+rr-weather-manager-api
+  Path: Mobile/weather-manager-mobile/cloudflare/rr-weather-manager-api
+  Optional push / user-data Worker (own D1); uses PRIMARY_API_BASE for auth checks.
+
+================================================================================
+MARKETING SITE (CLOUDFLARE PAGES)
+================================================================================
+Path: Web/main
+Package: rootrecord-website  |  Project: rootrecord-website
+Static pages (home, products, pricing, billing, account, FAQ, app-build-request,
+beta-tester-rewards, legal, contact, etc.) plus Pages Functions under
+Web/main/functions/ for site-config, API proxy, and app-build-request proxy.
+
+================================================================================
+SOLANA TOOLS (NEXT.JS WEB APP)
+================================================================================
+Path: Web/solana/solanasite
+Package: rootrecord-solana-tools  |  Next.js 14
+Public Solana tools (wallets, token flows, Raydium/Metaplex/Streamflow-related UI).
+Public URL (example): https://solana.rootrecord.info
+
+================================================================================
+END OF FILE
+================================================================================
