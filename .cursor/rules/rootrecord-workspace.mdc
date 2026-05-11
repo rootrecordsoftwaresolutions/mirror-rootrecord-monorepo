@@ -22,6 +22,12 @@ alwaysApply: true
 - Avoid unrelated refactors; minimal diffs.
 - Don’t commit build caches: `node_modules`, `.gradle`, `.wrangler`, `.next`, `build/`, `dist/`.
 
+## Git: commits and pushes (user-owned)
+
+- **Commits:** Only the user runs local commit commands (e.g. repo-root `commit-all.bat`). The assistant edits files and may suggest a commit message; it does **not** run commits unless the user explicitly asks for a one-off exception.
+- **Cloudflare updates:** Only the user runs `cloudflare-update-all.bat` (and any related “deploy all” scripts). The assistant may update the `.bat` / `.ps1` files, but does not execute deploys.
+- **Pushes / `gh` / remotes:** The assistant does **not** run `git push`, force-push, or `gh repo`/auth flows by default — they burn context. The user pushes when ready. If a task truly requires remote operations, the user must say so explicitly.
+
 ## Source-of-truth locations
 
 - **Production API:** per-product Workers `rootrecord-api-weather`, `rootrecord-api-business`, `rootrecord-api-account`, `rootrecord-api-token`, `rootrecord-api-kilauea` (see `Web/cloudflare/API-SHARDS.md`). Prefer **`https://rootrecord-api-<product>.rootrecord.workers.dev`** or a **`*.rootrecord.info`** custom domain on each. **`api.rootrecord.info`** may still map to **`rootrecord-primary`** during migration — treat **`Web/cloudflare/rootrecord-primary`** as **legacy** for new features; implement in **`rootrecord-api-*`** and keep copies aligned until primary is retired.
