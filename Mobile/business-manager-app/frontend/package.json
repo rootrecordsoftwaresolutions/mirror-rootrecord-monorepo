@@ -49,8 +49,8 @@
     "android:apk": "npm run build && npx cap sync android && cd android && .\\gradlew.bat clean assembleRelease && cd .. && node scripts/copy-android-artifacts.js apk",
     "android:bundle:release": "npm run build && npx cap sync android && cd android && .\\gradlew.bat bundleRelease && cd .. && node scripts/copy-android-artifacts.js aab",
     "android:apk-and-bundle": "npm run build && npx cap sync android && cd android && .\\gradlew.bat clean assembleRelease bundleRelease && cd .. && node scripts/copy-android-artifacts.js all",
-    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web",
-    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web -SkipBuild"
+    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web",
+    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web -SkipBuild"
   },
   "eslintConfig": {
     "extends": [

@@ -13,7 +13,7 @@
     "pages:deploy:business": "pnpm --filter rootrecord-business-manager-mobile run pages:deploy",
     "pages:deploy:account": "pnpm --filter rootrecord-account-hub-mobile run pages:deploy",
     "pages:deploy:token": "pnpm --filter rootrecord-token-manager-mobile run pages:deploy",
-    "pages:deploy:kilauea": "pnpm --filter rootrecord-kilauea-alerts-web run pages:deploy"
+    "pages:deploy:kilauea": "pnpm -C ../Web/apps/kilauea-alerts-web run pages:deploy"
   },
   "packageManager": "pnpm@10.18.3",
   "engines": {

@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-kilauea-web",
-    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-kilauea-web -SkipBuild"
+    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-kilauea-web",
+    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-kilauea-web -SkipBuild"
   },
   "dependencies": {
     "react": "^18.3.1",

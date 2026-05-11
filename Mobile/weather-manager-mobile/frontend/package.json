@@ -38,8 +38,8 @@
     "android:assemble": "pnpm exec cap sync android && cd android && .\\gradlew.bat assembleDebug",
     "android:play:ready": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-play-release.ps1",
     "android:apk:test": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-test-apk.ps1",
-    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web",
-    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web -SkipBuild"
+    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web",
+    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web -SkipBuild"
   },
   "eslintConfig": {
     "extends": [
