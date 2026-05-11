@@ -18,7 +18,7 @@ set "ERR=0"
 rem --- Workers (API primary + shards) ---
 echo [1/6] Deploy Workers: rootrecord-primary
 pushd "Web\cloudflare\rootrecord-primary" || goto FAIL
-if not exist "node_modules" npm ci || goto FAIL
+npm ci || goto FAIL
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy.ps1" %* || goto FAIL
 popd
 
@@ -29,25 +29,25 @@ popd
 
 echo [3/6] Deploy Workers: rootrecord-license
 pushd "Web\cloudflare\rootrecord-license" || goto FAIL
-if not exist "node_modules" npm ci || goto FAIL
+npm ci || goto FAIL
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy.ps1" %* || goto FAIL
 popd
 
 echo [4/6] Deploy Workers: rootrecord-solana-tx
 pushd "Web\cloudflare\rootrecord-solana-tx" || goto FAIL
-if not exist "node_modules" npm ci || goto FAIL
+npm ci || goto FAIL
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy.ps1" %* || goto FAIL
 popd
 
 echo [5/6] Deploy Workers: rootrecord-app-build
 pushd "Web\cloudflare\rootrecord-app-build" || goto FAIL
-if not exist "node_modules" npm ci || goto FAIL
+npm ci || goto FAIL
 npx wrangler deploy %* || goto FAIL
 popd
 
 echo [6/6] Deploy Workers: rr-weather-manager-api
 pushd "Web\cloudflare\rr-weather-manager-api" || goto FAIL
-if not exist "node_modules" npm ci || goto FAIL
+npm ci || goto FAIL
 npx wrangler d1 migrations apply USER_DATA_DB --remote || goto FAIL
 npx wrangler deploy %* || goto FAIL
 popd
@@ -60,7 +60,7 @@ echo ================================
 
 echo Deploy Pages: rootrecord-website (marketing)
 pushd "Web\main" || goto FAIL
-if not exist "node_modules" npm ci || goto FAIL
+npm ci || goto FAIL
 npm run pages:deploy --silent || goto FAIL
 popd
 

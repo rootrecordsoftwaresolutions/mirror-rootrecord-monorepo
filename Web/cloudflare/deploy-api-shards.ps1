@@ -17,9 +17,10 @@ foreach ($name in $shards) {
   Write-Host "`n========== $name ==========" -ForegroundColor Cyan
   Push-Location $dir
   try {
-    if (-not (Test-Path -LiteralPath (Join-Path $dir "node_modules"))) {
-      npm ci
-    }
+    # Always `npm ci` here: Wrangler v4 pulls `blake3-wasm` with a required `.wasm` file under
+    # `node_modules/blake3-wasm/dist/wasm/nodejs/`. Skipping install when `node_modules` exists but
+    # is incomplete (partial copy, AV quarantine, failed extract) yields ENOENT at deploy time.
+    npm ci
     powershell -NoProfile -ExecutionPolicy Bypass -File ./deploy.ps1 @args
   }
   finally {
