@@ -24,6 +24,23 @@ set "ERR=%ERRORLEVEL%"
 if not "%ERR%"=="0" (
   echo.
   echo Commit failed with exit code %ERR%.
+  pause
+  exit /b %ERR%
+)
+
+echo.
+echo Pushing to origin...
+"%GIT%" remote get-url origin >nul 2>nul
+if errorlevel 1 (
+  echo No 'origin' remote configured. Skipping push.
+  pause
+  exit /b 0
+)
+"%GIT%" push
+set "ERR=%ERRORLEVEL%"
+if not "%ERR%"=="0" (
+  echo.
+  echo Push failed with exit code %ERR%.
 )
 pause
 exit /b %ERR%
