@@ -1,9 +1,9 @@
-# Dependencies
+# Dependencies (Android Capacitor wrapper)
 node_modules/
-frontend/node_modules/
 
-# React build output
-frontend/build/
+# Per-app release staging
+release/*.apk
+release/*.aab
 
 # Python
 backend/.venv/

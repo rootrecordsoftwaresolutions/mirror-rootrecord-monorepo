@@ -9,15 +9,14 @@
 const fs = require("fs");
 const path = require("path");
 
-const frontendRoot = path.join(__dirname, "..");
-const repoRoot = path.join(frontendRoot, "..");
-const { version } = require(path.join(frontendRoot, "package.json"));
+const appRoot = path.join(__dirname, "..");
+const { version } = require(path.join(appRoot, "package.json"));
 
-const releaseApkDir = path.join(frontendRoot, "android/app/build/outputs/apk/release");
-const aabSrc = path.join(frontendRoot, "android/app/build/outputs/bundle/release/app-release.aab");
+const releaseApkDir = path.join(appRoot, "android/app/build/outputs/apk/release");
+const aabSrc = path.join(appRoot, "android/app/build/outputs/bundle/release/app-release.aab");
 
-const apkDest = path.join(repoRoot, `rootrecord-business-manager-mobile-${version}-release.apk`);
-const aabDest = path.join(repoRoot, `rootrecord-business-manager-mobile-${version}-release.aab`);
+const apkDest = path.join(appRoot, `rootrecord-business-manager-mobile-${version}-release.apk`);
+const aabDest = path.join(appRoot, `rootrecord-business-manager-mobile-${version}-release.aab`);
 
 function resolveReleaseApkSrc() {
   const candidates = [

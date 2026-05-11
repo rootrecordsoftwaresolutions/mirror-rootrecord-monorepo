@@ -1,6 +1,6 @@
 packages:
-  - "weather-manager-mobile/frontend"
-  - "business-manager-app/frontend"
-  - "account-hub-app/frontend"
-  - "token-manager-app/frontend"
+  - "weather-manager-mobile"
+  - "business-manager-app"
+  - "account-hub-app"
+  - "token-manager-app"
   - "apps/*"

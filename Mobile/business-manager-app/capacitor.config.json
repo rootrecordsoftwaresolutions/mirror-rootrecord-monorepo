@@ -1,7 +1,7 @@
 {
   "appId": "com.rootrecord.businessmanager",
   "appName": "Business Manager",
-  "webDir": "build",
+  "webDir": "../../Web/apps/business-manager-web/build",
   "server": {
     "androidScheme": "https"
   }

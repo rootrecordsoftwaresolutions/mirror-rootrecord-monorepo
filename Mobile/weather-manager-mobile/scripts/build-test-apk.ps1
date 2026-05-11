@@ -1,11 +1,12 @@
 $ErrorActionPreference = "Stop"
 
-$frontendRoot = Split-Path -Parent $PSScriptRoot
-$androidRoot = Join-Path $frontendRoot "android"
-$releaseDir = Join-Path $frontendRoot "release"
-$apkPath = Join-Path $androidRoot "app\\build\\outputs\\apk\\release\\RootRecord-Weather-release.apk"
-$keystorePropsPath = Join-Path $androidRoot "app\\keystore\\keystore.properties"
-$googleServicesPath = Join-Path $androidRoot "app\\google-services.json"
+$appRoot     = Split-Path -Parent $PSScriptRoot
+$webRoot     = Resolve-Path (Join-Path $appRoot "..\..\Web\apps\weather-manager-web")
+$androidRoot = Join-Path $appRoot "android"
+$releaseDir  = Join-Path $appRoot "release"
+$apkPath     = Join-Path $androidRoot "app\build\outputs\apk\release\RootRecord-Weather-release.apk"
+$keystorePropsPath  = Join-Path $androidRoot "app\keystore\keystore.properties"
+$googleServicesPath = Join-Path $androidRoot "app\google-services.json"
 
 Write-Host "Preparing test APK (release build; uninstall old app first)..." -ForegroundColor Cyan
 
@@ -16,19 +17,28 @@ if (-not (Test-Path -LiteralPath $googleServicesPath)) {
   throw "Missing Firebase config: $googleServicesPath"
 }
 
-Push-Location $frontendRoot
+Write-Host "Step 1/3: Building web assets at $webRoot ..." -ForegroundColor Yellow
+Push-Location $webRoot
 try {
-  Write-Host "Step 1/3: Building web assets..." -ForegroundColor Yellow
   if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+    pnpm install
     pnpm run build
   } else {
+    npm install --legacy-peer-deps
     npm run build
   }
+} finally {
+  Pop-Location
+}
 
+Push-Location $appRoot
+try {
   Write-Host "Step 2/3: Syncing Capacitor Android project..." -ForegroundColor Yellow
   if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+    pnpm install
     pnpm exec cap sync android
   } else {
+    npm install
     npx cap sync android
   }
 
@@ -57,4 +67,3 @@ try {
 } finally {
   Pop-Location
 }
-

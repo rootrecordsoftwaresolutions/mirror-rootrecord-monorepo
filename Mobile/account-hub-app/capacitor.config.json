@@ -1,7 +1,7 @@
 {
   "appId": "com.rootrecord.accounthub",
   "appName": "Account Hub",
-  "webDir": "build",
+  "webDir": "../../Web/apps/account-hub-web/build",
   "server": {
     "androidScheme": "https"
   }

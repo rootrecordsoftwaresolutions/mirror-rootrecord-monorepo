@@ -7,7 +7,8 @@ alwaysApply: true
 
 - **Canonical output root:** inside `MonoRepo/Mobile/`, directory **`builds/`** (alongside `scripts/`, `token-manager-app/`, etc.).
 - **Per-app subfolders (fixed names):** `token-manager`, `account-hub`, `business-manager`, `weather-manager`
-- **Automation:** run `Mobile/scripts/build-all-release-to-builds.ps1` from `MonoRepo/` (or `scripts/build-all-release-to-builds.ps1` from `MonoRepo/Mobile/`) — web production build, `npx cap sync android`, then `gradlew bundleRelease assembleRelease`, then copy one release APK + one AAB into the subfolder as `RootRecord-<Product>-<version>.apk` / `.aab`
-- **Gradle defaults** still live under each app’s `frontend/android/app/build/outputs/{apk,bundle}/release/`. Treat **`builds/`** (Mobile repo root) as the shared staging area for “all apps built here,” docs, and handoff to testers or Play upload prep—not ad hoc paths under `frontend/release/` unless an app-specific script explicitly documents both.
+- **Automation:** run `Mobile/scripts/build-all-release-to-builds.ps1` from `MonoRepo/` (or `scripts/build-all-release-to-builds.ps1` from `MonoRepo/Mobile/`) — builds the web app at `Web/apps/<name>-web/` first, then `pnpm exec cap sync android` and `gradlew bundleRelease assembleRelease` from `Mobile/<app>/`, then copies one release APK + one AAB into the subfolder as `RootRecord-<Product>-<version>.apk` / `.aab`
+- **Gradle defaults** live under `Mobile/<app>/android/app/build/outputs/{apk,bundle}/release/`. Treat **`builds/`** (Mobile repo root) as the shared staging area for “all apps built here,” docs, and handoff to testers or Play upload prep.
+- **Web source is no longer under `Mobile/<app>/frontend/`.** Each web app lives at `Web/apps/<name>-web/`. `Mobile/<app>/capacitor.config.json` has `webDir: "../../Web/apps/<name>-web/build"` so `cap sync` reads the web build from the new location.
 
 When telling someone where release binaries are, default to **`builds/<subfolder>/`** first (Mobile repo root). Human-readable doc: **`Mobile/docs/RELEASE-BUILD-OUTPUTS.md`**.

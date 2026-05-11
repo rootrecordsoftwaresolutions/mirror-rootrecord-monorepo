@@ -1,5 +1,5 @@
 {
-  "name": "rootrecord-business-manager-mobile",
+  "name": "rootrecord-business-web",
   "version": "1.10",
   "private": true,
   "homepage": ".",
@@ -42,15 +42,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "cap:sync": "npm run build && npx cap sync",
-    "android:open": "npx cap open android",
-    "android:build": "npm run build && npx cap sync android",
-    "android:copy-artifacts": "node scripts/copy-android-artifacts.js",
-    "android:apk": "npm run build && npx cap sync android && cd android && .\\gradlew.bat clean assembleRelease && cd .. && node scripts/copy-android-artifacts.js apk",
-    "android:bundle:release": "npm run build && npx cap sync android && cd android && .\\gradlew.bat bundleRelease && cd .. && node scripts/copy-android-artifacts.js aab",
-    "android:apk-and-bundle": "npm run build && npx cap sync android && cd android && .\\gradlew.bat clean assembleRelease bundleRelease && cd .. && node scripts/copy-android-artifacts.js all",
-    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web",
-    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web -SkipBuild"
+    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web",
+    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-business-web -SkipBuild"
   },
   "eslintConfig": {
     "extends": [
@@ -75,7 +68,6 @@
   "devDependencies": {
     "ajv": "8.12.0",
     "typescript": "4.9.5",
-    "@capacitor/cli": "^6.2.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",

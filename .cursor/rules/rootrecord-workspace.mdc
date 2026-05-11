@@ -26,6 +26,7 @@ alwaysApply: true
 
 - **Commits:** Only the user runs local commit commands (e.g. repo-root `commit-all.bat`). The assistant edits files and may suggest a commit message; it does **not** run commits unless the user explicitly asks for a one-off exception.
 - **Cloudflare updates:** Only the user runs `cloudflare-update-all.bat` (and any related “deploy all” scripts). The assistant may update the `.bat` / `.ps1` files, but does not execute deploys.
+- **`rootrecord-primary` is being phased out**: do **not** add it back to `cloudflare-update-all.bat` and do **not** run `wrangler deploy` against it. New work goes in the `rootrecord-api-*` shards. The shard `deploy.ps1` scripts may still read shared secret helper files (`.deploy-jwt`, `.deploy-internal-wallet-key`) from `Web\cloudflare\rootrecord-primary\` during migration; that is read-only and intentional.
 - **Pushes / `gh` / remotes:** The assistant does **not** run `git push`, force-push, or `gh repo`/auth flows by default — they burn context. The user pushes when ready. If a task truly requires remote operations, the user must say so explicitly.
 
 ## Source-of-truth locations
@@ -33,6 +34,8 @@ alwaysApply: true
 - **Production API:** per-product Workers `rootrecord-api-weather`, `rootrecord-api-business`, `rootrecord-api-account`, `rootrecord-api-token`, `rootrecord-api-kilauea` (see `Web/cloudflare/API-SHARDS.md`). Prefer **`https://rootrecord-api-<product>.rootrecord.workers.dev`** or a **`*.rootrecord.info`** custom domain on each. **`api.rootrecord.info`** may still map to **`rootrecord-primary`** during migration — treat **`Web/cloudflare/rootrecord-primary`** as **legacy** for new features; implement in **`rootrecord-api-*`** and keep copies aligned until primary is retired.
 - Marketing site: `Web/main/` (Cloudflare Pages `rootrecord-website`).
 - App build request Worker: `Web/cloudflare/rootrecord-app-build` (Worker name `rootrecord-app-build`; marketing form POST `/api/app-build-request` on Pages proxies to this Worker).
+- **Product web apps (Cloudflare Pages):** `Web/apps/<name>-web/` — `weather-manager-web`, `business-manager-web`, `account-hub-web`, `token-manager-web`, `kilauea-alerts-web`. Each is a standalone pnpm project with its own `pages:deploy` script. Web app source **does not** live under `Mobile/` anymore.
+- **Android (Capacitor) wrappers:** `Mobile/<app>/` (`weather-manager-mobile`, `business-manager-app`, `account-hub-app`, `token-manager-app`). Each holds `capacitor.config.json`, `android/`, and the `cap:sync` / `android:*` scripts. `webDir` in each `capacitor.config.json` points back at the matching `Web/apps/<name>-web/build/` output. There is **no** `Mobile/<app>/frontend/` directory.
 - **Solana Tools Next.js app (public site):** `solana-rootrecord-site/` at this monorepo root. Treat this directory as the canonical source for `solana.rootrecord.info`.
 
 ### Solana Tools — agents
@@ -43,8 +46,9 @@ alwaysApply: true
 
 ## Build expectations
 
-- **Release APK/AAB staging (all apps):** `Mobile/builds/<token-manager|account-hub|business-manager|weather-manager>/` — see `Mobile/docs/RELEASE-BUILD-OUTPUTS.md` and `Mobile/scripts/build-all-release-to-builds.ps1`.
-- Use `pnpm` in Mobile repo.
+- **Release APK/AAB staging (all apps):** `Mobile/builds/<token-manager|account-hub|business-manager|weather-manager>/` — see `Mobile/docs/RELEASE-BUILD-OUTPUTS.md` and `Mobile/scripts/build-all-release-to-builds.ps1`. The release script builds the web app at `Web/apps/<name>-web/` first, then `cap sync` + Gradle from `Mobile/<app>/`.
+- **Pages deploy (web apps):** run `pnpm install && pnpm run pages:deploy` inside `Web/apps/<name>-web/`, or run repo-root `cloudflare-update-pages.bat`. Never invoke web/Pages tooling from `Mobile/`.
+- Use `pnpm` in `Mobile/` (Android wrappers) and in each `Web/apps/<name>-web/` project independently.
 - Use `npm ci` for Cloudflare Workers; for the Solana site use `pnpm` in `solana-rootrecord-site/`.
 - If something fails, capture the exact command + error output and fix root cause (don’t “work around” by skipping checks).
 
@@ -58,5 +62,8 @@ alwaysApply: true
 - **Default terse.** Prefer short answers; skip preamble, moralizing, and “here’s what you already know.”
 - **No repetition:** do not restate the user’s facts back to them, re-summarize prior turns, or replay deploy/push steps unless they explicitly ask for a recap or log.
 - **Net-new only:** each message should add something they don’t already have (a decision, a diff, a command result, a risk). If the only honest reply is “acknowledged,” say that in one line.
+- **Done/fixed lists, not essays.** Default answer shape is a short bullet list of what changed. Do **not** explain the why/how of each change unless the user asks (“why?”, “explain”, “root cause?”). No diagnostic paragraphs, no “root cause” sections, no “what I did vs what I did not” recaps.
+- **No verification tables / wiring matrices** in the default response. Just say “verified” and list anomalies, if any.
+- **Code references only when actionable.** Avoid pasting code, file contents, or tool output unless the user asked for it or it’s a 1–3 line diff they need to see.
 - **Context cost:** avoid long bullet lists, duplicate headings, and quoting large tool output; link paths instead of pasting blocks when possible.
 - **Promises vs proof:** don’t claim on-chain outcomes, payouts, or production state without verifiable artifacts (signatures, stats fields, explorer)—otherwise say unknown / not verified.

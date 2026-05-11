@@ -1,10 +1,11 @@
 $ErrorActionPreference = "Stop"
 
-$frontendRoot = Split-Path -Parent $PSScriptRoot
-$androidRoot = Join-Path $frontendRoot "android"
-$releaseDir = Join-Path $frontendRoot "release"
-$bundlePath = Join-Path $androidRoot "app\build\outputs\bundle\release\app-release.aab"
-$keystorePropsPath = Join-Path $androidRoot "app\keystore\keystore.properties"
+$appRoot     = Split-Path -Parent $PSScriptRoot
+$webRoot     = Resolve-Path (Join-Path $appRoot "..\..\Web\apps\weather-manager-web")
+$androidRoot = Join-Path $appRoot "android"
+$releaseDir  = Join-Path $appRoot "release"
+$bundlePath  = Join-Path $androidRoot "app\build\outputs\bundle\release\app-release.aab"
+$keystorePropsPath  = Join-Path $androidRoot "app\keystore\keystore.properties"
 $googleServicesPath = Join-Path $androidRoot "app\google-services.json"
 
 Write-Host "Preparing Google Play upload bundle..." -ForegroundColor Cyan
@@ -16,19 +17,28 @@ if (-not (Test-Path -LiteralPath $googleServicesPath)) {
   throw "Missing Firebase config: $googleServicesPath"
 }
 
-Push-Location $frontendRoot
+Write-Host "Step 1/3: Building web assets at $webRoot ..." -ForegroundColor Yellow
+Push-Location $webRoot
 try {
-  Write-Host "Step 1/3: Building web assets..." -ForegroundColor Yellow
   if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+    pnpm install
     pnpm run build
   } else {
+    npm install --legacy-peer-deps
     npm run build
   }
+} finally {
+  Pop-Location
+}
 
+Push-Location $appRoot
+try {
   Write-Host "Step 2/3: Syncing Capacitor Android project..." -ForegroundColor Yellow
   if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+    pnpm install
     pnpm exec cap sync android
   } else {
+    npm install
     npx cap sync android
   }
 
@@ -45,7 +55,7 @@ try {
   }
 
   New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
-  $pkg = Get-Content -LiteralPath (Join-Path $frontendRoot "package.json") -Raw | ConvertFrom-Json
+  $pkg = Get-Content -LiteralPath (Join-Path $appRoot "package.json") -Raw | ConvertFrom-Json
   $ver = [string]$pkg.version
   if (-not $ver) { $ver = "0.0.0" }
   $stamp = Get-Date -Format "yyyyMMdd-HHmm"

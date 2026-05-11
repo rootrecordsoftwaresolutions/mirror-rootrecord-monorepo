@@ -1,7 +1,7 @@
 @echo off
 setlocal
 set "STUDIO=C:\Program Files\Android\Android Studio\bin\studio64.exe"
-set "PROJ=%~dp0frontend\android"
+set "PROJ=%~dp0android"
 if not exist "%STUDIO%" (
   echo Android Studio not found at:
   echo   %STUDIO%

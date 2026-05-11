@@ -1,18 +1,20 @@
 {
-  "name": "rr-weather-manager-mobile",
+  "name": "rootrecord-weather-android",
+  "version": "1.0.27",
   "private": true,
-  "description": "Root Record Weather Manager — mobile client (React) and optional local API (Python).",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/RootRecord/rootrecord-weather-manager-mobile.git"
-  },
+  "description": "Android (Capacitor) wrapper for the Weather Manager web app. Web source lives at Web/apps/weather-manager-web.",
   "scripts": {
-    "changelog:stamp": "node scripts/changelog-stamp.mjs",
-    "start": "pnpm -C \"..\" --filter rrweather-mobile start",
-    "build": "pnpm -C \"..\" --filter rrweather-mobile run build",
-    "test": "pnpm -C \"..\" --filter rrweather-mobile test",
-    "install:frontend": "pnpm -C \"..\" install",
-    "ci:frontend": "pnpm -C \"..\" install --frozen-lockfile",
-    "install:frontend:verbose": "powershell -NoProfile -ExecutionPolicy Bypass -File \"frontend/scripts/npm-install-with-progress.ps1\""
+    "build:web": "pnpm -C ../../Web/apps/weather-manager-web run build",
+    "cap:sync": "pnpm run build:web && pnpm exec cap sync",
+    "android:open": "pnpm exec cap open android",
+    "android:build": "pnpm run cap:sync",
+    "android:assemble": "pnpm exec cap sync android && cd android && .\\gradlew.bat assembleDebug",
+    "android:play:ready": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-play-release.ps1",
+    "android:apk:test": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-test-apk.ps1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
   }
 }

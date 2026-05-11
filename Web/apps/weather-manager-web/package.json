@@ -1,5 +1,5 @@
 {
-  "name": "rrweather-mobile",
+  "name": "rootrecord-weather-web",
   "version": "1.0.27",
   "private": true,
   "homepage": ".",
@@ -32,14 +32,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "cap:sync": "pnpm run build && pnpm exec cap sync",
-    "android:open": "pnpm exec cap open android",
-    "android:build": "pnpm run build && pnpm exec cap sync android",
-    "android:assemble": "pnpm exec cap sync android && cd android && .\\gradlew.bat assembleDebug",
-    "android:play:ready": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-play-release.ps1",
-    "android:apk:test": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-test-apk.ps1",
-    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web",
-    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../../Web/scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web -SkipBuild"
+    "pages:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web",
+    "pages:deploy:only": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/deploy-product-web-to-pages.ps1 -ProjectName rootrecord-weather-web -SkipBuild"
   },
   "eslintConfig": {
     "extends": [
@@ -64,7 +58,6 @@
   "devDependencies": {
     "ajv": "8.12.0",
     "typescript": "4.9.5",
-    "@capacitor/cli": "^6.2.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",

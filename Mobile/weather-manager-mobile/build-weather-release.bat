@@ -2,18 +2,18 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 rem RootRecord Weather — build signed release APK + Play bundle (AAB).
-rem Run from anywhere; paths are relative to this script's folder.
-set "ROOT=%~dp0"
-set "FRONTEND=%ROOT%frontend"
-set "ANDROID=%FRONTEND%\android"
+rem Web source lives at ..\..\Web\apps\weather-manager-web ; this app dir holds capacitor.config.json + android\.
+set "APP=%~dp0"
+set "WEB=%APP%..\..\Web\apps\weather-manager-web"
+set "ANDROID=%APP%android"
 set "KEYSTORE=%ANDROID%\app\keystore\keystore.properties"
 set "GJSON=%ANDROID%\app\google-services.json"
-set "RELEASE_DIR=%FRONTEND%\release"
+set "RELEASE_DIR=%APP%release"
 set "APK_SRC=%ANDROID%\app\build\outputs\apk\release\RootRecord-Weather-release.apk"
 set "BUNDLE_SRC=%ANDROID%\app\build\outputs\bundle\release\app-release.aab"
 
-if not exist "%FRONTEND%\package.json" (
-  echo ERROR: frontend not found at "%FRONTEND%"
+if not exist "%WEB%\package.json" (
+  echo ERROR: web source not found at "%WEB%"
   exit /b 1
 )
 if not exist "%KEYSTORE%" (
@@ -33,12 +33,18 @@ if errorlevel 1 (
   exit /b 1
 )
 
-pushd "%FRONTEND%" || exit /b 1
+pushd "%WEB%" || exit /b 1
 echo [1/4] Building web assets...
+call pnpm install
+if errorlevel 1 goto :fail
 call pnpm run build
 if errorlevel 1 goto :fail
+popd
 
+pushd "%APP%" || exit /b 1
 echo [2/4] Syncing Capacitor Android...
+call pnpm install
+if errorlevel 1 goto :fail
 call pnpm exec cap sync android
 if errorlevel 1 goto :fail
 
@@ -46,7 +52,6 @@ pushd "%ANDROID%" || goto :fail
 echo [3/4] Gradle: assembleRelease + bundleRelease...
 call gradlew.bat assembleRelease bundleRelease
 if errorlevel 1 goto :fail_pop2
-
 popd
 popd
 
@@ -63,7 +68,7 @@ if not exist "%BUNDLE_SRC%" (
 
 if not exist "%RELEASE_DIR%" mkdir "%RELEASE_DIR%"
 
-for /f "usebackq delims=" %%V in (`powershell -NoProfile -Command "(Get-Content -LiteralPath '%FRONTEND%\package.json' -Raw ^| ConvertFrom-Json).version"`) do set "VER=%%V"
+for /f "usebackq delims=" %%V in (`powershell -NoProfile -Command "(Get-Content -LiteralPath '%APP%package.json' -Raw ^| ConvertFrom-Json).version"`) do set "VER=%%V"
 if not defined VER set "VER=0.0.0"
 for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmm"`) do set "STAMP=%%T"
 

@@ -1,0 +1,19 @@
+{
+  "name": "rootrecord-token-android",
+  "version": "0.1.2",
+  "private": true,
+  "description": "Android (Capacitor) wrapper for the Token Manager web app. Web source lives at Web/apps/token-manager-web.",
+  "scripts": {
+    "build:web": "pnpm -C ../../Web/apps/token-manager-web run build",
+    "cap:sync": "pnpm run build:web && pnpm exec cap sync",
+    "cap:init:android": "pnpm exec cap add android",
+    "android:open": "pnpm exec cap open android",
+    "android:build": "pnpm run cap:sync",
+    "android:assemble:debug": "pnpm run cap:sync && cd android && ./gradlew assembleDebug"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  }
+}

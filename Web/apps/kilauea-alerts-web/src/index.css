@@ -92,27 +92,15 @@ a:hover {
   padding: 1.25rem clamp(1rem, 2.5vw, 1.75rem);
 }
 
-@media (min-width: 900px) {
-  .site-header-inner {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    /* Avoid a wide “dead band” between brand and toolbar (`space-between` looked like a broken empty main). */
-    justify-content: flex-start;
-    column-gap: 1.25rem;
-  }
-  .site-header-inner .brand-block {
-    flex: 1 1 240px;
-    min-width: 0;
-    padding-right: 0;
-  }
-  .site-header-inner .toolbar {
-    flex: 0 1 420px;
-    margin-top: 0;
-    margin-left: auto;
-    min-width: 0;
-    max-width: min(100%, 420px);
-  }
+/* Header is always stacked: brand on top, toolbar full-width below. The earlier two-column
+   layout collapsed `.brand-block` to its `min-width: 0` because `.toolbar` has wide intrinsic
+   content (location select + email + two buttons) and `margin-left: auto`, which squeezed the
+   intro paragraph to ~40px wide and wrapped one word per line. */
+.site-header-inner .brand-block {
+  min-width: 0;
+}
+.site-header-inner .toolbar {
+  width: 100%;
 }
 
 .brand-kicker {

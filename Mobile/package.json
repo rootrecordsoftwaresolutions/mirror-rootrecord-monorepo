@@ -1,19 +1,13 @@
 {
   "name": "rootrecord-mobile-workspace",
   "private": true,
-  "description": "Root workspace for Root Record mobile apps: shared tooling via pnpm; add new apps under apps/ and list them in pnpm-workspace.yaml.",
+  "description": "Android (Capacitor) workspaces for Root Record apps. Web sources live under ../Web/apps/* and are not part of this workspace.",
   "scripts": {
     "install:all": "pnpm install",
-    "weather:start": "pnpm --filter rrweather-mobile start",
-    "weather:build": "pnpm --filter rrweather-mobile run build",
-    "weather:test": "pnpm --filter rrweather-mobile test",
-    "business:start": "pnpm --filter rootrecord-business-manager-mobile start",
-    "business:build": "pnpm --filter rootrecord-business-manager-mobile run build",
-    "pages:deploy:weather": "pnpm --filter rrweather-mobile run pages:deploy",
-    "pages:deploy:business": "pnpm --filter rootrecord-business-manager-mobile run pages:deploy",
-    "pages:deploy:account": "pnpm --filter rootrecord-account-hub-mobile run pages:deploy",
-    "pages:deploy:token": "pnpm --filter rootrecord-token-manager-mobile run pages:deploy",
-    "pages:deploy:kilauea": "pnpm -C ../Web/apps/kilauea-alerts-web run pages:deploy"
+    "weather:android:build": "pnpm --filter rootrecord-weather-android run android:build",
+    "business:android:build": "pnpm --filter rootrecord-business-android run android:build",
+    "account:android:build": "pnpm --filter rootrecord-account-android run android:build",
+    "token:android:build": "pnpm --filter rootrecord-token-android run android:build"
   },
   "packageManager": "pnpm@10.18.3",
   "engines": {

@@ -36,9 +36,9 @@ credentials.json
 # Staged release APK/AAB copies (see docs/RELEASE-BUILD-OUTPUTS.md)
 /builds/**/*.apk
 /builds/**/*.aab
-# Legacy in-app release/ trees (use Mobile/builds/ per docs)
-**/frontend/release/*.aab
-**/frontend/release/*.apk
+# Per-app release/ trees (use Mobile/builds/ for shared staging)
+**/release/*.aab
+**/release/*.apk
 
 # Never commit GitHub recovery codes or local photos dropped in app folders
 **/github-recovery-codes.txt

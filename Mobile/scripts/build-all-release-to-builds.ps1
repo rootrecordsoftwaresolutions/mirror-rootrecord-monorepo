@@ -1,9 +1,11 @@
 # Build web + Capacitor Android release APK/AAB for each RootRecord app and copy into Mobile\builds\<subfolder>.
+# Web source lives under Web\apps\<name>-web (isolated from Mobile). Android wrapper lives under Mobile\<app>\.
 # Canonical staging layout — documented in Mobile/docs/RELEASE-BUILD-OUTPUTS.md and .cursor/rules/mobile-build-outputs.mdc
 # Requires: Node, JDK, Android SDK (ANDROID_HOME), and per-app signing where configured (Weather/BM keystore).
 param(
     [string]$MobileRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
-    [string]$OutRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")).Path "builds")
+    [string]$RepoRoot   = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
+    [string]$OutRoot    = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")).Path "builds")
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,14 +17,14 @@ $env:GENERATE_SOURCEMAP = "false"
 function Copy-BuildArtifacts {
     param(
         [string]$Subfolder,
-        [string]$FrontendDir,
+        [string]$AppDir,
         [string]$BaseName,
         [string]$Version
     )
     $dest = Join-Path $OutRoot $Subfolder
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    $apkDir = Join-Path $FrontendDir "android\app\build\outputs\apk\release"
-    $aabDir = Join-Path $FrontendDir "android\app\build\outputs\bundle\release"
+    $apkDir = Join-Path $AppDir "android\app\build\outputs\apk\release"
+    $aabDir = Join-Path $AppDir "android\app\build\outputs\bundle\release"
     $apk = Get-ChildItem -LiteralPath $apkDir -Filter "*.apk" -ErrorAction SilentlyContinue | Select-Object -First 1
     $aab = Get-ChildItem -LiteralPath $aabDir -Filter "*.aab" -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $apk) { throw "No APK in $apkDir" }
@@ -35,38 +37,39 @@ function Copy-BuildArtifacts {
 function Invoke-OneApp {
     param(
         [string]$Subfolder,
-        [string]$FrontendRel,
+        [string]$WebRel,     # relative to RepoRoot, e.g. "Web\apps\weather-manager-web"
+        [string]$AppRel,     # relative to MobileRoot, e.g. "weather-manager-mobile"
         [string]$BaseName,
-        [string]$Version,
-        [switch]$UseYarn
+        [string]$Version
     )
-    $fe = Join-Path $MobileRoot $FrontendRel
-    if (-not (Test-Path -LiteralPath $fe)) { throw "Missing frontend dir: $fe" }
+    $web = Join-Path $RepoRoot $WebRel
+    $app = Join-Path $MobileRoot $AppRel
+    if (-not (Test-Path -LiteralPath $web)) { throw "Missing web dir: $web" }
+    if (-not (Test-Path -LiteralPath $app)) { throw "Missing app dir: $app" }
     Write-Host "`n========== $Subfolder ($Version) ==========" -ForegroundColor Cyan
-    Push-Location $fe
+
+    # 1) Build the web app
+    Push-Location $web
     try {
-        if ($UseYarn -and (Get-Command yarn -ErrorAction SilentlyContinue)) {
-            yarn install
-            if ($LASTEXITCODE -ne 0) { throw "yarn install failed" }
-            yarn build
-        }
-        else {
-            # --legacy-peer-deps: Solana deps pull TS 5+ while react-scripts 5 expects TS4 peerOptional (token-manager, etc.).
-            if (Test-Path "package-lock.json") {
-                npm ci --legacy-peer-deps
-            }
-            else {
-                npm install --legacy-peer-deps
-            }
-            if ($LASTEXITCODE -ne 0) { throw "npm install/ci failed" }
-            npm run build
-        }
-        if ($LASTEXITCODE -ne 0) { throw "frontend build failed" }
+        pnpm install
+        if ($LASTEXITCODE -ne 0) { throw "pnpm install (web) failed in $web" }
+        pnpm run build
+        if ($LASTEXITCODE -ne 0) { throw "web build failed in $web" }
+    }
+    finally {
+        Pop-Location
+    }
 
-        npx cap sync android
-        if ($LASTEXITCODE -ne 0) { throw "cap sync android failed" }
+    # 2) Cap sync from the Mobile app dir (capacitor.config.json webDir points at the web build)
+    Push-Location $app
+    try {
+        pnpm install
+        if ($LASTEXITCODE -ne 0) { throw "pnpm install (android) failed in $app" }
+        pnpm exec cap sync android
+        if ($LASTEXITCODE -ne 0) { throw "cap sync android failed in $app" }
 
-        $androidDir = Join-Path $fe "android"
+        # 3) Gradle release build
+        $androidDir = Join-Path $app "android"
         Push-Location $androidDir
         try {
             & .\gradlew.bat bundleRelease assembleRelease --no-daemon
@@ -76,7 +79,7 @@ function Invoke-OneApp {
             Pop-Location
         }
 
-        Copy-BuildArtifacts -Subfolder $Subfolder -FrontendDir $fe -BaseName $BaseName -Version $Version
+        Copy-BuildArtifacts -Subfolder $Subfolder -AppDir $app -BaseName $BaseName -Version $Version
     }
     finally {
         Pop-Location
@@ -84,10 +87,10 @@ function Invoke-OneApp {
 }
 
 # Order: smaller apps first (faster feedback), Weather last (Firebase + signing heavier).
-Invoke-OneApp -Subfolder "token-manager" -FrontendRel "token-manager-app\frontend" -BaseName "RootRecord-TokenManager" -Version "0.1.1"
-Invoke-OneApp -Subfolder "account-hub" -FrontendRel "account-hub-app\frontend" -BaseName "RootRecord-AccountHub" -Version "0.1.2"
-Invoke-OneApp -Subfolder "business-manager" -FrontendRel "business-manager-app\frontend" -BaseName "RootRecord-BusinessManager" -Version "1.09"
-Invoke-OneApp -Subfolder "weather-manager" -FrontendRel "weather-manager-mobile\frontend" -BaseName "RootRecord-WeatherManager" -Version "1.0.19"
+Invoke-OneApp -Subfolder "token-manager"    -WebRel "Web\apps\token-manager-web"    -AppRel "token-manager-app"      -BaseName "RootRecord-TokenManager"    -Version "0.1.1"
+Invoke-OneApp -Subfolder "account-hub"      -WebRel "Web\apps\account-hub-web"      -AppRel "account-hub-app"        -BaseName "RootRecord-AccountHub"      -Version "0.1.2"
+Invoke-OneApp -Subfolder "business-manager" -WebRel "Web\apps\business-manager-web" -AppRel "business-manager-app"   -BaseName "RootRecord-BusinessManager" -Version "1.09"
+Invoke-OneApp -Subfolder "weather-manager"  -WebRel "Web\apps\weather-manager-web"  -AppRel "weather-manager-mobile" -BaseName "RootRecord-WeatherManager"  -Version "1.0.19"
 
 function Invoke-KilaueaAlertsNative {
     param(

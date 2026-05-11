@@ -9,7 +9,7 @@ module.exports = {
         mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
       },
       colors: {
-        /* Aligned with Weather Manager web (`weather-manager-mobile/frontend/tailwind.config.js`). */
+        /* Aligned with Weather Manager web (`Web/apps/weather-manager-web/tailwind.config.js`). */
         bg: { base: "#060d14", surface: "#0c1824", elevated: "#122a3d" },
         ink: {
           primary: "#e8f4ef",

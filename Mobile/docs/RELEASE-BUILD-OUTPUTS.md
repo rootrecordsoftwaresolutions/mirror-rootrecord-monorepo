@@ -16,13 +16,13 @@ On a typical dev PC the absolute path matches your clone, for example:
 
 ## Per-app subfolders
 
-| Subfolder | App source |
-|-----------|------------|
-| `token-manager/` | `token-manager-app/frontend/` |
-| `account-hub/` | `account-hub-app/frontend/` |
-| `business-manager/` | `business-manager-app/frontend/` |
-| `weather-manager/` | `weather-manager-mobile/frontend/` |
-| `kilauea-alerts/` | `kilauea-alerts-android/` (native Kotlin / Gradle at repo root of that folder) |
+| Subfolder | Web source (CRA) | Android wrapper (Capacitor) |
+|-----------|------------------|-----------------------------|
+| `token-manager/` | `Web/apps/token-manager-web/` | `Mobile/token-manager-app/` |
+| `account-hub/` | `Web/apps/account-hub-web/` | `Mobile/account-hub-app/` |
+| `business-manager/` | `Web/apps/business-manager-web/` | `Mobile/business-manager-app/` |
+| `weather-manager/` | `Web/apps/weather-manager-web/` | `Mobile/weather-manager-mobile/` |
+| `kilauea-alerts/` | n/a (native) | `Mobile/kilauea-alerts-android/` (native Kotlin / Gradle) |
 
 Filenames follow the pattern **`RootRecord-<Product>-<version>.apk`** and **`.aab`** (version from each app’s `package.json` / Android `versionName` used by the build script).
 
@@ -40,16 +40,16 @@ From the monorepo root (`MonoRepo/`):
 powershell -NoProfile -ExecutionPolicy Bypass -File "Mobile/scripts/build-all-release-to-builds.ps1"
 ```
 
-The script runs, per app: install (`npm ci` or `npm install` with legacy peer deps where needed), `npm run build`, `npx cap sync android`, then `android\gradlew.bat bundleRelease assembleRelease`, then copies the first matching APK and AAB from Gradle’s `outputs` into the subfolder above.
+The script runs, per app: `pnpm install && pnpm run build` in `Web/apps/<name>-web/`, then `pnpm install && pnpm exec cap sync android` in `Mobile/<app>/`, then `android\gradlew.bat bundleRelease assembleRelease`, then copies the first matching APK and AAB from Gradle’s `outputs` into the subfolder above.
 
 ## Relationship to Gradle output
 
-Gradle still writes under each frontend:
+Gradle writes under each Android wrapper:
 
-- `frontend/android/app/build/outputs/apk/release/*.apk`
-- `frontend/android/app/build/outputs/bundle/release/*.aab`
+- `Mobile/<app>/android/app/build/outputs/apk/release/*.apk`
+- `Mobile/<app>/android/app/build/outputs/bundle/release/*.aab`
 
-**`builds/`** (at Mobile repo root) is the **canonical handoff location** for “everything built” and for documentation; individual apps may also use app-local scripts (for example Weather’s `android:play:ready` copying into `frontend/release/`). When in doubt, use **`builds/<subfolder>/`**.
+**`builds/`** (at Mobile repo root) is the **canonical handoff location** for “everything built” and for documentation; individual apps may also use app-local scripts (for example Weather’s `android:play:ready`). When in doubt, use **`builds/<subfolder>/`**.
 
 ## Signing
 

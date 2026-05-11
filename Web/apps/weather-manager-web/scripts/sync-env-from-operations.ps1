@@ -2,14 +2,17 @@
 # Create (for example):
 #   F:\Root Record Operations\secrets\rr-weather-manager\frontend.env.production
 #   F:\Root Record Operations\secrets\rr-weather-manager\backend.env
-# Put the same contents you would use for frontend/.env.production and backend/.env.
+# Destinations after the Web/Mobile split:
+#   Web\apps\weather-manager-web\.env.production
+#   Mobile\weather-manager-mobile\backend\.env
 $ErrorActionPreference = "Stop"
 $base = "F:\Root Record Operations\secrets\rr-weather-manager"
 $feSrc = Join-Path $base "frontend.env.production"
 $beSrc = Join-Path $base "backend.env"
-$repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$feDst = Join-Path $repo "frontend\.env.production"
-$beDst = Join-Path $repo "backend\.env"
+$webRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
+$feDst = Join-Path $webRoot ".env.production"
+$beDst = Join-Path $repoRoot "Mobile\weather-manager-mobile\backend\.env"
 
 if (-not (Test-Path $base)) {
   Write-Host "Nothing to do: create folder and files:" -ForegroundColor Yellow
