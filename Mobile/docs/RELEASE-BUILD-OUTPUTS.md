@@ -2,7 +2,7 @@
 
 All RootRecord Android apps built from this repository use a **single staging root** for release **APK** and **AAB** copies, so paths stay predictable across machines and docs.
 
-**Repository root** here means the **Mobile** monorepo checkout: the directory that contains `scripts/`, `builds/`, `token-manager-app/`, etc. (In a larger tree such as `Development/Mobile/`, that folder is still the Mobile repo root.)
+`Mobile/` is the app workspace inside this monorepo. In this repository, paths are rooted at `MonoRepo/`.
 
 ## Output root
 
@@ -12,7 +12,7 @@ All RootRecord Android apps built from this repository use a **single staging ro
 
 On a typical dev PC the absolute path matches your clone, for example:
 
-`C:\Users\rrdeveloper\Development\Mobile\builds\`
+`C:\Users\rrdeveloper\MonoRepo\Mobile\builds\`
 
 ## Per-app subfolders
 
@@ -34,7 +34,7 @@ From the **Mobile** repo root (`Mobile/` — the folder that contains `scripts/`
 powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/build-all-release-to-builds.ps1"
 ```
 
-From a parent folder (for example the overall **Development** tree that contains `Mobile/`):
+From the monorepo root (`MonoRepo/`):
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "Mobile/scripts/build-all-release-to-builds.ps1"

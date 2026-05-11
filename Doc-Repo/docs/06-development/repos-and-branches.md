@@ -1,14 +1,14 @@
 # Repositories & branches
 
-## Repositories
+## Repository
 
-| Name | Contents |
+| Path | Contents |
 |------|-----------|
-| Mobile-Development-2026 | All RootRecord Android-first apps in one pnpm workspace |
-| Web-Development-2026 | Workers, Pages, shared worker libraries |
-| RootRecord/solana-rootrecord-site | **Only** shipping Solana Tools Next.js app |
+| `Mobile/` | All RootRecord Android-first apps in one pnpm workspace |
+| `Web/` | Workers, Pages, shared worker libraries |
+| `solana-rootrecord-site/` | Shipping Solana Tools Next.js app source |
 
-## Branch conventions (Mobile)
+## Branch conventions
 
 - **`main`** — canonical branch.
 - **`weather-work`** — feature branch for Weather changes; merge via PR.
@@ -16,9 +16,7 @@
 
 **Do not** recreate historic `app/*` subtree branch experiments.
 
-## Branch conventions (Web)
-
-Follow each repo’s README; Workers often use **`main`** with PRs for risky changes.
+For all areas, use monorepo **`main`** with PRs for risky changes.
 
 ## Commit hygiene
 

@@ -27,9 +27,9 @@ See **`Web/credentials.env.example`** for copy-paste lines.
 ## 3. Deploy wiring (already implemented)
 
 - **Marketing** (`Web/main/pages-deploy.ps1`): copies the site to a **temp folder**, injects the beacon into `*.html` there only (so **tokens never touch tracked files**), then `wrangler pages deploy`.
-- **Product Pages** (`Mobile/scripts/deploy-product-web-to-pages.ps1`): injects into **`build/`** after `pnpm run build` (build output is gitignored).
+- **Product Pages** (`Web/scripts/deploy-product-web-to-pages.ps1`): injects into **`build/`** after `pnpm run build` (build output is gitignored).
 
-Injection script: `Web/scripts/inject-cf-web-analytics.ps1` (duplicate under `Mobile/scripts/` for Mobile-only checkouts).
+Injection script: `Web/scripts/inject-cf-web-analytics.ps1`.
 
 ## 4. Avoid double counting
 

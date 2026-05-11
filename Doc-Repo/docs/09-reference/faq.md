@@ -14,19 +14,19 @@ Some artifacts may appear on GitHub (releases, installers). **Availability varie
 
 ## Where is the Solana app?
 
-**`https://solana.rootrecord.info`**, built from **`RootRecord/solana-rootrecord-site`**.
+**`https://solana.rootrecord.info`**, built from `solana-rootrecord-site/` in this monorepo and synced to GitHub `RootRecord/solana-rootrecord-site`.
 
 ## Do you custody my seed phrase?
 
 **No** for Token Manager / standard wallet flows—those are **non-custodial**. Custodial features, if offered, are **separate** flows with explicit UX.
 
-## Which repo do I clone for mobile?
+## Which folder do I use for mobile?
 
-**Mobile-Development-2026** (pnpm workspace).
+`Mobile/` (pnpm workspace) inside `MonoRepo/`.
 
-## Why are there two git roots?
+## Why is this now one git root?
 
-Historical separation: mobile release cadence and web infra deploy **differ**; forcing one mono-git would couple unrelated permissions and CI.
+To keep pathing, docs, and automation consistent across mobile, web, and workers in a single workspace.
 
 ## How do I report a security issue?
 

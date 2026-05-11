@@ -1,6 +1,6 @@
 # Kilauea Alerts by Root Record
 
-Native **Kotlin + Jetpack Compose** app for Big Island volcano status, earthquakes, weather (via Root Record `GET /api/dashboard`), live feeds, and alerts — with offline cache in the **`kilauea_data`** Room table. A lightweight **web** companion (dashboard bundle + Big Island presets) lives in **`../kilauea-alerts-web/`** and deploys to **`https://kilauea.rootrecord.info`**.
+Native **Kotlin + Jetpack Compose** app for Big Island volcano status, earthquakes, weather (via Root Record `GET /api/dashboard`), live feeds, and alerts — with offline cache in the **`kilauea_data`** Room table. A lightweight **web** companion (dashboard bundle + Big Island presets) lives in **`../../Web/apps/kilauea-alerts-web/`** and deploys to **`https://kilauea.rootrecord.info`**.
 
 ## Build
 

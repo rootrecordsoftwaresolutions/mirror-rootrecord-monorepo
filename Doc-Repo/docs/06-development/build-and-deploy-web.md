@@ -34,7 +34,7 @@ Verify **`/api/site-config`** returns the intended `ROOTRECORD_API_BASE`.
 
 ## Solana Tools site
 
-Not deployed from this repo—use **`RootRecord/solana-rootrecord-site`**.
+Use `solana-rootrecord-site/` at the monorepo root.
 
 ## Related reading
 

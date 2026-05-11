@@ -60,7 +60,7 @@ Stack: React 18, CRA, Capacitor 6. API: https://api.rootrecord.info (where used)
    Play: com.rootrecord.weathermanager
    Maps (Leaflet), push notifications, weather API client.
    Optional FastAPI: Mobile/weather-manager-mobile/backend/
-   Optional Worker: Mobile/weather-manager-mobile/cloudflare/rr-weather-manager-api
+   Optional Worker: Web/cloudflare/rr-weather-manager-api
    From Mobile/: pnpm weather:start | weather:build | weather:test
 
 2) Business Manager
@@ -102,7 +102,7 @@ rootrecord-app-build
   App build request form (Discord); called from the marketing site via Pages Functions.
 
 rr-weather-manager-api
-  Path: Mobile/weather-manager-mobile/cloudflare/rr-weather-manager-api
+  Path: Web/cloudflare/rr-weather-manager-api
   Optional push / user-data Worker (own D1); uses PRIMARY_API_BASE for auth checks.
 
 ================================================================================
@@ -117,7 +117,7 @@ Web/main/functions/ for site-config, API proxy, and app-build-request proxy.
 ================================================================================
 SOLANA TOOLS (NEXT.JS WEB APP)
 ================================================================================
-Path: Web/solana/solanasite
+Path: solana-rootrecord-site
 Package: rootrecord-solana-tools  |  Next.js 14
 Public Solana tools (wallets, token flows, Raydium/Metaplex/Streamflow-related UI).
 Public URL (example): https://solana.rootrecord.info

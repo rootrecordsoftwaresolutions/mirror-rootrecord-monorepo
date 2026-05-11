@@ -14,9 +14,10 @@ Private workspace for RootRecord web stacks: **Cloudflare Workers** (primary API
 | `cloudflare/rootrecord-api-kilauea` | Per-app API shard for Kīlauea Alerts. |
 | `cloudflare/rootrecord-license` | Licence Worker (legacy / companion) |
 | `cloudflare/shared` | Shared TS modules (password verify, billing, app associations, etc.) |
-| `solana/` | **Not** the Solana Tools app source — see `solana/README.md`. The live Next app is only in [RootRecord/solana-rootrecord-site](https://github.com/RootRecord/solana-rootrecord-site). |
+| `solana/` | Solana operational docs/reference notes (`README.md`, `HELE/`), not the app source. |
 | `solana/HELE` | Token / ops notes (`README.md`; local `.env` is gitignored) |
 | `main` | **rootrecord.info** Cloudflare Pages site (static HTML + `functions/`; `wrangler pages deploy`) |
+| `apps/kilauea-alerts-web` | Kilauea Alerts web app (Vite + React) deployed as `rootrecord-kilauea-web` |
 
 Worker source of truth for the primary API is **`cloudflare/rootrecord-primary`**.
 
@@ -25,7 +26,7 @@ Worker source of truth for the primary API is **`cloudflare/rootrecord-primary`*
 ## New machine checklist
 
 1. **Clone** this repo and open the `Web` folder (or your clone root).
-2. **Node.js** ≥ 18 and **npm**; for the Solana **site** clone [solana-rootrecord-site](https://github.com/RootRecord/solana-rootrecord-site) separately and use **pnpm** there.
+2. **Node.js** ≥ 18 and **npm**; for the Solana **site** use **pnpm** in `../solana-rootrecord-site`.
 3. **Cloudflare:** [Wrangler](https://developers.cloudflare.com/workers/wrangler/) — `npx wrangler login` once per machine.
 4. **Secrets:** copy each project’s `.env.example` to `.env` / `.dev.vars` where documented; never commit real secrets. Worker deploy uses `wrangler secret put` for production secrets.
 5. **Deploy credentials:** copy **`credentials.env.example`** → **`credentials.env`** at this repo’s root (or any parent folder of `cloudflare/rootrecord-primary`). Both Worker `deploy.ps1` scripts walk upward until they find `credentials.env`. The real file is gitignored.
@@ -55,9 +56,9 @@ cd cloudflare/shared
 npm ci
 ```
 
-### Solana Tools Next app (separate repo)
+### Solana Tools Next app
 
-Clone **`RootRecord/solana-rootrecord-site`**, then `pnpm install` / `pnpm dev` there. Do not expect a runnable app under `Web/solana/`. See `solana/SOLANA-SITE-CANONICAL-REPO.md`.
+Use the monorepo root directory **`solana-rootrecord-site/`**, then `pnpm install` / `pnpm dev` there.
 
 ### Install & run — marketing site (Pages, `main/`)
 

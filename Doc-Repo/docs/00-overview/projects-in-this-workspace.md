@@ -1,6 +1,6 @@
 # Projects in the RootRecord workspace (snapshot)
 
-This page summarizes what typically lives under **`Development/`** when building RootRecord. Paths mirror the internal workspace rules (`Mobile-Development-2026`, `Web-Development-2026`).
+This page summarizes what lives under **`MonoRepo/`** when building RootRecord.
 
 ## Mobile monorepo (`Mobile/`)
 
@@ -23,7 +23,7 @@ Shared tooling: **`pnpm`**, staged releases under **`builds/`** per app token.
 | `cloudflare/shared/` | Shared Worker TS utilities |
 | `main/` | **rootrecord.info** — Cloudflare Pages static site |
 
-**Not a source tree for shipping Solana Tools Next.js** — that lives in **`RootRecord/solana-rootrecord-site`** only.
+Solana Tools Next.js source is at **`solana-rootrecord-site/`** at the monorepo root.
 
 ## This documentation repo (`Doc-Repo/`)
 

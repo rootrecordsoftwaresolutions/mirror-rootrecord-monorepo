@@ -1,6 +1,6 @@
 # Environment and Git — multi-device checklist
 
-Use this when cloning **`Mobile-Development-2026`** on a new machine. Your copied **`.env`** files are per-app; match them to the sections below.
+Use this when setting up `MonoRepo/Mobile` on a new machine. Your copied **`.env`** files are per-app; match them to the sections below.
 
 ## Git (mobile)
 
@@ -8,9 +8,7 @@ Use this when cloning **`Mobile-Development-2026`** on a new machine. Your copie
 - From repo root: `pnpm install` (workspace).
 - **Identity:** `git config user.name` / `user.email` (or `--global`) before committing.
 
-## Cloudflare / Workers (sibling **Web** repo)
-
-Worker source lives in **`Web-Development-2026`** (separate clone), not inside `Mobile/`.
+## Cloudflare / Workers (`MonoRepo/Web`)
 
 - **Primary API:** `Web/cloudflare/rootrecord-primary` — `npm ci`, `npm run dev`, deploy via `deploy.ps1`.
 - **Licence Worker:** `Web/cloudflare/rootrecord-license` — same pattern.
@@ -45,5 +43,5 @@ Per app under `frontend/android/`: **`local.properties`**, release **keystore** 
 
 ## Optional
 
-- **`RootRecord/solana-rootrecord-site`** (clone separately) — `.env.example` for Next/Vercel and server keys for the Solana site.
+- **`solana-rootrecord-site/`** (monorepo root) — `.env.example` for Next/Vercel and server keys for the Solana site.
 - **`Web/solana/HELE/.env`** — local only; gitignored.
