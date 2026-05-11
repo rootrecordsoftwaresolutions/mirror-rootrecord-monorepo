@@ -27,3 +27,6 @@ credentials.env.txt
 **/build/
 **/__pycache__/
 **/.venv/
+
+# Editor tooling
+.cursor/
