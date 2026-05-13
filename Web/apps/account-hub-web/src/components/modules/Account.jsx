@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Sparkles,
   MessageSquare,
-  Gift,
   Megaphone,
 } from "lucide-react";
 import { NATIVE_APP_VERSION } from "../../lib/nativeAppVersion";
@@ -22,7 +21,6 @@ const LINKS = [
   { to: "/security", label: "Security", desc: "Password, sessions", icon: ShieldCheck, testid: "account-link-security" },
   { to: "/subscription", label: "Subscription", desc: "Plan and billing", icon: CreditCard, testid: "account-link-subscription" },
   { to: "/notifications", label: "Notifications", desc: "Push and email", icon: Bell, testid: "account-link-notifications" },
-  { to: "/testing-rewards", label: "Testing rewards", desc: "Pending / wallet / lifetime", icon: Gift, testid: "account-link-testing-rewards" },
   { to: "/developer-messages", label: "Developer messages", desc: "Release notes and notices", icon: Megaphone, testid: "account-link-developer-messages" },
   { to: "/about", label: "About", desc: "Version and contact", icon: Info, testid: "account-link-about" },
   { to: "/help", label: "Help", desc: "Contact links", icon: HelpCircle, testid: "account-link-help" },

@@ -5,7 +5,7 @@
 > User follow-up: "Just do what you think is best. I just want a professional website."
 
 ## Product
-RootRecord — maker of multi-device software: **Business Manager** (Android-first; legacy Windows installers may remain on GitHub), **Weather Manager** (Windows and Android), web accounts and billing, and Solana tooling in the browser. The site markets those programs, hosts account sign-in for the rootrecord.info license worker, and publishes Terms/Privacy for compliance.
+RootRecord — maker of multi-device software: **Business Manager** (Android-first; legacy Windows installers may remain on GitHub), **Weather Manager** (Windows and Android), **Kīlauea Alerts** (Android + web), and web accounts and billing. The site markets those programs, hosts account sign-in for the rootrecord.info license worker, and publishes Terms/Privacy for compliance. Testing-rewards points can be redeemed on the Beta tester rewards page (100,000 points = 1 month of Pro).
 
 ## Architecture (unchanged from original repo — required for Cloudflare Pages deploy)
 - **Static HTML + CSS** deployed via Cloudflare Pages (`wrangler.toml`, `package.json`, `functions/api/site-config.ts`)

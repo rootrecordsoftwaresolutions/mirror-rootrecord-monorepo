@@ -2,7 +2,6 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { WalletProvider, useWallet } from "./contexts/WalletContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { earnHeartbeat, getRrToken, RR_APP_ID } from "./lib/rrApi";
 import BottomNav from "./components/ui/BottomNav";
 import Toast, { ToastProvider } from "./components/ui/Toast";
 import AuthScreen from "./components/modules/AuthScreen";
@@ -13,24 +12,10 @@ import Receive from "./components/modules/Receive";
 import History from "./components/modules/History";
 import Settings from "./components/modules/Settings";
 import DeveloperMessages from "./components/modules/DeveloperMessages";
-import TestingRewards from "./components/modules/TestingRewards";
 import Feedback from "./components/modules/Feedback";
 import AddressBook from "./components/modules/AddressBook";
 import MyWallet from "./components/modules/MyWallet";
-
-/** Same earn heartbeat pattern as other apps — shared `rr_earn_*` balance on primary Worker. */
-function EarnHeartbeat() {
-  const loc = useLocation();
-  React.useEffect(() => {
-    if (!getRrToken()) return undefined;
-    const page = loc.pathname || "/";
-    const tick = () => earnHeartbeat({ app_id: RR_APP_ID, page }).catch(() => {});
-    tick();
-    const id = setInterval(tick, 25_000);
-    return () => clearInterval(id);
-  }, [loc.pathname]);
-  return null;
-}
+import About from "./components/modules/About";
 
 function AuthGate({ children }) {
   const { user } = useAuth();
@@ -108,14 +93,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/testing-rewards"
-        element={
-          <AuthGate>
-            <Gate><TestingRewards /></Gate>
-          </AuthGate>
-        }
-      />
-      <Route
         path="/feedback"
         element={
           <AuthGate>
@@ -139,6 +116,14 @@ function AppRoutes() {
           </AuthGate>
         }
       />
+      <Route
+        path="/about"
+        element={
+          <AuthGate>
+            <About />
+          </AuthGate>
+        }
+      />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
@@ -151,7 +136,6 @@ export default function App() {
         <ToastProvider>
           <BrowserRouter>
             <div className="min-h-[100dvh] lg:pl-56" data-testid="app-root">
-              <EarnHeartbeat />
               <AppRoutes />
               <BottomNav />
               <Toast />

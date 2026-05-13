@@ -1,33 +1,35 @@
 @echo off
 setlocal EnableExtensions
 
-rem Deploys all Cloudflare Pages projects in this monorepo (no Workers).
+rem Deploys Cloudflare Pages projects in this monorepo (no Workers).
 rem Requires Node + npm + pnpm on PATH and Wrangler auth (credentials.env or wrangler login).
 rem All web app sources live under Web\apps\* and are isolated from Mobile\* (Android).
+rem
+rem Usage:
+rem   cloudflare-update-pages.bat                - deploy ALL Pages projects
+rem   cloudflare-update-pages.bat <name>         - deploy ONE Pages project
+rem
+rem Valid <name> values:
+rem   website                                    - Web\main (marketing)
+rem   weather  business  account  token  kilauea - per-product web app
 
 cd /d "%~dp0"
-
 set "LOGFILE=%~dp0cloudflare-update-pages.log"
 echo Starting %DATE% %TIME% > "%LOGFILE%"
 echo Log: %LOGFILE%
 
+set "ONLY=%~1"
+if not "%ONLY%"=="" goto SINGLE
+
 echo.
 echo ================================
-echo RootRecord Cloudflare - Pages
+echo RootRecord Cloudflare - Pages (ALL)
 echo ================================
 echo Repo: %CD%
 echo.
 
 set "STEP=init"
 set "ERR=0"
-
-rem Pages projects:
-rem   rootrecord-website        -> Web\main                            (marketing static + Functions)
-rem   rootrecord-weather-web    -> Web\apps\weather-manager-web        (React/CRA)
-rem   rootrecord-business-web   -> Web\apps\business-manager-web       (React/CRA)
-rem   rootrecord-account-web    -> Web\apps\account-hub-web            (React/CRA)
-rem   rootrecord-token-web      -> Web\apps\token-manager-web          (React/CRA)
-rem   rootrecord-kilauea-web    -> Web\apps\kilauea-alerts-web         (Vite + React)
 
 set "STEP=[1/6] Pages: rootrecord-website (marketing, Web\main)"
 echo %STEP%
@@ -91,6 +93,57 @@ popd
 
 echo.
 echo Pages done.
+echo Finished %DATE% %TIME% >> "%LOGFILE%"
+pause
+endlocal
+exit /b 0
+
+rem ----------------------------------------------------------------------------
+rem Single-page deploy path.
+rem ----------------------------------------------------------------------------
+:SINGLE
+echo.
+echo ================================
+echo RootRecord Cloudflare - Pages: %ONLY%
+echo ================================
+echo.
+
+set "TARGET="
+set "PKG="
+if /I "%ONLY%"=="website"  ( set "TARGET=Web\main"                            & set "PKG=npm" )
+if /I "%ONLY%"=="weather"  ( set "TARGET=Web\apps\weather-manager-web"        & set "PKG=pnpm" )
+if /I "%ONLY%"=="business" ( set "TARGET=Web\apps\business-manager-web"       & set "PKG=pnpm" )
+if /I "%ONLY%"=="account"  ( set "TARGET=Web\apps\account-hub-web"            & set "PKG=pnpm" )
+if /I "%ONLY%"=="token"    ( set "TARGET=Web\apps\token-manager-web"          & set "PKG=pnpm" )
+if /I "%ONLY%"=="kilauea"  ( set "TARGET=Web\apps\kilauea-alerts-web"         & set "PKG=pnpm" )
+
+if "%TARGET%"=="" (
+  echo Unknown Pages project: %ONLY%
+  echo Valid: website weather business account token kilauea
+  pause
+  endlocal
+  exit /b 1
+)
+
+set "STEP=deploy %TARGET%"
+echo %STEP%
+pushd "%TARGET%"
+if errorlevel 1 goto FAIL
+if /I "%PKG%"=="npm" (
+  call npm ci
+  if errorlevel 1 ( popd & goto FAIL )
+  call npm run pages:deploy --silent
+  if errorlevel 1 ( popd & goto FAIL )
+) else (
+  call pnpm install
+  if errorlevel 1 ( popd & goto FAIL )
+  call pnpm run pages:deploy
+  if errorlevel 1 ( popd & goto FAIL )
+)
+popd
+
+echo.
+echo Pages %ONLY% done.
 echo Finished %DATE% %TIME% >> "%LOGFILE%"
 pause
 endlocal

@@ -9,7 +9,11 @@ set "ANDROID=%APP%android"
 set "KEYSTORE=%ANDROID%\app\keystore\keystore.properties"
 set "GJSON=%ANDROID%\app\google-services.json"
 set "RELEASE_DIR=%APP%release"
-set "APK_SRC=%ANDROID%\app\build\outputs\apk\release\RootRecord-Weather-release.apk"
+rem Default Gradle output names — the rename in app/build.gradle was dropped because the
+rem `applicationVariants.configureEach { output.outputFileName = ... }` hook silently no-ops
+rem on some AGP versions, leaving only the AAB produced. We rename on copy at the bottom
+rem of this script instead, which is AGP-version-proof.
+set "APK_SRC=%ANDROID%\app\build\outputs\apk\release\app-release.apk"
 set "BUNDLE_SRC=%ANDROID%\app\build\outputs\bundle\release\app-release.aab"
 
 if not exist "%WEB%\package.json" (

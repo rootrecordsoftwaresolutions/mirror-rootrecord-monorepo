@@ -51,7 +51,7 @@ export const rrApi = axios.create({ baseURL: API_BASE, timeout: 25000 });
 const TOKEN_KEY = "rrtm_rr_token";
 const DEVICE_ID_KEY = "rrtm_rr_device_id";
 
-/** Ecosystem id for per-app earn/reward analytics (shared pool across RootRecord apps). */
+/** Ecosystem id used by per-app server endpoints (version policy, developer messages, feedback). */
 export const RR_APP_ID = String(process.env.REACT_APP_RR_APP_ID || "rootrecord_token_manager_android");
 
 export function getRrToken() {
@@ -105,17 +105,6 @@ export function formatRrApiError(err) {
     }
   }
   return msg || "Something went wrong.";
-}
-
-/** Beta / usage rewards — same `rr_earn_*` pool as Weather, Business, Account Hub. */
-export function earnGetSummary() {
-  return rrApi.get("/earn/summary", { params: { app_id: RR_APP_ID } });
-}
-export function earnHeartbeat(body) {
-  return rrApi.post("/earn/heartbeat", body);
-}
-export function earnCheckin(body) {
-  return rrApi.post("/earn/checkin", body ?? { app_id: RR_APP_ID });
 }
 
 export function listDeveloperMessages() {

@@ -63,17 +63,28 @@ export async function upsertUserAccountFromLicense(
     .run();
 }
 
+/**
+ * Returns merged access flags: the license-driven `pro_unlocked` column OR an active
+ * rewards-redeemed Pro window (`pro_redeemed_until > now`). Schema column added by
+ * api-account migration 0033; D1 is shared across every shard, so this shard just reads.
+ */
 export async function readUserAccountAccessFlags(
   db: D1Database,
   email: string
-): Promise<{ pro_unlocked: boolean; life_member: boolean } | null> {
+): Promise<{ pro_unlocked: boolean; life_member: boolean; pro_redeemed_until: string | null } | null> {
   const e = email.trim().toLowerCase();
   if (!e) return null;
   const row = await db
-    .prepare("SELECT pro_unlocked, life_member FROM user_accounts WHERE email = ?")
+    .prepare("SELECT pro_unlocked, life_member, pro_redeemed_until FROM user_accounts WHERE email = ?")
     .bind(e)
-    .first<{ pro_unlocked: number; life_member: number }>();
+    .first<{ pro_unlocked: number; life_member: number; pro_redeemed_until: string | null }>();
   if (!row) return null;
-  return { pro_unlocked: Boolean(row.pro_unlocked), life_member: Boolean(row.life_member) };
+  const redeemedUntil = row.pro_redeemed_until ? String(row.pro_redeemed_until).trim() || null : null;
+  const redemptionActive = redeemedUntil ? Date.parse(redeemedUntil) > Date.now() : false;
+  return {
+    pro_unlocked: Boolean(row.pro_unlocked) || redemptionActive,
+    life_member: Boolean(row.life_member),
+    pro_redeemed_until: redeemedUntil,
+  };
 }
 

@@ -18,7 +18,7 @@ import javax.inject.Singleton
 
 private val JsonMedia = "application/json; charset=utf-8".toMediaType()
 
-/** Matches `POST /api/feedback` on api.rootrecord.info (see rootrecord-primary `feedback-route.ts`). */
+/** Matches `POST /api/feedback` on api-kilauea.rootrecord.info (Worker `rootrecord-api-kilauea`; route copied from legacy primary). */
 @Serializable
 private data class FeedbackBody(
     val type: String = "general",
@@ -51,7 +51,7 @@ class FeedbackRepository @Inject constructor(
                 ),
             )
             val req = Request.Builder()
-                .url("https://api.rootrecord.info/api/feedback")
+                .url("https://rootrecord-api-kilauea.rootrecord.workers.dev/api/feedback")
                 .post(bodyJson.toRequestBody(JsonMedia))
                 .header("X-App-Version", BuildConfig.VERSION_NAME)
                 .build()

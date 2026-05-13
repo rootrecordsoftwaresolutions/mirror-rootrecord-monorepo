@@ -25,14 +25,17 @@ private fun JsonPrimitive?.booleanLike(): Boolean {
 
 private val JsonMedia = "application/json; charset=utf-8".toMediaType()
 
-private const val LOGIN_URL = "https://api.rootrecord.info/v1/auth/login"
-private const val LOGOUT_URL = "https://api.rootrecord.info/v1/auth/logout"
+// Per-product API shard (rootrecord-api-kilauea). Keep in sync with NetworkModule.ROOTRECORD_BASE —
+// the custom domain `api-kilauea.rootrecord.info` is not reliably resolving from devices, so we hit
+// the Worker's *.workers.dev URL directly until that's fixed in Cloudflare.
+private const val LOGIN_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/auth/login"
+private const val LOGOUT_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/auth/logout"
 
 @Serializable
 private data class LoginBody(val email: String, val password: String)
 
 /**
- * Root Record account session (see POST /v1/auth/login on api.rootrecord.info).
+ * Root Record account session (see POST /v1/auth/login on api-kilauea.rootrecord.info — Worker `rootrecord-api-kilauea`).
  * Uses the same OkHttp stack as [RootRecordApi] (guest id + optional bearer).
  */
 @Singleton

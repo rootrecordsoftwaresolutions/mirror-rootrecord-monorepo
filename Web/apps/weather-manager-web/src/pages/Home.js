@@ -255,6 +255,12 @@ export default function Home() {
       setBundle(data);
       setBundleLocId(loc.id);
       writeWeatherSnapshot(loc.id, data);
+      // Free users who burned their 2/day external fetch budget see this flag from the
+      // Worker. Surface the upsell when they actively attempt a refresh (`force === true`)
+      // so we don't spam the modal on every silent auto-load.
+      if (force && data && data.free_daily_limit_reached) {
+        try { window.dispatchEvent(new Event('rr.upsell.show')); } catch { /* ignore */ }
+      }
     } catch (e) {
       setErr(String(e?.response?.data?.detail || e?.message || 'Failed to load weather'));
       setBundleLocId(loc.id);
@@ -501,6 +507,83 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* Next 5 days */}
+            {forecastPeriods.length > 0 && (() => {
+              // Pair Day/Night periods into one card per day. Handles both AccuWeather
+              // (always Day 1 / Night 1 / Day 2 / Night 2…) and NWS (may start with a
+              // standalone "Tonight" night period, then alternate).
+              const pairs = [];
+              let i = 0;
+              while (i < forecastPeriods.length && pairs.length < 5) {
+                const p = forecastPeriods[i];
+                if (!p) { i += 1; continue; }
+                if (p.isDaytime === true) {
+                  const next = forecastPeriods[i + 1];
+                  if (next && next.isDaytime === false) {
+                    pairs.push({ day: p, night: next });
+                    i += 2;
+                  } else {
+                    pairs.push({ day: p, night: null });
+                    i += 1;
+                  }
+                } else if (p.isDaytime === false) {
+                  pairs.push({ day: null, night: p });
+                  i += 1;
+                } else {
+                  i += 1;
+                }
+              }
+              if (pairs.length === 0) return null;
+              const todayKey = new Date().toDateString();
+              const labelFor = (pair, idx) => {
+                const ref = pair.day || pair.night;
+                const rawName = String(ref?.name || '').trim();
+                // AccuWeather placeholder names "Day N" / "Night N" → derive weekday from startTime.
+                const isPlaceholder = /^(day|night)\s+\d+$/i.test(rawName);
+                if (!isPlaceholder && rawName) return rawName;
+                const d = ref?.startTime ? new Date(ref.startTime) : null;
+                if (d && !Number.isNaN(d.getTime())) {
+                  if (d.toDateString() === todayKey) return 'Today';
+                  return d.toLocaleDateString(undefined, { weekday: 'short' });
+                }
+                return rawName || `Day ${idx + 1}`;
+              };
+              return (
+                <div className="mb-6">
+                  <h2 className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-2">Next 5 days</h2>
+                  <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-0.5" data-testid="home-daily-strip">
+                    {pairs.map((pair, idx) => {
+                      const ref = pair.day || pair.night;
+                      const label = labelFor(pair, idx);
+                      const phrase = safeText(pair.day?.shortForecast ?? pair.night?.shortForecast, '—');
+                      const icon = pair.day?.icon ?? pair.night?.icon ?? null;
+                      return (
+                        <div
+                          key={ref?.startTime || ref?.number || idx}
+                          className="flex min-w-[112px] max-w-[140px] shrink-0 flex-col bg-container border border-subtle px-2.5 py-3 text-center"
+                          data-testid="home-daily-cell"
+                        >
+                          <div className="text-[10px] font-mono text-accent/70 shrink-0">{label}</div>
+                          <div className="mt-1 flex items-center justify-center shrink-0">
+                            <AccuWeatherIcon code={icon} className="w-8 h-8 text-neutral-200" title={phrase} />
+                          </div>
+                          <div className="font-mono text-lg mt-1 shrink-0">
+                            {pair.day ? fmtHourlyGridTemp(pair.day, hourlyGridUnits) : '—'}
+                          </div>
+                          <div className="font-mono text-xs text-accent/70 shrink-0">
+                            {pair.night ? fmtHourlyGridTemp(pair.night, hourlyGridUnits) : '—'}
+                          </div>
+                          <div className="mt-2 min-h-[3.5rem] text-[10px] leading-snug text-accent/70 line-clamp-4 break-words hyphens-auto">
+                            {phrase}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Alerts (NOAA + Canada) */}
             {(() => {

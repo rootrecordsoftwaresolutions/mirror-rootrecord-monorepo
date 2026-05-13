@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { AuthScreen } from "./components/AuthScreen";
 import { DetailModal } from "./components/DetailModal";
+import { DeveloperMessage } from "./components/DeveloperMessage";
+import { ProPaywall } from "./components/ProPaywall";
+import { UpsellModal, UPSELL_EVENT } from "./components/UpsellModal";
 import { useAuth } from "./contexts/AuthContext";
 import { BIG_ISLAND_LOCATIONS, type BigIslandLocation } from "./locations";
-import { apiFetch } from "./lib/api";
+import { apiFetch, isPro, isLifeMember } from "./lib/api";
+
+const FREE_TIER_LOC_ID = "volcano";
+
+const IS_NATIVE = typeof window !== "undefined" && Boolean((window as { Capacitor?: { isNativePlatform?: () => boolean } })?.Capacitor?.isNativePlatform?.());
 import {
   alertTitle,
   asRecord,
@@ -26,10 +33,46 @@ function dashboardPath(loc: BigIslandLocation, refresh: boolean): string {
 }
 
 function periodTemp(p: Record<string, unknown>): string {
-  const t = p.temperature ?? p.Temperature;
-  const u = String(p.temperatureUnit ?? p.TemperatureUnit ?? "").trim();
-  if (t == null || t === "") return "—";
-  return u ? `${t}°${u}` : `${t}°`;
+  const raw = p.temperature ?? p.Temperature;
+  const u = String(p.temperatureUnit ?? p.TemperatureUnit ?? "").trim().toUpperCase();
+  if (raw == null || raw === "") return "—";
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return "—";
+  // Imperial display: always emit °F. NWS Hawaiʻi often returns °C; convert.
+  const f = u === "C" ? (n * 9) / 5 + 32 : n;
+  return `${Math.round(f)}°F`;
+}
+
+/** Rewrite USGS `place` strings like "28 km E of …" → "17 mi E of …". */
+function imperialPlace(raw: unknown): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "—";
+  return s.replace(/(\d+(?:\.\d+)?)\s*km\b/gi, (_m, n) => `${Math.round(parseFloat(n) * 0.621371)} mi`);
+}
+
+/**
+ * Forecast period label. AccuWeather (via api-kilauea) emits names as "Day 1"/"Night 1",
+ * which is not what users want — replace with a human weekday in Pacific/Honolulu
+ * (e.g. "Today" / "Tonight" / "Wednesday" / "Wednesday Night"). Falls back to the
+ * server-supplied name if startTime is missing or unparseable.
+ */
+function periodLabel(p: Record<string, unknown>, index: number): string {
+  const original = String(p.name || p.Name || `Period ${index + 1}`).trim();
+  const isNight = original.toLowerCase().includes("night");
+  const raw = p.startTime ?? p.StartTime ?? p.Date ?? "";
+  const d = raw ? new Date(String(raw)) : null;
+  if (!d || Number.isNaN(d.getTime())) return original;
+  const tz = "Pacific/Honolulu";
+  const ymd = (date: Date) =>
+    new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: tz,
+    }).format(date);
+  if (ymd(d) === ymd(new Date())) return isNight ? "Tonight" : "Today";
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: tz }).format(d);
+  return isNight ? `${weekday} Night` : weekday;
 }
 
 export function App() {
@@ -139,6 +182,11 @@ export function App() {
     return <AuthScreen />;
   }
 
+  // Web is Pro-only. Native (Capacitor Android) bypasses the paywall and runs free-with-restrictions.
+  if (!IS_NATIVE && !isPro() && !isLifeMember()) {
+    return <ProPaywall />;
+  }
+
   return (
     <div className="app-root">
       <header className="site-header">
@@ -159,14 +207,27 @@ export function App() {
                 value={location.id}
                 onChange={(e) => {
                   const next = BIG_ISLAND_LOCATIONS.find((l) => l.id === e.target.value);
-                  if (next) setLocation(next);
+                  if (!next) return;
+                  // Free-tier lock: only Volcano is allowed. Anything else triggers the upsell
+                  // and the picker snaps back. (The server enforces the same lock if a client
+                  // ever bypasses this guard, so the rewriting is purely UX-side.)
+                  const free = !isPro() && !isLifeMember();
+                  if (free && next.id !== FREE_TIER_LOC_ID) {
+                    try { window.dispatchEvent(new Event(UPSELL_EVENT)); } catch { /* ignore */ }
+                    return;
+                  }
+                  setLocation(next);
                 }}
               >
-                {BIG_ISLAND_LOCATIONS.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label}
-                  </option>
-                ))}
+                {BIG_ISLAND_LOCATIONS.map((l) => {
+                  const free = !isPro() && !isLifeMember();
+                  const locked = free && l.id !== FREE_TIER_LOC_ID;
+                  return (
+                    <option key={l.id} value={l.id}>
+                      {l.label}{locked ? " — Pro" : ""}
+                    </option>
+                  );
+                })}
               </select>
             </label>
             <div className="toolbar-user">
@@ -215,6 +276,8 @@ export function App() {
           <span className="muted small"> Forecast and alerts below may still load.</span>
         </div>
       ) : null}
+
+      <DeveloperMessage />
 
       <div className="dashboard-layout">
         <div className="dashboard-main">
@@ -323,7 +386,7 @@ export function App() {
               </div>
               <ul className="period-grid">
                 {periods.slice(0, 10).map((p, i) => {
-                  const name = String(p.name || p.Name || `Period ${i + 1}`).trim();
+                  const name = periodLabel(p, i);
                   const sub = String(p.shortForecast || p.ShortPhrase || "").trim();
                   return (
                     <li key={i} className="period-card">
@@ -462,7 +525,7 @@ export function App() {
                   const row = asRecord(q);
                   if (!row) return null;
                   const mag = row.magnitude ?? row.mag;
-                  const place = String(row.place || row.title || "—");
+                  const place = imperialPlace(row.place || row.title);
                   const when = usgsTimeLabel(row.time);
                   return (
                     <li
@@ -508,6 +571,37 @@ export function App() {
               </a>
               <a className="link-pill" href="https://www.weather.gov/hfo/" target="_blank" rel="noreferrer">
                 NWS Honolulu
+              </a>
+            </div>
+          </section>
+
+          <section className="panel panel-links">
+            <div className="panel-head">
+              <span className="panel-icon" aria-hidden>
+                ▶
+              </span>
+              <h2>Featured channels</h2>
+            </div>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Independent Hawaiʻi volcano coverage from the community. The /live link opens the active
+              stream when on air, otherwise the channel page.
+            </p>
+            <div className="link-row">
+              <a
+                className="link-pill"
+                href="https://www.youtube.com/@TwoPineapples/live"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Two Pineapples — Live
+              </a>
+              <a
+                className="link-pill"
+                href="https://www.youtube.com/@TwoPineapples"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Two Pineapples — Channel
               </a>
             </div>
           </section>
@@ -575,7 +669,7 @@ export function App() {
             );
           })()}
         >
-          <p className="modal-lead">{String(detailModal.q.place || detailModal.q.title || "—")}</p>
+          <p className="modal-lead">{imperialPlace(detailModal.q.place || detailModal.q.title)}</p>
           <dl className="modal-dl">
             {quakeDetailRows(detailModal.q).flatMap((r) => [
               <dt key={`${r.label}-k`}>{r.label}</dt>,
@@ -584,6 +678,7 @@ export function App() {
           </dl>
         </DetailModal>
       ) : null}
+      <UpsellModal />
     </div>
   );
 }

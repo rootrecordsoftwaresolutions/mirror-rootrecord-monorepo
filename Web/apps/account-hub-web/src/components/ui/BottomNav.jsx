@@ -19,7 +19,6 @@ function sideLinkClass(isActive) {
 export default function BottomNav() {
   const loc = useLocation();
   if (loc.pathname.startsWith("/auth")) return null;
-  if (loc.pathname.startsWith("/testing-rewards")) return null;
   if (loc.pathname.startsWith("/developer-messages")) return null;
   if (loc.pathname.startsWith("/feedback")) return null;
 

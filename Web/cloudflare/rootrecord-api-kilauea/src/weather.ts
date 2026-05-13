@@ -1,8 +1,42 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { NWS_USER_AGENT } from "./cors";
 import { bumpUsageMetric } from "./usage";
+import { fetchOpenMeteoCurrent, type OpenMeteoBackfill } from "./open-meteo";
 
 const ACCU_BASE = "https://dataservice.accuweather.com";
+
+/**
+ * Merge an Open-Meteo backfill into an NWS observation + hourly_now.
+ * Only fills fields the primary source left null/undefined — never overwrites NWS data.
+ * Returns a list of field names actually backfilled so the caller can mark provenance.
+ */
+function mergeOpenMeteoBackfill(
+  observation: Record<string, unknown>,
+  hourlyNow: Record<string, unknown>,
+  om: OpenMeteoBackfill,
+): string[] {
+  const filled: string[] = [];
+  const isEmpty = (v: unknown): boolean => {
+    if (v === null || v === undefined) return true;
+    if (typeof v === "object" && v !== null && !Array.isArray(v)) {
+      const o = v as Record<string, unknown>;
+      if ("value" in o && (o.value === null || o.value === undefined)) return true;
+    }
+    return false;
+  };
+  for (const [k, v] of Object.entries(om.observation)) {
+    if (v !== null && v !== undefined && isEmpty(observation[k])) {
+      observation[k] = v;
+      filled.push(k);
+    }
+  }
+  for (const [k, v] of Object.entries(om.hourly_now)) {
+    if (v !== null && v !== undefined && isEmpty(hourlyNow[k])) {
+      hourlyNow[k] = v;
+    }
+  }
+  return filled;
+}
 
 async function nwsFetch(url: string): Promise<Record<string, unknown>> {
   const r = await fetch(url, {
@@ -308,8 +342,32 @@ function isoAgeSeconds(iso: string): number | null {
 }
 
 function weatherDataTtlSec(env: { WEATHER_DATA_TTL_SEC?: string }): number {
-  const n = parseInt(String(env.WEATHER_DATA_TTL_SEC ?? "600"), 10);
-  return Number.isFinite(n) && n > 0 ? n : 600;
+  // Default 1h. Was 10min, which caused frequent AccuWeather hits even when nothing changed.
+  // Per-product policy: hourly endpoints update at most once an hour, 5-day daily once a day.
+  // Both controlled at the AccuWeather call layer via `accuFetchJson({ ttlSec })`.
+  const n = parseInt(String(env.WEATHER_DATA_TTL_SEC ?? "3600"), 10);
+  return Number.isFinite(n) && n > 0 ? n : 3600;
+}
+
+/**
+ * Per-endpoint AccuWeather TTLs (seconds). Used by `accuFetchJson` via the Workers Cache API.
+ * Goal: never double-call the same AccuWeather endpoint for the same location within its TTL,
+ * regardless of which Worker shard, user, or trigger (login / dashboard hit / etc) initiated it.
+ *
+ *   daily/5day    →  24h  (user-visible 5-day outlook changes meaningfully ~once/day)
+ *   hourly/*hour  →   1h  (rolling window; refreshing more often burns credits with no UX gain)
+ *   currentcond.  →  30m  (live conditions; sub-30-min refresh isn't worth the credit cost)
+ *   alarms        →  10m  (severe-weather alerts; AccuWeather TOS-compatible polling)
+ *   locations     →  30d  (city geoposition lookups effectively don't change)
+ */
+const ACCU_TTL_FALLBACK_SEC = 600;
+function accuTtlForPath(path: string): number {
+  if (path.startsWith("/forecasts/v1/daily/")) return 86400;
+  if (path.startsWith("/forecasts/v1/hourly/")) return 3600;
+  if (path.startsWith("/currentconditions/v1/")) return 1800;
+  if (path.startsWith("/alarms/v1/")) return 600;
+  if (path.startsWith("/locations/v1/")) return 30 * 86400;
+  return ACCU_TTL_FALLBACK_SEC;
 }
 
 interface AccuEnv {
@@ -473,20 +531,57 @@ async function accuFetchJson<T>(
   env: AccuEnv,
   path: string,
   params: Record<string, string>,
-  opts?: { db?: D1Database; metric?: string }
+  opts?: { db?: D1Database; metric?: string; ttlSec?: number }
 ): Promise<T> {
   const apiKey = String(env.ACCUWEATHER_API_KEY || "").trim();
   if (!apiKey) throw new Error("accuweather_not_configured");
   const u = new URL(`${ACCU_BASE}${path}`);
-  u.searchParams.set("apikey", apiKey);
   u.searchParams.set("language", String(env.ACCUWEATHER_LANGUAGE || "en-us"));
   for (const [k, v] of Object.entries(params)) {
     u.searchParams.set(k, v);
   }
-  const r = await fetch(u.toString(), { headers: { Accept: "application/json" } });
+  // Cache key excludes the API key (which rotates) but includes language + path + params.
+  // Workers Cache API is per-data-center; for a low-traffic app this still cuts double-calls
+  // by ~250x worst case (one cold fill per DC) and ~Nx in practice (most users share a DC).
+  const ttlSec = opts?.ttlSec ?? accuTtlForPath(path);
+  const cacheUrl = new URL(u.toString());
+  const cacheKey = new Request(cacheUrl.toString());
+  const cache = (caches as unknown as { default?: Cache }).default || null;
+  if (cache && ttlSec > 0) {
+    try {
+      const hit = await cache.match(cacheKey);
+      if (hit && hit.ok) {
+        await bumpUsageMetric(opts?.db, "accu.cache.hit", 1);
+        return (await hit.json()) as T;
+      }
+    } catch {
+      /* cache miss / unsupported — fall through to network */
+    }
+  }
+  // Network fetch. The API key is appended only to the actual request, never to the cache key.
+  const reqUrl = new URL(u.toString());
+  reqUrl.searchParams.set("apikey", apiKey);
+  const r = await fetch(reqUrl.toString(), { headers: { Accept: "application/json" } });
   if (!r.ok) throw new Error(`ACCU ${r.status}`);
   await bumpUsageMetric(opts?.db, opts?.metric || "accu.call.unknown", 1);
-  return (await r.json()) as T;
+  const body = await r.text();
+  if (cache && ttlSec > 0) {
+    try {
+      await cache.put(
+        cacheKey,
+        new Response(body, {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": `public, max-age=${ttlSec}`,
+          },
+        }),
+      );
+    } catch {
+      /* best-effort cache write */
+    }
+  }
+  return JSON.parse(body) as T;
 }
 
 async function accuLocationKey(
@@ -643,7 +738,10 @@ export async function weatherCurrent(
         state: loc.state,
       };
     } catch {
-      return { available: false, source: "accuweather", reason: "accuweather_current_unavailable" };
+      // AccuWeather threw (quota, 401, transient 5xx). Fall through to the NWS path below
+      // so we still produce a usable observation; Open-Meteo backfill fills the gaps NWS
+      // doesn't publish (feels-like / wet-bulb / gusts). Tagged so callers can see why.
+      await bumpUsageMetric(db, "accu.current.fallthrough_to_nws", 1);
     }
   }
   try {
@@ -676,10 +774,27 @@ export async function weatherCurrent(
       }
     }
     observation = mergeHourlyIntoObservation(observation, hourlyFirst);
+    // Open-Meteo backfill: NWS observations do not publish feels-like, wet-bulb, gusts,
+    // cloud cover, or precip totals reliably. Fill those gaps with real Open-Meteo
+    // measurements (no API key, no AccuWeather quota). Never overwrites NWS values.
+    let backfilled: string[] = [];
+    let source: string = "nws";
+    try {
+      const om = await fetchOpenMeteoCurrent(lat, lon, { db });
+      if (om) {
+        backfilled = mergeOpenMeteoBackfill(observation, hourlyFirst, om);
+        if (backfilled.length > 0) source = "nws+open-meteo";
+      }
+    } catch {
+      /* backfill is best-effort */
+    }
     const rel = (props.relativeLocation as Record<string, unknown>) || {};
     const relProps = (rel.properties as Record<string, unknown>) || {};
     return {
       available: true,
+      source,
+      attribution: source === "nws+open-meteo" ? "NWS + Open-Meteo" : "NWS",
+      backfilled_fields: backfilled,
       observation,
       hourly_now: hourlyFirst,
       forecast_url: forecastUrl,
@@ -688,6 +803,21 @@ export async function weatherCurrent(
       state: relProps.state,
     };
   } catch {
+    // NWS unreachable too — try Open-Meteo as primary so the bundle still has something useful.
+    try {
+      const om = await fetchOpenMeteoCurrent(lat, lon, { db });
+      if (om) {
+        return {
+          available: true,
+          source: "open-meteo",
+          attribution: "Open-Meteo",
+          observation: om.observation,
+          hourly_now: om.hourly_now,
+        };
+      }
+    } catch {
+      /* fall through */
+    }
     return { available: false, reason: "nws_points_unavailable" };
   }
 }
@@ -714,9 +844,11 @@ export async function weatherForecast(
         ),
         accuFetchJson<Array<Record<string, unknown>>>(
           env || {},
-          `/forecasts/v1/hourly/12hour/${encodeURIComponent(loc.key)}`,
+          // 72-hour (3-day) hourly — matches user-facing multi-day hourly expectation.
+          // AccuWeather pricing tiers: 1h / 12h / 24h / 72h / 120h (skip 48h tier).
+          `/forecasts/v1/hourly/72hour/${encodeURIComponent(loc.key)}`,
           { details: "true", metric: "true" },
-          { db, metric: "accu.call.forecast_hourly_12hour" }
+          { db, metric: "accu.call.forecast_hourly_72hour" }
         ),
       ]);
       const dailyPeriods = (((daily?.DailyForecasts as unknown[]) || []) as Array<Record<string, unknown>>).flatMap((d, idx) => {
@@ -802,7 +934,7 @@ export async function weatherForecast(
       try {
         const fh = await nwsFetch(forecastHourlyUrl);
         const fhProps = (fh.properties as Record<string, unknown>) || {};
-        hourly = ((fhProps.periods as unknown[]) || []).slice(0, 24);
+        hourly = ((fhProps.periods as unknown[]) || []).slice(0, 72);
         hourly_grid_units = String(fhProps.units || "us");
       } catch {
         /* ignore */
@@ -1174,19 +1306,22 @@ export async function dashboardBundle(
   let accuLoc: AccuLoc | null = null;
 
   if (!opts.refresh) {
+    // Cross-user cache: read the most-recent bundle for this grid_key from ANY user. A Kilauea
+    // user and a Weather Manager user at the same lat/lon now share the same row in D1, instead
+    // of independently re-keying by user_id. Writes still record `userId` for attribution.
     const row = await db
       .prepare(
         `SELECT bundle_json, fetched_at FROM weather_data
-         WHERE user_id = ? AND grid_key = ?
+         WHERE grid_key = ?
          ORDER BY fetched_at DESC LIMIT 1`
       )
-      .bind(userId, gridKey)
+      .bind(gridKey)
       .first<{ bundle_json: string; fetched_at: string }>();
     if (row?.bundle_json && row.fetched_at) {
       const age = isoAgeSeconds(row.fetched_at);
       if (age != null && age >= 0 && age < ttlSec) {
         try {
-          await bumpUsageMetric(db, "cache.hit.user_grid", 1);
+          await bumpUsageMetric(db, "cache.hit.grid", 1);
           return JSON.parse(row.bundle_json) as Record<string, unknown>;
         } catch {
           /* fetch fresh */

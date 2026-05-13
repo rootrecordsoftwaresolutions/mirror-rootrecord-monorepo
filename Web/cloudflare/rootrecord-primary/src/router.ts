@@ -41,28 +41,8 @@ import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./devel
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
 
-import {
-
-  canadaAlerts,
-
-  dashboardBundle,
-
-  eonetCyclones,
-
-  eonetWildfires,
-
-  tsunamiBulletins,
-
-  usgsEarthquakes,
-
-  weatherAlerts,
-
-  weatherCurrent,
-
-  weatherForecast,
-
-} from "./weather";
-import { readUsageDaily } from "./usage";
+// Weather/forecast/natural-disaster modules removed from this shard.
+// Live only on rootrecord-api-weather + rootrecord-api-kilauea (see ./weather.ts there).
 
 import { lifeMemberFromLicenseData, upsertUserAccountFromLicense } from "./accounts";
 
@@ -88,18 +68,6 @@ export interface Env {
   FCM_CLIENT_EMAIL?: string;
 
   FCM_PRIVATE_KEY?: string;
-
-  /** Seconds: reuse latest D1 `weather_data` row for same user + grid (default 600). */
-
-  WEATHER_DATA_TTL_SEC?: string;
-
-  /** AccuWeather provider settings (`ACCUWEATHER_API_KEY` as secret; language optional var). */
-
-  ACCUWEATHER_API_KEY?: string;
-
-  ACCUWEATHER_LANGUAGE?: string;
-
-  ACCUWEATHER_REUSE_RADIUS_MILES?: string;
 
   /** Stripe restricted key or secret (`wrangler secret put STRIPE_SECRET_KEY`). */
 
@@ -1054,106 +1022,6 @@ export async function handleRequest(
 
 
 
-  const lat = num(q, "lat");
-
-  const lon = num(q, "lon");
-
-
-
-  if (method === "GET" && sub === "/weather/current" && lat != null && lon != null) {
-
-    return json(await weatherCurrent(lat, lon, env, env.DB), 200);
-
-  }
-
-  if (method === "GET" && sub === "/weather/forecast" && lat != null && lon != null) {
-
-    return json(await weatherForecast(lat, lon, env, env.DB), 200);
-
-  }
-
-  if (method === "GET" && sub === "/weather/alerts" && lat != null && lon != null) {
-
-    return json(await weatherAlerts(lat, lon, env, env.DB), 200);
-
-  }
-
-  if (method === "GET" && sub === "/internal/usage/accuweather") {
-    const key = (request.headers.get("X-RR-Usage-Admin-Key") || "").trim();
-    const expected = (env.RR_USAGE_ADMIN_SECRET || env.RR_PUSH_ADMIN_SECRET || "").trim();
-    let authorized = false;
-    if (expected && key && key === expected) {
-      authorized = true;
-    } else {
-      const auth = request.headers.get("Authorization") || "";
-      if (auth.toLowerCase().startsWith("bearer ")) {
-        const token = auth.slice(7).trim();
-        try {
-          const meRes = await authMe(env, token, ctx);
-          if (meRes.ok) {
-            const me = (await meRes.json()) as Record<string, unknown>;
-            const email = String(me.email || "").trim().toLowerCase();
-            authorized = email === "root@rootrecord.info";
-          }
-        } catch {
-          authorized = false;
-        }
-      }
-    }
-    if (!authorized) return json({ detail: "Unauthorized" }, 401);
-    const days = Math.min(90, Math.max(1, Math.floor(num(q, "days") ?? 30)));
-    const rows = await readUsageDaily(env.DB, days);
-    const dailyMap = new Map<string, Record<string, number>>();
-    for (const row of rows) {
-      const bucket = dailyMap.get(row.day_utc) || {};
-      bucket[row.metric] = Number(row.count || 0);
-      dailyMap.set(row.day_utc, bucket);
-    }
-    const daily = [...dailyMap.entries()].map(([day_utc, metrics]) => {
-      const accuCalls = Object.entries(metrics)
-        .filter(([k]) => k.startsWith("accu.call."))
-        .reduce((s, [, v]) => s + Number(v || 0), 0);
-      const cacheHits = (metrics["cache.hit.user_grid"] || 0) + (metrics["cache.hit.radius"] || 0);
-      const cacheMiss = metrics["cache.miss.dashboard"] || 0;
-      return { day_utc, accu_calls: accuCalls, cache_hits: cacheHits, cache_misses: cacheMiss, metrics };
-    });
-    const totalAccuCalls = daily.reduce((s, d) => s + d.accu_calls, 0);
-    const avgPerDay = daily.length ? totalAccuCalls / daily.length : 0;
-    const projectedMonth = Math.round(avgPerDay * 30);
-    const totalsByMetric: Record<string, number> = {};
-    for (const row of rows) {
-      const keyName = String(row.metric || "");
-      totalsByMetric[keyName] = (totalsByMetric[keyName] || 0) + Number(row.count || 0);
-    }
-    const accuCallBreakdown = Object.fromEntries(
-      Object.entries(totalsByMetric)
-        .filter(([k]) => k.startsWith("accu.call."))
-        .sort((a, b) => b[1] - a[1])
-    );
-    const cacheStats = {
-      user_grid_hits: totalsByMetric["cache.hit.user_grid"] || 0,
-      radius_hits: totalsByMetric["cache.hit.radius"] || 0,
-      dashboard_misses: totalsByMetric["cache.miss.dashboard"] || 0,
-    };
-    const totalCacheChecks = cacheStats.user_grid_hits + cacheStats.radius_hits + cacheStats.dashboard_misses;
-    const cacheHitRate = totalCacheChecks ? (cacheStats.user_grid_hits + cacheStats.radius_hits) / totalCacheChecks : 0;
-    return json(
-      {
-        days,
-        total_accu_calls: totalAccuCalls,
-        avg_accu_calls_per_day: Number(avgPerDay.toFixed(2)),
-        projected_30_day_calls: projectedMonth,
-        allowance_monthly_calls: 500,
-        projected_overage_calls: Math.max(0, projectedMonth - 500),
-        cache_stats: { ...cacheStats, cache_hit_rate: Number((cacheHitRate * 100).toFixed(2)) },
-        accu_call_breakdown: accuCallBreakdown,
-        totals_by_metric: totalsByMetric,
-        daily,
-      },
-      200
-    );
-  }
-
   if (method === "GET" && sub === "/internal/recent-http-errors") {
     const secret = (env.RR_PUSH_ADMIN_SECRET || "").trim();
     if (!secret) {
@@ -1167,66 +1035,6 @@ export async function handleRequest(
     const lim = Math.min(200, Math.max(1, Math.floor(num(q, "limit") ?? 50)));
     const events = await readRecentHttpErrorEvents(env.DB, lim);
     return json({ ok: true, events, limit: lim }, 200);
-  }
-
-  if (method === "GET" && sub === "/canada/alerts" && lat != null && lon != null) {
-
-    const radius = num(q, "radius_km") ?? 150;
-
-    return json(await canadaAlerts(lat, lon, radius), 200);
-
-  }
-
-  if (method === "GET" && sub === "/usgs/earthquakes") {
-
-    const period = (q.get("period") || "day") as "hour" | "day" | "week" | "month";
-
-    const minMag = num(q, "min_magnitude") ?? 0;
-
-    const radius = num(q, "radius_miles") ?? 2000;
-
-    return json(await usgsEarthquakes(lat, lon, radius, period, minMag), 200);
-
-  }
-
-  if (method === "GET" && sub === "/usgs/tsunamis") {
-
-    return json(await tsunamiBulletins(), 200);
-
-  }
-
-  if (method === "GET" && sub === "/eonet/cyclones") {
-
-    return json(await eonetCyclones(), 200);
-
-  }
-
-  if (method === "GET" && sub === "/eonet/wildfires") {
-
-    return json(await eonetWildfires(), 200);
-
-  }
-
-  if (method === "GET" && sub === "/dashboard" && lat != null && lon != null) {
-
-    const uidRes = await resolveUserId(request, env);
-
-    if (uidRes instanceof Response) return uidRes;
-
-    const refresh = ["1", "true", "yes"].includes((q.get("refresh") || "").toLowerCase());
-
-    const rawLocId = (q.get("location_id") || "").trim();
-
-    const locationId = rawLocId ? rawLocId.slice(0, 64) : null;
-
-    return json(
-
-      await dashboardBundle(env.DB, env, uidRes, lat, lon, { refresh, locationId }),
-
-      200
-
-    );
-
   }
 
   const forwardRes = await maybeForwardSolanaToolsApi(request, env, pathname, method);

@@ -68,19 +68,18 @@ export default function DeveloperMessages() {
         {!loading && !err && items.length === 0 && (
           <p className="text-sm text-accent/70">No messages yet. Check back after updates.</p>
         )}
-        <ul className="space-y-3 mt-2">
-          {items.map((m) => (
-            <li
-              key={m.id}
-              className="bg-container border border-subtle rounded-sm p-4"
-              data-testid={`developer-message-${m.id}`}
-            >
-              <div className="text-sm font-semibold text-white">{m.title}</div>
-              <div className="text-[10px] font-mono text-accent/60 mt-1 mb-2">{formatWhen(m.created_at)}</div>
-              <div className="text-sm text-accent/90 whitespace-pre-wrap leading-relaxed">{m.body}</div>
-            </li>
-          ))}
-        </ul>
+        {/* API returns the single most recent row; render exactly that — no per-message title
+            (older synced rows had a "Discord · author" prefix we no longer want to surface). */}
+        {items[0] && (
+          <div
+            key={items[0].id}
+            className="bg-container border border-subtle rounded-sm p-4 mt-2"
+            data-testid={`developer-message-${items[0].id}`}
+          >
+            <div className="text-[10px] font-mono text-accent/60 mb-2">{formatWhen(items[0].created_at)}</div>
+            <div className="text-sm text-accent/90 whitespace-pre-wrap leading-relaxed">{items[0].body}</div>
+          </div>
+        )}
       </div>
     </div>
   );

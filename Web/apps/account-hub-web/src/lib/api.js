@@ -49,7 +49,7 @@ const useProdFallback =
 const BACKEND = useProdFallback ? PRIMARY_BACKEND : fromEnv || defaultBackend();
 const API_BASE = `${BACKEND}/api`;
 
-/** Ecosystem id for per-app earn/reward analytics (shared pool with Weather + Business). */
+/** Ecosystem id used by per-app server endpoints (version policy, developer messages). */
 export const RR_APP_ID = String(
   process.env.REACT_APP_RR_APP_ID || "rootrecord_account_hub_android"
 );
@@ -115,17 +115,6 @@ export function formatApiError(err) {
     }
   }
   return msg || "Something went wrong.";
-}
-
-/** Beta / usage rewards — same `rr_earn_*` pool as Weather and Business. */
-export function earnGetSummary() {
-  return api.get("/earn/summary", { params: { app_id: RR_APP_ID } });
-}
-export function earnHeartbeat(body) {
-  return api.post("/earn/heartbeat", body);
-}
-export function earnCheckin(body) {
-  return api.post("/earn/checkin", body ?? { app_id: RR_APP_ID });
 }
 
 export function getMobileVersionPolicy() {

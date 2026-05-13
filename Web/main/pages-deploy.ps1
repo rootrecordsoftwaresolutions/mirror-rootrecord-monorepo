@@ -71,7 +71,8 @@ try {
   } else {
     Set-Location $srcRoot
   }
-  npx wrangler pages deploy . --project-name=rootrecord-website @args
+  # --branch: must match Pages project "Production branch" (usually main) so rootrecord.info updates.
+  npx wrangler pages deploy . --project-name=rootrecord-website --branch main @args
 } finally {
   Set-Location $srcRoot
   if ($staging -and (Test-Path -LiteralPath $staging)) {

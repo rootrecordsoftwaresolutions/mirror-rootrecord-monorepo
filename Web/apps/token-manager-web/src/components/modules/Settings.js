@@ -1,18 +1,12 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../ui/PageHeader";
 import NetworkPill from "../ui/NetworkPill";
 import AddressCopy from "../ui/AddressCopy";
 import { useWallet } from "../../contexts/WalletContext";
-import { LogOut, BookUser, Network, ChevronRight, ShieldCheck, Coins, RotateCw, Wallet, Megaphone, Gift, MessageSquare } from "lucide-react";
+import { LogOut, BookUser, Network, ChevronRight, ShieldCheck, Wallet, Megaphone, MessageSquare, Monitor, ExternalLink, HelpCircle } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { useAuth } from "../../contexts/AuthContext";
-import { earnGetSummary, formatRrApiError } from "../../lib/rrApi";
-import {
-  formatRewardBalance,
-  parseDisplayBalanceFromSummary,
-  parseRewardBreakdownFromSummary,
-  SOLANA_TOOLS_ACCOUNT_URL,
-} from "../../lib/rewardsFormat";
 import { NATIVE_APP_VERSION } from "../../lib/nativeAppVersion";
 
 const NETS = [
@@ -21,36 +15,17 @@ const NETS = [
   { id: "testnet", label: "Testnet", hint: "Validator performance cluster" },
 ];
 
+const DESKTOP_WEB_URL = "https://token.rootrecord.info/";
+
+const IS_NATIVE_ANDROID = (() => {
+  try { return Capacitor?.isNativePlatform?.() === true; } catch { return false; }
+})();
+
 export default function Settings() {
   const nav = useNavigate();
   const { pubkey, mode, network, changeNetwork, disconnect } = useWallet();
   const { user, logout, refreshEntitlement } = useAuth();
-  const [earn, setEarn] = useState(null);
-  const [earnLoading, setEarnLoading] = useState(false);
-  const [earnErr, setEarnErr] = useState("");
   const [entBusy, setEntBusy] = useState(false);
-
-  const loadEarn = useCallback(async () => {
-    setEarnErr("");
-    setEarnLoading(true);
-    try {
-      const { data } = await earnGetSummary();
-      setEarn(data || null);
-    } catch (e) {
-      setEarn(null);
-      setEarnErr(formatRrApiError(e));
-    } finally {
-      setEarnLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    loadEarn();
-  }, [user, loadEarn]);
-
-  const rewardBr = user ? parseRewardBreakdownFromSummary(earn) : null;
-  const rewardHeadline = user ? formatRewardBalance(parseDisplayBalanceFromSummary(earn)) : null;
 
   return (
     <div className="page-shell" data-testid="settings-screen">
@@ -120,61 +95,6 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="card p-4" data-testid="settings-rewards">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Coins size={16} className="text-phos" />
-              <div className="label mb-0">Rewards</div>
-            </div>
-            <button
-              className="btn btn-ghost px-3 py-2"
-              onClick={loadEarn}
-              disabled={!user || earnLoading}
-              data-testid="settings-rewards-refresh"
-              title="Refresh"
-            >
-              <RotateCw size={16} />
-            </button>
-          </div>
-          <div className="mt-2 text-sm text-ink-secondary">
-            {user ? (
-              earnLoading ? (
-                "Loading…"
-              ) : earnErr ? (
-                <span className="text-red-200">{earnErr}</span>
-              ) : (
-                <div className="space-y-1.5">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-ink-tertiary">Pending rewards</span>
-                    <span className="font-semibold text-ink-primary tabular-nums">{formatRewardBalance(rewardBr?.pending ?? null)}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-ink-tertiary">Wallet balance</span>
-                    <span className="font-semibold text-ink-primary tabular-nums">{formatRewardBalance(rewardBr?.wallet ?? null)}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-ink-tertiary">Lifetime rewards</span>
-                    <span className="font-semibold text-ink-primary tabular-nums">{formatRewardBalance(rewardBr?.lifetime ?? null)}</span>
-                  </div>
-                  <div className="flex justify-between gap-2 border-t border-white/10 pt-1.5 mt-1">
-                    <span className="text-ink-tertiary">Total (apps)</span>
-                    <span className="font-semibold text-ink-primary tabular-nums">{rewardHeadline}</span>
-                  </div>
-                  <p className="text-[10px] text-ink-tertiary leading-relaxed pt-0.5">
-                    Headline total includes pending accruals. Withdrawable on-chain:{" "}
-                    <a href={SOLANA_TOOLS_ACCOUNT_URL} className="text-phos underline" target="_blank" rel="noopener noreferrer">
-                      Solana Tools → Account
-                    </a>
-                    . Shared across RootRecord apps.
-                  </p>
-                </div>
-              )
-            ) : (
-              "Sign in to track your shared rewards balance."
-            )}
-          </div>
-        </div>
-
         <div className="card overflow-hidden" data-testid="settings-network">
           <div className="px-4 py-3 flex items-center gap-2 border-b border-white/5">
             <Network size={16} className="text-ink-secondary" />
@@ -204,20 +124,24 @@ export default function Settings() {
           </div>
         </div>
 
-        <button
-          onClick={() => nav("/testing-rewards")}
-          className="card w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
-          data-testid="settings-open-testing-rewards"
-        >
-          <div className="flex items-center gap-3">
-            <Gift size={18} className="text-phos" />
-            <div className="text-left">
-              <div className="font-semibold text-ink-primary">Testing rewards</div>
-              <div className="text-[11px] text-ink-tertiary mt-0.5">Pending / wallet / lifetime — full withdraw on Solana Tools.</div>
+        {IS_NATIVE_ANDROID && (
+          <a
+            href={DESKTOP_WEB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="card w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors no-underline"
+            data-testid="settings-desktop-link"
+          >
+            <div className="flex items-center gap-3">
+              <Monitor size={18} className="text-phos" />
+              <div className="text-left">
+                <div className="font-semibold text-ink-primary">Desktop version — Pro members</div>
+                <div className="text-[11px] text-ink-tertiary mt-0.5">token.rootrecord.info — full experience in any desktop or laptop browser.</div>
+              </div>
             </div>
-          </div>
-          <ChevronRight size={16} className="text-ink-tertiary" />
-        </button>
+            <ExternalLink size={16} className="text-ink-tertiary" />
+          </a>
+        )}
 
         <button
           onClick={() => nav("/developer-messages")}
@@ -229,6 +153,21 @@ export default function Settings() {
             <div className="text-left">
               <div className="font-semibold text-ink-primary">Developer messages</div>
               <div className="text-[11px] text-ink-tertiary mt-0.5">Release notes and notices from RootRecord.</div>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-ink-tertiary" />
+        </button>
+
+        <button
+          onClick={() => nav("/about")}
+          className="card w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+          data-testid="settings-open-about"
+        >
+          <div className="flex items-center gap-3">
+            <HelpCircle size={18} className="text-phos" />
+            <div className="text-left">
+              <div className="font-semibold text-ink-primary">About &amp; Help</div>
+              <div className="text-[11px] text-ink-tertiary mt-0.5">Version, principles, and plans.</div>
             </div>
           </div>
           <ChevronRight size={16} className="text-ink-tertiary" />

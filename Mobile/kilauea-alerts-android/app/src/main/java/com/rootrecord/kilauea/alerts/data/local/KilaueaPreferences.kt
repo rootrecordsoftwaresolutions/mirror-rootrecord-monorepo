@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -52,6 +53,13 @@ class KilaueaPreferences @Inject constructor(
 
     /** After first-run welcome + tutorial flow is dismissed. */
     val welcomeTutorialComplete: Flow<Boolean> = ds.data.map { it[WELCOME_TUTORIAL_COMPLETE] == true }
+
+    /**
+     * Per-process app launches. Incremented exactly once per app cold-start
+     * (see `MainActivity.onCreate` — config-change recreates skip the bump).
+     * Used to drive the every-other-open Pro upsell.
+     */
+    val appOpenCount: Flow<Int> = ds.data.map { it[APP_OPEN_COUNT] ?: 0 }
 
     suspend fun getAuthAccessToken(): String? =
         ds.data.first()[AUTH_ACCESS_TOKEN]?.takeIf { it.isNotBlank() }
@@ -138,6 +146,17 @@ class KilaueaPreferences @Inject constructor(
         ds.edit { it[WELCOME_TUTORIAL_COMPLETE] = v }
     }
 
+    /** Atomically increment and return the new app-open count. */
+    suspend fun incrementAppOpenCount(): Int {
+        var next = 0
+        ds.edit { p ->
+            val cur = p[APP_OPEN_COUNT] ?: 0
+            next = cur + 1
+            p[APP_OPEN_COUNT] = next
+        }
+        return next
+    }
+
     suspend fun getNotifiedVolcanoIds(): String =
         ds.data.first()[VOLCANO_NOTIFIED_IDS] ?: "[]"
 
@@ -189,6 +208,7 @@ class KilaueaPreferences @Inject constructor(
         private val AUTH_ACCOUNT_ID = stringPreferencesKey("auth_account_id")
         private val AUTH_PRO_UNLOCKED = booleanPreferencesKey("auth_pro_unlocked")
         private val WELCOME_TUTORIAL_COMPLETE = booleanPreferencesKey("welcome_tutorial_complete")
+        private val APP_OPEN_COUNT = intPreferencesKey("app_open_count")
 
         private const val DEFAULT_EQ_THRESHOLD = 4.0f
     }

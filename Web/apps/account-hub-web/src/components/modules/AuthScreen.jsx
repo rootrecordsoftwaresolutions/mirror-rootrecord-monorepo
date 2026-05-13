@@ -104,7 +104,7 @@ export default function AuthScreen() {
         </p>
         <p className="text-xs text-ink-tertiary mt-3 text-center max-w-[320px]">
           Use the same email and password as Weather Manager, Business Manager,
-          and the Windows installers. Your plan and earn balance follow you.
+          and the Windows installers. Your plan follows you.
         </p>
       </div>
 
@@ -194,7 +194,7 @@ export default function AuthScreen() {
       </form>
 
       <p className="text-xs text-ink-tertiary text-center mt-auto pt-6">
-        Web builds use the account API shard; Android uses the shared primary API. Shared earn balance with Weather and Business.
+        Web builds use the account API shard; Android uses the shared primary API.
       </p>
     </div>
   );

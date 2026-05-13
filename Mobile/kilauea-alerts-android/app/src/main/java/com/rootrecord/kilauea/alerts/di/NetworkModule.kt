@@ -16,7 +16,12 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
-private const val ROOTRECORD_BASE = "https://api.rootrecord.info/"
+// Per-product API shard for Kīlauea Alerts (Worker: rootrecord-api-kilauea, Web/cloudflare/rootrecord-api-kilauea).
+// `api-kilauea.rootrecord.info` is the intended Custom Domain, but as of v1.0.x it is not reliably
+// resolving from devices ("Unable to resolve host" on Android, 503 from the proxy edge). The
+// `*.workers.dev` URL is bound directly to the Worker and is the safe default until the custom
+// domain is re-attached in Cloudflare. Keep this in sync with FeedbackRepository / AuthRepository.
+private const val ROOTRECORD_BASE = "https://rootrecord-api-kilauea.rootrecord.workers.dev/"
 
 @Module
 @InstallIn(SingletonComponent::class)

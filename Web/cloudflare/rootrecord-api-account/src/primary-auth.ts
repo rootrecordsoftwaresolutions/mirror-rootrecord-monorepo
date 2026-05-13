@@ -711,6 +711,12 @@ export async function authMe(
 
       billing_checkout_available,
 
+      // Active rewards-redeemed Pro window (100k points = 1 month). NULL once expired
+      // or if the user has never redeemed. The merged `pro_unlocked` above already OR's
+      // this in via readUserAccountAccessFlags, so clients can ignore unless they want
+      // to show "Pro active until <date>".
+      pro_redeemed_until: acct?.pro_redeemed_until ?? null,
+
       account_created_at: sess.account_created_at,
 
       linked_wallet_pubkey,

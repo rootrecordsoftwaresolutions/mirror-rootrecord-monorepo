@@ -14,7 +14,7 @@ const TOGGLES = [
   {
     key: "email_summary",
     label: "Email summaries",
-    desc: "Weekly plan and earn-balance roll-up.",
+    desc: "Weekly plan and account roll-up.",
     icon: Mail,
     testid: "notifs-toggle-email",
   },

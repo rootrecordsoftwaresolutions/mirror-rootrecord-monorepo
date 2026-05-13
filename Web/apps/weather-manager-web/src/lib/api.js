@@ -3,9 +3,12 @@ import { Capacitor } from '@capacitor/core';
 import { attachAxiosNetworkResilience } from './httpResilience';
 import { safeLocalStorage } from './storage';
 
-// Native Android (Capacitor): shared primary. Web: shard Worker (workers.dev) unless REACT_APP_BACKEND_URL overrides (e.g. https://api-weather.rootrecord.info after Custom Hostname + DNS).
-const PRIMARY_BACKEND = 'https://api.rootrecord.info';
-const SHARD_WEB_BACKEND = 'https://rootrecord-api-weather.rootrecord.workers.dev';
+// Per-product API shard `rootrecord-api-weather` (Web/cloudflare/rootrecord-api-weather).
+// Native Android (Capacitor) → custom domain (no cookie concerns).
+// Web → same custom domain so SSO cookies under `.rootrecord.info` work; falls back to workers.dev if Custom Domain isn't attached yet.
+// Override either via REACT_APP_BACKEND_URL.
+const PRIMARY_BACKEND = 'https://api-weather.rootrecord.info';
+const SHARD_WEB_BACKEND = 'https://api-weather.rootrecord.info';
 
 function isNativeAndroid() {
   try {
@@ -60,7 +63,7 @@ const BACKEND = useProdFallback
   : fromEnv || defaultBackend();
 const API = `${BACKEND}/api`;
 
-/** Ecosystem id for per-app earn/reward analytics (server + this build). */
+/** Ecosystem id used by per-app server endpoints (version policy, developer messages, push). */
 export const RR_APP_ID = String(process.env.REACT_APP_RR_APP_ID || 'rootrecord_weather_manager_android');
 
 export function isBackendConfigured() {
@@ -239,10 +242,6 @@ export const api = {
   // prefs
   getPrefs: () => client.get('/me/prefs'),
   setPrefs: (body) => client.post('/me/prefs', body),
-  // Beta tester / usage rewards balance (see website for program details)
-  getEarnSummary: () => client.get('/earn/summary', { params: { app_id: RR_APP_ID } }),
-  earnHeartbeat: (body) => client.post('/earn/heartbeat', body),
-  earnCheckin: (body) => client.post('/earn/checkin', body),
   // locations
   listLocations: async () => {
     const res = await client.get('/locations');

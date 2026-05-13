@@ -63,17 +63,64 @@ export async function upsertUserAccountFromLicense(
     .run();
 }
 
+/**
+ * Returns the merged access flags for an email: the license-driven `pro_unlocked` column
+ * OR an active rewards-redeemed Pro window (`pro_redeemed_until > now`). Life membership
+ * is read straight from the column.
+ *
+ * `pro_redeemed_until` is set by `POST /api/earn/redeem-pro-month` (100,000 testing
+ * rewards = 1 month) — kept in a separate column so license-side syncs that mirror Stripe
+ * state can't accidentally clobber an active redemption.
+ */
 export async function readUserAccountAccessFlags(
   db: D1Database,
   email: string
-): Promise<{ pro_unlocked: boolean; life_member: boolean } | null> {
+): Promise<{ pro_unlocked: boolean; life_member: boolean; pro_redeemed_until: string | null } | null> {
   const e = email.trim().toLowerCase();
   if (!e) return null;
   const row = await db
-    .prepare("SELECT pro_unlocked, life_member FROM user_accounts WHERE email = ?")
+    .prepare("SELECT pro_unlocked, life_member, pro_redeemed_until FROM user_accounts WHERE email = ?")
     .bind(e)
-    .first<{ pro_unlocked: number; life_member: number }>();
+    .first<{ pro_unlocked: number; life_member: number; pro_redeemed_until: string | null }>();
   if (!row) return null;
-  return { pro_unlocked: Boolean(row.pro_unlocked), life_member: Boolean(row.life_member) };
+  const redeemedUntil = row.pro_redeemed_until ? String(row.pro_redeemed_until).trim() || null : null;
+  const redemptionActive = redeemedUntil ? Date.parse(redeemedUntil) > Date.now() : false;
+  return {
+    pro_unlocked: Boolean(row.pro_unlocked) || redemptionActive,
+    life_member: Boolean(row.life_member),
+    pro_redeemed_until: redeemedUntil,
+  };
+}
+
+/**
+ * Extends the rewards-redeemed Pro window by `addDays` for the given email. New floor is
+ * `max(now, current pro_redeemed_until)` so a user can stack months back-to-back. Returns
+ * the new expiration ISO string (or null on no-op). Caller is expected to have already
+ * debited `rr_earn_balance`.
+ */
+export async function extendProRedeemedUntil(
+  db: D1Database,
+  email: string,
+  addDays: number,
+): Promise<string | null> {
+  const e = email.trim().toLowerCase();
+  if (!e || addDays <= 0) return null;
+  const row = await db
+    .prepare("SELECT pro_redeemed_until FROM user_accounts WHERE email = ?")
+    .bind(e)
+    .first<{ pro_redeemed_until: string | null }>();
+  if (!row) return null;
+  const nowMs = Date.now();
+  const existingMs = row.pro_redeemed_until ? Date.parse(String(row.pro_redeemed_until)) : NaN;
+  const floorMs = Number.isFinite(existingMs) && existingMs > nowMs ? existingMs : nowMs;
+  const nextMs = floorMs + addDays * 24 * 60 * 60 * 1000;
+  const nextIso = new Date(nextMs).toISOString();
+  await db
+    .prepare(
+      "UPDATE user_accounts SET pro_redeemed_until = ?, updated_at = ? WHERE email = ?",
+    )
+    .bind(nextIso, new Date().toISOString(), e)
+    .run();
+  return nextIso;
 }
 

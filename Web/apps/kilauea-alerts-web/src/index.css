@@ -715,6 +715,28 @@ a:hover {
   gap: 0.85rem;
 }
 
+/* .field is designed for horizontal form rows (`flex: 1 1 200px`) so the inputs share width
+   evenly. Inside the column-direction auth-form, that same flex-grow stretched each field
+   VERTICALLY to fill the card, producing a huge gap between Email and Password. Pin them. */
+.auth-form .field {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.auth-linkish {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font: inherit;
+}
+.auth-linkish:hover {
+  opacity: 0.85;
+}
+
 .input {
   width: 100%;
   padding: 0.55rem 0.75rem;

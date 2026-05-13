@@ -1,7 +1,6 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { earnHeartbeat, getToken, RR_APP_ID } from "./lib/api";
 import BottomNav from "./components/ui/BottomNav";
 import AuthScreen from "./components/modules/AuthScreen";
 import Home from "./components/modules/Home";
@@ -12,22 +11,7 @@ import Notifications from "./components/modules/Notifications";
 import Account from "./components/modules/Account";
 import { About, Help } from "./components/modules/Info";
 import Feedback from "./components/modules/Feedback";
-import TestingRewards from "./components/modules/TestingRewards";
 import DeveloperMessages from "./components/modules/DeveloperMessages";
-
-/** Same earn heartbeat pattern as Weather + Business — shared rr_earn_* pool. */
-function EarnHeartbeat() {
-  const loc = useLocation();
-  useEffect(() => {
-    if (!getToken()) return undefined;
-    const page = loc.pathname || "/";
-    const tick = () => earnHeartbeat({ app_id: RR_APP_ID, page }).catch(() => {});
-    tick();
-    const id = setInterval(tick, 25_000);
-    return () => clearInterval(id);
-  }, [loc.pathname]);
-  return null;
-}
 
 function Gate({ children }) {
   const { user } = useAuth();
@@ -79,7 +63,6 @@ function AppRoutes() {
       <Route path="/about" element={<Gate><About /></Gate>} />
       <Route path="/help" element={<Gate><Help /></Gate>} />
       <Route path="/feedback" element={<Gate><Feedback /></Gate>} />
-      <Route path="/testing-rewards" element={<Gate><TestingRewards /></Gate>} />
       <Route path="/developer-messages" element={<Gate><DeveloperMessages /></Gate>} />
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
@@ -89,7 +72,6 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <EarnHeartbeat />
       <div
         className="min-h-[100dvh] lg:pl-56"
         style={{

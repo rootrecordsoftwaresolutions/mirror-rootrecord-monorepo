@@ -1,11 +1,11 @@
 # RootRecord Business Manager — Mobile (PRD)
 
 ## Product
-Standalone **Android** Business Manager (Capacitor + React): time, money, clients, inventory, scheduling, work log, and reports. Users sign in with a **RootRecord account**; cloud data for this app is stored on **RootRecord primary** (`https://api.rootrecord.info`, D1 `bm_owned_row`). Visual language: dark teal (#2B8A8F), tagline *"Your grounding root for business productivity."* This repo is **not** coupled to any other Business Manager codebase or release train.
+Standalone **Android** Business Manager (Capacitor + React): time, money, clients, inventory, scheduling, work log, and reports. Users sign in with a **RootRecord account**; cloud data for this app is served by the per-product API shard **`rootrecord-api-business`** (`https://api-business.rootrecord.info`, D1 `bm_owned_row`). Visual language: dark teal (#2B8A8F), tagline *"Your grounding root for business productivity."* This repo is **not** coupled to any other Business Manager codebase or release train.
 
 ## Architecture (this repo)
 - **Frontend**: React 18 mobile-first PWA (Manrope + Work Sans, Tailwind). React Router. Recharts. jsPDF for Reports → PDF.
-- **Backend (optional)**: FastAPI + Motor (MongoDB), `/api` — useful for local dev and tests; the **shipping APK** uses the **Cloudflare Worker** API directly (`api.rootrecord.info`).
+- **Backend (optional)**: FastAPI + Motor (MongoDB), `/api` — useful for local dev and tests; the **shipping APK** uses the **Cloudflare Worker** API directly (`api-business.rootrecord.info`, Worker `rootrecord-api-business`).
 - **Auth & billing**: RootRecord **licence Worker** (`rootrecord-license…`) for login, signup, `/v1/me`, entitlement — same account system as other RootRecord apps.
 - **Navigation**: Bottom tabs — Dashboard / Track / Money / Schedule / More.
 

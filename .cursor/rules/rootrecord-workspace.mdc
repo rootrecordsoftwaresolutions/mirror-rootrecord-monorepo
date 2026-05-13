@@ -31,7 +31,32 @@ alwaysApply: true
 
 ## Source-of-truth locations
 
-- **Production API:** per-product Workers `rootrecord-api-weather`, `rootrecord-api-business`, `rootrecord-api-account`, `rootrecord-api-token`, `rootrecord-api-kilauea` (see `Web/cloudflare/API-SHARDS.md`). Prefer **`https://rootrecord-api-<product>.rootrecord.workers.dev`** or a **`*.rootrecord.info`** custom domain on each. **`api.rootrecord.info`** may still map to **`rootrecord-primary`** during migration — treat **`Web/cloudflare/rootrecord-primary`** as **legacy** for new features; implement in **`rootrecord-api-*`** and keep copies aligned until primary is retired.
+- **Production API:** per-product Workers `rootrecord-api-weather`, `rootrecord-api-business`, `rootrecord-api-account`, `rootrecord-api-token`, `rootrecord-api-kilauea` (see `Web/cloudflare/API-SHARDS.md`). Prefer **`https://rootrecord-api-<product>.rootrecord.workers.dev`** or a **`*.rootrecord.info`** custom domain on each. **`api.rootrecord.info`** may still map to **`rootrecord-primary`** during migration — treat **`Web/cloudflare/rootrecord-primary`** as **legacy** for new features; implement in **`rootrecord-api-*`** and keep copies aligned until primary is retired. Final retirement: run `cloudflare-delete-primary.bat` (interactive confirmation).
+- **Frozen Workers (NOT touched by `cloudflare-update-workers.bat`):**
+  - `rootrecord-solana-tx` — RRTT custodial transaction Worker. Source kept in repo; do not redeploy as part of routine updates. If a change is required, `cd Web/cloudflare/rootrecord-solana-tx && npx wrangler deploy` manually. Caveat: it has no crons of its own — `rootrecord-primary` pings it at `:00/:10` UTC. When primary is deleted, the RRTT cron chain breaks unless its trigger is re-wired elsewhere.
+  - `rootrecord-primary` — legacy, see above.
+
+### Per-shard code scoping
+
+Each shard should only carry code for its own product. Current state (post weather-strip):
+
+- **Weather + forecast + natural-disaster modules (`weather.ts`):** live ONLY on `rootrecord-api-weather` and `rootrecord-api-kilauea`. Stripped from token / business / account / primary.
+- **NOAA alert cron (`noaa-alert-cron.ts`):** lives ONLY on `rootrecord-api-weather` and `rootrecord-api-kilauea`. The `*/5 * * * *` cron is registered ONLY on `rootrecord-api-weather` (kilauea's `crons = []`).
+- **`45 8 * * *` inactive-account cleanup:** currently registered ONLY on `rootrecord-primary`. When primary is retired, move this cron + handler to `rootrecord-api-account` (its wrangler `crons = []` today). Tracked in `cloudflare-delete-primary.bat` header.
+- **Stripe / FCM / Solana-custodial routes:** still mounted on all 5 shards (copy-pasted ancestry). Acceptable for now since user traffic for each product targets only its own shard. Future scoping work: strip routes + gate secrets per shard.
+
+### AccuWeather caching (api-weather + api-kilauea)
+
+Two cache layers, both live in D1 / Cloudflare Cache API. NEVER call AccuWeather endpoints directly — always go through `accuFetchJson(env, path, params, opts)` so the per-endpoint TTL is applied.
+
+- **`weather_data` (D1) — bundle cache:** keyed by `grid_key` only (cross-user). TTL `WEATHER_DATA_TTL_SEC` (default `3600` = 1h). `userId` is recorded on writes for attribution but is NOT part of the lookup.
+- **Cloudflare Cache API — per-AccuWeather-endpoint:** TTLs set in `accuTtlForPath()`:
+  - `/forecasts/v1/daily/*`     → 24 h
+  - `/forecasts/v1/hourly/*`    → 1 h
+  - `/currentconditions/v1/*`   → 30 min
+  - `/alarms/v1/*`              → 10 min
+  - `/locations/v1/*`           → 30 days
+  Cache key excludes the API key. Shared across api-weather + api-kilauea automatically (same Cloudflare account → same edge cache namespace), so a Kilauea read warms the cache for Weather Manager reads of the same grid.
 - Marketing site: `Web/main/` (Cloudflare Pages `rootrecord-website`).
 - App build request Worker: `Web/cloudflare/rootrecord-app-build` (Worker name `rootrecord-app-build`; marketing form POST `/api/app-build-request` on Pages proxies to this Worker).
 - **Product web apps (Cloudflare Pages):** `Web/apps/<name>-web/` — `weather-manager-web`, `business-manager-web`, `account-hub-web`, `token-manager-web`, `kilauea-alerts-web`. Each is a standalone pnpm project with its own `pages:deploy` script. Web app source **does not** live under `Mobile/` anymore.
@@ -67,3 +92,23 @@ alwaysApply: true
 - **Code references only when actionable.** Avoid pasting code, file contents, or tool output unless the user asked for it or it’s a 1–3 line diff they need to see.
 - **Context cost:** avoid long bullet lists, duplicate headings, and quoting large tool output; link paths instead of pasting blocks when possible.
 - **Promises vs proof:** don’t claim on-chain outcomes, payouts, or production state without verifiable artifacts (signatures, stats fields, explorer)—otherwise say unknown / not verified.
+
+## Token cost discipline (DO NOT BURN THE USER'S CREDITS)
+
+The user pays per token. Every avoidable tool call or re-edit costs them real dollars. Hold to these:
+
+- **Do not run local builds, deploys, or long-running scripts.** Never invoke `pnpm run build`, `gradlew`, `wrangler deploy`, `cap sync`, `release-bump-and-build.ps1`, `cloudflare-update-*.bat`, `commit-all.bat`, or any equivalent from this session — they take minutes and burn tokens streaming output. Edit the script, describe the change, the user runs it. If you need diagnostic data, patch logging into the script first and have the user re-run.
+- **Do not "reproduce" a user-reported crash by running it yourself.** First step is to read the script, infer the failure mode, and add logging if the existing log is insufficient. The user re-runs and pastes output.
+- **No speculative refactors.** When the user reports a problem, fix that problem with the minimum change. Don't redesign adjacent helpers, rename things, or add opt-in flags unless asked. Each extra edit you initiate is tokens the user did not ask to spend.
+- **Plan multi-file changes before touching anything.** If a change touches 3+ files with the same pattern, sketch the final shape in one short message and confirm before editing. Editing N files, then re-editing the same N files because the design shifted, is the worst token sink.
+- **No re-reads.** Don't re-read a file you already have in context to "double-check" before an edit. Trust your prior read unless the user changed it.
+- **Avoid `git log`, `git diff` over large ranges, `find`, `dir /s`, broad `Grep` with no path, and `Glob '**'` without a target dir** — they stream large output. Scope to a directory.
+- **End-of-turn:** if the only useful reply is "acknowledged" or "no follow-up needed", say that in one line. No recap, no "here's what we did".
+
+## Anti-redundancy (no cruft creation)
+
+- **Verify before creating.** Before adding a new script, wrapper, helper module, batch file, or `.bat` companion, check whether the thing already exists or whether the task can be done by editing an existing file. Use the Cloudflare API (Pages projects, Workers list), `Get-ChildItem`, `Grep`, or `Read` on `credentials.env` / existing scripts to confirm state — do not speculate.
+- **Edit existing files surgically.** Default to modifying the one or two files that already cover the area instead of creating new ones alongside them. Mirror existing patterns rather than inventing parallel ones.
+- **Ask, don’t pre-build.** If unsure whether a “delete X” / “sync Y” / “wrap Z” helper is wanted, ask in one line. Do not create the file first and then offer it.
+- **No band-aid layers.** When a server or upstream issue causes missing data, do not invent client-side derivations or fake values to paper over it — diagnose the source and either fix it or surface the gap honestly. Real-data fallbacks (e.g. Open-Meteo) are acceptable; computed-from-thin-air values are not.
+- **Tear down what you create on revert.** If a created file is rejected or no longer needed (user says “already deleted”, “didn’t need that”, etc.), delete it the same turn — don’t leave orphans in the repo.

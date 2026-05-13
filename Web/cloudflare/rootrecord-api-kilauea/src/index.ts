@@ -1,9 +1,9 @@
 import { json } from "./cors";
-import { logHttpRequestJson, persistHttpErrorIfNeeded, pruneWorkerHttpErrorEvents } from "./observability";
+import { logHttpRequestJson, persistHttpErrorIfNeeded } from "./observability";
 import type { Env } from "./router";
 import { handleRequest } from "./router";
-import { runInactiveAccountCleanupCron } from "./inactive-account-cron";
 import { runNoaaAlertCron } from "./noaa-alert-cron";
+import { runUsgsKilaueaDiscordCron } from "./usgs-discord-cron";
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -49,18 +49,16 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const c = event.cron || "";
     const shard = workerShard(env);
-
-    if (c === "45 8 * * *") {
-      if (shard === "primary" || shard === "account") {
-        await runInactiveAccountCleanupCron(env);
-        await pruneWorkerHttpErrorEvents(env.DB).catch((e) => console.error("observability prune", String(e)));
-      }
+    // `*/5` (only registered on api-weather): NOAA push poller. No-op here unless this Worker is
+    // deployed with WORKER_SHARD="weather", which it isn't.
+    if (c === "*/5 * * * *" && shard === "weather") {
+      await runNoaaAlertCron(env);
       return;
     }
-    if (c === "*/5 * * * *") {
-      if (shard === "primary" || shard === "weather") {
-        await runNoaaAlertCron(env);
-      }
+    // `*/10` (only registered on api-kilauea): USGS Big Island quakes → Discord #kilauea-alerts.
+    if (c === "*/10 * * * *" && shard === "kilauea") {
+      await runUsgsKilaueaDiscordCron(env);
+      return;
     }
   },
 };

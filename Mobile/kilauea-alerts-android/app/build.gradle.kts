@@ -18,8 +18,8 @@ android {
         applicationId = "com.rootrecord.kilauea"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.4"
+        versionCode = 10
+        versionName = "1.0.10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val props = Properties()

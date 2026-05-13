@@ -2,7 +2,7 @@
 
 ## Google Play Console — App access (reviewer login)
 
-Dedicated row in **license** D1 (`license_accounts`), created via `POST https://rootrecord-license.rootrecord.workers.dev/v1/auth/signup`. Same credentials work in the app via **Sign in** on `api.rootrecord.info`. No 2FA.
+Dedicated row in **license** D1 (`license_accounts`), created via `POST https://rootrecord-license.rootrecord.workers.dev/v1/auth/signup`. Same credentials work in the app via **Sign in** on `api-business.rootrecord.info` (Worker `rootrecord-api-business`). No 2FA.
 
 | Field | Value |
 |--------|--------|
@@ -10,10 +10,10 @@ Dedicated row in **license** D1 (`license_accounts`), created via `POST https://
 | **Username** | `google-play-review@rootrecord.info` |
 | **Password** | `RootRecordPlayReview2026!Bm` |
 
-**Other info for reviewers:** Open the app → **Sign in** (not “Continue without an account”) → enter the email and password above. Internet required; backend `api.rootrecord.info`.
+**Other info for reviewers:** Open the app → **Sign in** (not “Continue without an account”) → enter the email and password above. Internet required; backend `api-business.rootrecord.info`.
 
 ## ⚠️ Auth (2026-04-30)
-Authentication **proxies to the live RootRecord licence Worker** at `https://rootrecord-license.rootrecord.workers.dev`. Use the same RootRecord account email/password you use on **rootrecord.info** (and the same account the Android app signs into on `api.rootrecord.info`).
+Authentication **proxies to the live RootRecord licence Worker** at `https://rootrecord-license.rootrecord.workers.dev`. Use the same RootRecord account email/password you use on **rootrecord.info** (and the same account the Android app signs into on `api-business.rootrecord.info`).
 
 The previously-seeded `admin@rootrecord.app / admin123` local-only admin account **no longer exists** — passwords are managed by the licence Worker, not stored locally.
 

@@ -35,6 +35,10 @@ class WeatherViewModel @Inject constructor(
     val useMyLocationWeather =
         prefs.weatherUseMyLocation.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** Pro / Lifetime: server's `pro_unlocked` already OR's `life_member` in. */
+    val proUnlocked =
+        prefs.authProUnlocked.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     private var lastGpsLat: Double? = null
     private var lastGpsLon: Double? = null
 

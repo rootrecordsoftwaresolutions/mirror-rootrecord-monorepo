@@ -5,6 +5,13 @@
 #
 # Secrets: JWT_SECRET (set by deploy.ps1 from credentials.env, optional Web/main/.env, and/or gitignored .deploy-* files).
 #
+# Optional: near–real-time air (AirNow) for Kīlauea Android home — GET /api/airnow/current
+#   wrangler secret put AIRNOW_API_KEY   # https://docs.airnowapi.org/account/request/
+#
+# Optional: Kīlauea Android home screen — EPA AQS daily summaries (Hawaiʻi County) via GET /api/aqs/hawaii-county-daily
+#   wrangler secret put AQS_API_EMAIL   # same email you used at https://aqs.epa.gov/data/api/signup?email=...
+#   wrangler secret put AQS_API_KEY      # key from EPA email (not your account password)
+#
 # Cloudflare account: set CLOUDFLARE_ACCOUNT_ID in repo-root credentials.env (loaded by deploy.ps1), or run `wrangler login`.
 # New D1 in a new account: `npx wrangler d1 create root-record` → paste database_id here and in credentials.env (D1_DATABASE_ID) and rootrecord-license/wrangler.toml.
 name = "rootrecord-api-kilauea"
@@ -14,8 +21,9 @@ compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-# Explicitly no schedules (Kīlauea ingest is app-driven). Clears any legacy triggers if present.
-crons = []
+# `*/10` = USGS earthquakes (Big Island, M2.0+, ~150km of Kilauea) → Discord #kilauea-alerts.
+# Dedupes via `discord_posted_quakes` (migration 0033). Secret: DISCORD_KILAUEA_USGS_WEBHOOK_URL.
+crons = ["*/10 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -57,7 +65,7 @@ RRTT_DECIMALS = "9"
 CUSTODIAL_RPC_REFRESH_BUDGET_MS = "10000"
 # Native apps: GET /api/mobile/version-policy?app_id=… — bump when old builds must update.
 MIN_APP_VERSION_WEATHER = "1.0.16"
-MIN_APP_VERSION_BM = "1.06"
+MIN_APP_VERSION_BM = "1.0.0"
 PLAY_STORE_URL_WEATHER = "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager"
 PLAY_STORE_URL_BM = "https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager"
 MIN_APP_VERSION_TOKEN_MANAGER = "0.1.0"

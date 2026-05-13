@@ -3,7 +3,8 @@ import { logHttpRequestJson, persistHttpErrorIfNeeded, pruneWorkerHttpErrorEvent
 import type { Env } from "./router";
 import { handleRequest } from "./router";
 import { runInactiveAccountCleanupCron } from "./inactive-account-cron";
-import { runNoaaAlertCron } from "./noaa-alert-cron";
+// NOAA alert cron lives only on rootrecord-api-weather (and api-kilauea if it ever needs alerts).
+// This shard is wrangler `crons = []`, so even the shard gate below is belt-and-suspenders.
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -57,10 +58,6 @@ export default {
       }
       return;
     }
-    if (c === "*/5 * * * *") {
-      if (shard === "primary" || shard === "weather") {
-        await runNoaaAlertCron(env);
-      }
-    }
+    // No `*/5` cron handler on this shard. NOAA alert cron is owned by rootrecord-api-weather.
   },
 };

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,8 @@ import com.rootrecord.kilauea.alerts.ui.photos.PhotosViewModel
 import java.io.File
 import java.io.FileOutputStream
 
+private const val BILLING_URL = "https://rootrecord.info/billing"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotosScreen(
@@ -52,6 +55,7 @@ fun PhotosScreen(
 ) {
     val state by vm.state.collectAsState()
     val signedIn by vm.signedIn.collectAsState()
+    val proUnlocked by vm.proUnlocked.collectAsState()
     val ctx = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
@@ -94,25 +98,56 @@ fun PhotosScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (!signedIn) {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Sign in required", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "To submit a photo, sign in on the More tab with your Root Record account.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+            // Three-state ladder for the submission control:
+            //   not signed in   → sign-in nudge (gallery still browsable below)
+            //   signed in, free → Pro upgrade pitch (gating per product decision)
+            //   Pro / Lifetime  → real "Submit photo" button
+            // We deliberately don't render a disabled submit button for non-Pro users: it reads as
+            // "broken" rather than "locked", which is exactly the confusion that prompted this gate.
+            when {
+                !signedIn -> {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Sign in required", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "To submit a photo, sign in on the More tab with your Root Record account.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
-            }
-            Button(
-                onClick = { pick.launch("image/*") },
-                enabled = signedIn && !state.uploading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Filled.Upload, contentDescription = null)
-                Text("Submit photo", modifier = Modifier.padding(start = 8.dp))
+                !proUnlocked -> {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Pro / Lifetime feature", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Photo submissions are part of Root Record Pro and Lifetime. The public gallery stays free to browse — upgrade to contribute your own shots of Kīlauea.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Button(
+                                onClick = {
+                                    CustomTabsIntent.Builder().build()
+                                        .launchUrl(ctx, Uri.parse(BILLING_URL))
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Become a member")
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    Button(
+                        onClick = { pick.launch("image/*") },
+                        enabled = !state.uploading,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.Upload, contentDescription = null)
+                        Text("Submit photo", modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
             }
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 

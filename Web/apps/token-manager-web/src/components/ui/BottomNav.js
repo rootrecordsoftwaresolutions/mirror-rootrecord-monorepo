@@ -27,7 +27,6 @@ export default function BottomNav() {
   if (loc.pathname === "/connect") return null;
   if (loc.pathname === "/auth") return null;
   if (loc.pathname.startsWith("/developer-messages")) return null;
-  if (loc.pathname.startsWith("/testing-rewards")) return null;
   if (loc.pathname.startsWith("/feedback")) return null;
   if (!user) return null;
 

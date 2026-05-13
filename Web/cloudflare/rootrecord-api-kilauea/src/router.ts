@@ -3,6 +3,25 @@ import type { D1Database, ExecutionContext } from "@cloudflare/workers-types";
 import { bindCorsRequest, cors, json } from "./cors";
 
 import { resolveUserId } from "./auth";
+import { readUserAccountAccessFlags } from "./accounts";
+
+// Volcano Village / HVNP — the only location free Kīlauea Alerts accounts can read. Coords
+// mirror BIG_ISLAND_LOCATIONS[id="volcano"] in the web app's locations.ts.
+const FREE_TIER_LOC_ID = "volcano";
+const FREE_TIER_LAT = 19.4194;
+const FREE_TIER_LON = -155.2888;
+
+async function isProEmailUser(db: D1Database, userId: string): Promise<boolean> {
+  if (!userId.startsWith("user:")) return false;
+  const email = userId.slice("user:".length).trim().toLowerCase();
+  if (!email) return false;
+  try {
+    const flags = await readUserAccountAccessFlags(db, email);
+    return Boolean(flags && (flags.pro_unlocked || flags.life_member));
+  } catch {
+    return false;
+  }
+}
 
 import { authLogin, authMe, authSignup, extractAuthToken, sessionFromRequest } from "./primary-auth";
 import { buildSessionCookieHeader, ssoCookieDomainForApiHost } from "./web-sso";
@@ -40,6 +59,8 @@ import { handleMobileVersionPolicy } from "./mobile-client-version";
 import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./developer-messages";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
+import { handleAqsHawaiiCountyDaily } from "./aqs-epa";
+import { handleAirNowCurrent } from "./airnow-proxy";
 
 import {
 
@@ -124,6 +145,10 @@ export interface Env {
 
   DISCORD_FEEDBACK_WEBHOOK_URL?: string;
 
+  /** Discord webhook for USGS Big Island earthquakes → #kilauea-alerts (set ONLY on api-kilauea). */
+
+  DISCORD_KILAUEA_USGS_WEBHOOK_URL?: string;
+
   /** Bearer secret for POST /api/solana-site/log from the Next Solana Tools site (`wrangler secret put SOLANA_SITE_LOG_SECRET`). */
 
   SOLANA_SITE_LOG_SECRET?: string;
@@ -188,6 +213,12 @@ export interface Env {
   MIN_APP_VERSION_ACCOUNT_HUB?: string;
   PLAY_STORE_URL_TOKEN_MANAGER?: string;
   PLAY_STORE_URL_ACCOUNT_HUB?: string;
+
+  /** EPA AQS proxy (`GET /api/aqs/hawaii-county-daily`): `wrangler secret put AQS_API_EMAIL` + `AQS_API_KEY`. */
+  AQS_API_EMAIL?: string;
+  AQS_API_KEY?: string;
+  /** AirNow current observations (`GET /api/airnow/current`): `wrangler secret put AIRNOW_API_KEY`. */
+  AIRNOW_API_KEY?: string;
 
   /**
    * Per-app API shard: when set (e.g. `weather`), `scheduled()` only runs jobs for that shard.
@@ -679,6 +710,14 @@ export async function handleRequest(
     return handleDeveloperMessagesGet(env, url);
   }
 
+  if (method === "GET" && sub === "/aqs/hawaii-county-daily") {
+    return handleAqsHawaiiCountyDaily(request, env);
+  }
+
+  if (method === "GET" && sub === "/airnow/current") {
+    return handleAirNowCurrent(request, env);
+  }
+
   if (method === "POST" && sub === "/internal/developer-messages") {
     return handleDeveloperMessagesPost(request, env);
   }
@@ -1113,7 +1152,9 @@ export async function handleRequest(
       const accuCalls = Object.entries(metrics)
         .filter(([k]) => k.startsWith("accu.call."))
         .reduce((s, [, v]) => s + Number(v || 0), 0);
-      const cacheHits = (metrics["cache.hit.user_grid"] || 0) + (metrics["cache.hit.radius"] || 0);
+      // Backwards-compat: pre-strip metric name was `cache.hit.user_grid` (per-user); post-strip
+      // is `cache.hit.grid` (cross-user). Summing both keeps historical day-buckets correct.
+      const cacheHits = (metrics["cache.hit.grid"] || 0) + (metrics["cache.hit.user_grid"] || 0) + (metrics["cache.hit.radius"] || 0);
       const cacheMiss = metrics["cache.miss.dashboard"] || 0;
       return { day_utc, accu_calls: accuCalls, cache_hits: cacheHits, cache_misses: cacheMiss, metrics };
     });
@@ -1131,12 +1172,13 @@ export async function handleRequest(
         .sort((a, b) => b[1] - a[1])
     );
     const cacheStats = {
-      user_grid_hits: totalsByMetric["cache.hit.user_grid"] || 0,
+      grid_hits: (totalsByMetric["cache.hit.grid"] || 0) + (totalsByMetric["cache.hit.user_grid"] || 0),
       radius_hits: totalsByMetric["cache.hit.radius"] || 0,
+      accu_endpoint_hits: totalsByMetric["accu.cache.hit"] || 0,
       dashboard_misses: totalsByMetric["cache.miss.dashboard"] || 0,
     };
-    const totalCacheChecks = cacheStats.user_grid_hits + cacheStats.radius_hits + cacheStats.dashboard_misses;
-    const cacheHitRate = totalCacheChecks ? (cacheStats.user_grid_hits + cacheStats.radius_hits) / totalCacheChecks : 0;
+    const totalCacheChecks = cacheStats.grid_hits + cacheStats.radius_hits + cacheStats.dashboard_misses;
+    const cacheHitRate = totalCacheChecks ? (cacheStats.grid_hits + cacheStats.radius_hits) / totalCacheChecks : 0;
     return json(
       {
         days,
@@ -1217,15 +1259,30 @@ export async function handleRequest(
 
     const rawLocId = (q.get("location_id") || "").trim();
 
-    const locationId = rawLocId ? rawLocId.slice(0, 64) : null;
+    let locationId: string | null = rawLocId ? rawLocId.slice(0, 64) : null;
 
-    return json(
+    // Free-tier restriction: Kīlauea Alerts free accounts are locked to Volcano. Any other
+    // requested location is silently rewritten to Volcano so the response is well-formed
+    // and the client doesn't show a half-broken dashboard. Pro/Lifetime/guest are bypassed
+    // here — guests can't authenticate at all from the released client, so they only reach
+    // this branch via the marketing/web preview which has its own paywall.
+    let effLat = lat;
+    let effLon = lon;
+    let locked = false;
+    const isPro = await isProEmailUser(env.DB, uidRes);
+    if (!isPro && locationId !== FREE_TIER_LOC_ID) {
+      locationId = FREE_TIER_LOC_ID;
+      effLat = FREE_TIER_LAT;
+      effLon = FREE_TIER_LON;
+      locked = true;
+    }
 
-      await dashboardBundle(env.DB, env, uidRes, lat, lon, { refresh, locationId }),
-
-      200
-
-    );
+    const bundle = await dashboardBundle(env.DB, env, uidRes, effLat, effLon, { refresh, locationId });
+    if (locked && bundle && typeof bundle === "object") {
+      (bundle as Record<string, unknown>).free_location_locked = true;
+      (bundle as Record<string, unknown>).free_location_id = FREE_TIER_LOC_ID;
+    }
+    return json(bundle, 200);
 
   }
 

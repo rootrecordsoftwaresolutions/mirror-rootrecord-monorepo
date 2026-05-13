@@ -79,7 +79,38 @@ $buildDir = Join-Path $frontendRoot "build"
 # Always run a production build when not -SkipBuild — otherwise stale build/ can be uploaded after code edits.
 if (-not $SkipBuild) {
   Write-Host "Building SPA (react-scripts)..."
-  pnpm run build
+  # react-scripts/webpack builds for the heavier bundles (Business Manager: recharts +
+  # framer-motion + jspdf + full radix-ui set) OOM on Node 22 even with a generous heap. The
+  # crash is "Committing semi space failed" — Windows refusing a virtual-memory commit during
+  # scavenge, not V8's old-space cap. Two-pronged mitigation:
+  #
+  #   1. GENERATE_SOURCEMAP=false — source-map emission is what actually pushes peak commit
+  #      over the cliff; production bundles don't need them and Cloudflare Pages doesn't either.
+  #      This is the single most effective CRA OOM fix and a no-op on apps that already disable
+  #      sourcemaps via .env.production.
+  #   2. NODE_OPTIONS = bigger old-space + bigger semi-space. Semi-space (default 16MB) is what
+  #      the "Committing semi space failed" abort references; raising it gives V8 more room to
+  #      grow the young generation before forcing a commit storm. Old-space at 8GB so the build
+  #      itself doesn't run out either.
+  #
+  # Both env vars are saved and restored so we don't pollute the caller's session.
+  $existingNodeOptions = $env:NODE_OPTIONS
+  $existingGenSourcemap = $env:GENERATE_SOURCEMAP
+  $heapOption = "--max-old-space-size=8192 --max-semi-space-size=128"
+  if ([string]::IsNullOrWhiteSpace($existingNodeOptions)) {
+    $env:NODE_OPTIONS = $heapOption
+  }
+  elseif ($existingNodeOptions -notmatch "max-old-space-size") {
+    $env:NODE_OPTIONS = "$existingNodeOptions $heapOption"
+  }
+  $env:GENERATE_SOURCEMAP = "false"
+  try {
+    pnpm run build
+  }
+  finally {
+    $env:NODE_OPTIONS = $existingNodeOptions
+    $env:GENERATE_SOURCEMAP = $existingGenSourcemap
+  }
 }
 
 if (-not (Test-Path (Join-Path $buildDir "index.html"))) {

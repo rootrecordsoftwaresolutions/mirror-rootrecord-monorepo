@@ -38,6 +38,9 @@ import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
 import { readRecentHttpErrorEvents } from "./observability";
 import { handleMobileVersionPolicy } from "./mobile-client-version";
 import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./developer-messages";
+import { handleDiscordUserActivityGet } from "./discord-user-activity";
+import { handleDiscordChannelBackfillPost } from "./discord-channel-backfill";
+import { handleDiscordActivityDailyGet, handleDiscordActivityDailyRebuildPost } from "./discord-activity-stats";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
 
@@ -123,6 +126,18 @@ export interface Env {
   /** Discord webhook for POST /api/feedback (`wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL`). */
 
   DISCORD_FEEDBACK_WEBHOOK_URL?: string;
+
+  /** Discord webhook for USGS Big Island earthquakes → #kilauea-alerts (set ONLY on api-kilauea). */
+
+  DISCORD_KILAUEA_USGS_WEBHOOK_URL?: string;
+
+  /** Discord bot token (read-only) for syncing the announcements channel → `developer_messages` D1. */
+
+  DISCORD_BOT_TOKEN?: string;
+
+  /** Discord channel ID to read announcements from (plain `[vars]`; bot must have View Channel + Read Message History). */
+
+  DISCORD_ANNOUNCEMENTS_CHANNEL_ID?: string;
 
   /** Bearer secret for POST /api/solana-site/log from the Next Solana Tools site (`wrangler secret put SOLANA_SITE_LOG_SECRET`). */
 
@@ -683,6 +698,22 @@ export async function handleRequest(
     return handleDeveloperMessagesPost(request, env);
   }
 
+  if (method === "GET" && sub === "/internal/discord-user-activity") {
+    return handleDiscordUserActivityGet(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/discord-channel-backfill") {
+    return handleDiscordChannelBackfillPost(request, env);
+  }
+
+  if (method === "GET" && sub === "/internal/discord-activity-daily") {
+    return handleDiscordActivityDailyGet(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/discord-activity-daily-rebuild") {
+    return handleDiscordActivityDailyRebuildPost(request, env);
+  }
+
   if (method === "POST" && sub === "/auth/login") {
 
     let creds: { email?: string; password?: string; device_id?: string };
@@ -1113,7 +1144,9 @@ export async function handleRequest(
       const accuCalls = Object.entries(metrics)
         .filter(([k]) => k.startsWith("accu.call."))
         .reduce((s, [, v]) => s + Number(v || 0), 0);
-      const cacheHits = (metrics["cache.hit.user_grid"] || 0) + (metrics["cache.hit.radius"] || 0);
+      // Backwards-compat: pre-strip metric name was `cache.hit.user_grid` (per-user); post-strip
+      // is `cache.hit.grid` (cross-user). Summing both keeps historical day-buckets correct.
+      const cacheHits = (metrics["cache.hit.grid"] || 0) + (metrics["cache.hit.user_grid"] || 0) + (metrics["cache.hit.radius"] || 0);
       const cacheMiss = metrics["cache.miss.dashboard"] || 0;
       return { day_utc, accu_calls: accuCalls, cache_hits: cacheHits, cache_misses: cacheMiss, metrics };
     });
@@ -1131,12 +1164,13 @@ export async function handleRequest(
         .sort((a, b) => b[1] - a[1])
     );
     const cacheStats = {
-      user_grid_hits: totalsByMetric["cache.hit.user_grid"] || 0,
+      grid_hits: (totalsByMetric["cache.hit.grid"] || 0) + (totalsByMetric["cache.hit.user_grid"] || 0),
       radius_hits: totalsByMetric["cache.hit.radius"] || 0,
+      accu_endpoint_hits: totalsByMetric["accu.cache.hit"] || 0,
       dashboard_misses: totalsByMetric["cache.miss.dashboard"] || 0,
     };
-    const totalCacheChecks = cacheStats.user_grid_hits + cacheStats.radius_hits + cacheStats.dashboard_misses;
-    const cacheHitRate = totalCacheChecks ? (cacheStats.user_grid_hits + cacheStats.radius_hits) / totalCacheChecks : 0;
+    const totalCacheChecks = cacheStats.grid_hits + cacheStats.radius_hits + cacheStats.dashboard_misses;
+    const cacheHitRate = totalCacheChecks ? (cacheStats.grid_hits + cacheStats.radius_hits) / totalCacheChecks : 0;
     return json(
       {
         days,

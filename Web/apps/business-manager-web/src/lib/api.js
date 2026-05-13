@@ -2,9 +2,12 @@ import axios from "axios";
 import { Capacitor } from "@capacitor/core";
 import { attachAxiosNetworkResilience } from "./httpResilience";
 
-// Native Android (Capacitor): shared primary. Web: shard Worker (workers.dev) unless REACT_APP_BACKEND_URL overrides (e.g. https://api-business.rootrecord.info after Custom Hostname + DNS).
-const PRIMARY_BACKEND = "https://api.rootrecord.info";
-const SHARD_WEB_BACKEND = "https://rootrecord-api-business.rootrecord.workers.dev";
+// Per-product API shard `rootrecord-api-business` (Web/cloudflare/rootrecord-api-business).
+// Native Android (Capacitor) → custom domain (no cookie concerns).
+// Web → same custom domain so SSO cookies under `.rootrecord.info` work; falls back to workers.dev if Custom Domain isn't attached yet.
+// Override either via REACT_APP_BACKEND_URL.
+const PRIMARY_BACKEND = "https://api-business.rootrecord.info";
+const SHARD_WEB_BACKEND = "https://api-business.rootrecord.info";
 
 function isNativeAndroid() {
   try {
@@ -58,7 +61,7 @@ const BACKEND = useProdFallback
   : fromEnv || defaultBackend();
 const API_BASE = `${BACKEND}/api`;
 
-/** Same earn / signup-bonus accounting as Weather; separate per-app daily caps. */
+/** Ecosystem id used by per-app server endpoints (version policy, developer messages). */
 export const RR_APP_ID = String(
   process.env.REACT_APP_RR_APP_ID || "rootrecord_business_manager_android"
 );
@@ -146,17 +149,6 @@ export function wipeBusinessCloudData() {
     if (e?.response?.status === 404) return api.post("/auth/wipe-business-data", {});
     return Promise.reject(e);
   });
-}
-
-/** Beta / usage rewards — shared balance with Weather (`rr_earn_*` on Worker). */
-export function earnGetSummary() {
-  return api.get("/earn/summary", { params: { app_id: RR_APP_ID } });
-}
-export function earnHeartbeat(body) {
-  return api.post("/earn/heartbeat", body);
-}
-export function earnCheckin(body) {
-  return api.post("/earn/checkin", body ?? { app_id: RR_APP_ID });
 }
 
 /** Server min supported semver + Play Store link (sign-in screen). */

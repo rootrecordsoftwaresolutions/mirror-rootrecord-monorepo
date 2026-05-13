@@ -36,7 +36,7 @@ Set `REACT_APP_BACKEND_URL` to your API base (no trailing `/api`); the client us
 
 Native project: **`frontend/android/`** (Capacitor 6). This dev PC uses **JDK 17** for Gradle via **`%USERPROFILE%\.gradle\gradle.properties`**, **`ANDROID_HOME`** / **`ANDROID_SDK_ROOT`** → `%LOCALAPPDATA%\Android\Sdk`, and **`frontend/android/local.properties`** (`sdk.dir`; gitignored).
 
-**Debug APK (CLI):** from **`frontend/`**, run **`pnpm run android:assemble`**. Output: **`frontend/android/app/build/outputs/apk/debug/RootRecord-Weather.apk`** (release: **`.../release/RootRecord-Weather-release.apk`**).
+**Debug APK (CLI):** from **`frontend/`**, run **`pnpm run android:assemble`**. Output: **`frontend/android/app/build/outputs/apk/debug/app-debug.apk`** (release: **`.../release/app-release.apk`**). The build scripts (`build-weather-release.bat`, `bump-and-build-release.bat`) rename on copy into `release/` / `Mobile/builds/weather-manager/`.
 
 **Workspace standard — all apps’ release APK + AAB:** from the **Mobile** monorepo root, staged copies live under **`builds/weather-manager/`** (sibling folders for other apps). Run **`scripts/build-all-release-to-builds.ps1`**, or see **`docs/RELEASE-BUILD-OUTPUTS.md`** (repo root = folder that contains `scripts/` and `builds/`).
 

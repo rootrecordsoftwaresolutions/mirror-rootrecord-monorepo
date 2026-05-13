@@ -179,8 +179,7 @@ export default function AuthScreen() {
       </form>
 
       <p className="text-xs text-ink-tertiary text-center mt-auto pt-6">
-        Same RootRecord sign-in as Weather Manager. Beta tester rewards: see <strong>Account Settings</strong> after sign-in
-        or <a href="https://rootrecord.info/beta-tester-rewards.html" target="_blank" rel="noopener noreferrer" className="text-brand underline-offset-2 hover:underline">rootrecord.info</a>.
+        Same RootRecord sign-in as the other RootRecord apps.
       </p>
     </div>
   );

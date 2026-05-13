@@ -1,13 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cloud, ArrowRight, Loader2 } from 'lucide-react';
+import { Cloud, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { api, session, getMobileVersionPolicy } from '../lib/api';
 import { NATIVE_APP_VERSION } from '../lib/nativeAppVersion';
 import { semverLt } from '../lib/semverLt';
 
+// Single source of truth for the upgrade CTA — same URL Business Manager and Kīlauea use.
+const BILLING_URL = 'https://rootrecord.info/billing';
+
+// Native (Capacitor Android) users get free-tier app-shell access (see App.js `IS_NATIVE`), so
+// don't lead with a billing pitch there — the pitch is web-only.
+const IS_NATIVE = typeof window !== 'undefined' && Boolean(window?.Capacitor?.isNativePlatform?.());
+
 export default function AuthGate({ onSignedIn }) {
   const navigate = useNavigate();
-  const [mode, setMode] = useState('signin'); // signin | signup
+  // `view` controls the landing experience: `pitch` is the default Pro pitch on web (matches
+  // the Kīlauea web AuthScreen pattern — every web dashboard is Pro/Lifetime so we don't bury
+  // the upsell behind a sign-in form that 99% of free users will hit ProPaywall through anyway).
+  // Existing members tap "Sign in" to flip to the form. Native skips straight to `signin`.
+  const [view, setView] = useState(IS_NATIVE ? 'signin' : 'pitch'); // pitch | signin | signup
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +59,7 @@ export default function AuthGate({ onSignedIn }) {
     }
     setBusy(true);
     try {
-      const fn = mode === 'signin' ? api.login : api.signup;
+      const fn = view === 'signin' ? api.login : api.signup;
       const doAttempt = async () => fn(email.trim(), password);
       let res;
       try {
@@ -135,71 +146,117 @@ export default function AuthGate({ onSignedIn }) {
             </div>
           </div>
 
-          <div className="flex gap-2 mb-6 text-xs uppercase tracking-widest font-mono">
-            <button
-              type="button"
-              data-testid="auth-tab-signin"
-              onClick={() => setMode('signin')}
-              className={`pb-2 border-b-2 ${mode === 'signin' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              data-testid="auth-tab-signup"
-              onClick={() => setMode('signup')}
-              className={`pb-2 border-b-2 ${mode === 'signup' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
-            >
-              Create account
-            </button>
-          </div>
-
-          <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-            <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-accent/70 font-mono">Email</span>
-              <input
-                data-testid="auth-email-input"
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="mt-1 w-full bg-container border border-subtle rounded-sm px-3 py-3 outline-none focus:border-accent transition-colors"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-accent/70 font-mono">Password</span>
-              <input
-                data-testid="auth-password-input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••"
-                className="mt-1 w-full bg-container border border-subtle rounded-sm px-3 py-3 outline-none focus:border-accent transition-colors"
-              />
-            </label>
-
-            {err && (
-              <div className="text-xs bg-sev-severe/10 border border-sev-severe/40 text-sev-severe p-2 rounded-sm" data-testid="auth-error">
-                {err}
+          {view === 'pitch' ? (
+            <div data-testid="auth-pitch">
+              <div className="flex items-center gap-2 text-accent/80 text-[11px] uppercase tracking-widest mb-3 font-mono">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                RootRecord Pro
               </div>
-            )}
+              <h2 className="text-2xl font-semibold leading-tight mb-3">
+                Weather is designed for Pro and Lifetime members only.
+              </h2>
+              <p className="text-sm text-accent/85 leading-relaxed mb-6">
+                The Weather Manager web dashboard is part of Root Record Pro and Lifetime. The
+                Android app remains usable on the free tier (one saved location, capped refreshes).
+              </p>
+              <a
+                href={BILLING_URL}
+                data-testid="auth-become-member"
+                className="bg-accent hover:bg-accentHover text-white py-3 rounded-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
+              >
+                Become a Member
+                <ArrowRight className="w-4 h-4" />
+              </a>
+              <p className="mt-6 text-[11px] text-accent/70 text-center">
+                Already a member?{' '}
+                <button
+                  type="button"
+                  data-testid="auth-show-signin"
+                  onClick={() => { setView('signin'); setErr(''); }}
+                  className="underline underline-offset-2 hover:text-white"
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-2 mb-6 text-xs uppercase tracking-widest font-mono">
+                <button
+                  type="button"
+                  data-testid="auth-tab-signin"
+                  onClick={() => setView('signin')}
+                  className={`pb-2 border-b-2 ${view === 'signin' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  data-testid="auth-tab-signup"
+                  onClick={() => setView('signup')}
+                  className={`pb-2 border-b-2 ${view === 'signup' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
+                >
+                  Create account
+                </button>
+              </div>
 
-            <button
-              type="submit"
-              disabled={busy}
-              data-testid="auth-submit-button"
-              className="bg-accent hover:bg-accentHover text-white py-3 rounded-sm flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
-            >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-              {mode === 'signin' ? 'Sign in' : 'Create account'}
-            </button>
-          </form>
+              <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-widest text-accent/70 font-mono">Email</span>
+                  <input
+                    data-testid="auth-email-input"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="mt-1 w-full bg-container border border-subtle rounded-sm px-3 py-3 outline-none focus:border-accent transition-colors"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-widest text-accent/70 font-mono">Password</span>
+                  <input
+                    data-testid="auth-password-input"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••"
+                    className="mt-1 w-full bg-container border border-subtle rounded-sm px-3 py-3 outline-none focus:border-accent transition-colors"
+                  />
+                </label>
 
-          <p className="mt-6 text-[11px] text-accent/70 leading-relaxed">
-            Create an account to save locations and receive alert notifications across devices.
-          </p>
+                {err && (
+                  <div className="text-xs bg-sev-severe/10 border border-sev-severe/40 text-sev-severe p-2 rounded-sm" data-testid="auth-error">
+                    {err}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={busy}
+                  data-testid="auth-submit-button"
+                  className="bg-accent hover:bg-accentHover text-white py-3 rounded-sm flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+                >
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                  {view === 'signin' ? 'Sign in' : 'Create account'}
+                </button>
+              </form>
+
+              {!IS_NATIVE && (
+                <p className="mt-6 text-[11px] text-accent/70 text-center">
+                  <button
+                    type="button"
+                    data-testid="auth-back-to-pitch"
+                    onClick={() => { setView('pitch'); setErr(''); }}
+                    className="underline underline-offset-2 hover:text-white"
+                  >
+                    ← Back
+                  </button>
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

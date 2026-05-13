@@ -47,6 +47,22 @@ export function isAuthed(): boolean {
   return Boolean(getStoredToken());
 }
 
+export function isPro(): boolean {
+  try {
+    return localStorage.getItem(STORAGE.pro) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function isLifeMember(): boolean {
+  try {
+    return localStorage.getItem(STORAGE.life) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function setSession(token: string, email: string, pro?: boolean, lifeMember?: boolean): void {
   try {
     localStorage.setItem(STORAGE.token, token);

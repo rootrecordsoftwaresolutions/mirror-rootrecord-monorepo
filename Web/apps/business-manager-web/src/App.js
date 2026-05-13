@@ -1,7 +1,6 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { getToken, earnHeartbeat, earnCheckin, isBackendConfigured, RR_APP_ID } from "./lib/api";
 import BottomNav from "./components/ui/BottomNav";
 import AuthScreen from "./components/modules/AuthScreen";
 import Dashboard from "./components/modules/Dashboard";
@@ -15,57 +14,10 @@ import Stock from "./components/modules/Stock";
 import Categories from "./components/modules/Categories";
 import { AccountSettings, BusinessSettings, ProgramSettings, About, Feedback } from "./components/modules/Settings";
 import DeveloperMessages from "./components/modules/DeveloperMessages";
+import ProPaywall from "./components/ProPaywall";
+import UpsellModal from "./components/UpsellModal";
 
-/** Same earn heartbeat pattern as Weather Manager — shared `rr_earn_*` balance on the API Worker. */
-function EarnHeartbeat() {
-  const loc = useLocation();
-  const { user } = useAuth();
-  useEffect(() => {
-    if (!getToken()) return undefined;
-    const page = loc.pathname || "/";
-    const tick = () => earnHeartbeat({ app_id: RR_APP_ID, page }).catch(() => {});
-    tick();
-    const id = setInterval(tick, 25_000);
-    return () => clearInterval(id);
-  }, [loc.pathname, user]);
-  return null;
-}
-
-function utcYmd() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Once per UTC day while signed in (not guest): silent earn check-in, same as Weather Manager. */
-function DailyEarnCheckin() {
-  const { user, guest } = useAuth();
-  useEffect(() => {
-    if (user === undefined || guest || !user) return undefined;
-    if (!isBackendConfigured()) return undefined;
-    const KEY = "rrbm.dailyCheckin.lastAttemptYmd";
-    let cancelled = false;
-    const attempt = async () => {
-      if (cancelled) return;
-      const today = utcYmd();
-      if (localStorage.getItem(KEY) === today) return;
-      localStorage.setItem(KEY, today);
-      try {
-        await earnCheckin({ app_id: RR_APP_ID });
-      } catch {
-        /* retry next open / foreground */
-      }
-    };
-    attempt();
-    const onVis = () => {
-      if (document.visibilityState === "visible") attempt();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [user, guest]);
-  return null;
-}
+const IS_NATIVE = typeof window !== "undefined" && Boolean(window?.Capacitor?.isNativePlatform?.());
 
 function Gate({ children }) {
   const { user, guest } = useAuth();
@@ -78,6 +30,10 @@ function Gate({ children }) {
   if (!user && !guest) {
     return <Navigate to="/auth" replace state={{ from: loc.pathname }} />;
   }
+  // Web: Pro-only. Native (Capacitor Android) bypasses the paywall and runs free-with-restrictions.
+  if (user && user.plan !== "pro" && !IS_NATIVE) {
+    return <ProPaywall />;
+  }
   return children;
 }
 
@@ -89,6 +45,7 @@ function AppLayoutShell() {
     <div className={`business-web-main min-h-[100dvh] ${padRail ? "lg:pl-56" : ""}`}>
       <Outlet />
       <BottomNav />
+      <UpsellModal />
     </div>
   );
 }
@@ -113,7 +70,6 @@ function AppRoutes() {
       <Route path="/program" element={<Gate><ProgramSettings /></Gate>} />
       <Route path="/about" element={<Gate><About /></Gate>} />
       <Route path="/feedback" element={<Gate><Feedback /></Gate>} />
-      <Route path="/testing-rewards" element={<Gate><Navigate to="/account" replace /></Gate>} />
       <Route path="/developer-messages" element={<Gate><DeveloperMessages /></Gate>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
@@ -125,8 +81,6 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <EarnHeartbeat />
-        <DailyEarnCheckin />
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>

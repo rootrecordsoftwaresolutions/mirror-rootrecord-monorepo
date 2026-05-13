@@ -13,7 +13,8 @@ export interface MobileVersionEnv {
 }
 
 const DEF_MIN_WEATHER = "1.0.16";
-const DEF_MIN_BM = "1.06";
+/** Must be three-part semver: `"1.06"` parses as 1.6.0 and falsely flags `1.0.19` as outdated. */
+const DEF_MIN_BM = "1.0.0";
 const DEF_MIN_TOKEN = "0.1.0";
 const DEF_MIN_ACCOUNT_HUB = "0.1.1";
 const DEF_PLAY_WEATHER = "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager";

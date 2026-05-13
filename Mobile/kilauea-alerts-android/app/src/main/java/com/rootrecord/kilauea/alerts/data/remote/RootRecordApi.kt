@@ -10,7 +10,7 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 
 /**
- * Root Record primary API — weather dashboard on api.rootrecord.info.
+ * Root Record per-product API shard — weather dashboard on api-kilauea.rootrecord.info (Worker `rootrecord-api-kilauea`).
  * Requires [com.rootrecord.kilauea.alerts.di.GuestHeaderInterceptor] on the OkHttp client.
  */
 interface RootRecordApi {
@@ -38,9 +38,29 @@ interface RootRecordApi {
         @Part("caption") caption: String? = null,
     ): String
 
+    /** Near–real-time observations (AirNow); API key on Worker only. */
+    @GET("/api/airnow/current")
+    suspend fun airNowCurrent(
+        @Query("lat") lat: Double,
+        @Query("lon") lon: Double,
+        @Query("distance") distance: Int = 50,
+    ): String
+
+    @GET("/api/aqs/hawaii-county-daily")
+    suspend fun aqsHawaiiCountyDaily(): String
+
     /** Serve photo bytes (approved only). Used by Coil (no auth). */
     @GET("/api/photos/file/{id}")
     suspend fun photoFile(
         @Path("id") id: String,
     ): okhttp3.ResponseBody
+
+    /**
+     * Latest developer/team update (synced from the team's announcements channel into D1).
+     * Server returns `{ messages: [row] | [] }` — at most one row.
+     */
+    @GET("/api/mobile/developer-messages")
+    suspend fun developerMessages(
+        @Query("app_id") appId: String = "rootrecord_kilauea_alerts_android",
+    ): String
 }

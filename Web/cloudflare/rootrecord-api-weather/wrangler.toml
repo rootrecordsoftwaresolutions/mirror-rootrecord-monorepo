@@ -14,6 +14,14 @@ compatibility_date = "2024-11-01"
 # Solana web3 + SPL use Buffer in some paths; required for treasury→custodial txs in this Worker.
 compatibility_flags = ["nodejs_compat"]
 
+# Custom Domain: wrangler creates the DNS record on the rootrecord.info zone and binds it
+# to this Worker on deploy. SSO cookies under `.rootrecord.info` require the API to share
+# the parent zone (see web-sso.ts). If you ever need to move it to another Worker, detach
+# via the dashboard first OR remove this block before deploy.
+[[routes]]
+pattern = "api-weather.rootrecord.info"
+custom_domain = true
+
 [triggers]
 # NOAA NWS FCM path for Weather Manager (`rrwm_*` tables). Not treasury/RRTT.
 crons = ["*/5 * * * *"]
@@ -58,7 +66,7 @@ RRTT_DECIMALS = "9"
 CUSTODIAL_RPC_REFRESH_BUDGET_MS = "10000"
 # Native apps: GET /api/mobile/version-policy?app_id=… — bump when old builds must update.
 MIN_APP_VERSION_WEATHER = "1.0.16"
-MIN_APP_VERSION_BM = "1.06"
+MIN_APP_VERSION_BM = "1.0.0"
 PLAY_STORE_URL_WEATHER = "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager"
 PLAY_STORE_URL_BM = "https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager"
 MIN_APP_VERSION_TOKEN_MANAGER = "0.1.0"
@@ -70,7 +78,12 @@ PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.
 #   Header: X-RR-Push-Admin-Key: <same as push-broadcast>
 #   JSON: { "title": "…", "body": "…", "app_scope": "all" | "weather" | "bm" | "token_manager" | "account_hub" }
 #
-# Discord developer feed sync → Worker `rootrecord-solana-tx` (same D1 `developer_messages`).
+# Discord → D1 `developer_messages` sync runs from this Worker's `*/5` cron (see `src/index.ts`).
+# Previously hosted on rootrecord-primary / rootrecord-solana-tx (both decommissioned). The D1
+# is shared across every shard so a single sync populates the feed for Weather + Business +
+# Account + Token + Kīlauea simultaneously. Bot needs: View Channel + Read Message History +
+# Privileged "Message Content" intent on the announcements channel.
+DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1500286864119038103"
 
 # Internal custodial wallet encryption (AES-256-GCM). deploy.ps1 uploads INTERNAL_WALLET_ENC_KEY_B64
 # Failsafe: application code never DELETEs `internal_solana_wallets` (encrypted keys) — even on DELETE /v1/me / inactive purge.

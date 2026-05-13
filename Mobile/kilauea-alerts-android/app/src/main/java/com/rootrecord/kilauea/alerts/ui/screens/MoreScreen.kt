@@ -40,6 +40,7 @@ import androidx.navigation.NavController
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.rootrecord.kilauea.alerts.BuildConfig
 import com.rootrecord.kilauea.alerts.ui.KilaueaNavRoutes
 import com.rootrecord.kilauea.alerts.ui.components.DisclaimerBanner
 import com.rootrecord.kilauea.alerts.ui.more.MoreViewModel
@@ -61,6 +62,7 @@ fun MoreScreen(
     val authPro by vm.authProUnlocked.collectAsState()
     val loginBusy by vm.loginBusy.collectAsState()
     val loginError by vm.loginError.collectAsState()
+    val latestDev by vm.latestDevMessage.collectAsState()
 
     var emailField by rememberSaveable { mutableStateOf("") }
     var passwordField by rememberSaveable { mutableStateOf("") }
@@ -175,19 +177,108 @@ fun MoreScreen(
             vm.setLive(it)
         }
 
+        // Latest team update — rendered immediately above the "Desktop version" card so the
+        // signal-to-noise is good (settings/toggles above, outbound links below). Only shows when
+        // there's actually a message to display; collapses cleanly otherwise.
+        latestDev?.let { msg ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Latest update from the team", style = MaterialTheme.typography.titleMedium)
+                    if (msg.createdAt.isNotBlank()) {
+                        Text(
+                            formatDeveloperMessageWhen(msg.createdAt),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(msg.body, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("About", style = MaterialTheme.typography.titleMedium)
+                Text("Desktop version", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "This app is in development. Data is sourced from official agencies (USGS, NWS) and may have delays or gaps.",
+                    "Pro members can open the full Kīlauea Alerts dashboard in any desktop or laptop browser at kilauea.rootrecord.info.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = { uriHandler.openUri("https://kilauea.rootrecord.info/") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Open kilauea.rootrecord.info")
+                }
+            }
+        }
+
+        // ---- About & Help ---------------------------------------------------------------
+        // Layout mirrors Business Manager's About page
+        // (`Web/apps/business-manager-web/src/components/modules/Settings.jsx`) so the five
+        // RootRecord products read the same way; copy here is Kilauea-Alerts-specific.
+        //
+        // Version comes from `BuildConfig.VERSION_NAME` (sourced from `app/build.gradle.kts`
+        // `defaultConfig.versionName`). This is what the release builder
+        // (`Mobile/kilauea-alerts-android/bump-and-build-release.bat`) reads when naming the
+        // APK/AAB artifacts, so any version bump in build.gradle.kts flows into both the
+        // outputs and this screen automatically — never hard-code a version here.
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("About & Help", style = MaterialTheme.typography.titleMedium)
+
+                Text(
+                    "RootRecord Kīlauea Alerts",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    "Mobile build · v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "Built by Root Record Software Solutions.",
+                    "USGS volcano notices, NWS Hawaiʻi alerts, AccuWeather forecasts, and earthquake feeds — focused on Hawaiʻi Island.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+
+                Text(
+                    "What RootRecord stands for",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    "• Reliability first\n• Clarity over cleverness\n• Operability in the real world\n• Composable services\n• Respectful communication",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Text("Plans", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Pro unlocks every Big Island location, push alerts, and the full Kīlauea dashboard at kilauea.rootrecord.info. Free keeps the Volcano-only view with live USGS, NWS, and HVO data.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Text("Custom app development", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Need something built for your workflow, team, or customers? Tell us purpose, platforms, scope, and timeline.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(
+                    onClick = { uriHandler.openUri("https://rootrecord.info/app-build-request") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("rootrecord.info/app-build-request")
+                }
+
+                Text("Where to get help", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Use Send feedback below for bug reports, ideas, or subscription questions. Visit rootrecord.info for the latest.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
                 TextButton(
                     onClick = { uriHandler.openUri("https://rootrecord.info/") },
                     modifier = Modifier.fillMaxWidth(),
@@ -257,4 +348,13 @@ private fun RowToggle(label: String, checked: Boolean, onCheckedChange: (Boolean
         Text(label, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+/** Render a developer-message ISO timestamp as a short local date/time, falling back to raw. */
+private fun formatDeveloperMessageWhen(iso: String): String {
+    return runCatching {
+        val instant = java.time.Instant.parse(iso)
+        val zoned = instant.atZone(java.time.ZoneId.systemDefault())
+        zoned.format(java.time.format.DateTimeFormatter.ofPattern("MMM d, h:mm a"))
+    }.getOrElse { iso }
 }

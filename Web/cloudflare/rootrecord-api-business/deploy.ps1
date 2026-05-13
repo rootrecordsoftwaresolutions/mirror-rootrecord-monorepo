@@ -117,10 +117,8 @@ if ($pushAdmin -and $pushAdmin.Length -ge 8) {
   $pushAdmin | npx wrangler secret put RR_PUSH_ADMIN_SECRET
 }
 
-$usageAdmin = [string]$env:RR_USAGE_ADMIN_SECRET
-if ($usageAdmin -and $usageAdmin.Length -ge 8) {
-  $usageAdmin | npx wrangler secret put RR_USAGE_ADMIN_SECRET
-}
+# RR_USAGE_ADMIN_SECRET upload removed: only consumer was `/internal/usage/accuweather`,
+# which was deleted from every shard. Re-add here if a new admin route revives it.
 
 $fcmPath = [string]$env:FCM_SERVICE_ACCOUNT_JSON_PATH
 if (-not $fcmPath) { $fcmPath = [string]$env:FCM_SERVICE_ACCOUNT_JSON_FILE }
@@ -134,10 +132,21 @@ if ($stripeSecret -match '^sk_(live|test)_' -and $stripeSecret.Length -gt 30) {
   Write-Host "Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env)."
 }
 
+# AccuWeather secret only goes to weather + kilauea shards. Token/business/account/primary do not
+# carry weather code anymore (see router.ts: "Weather/forecast/natural-disaster modules removed").
+$shardLeaf = Split-Path $PSScriptRoot -Leaf
 $accuApiKey = [string]$env:ACCUWEATHER_API_KEY
-if ($accuApiKey -and $accuApiKey.Length -ge 16) {
+if (($shardLeaf -eq 'rootrecord-api-weather' -or $shardLeaf -eq 'rootrecord-api-kilauea') -and $accuApiKey -and $accuApiKey.Length -ge 16) {
   $accuApiKey | npx wrangler secret put ACCUWEATHER_API_KEY
-  Write-Host "Uploaded ACCUWEATHER_API_KEY to Worker (from credentials.env)."
+  Write-Host "Uploaded ACCUWEATHER_API_KEY to $shardLeaf (from credentials.env)."
+}
+
+# USGS earthquakes → Discord #kilauea-alerts webhook. Consumed by `runUsgsKilaueaDiscordCron`
+# in api-kilauea on the */10 cron; pointless on other shards.
+$kilaueaUsgsWebhook = [string]$env:DISCORD_KILAUEA_USGS_WEBHOOK_URL
+if ($shardLeaf -eq 'rootrecord-api-kilauea' -and $kilaueaUsgsWebhook -match '^https://discord(?:app)?\.com/api/webhooks/' -and $kilaueaUsgsWebhook.Length -gt 60) {
+  $kilaueaUsgsWebhook | npx wrangler secret put DISCORD_KILAUEA_USGS_WEBHOOK_URL
+  Write-Host "Uploaded DISCORD_KILAUEA_USGS_WEBHOOK_URL to $shardLeaf (from credentials.env)."
 }
 
 $discordFeedback = [string]$env:DISCORD_FEEDBACK_WEBHOOK_URL

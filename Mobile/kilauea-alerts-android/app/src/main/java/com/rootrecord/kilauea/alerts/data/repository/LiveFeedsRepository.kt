@@ -154,6 +154,16 @@ class LiveFeedsRepository @Inject constructor(
                 youtubeVideoId = null,
                 watchUrl = "https://www.usgs.gov/volcanoes/kilauea/webcams",
             ),
+            // Featured community creator. Uses /live so YouTube redirects to the active stream
+            // when broadcasting and falls back to the channel page otherwise — no API key needed.
+            LiveFeed(
+                id = "yt_two_pineapples",
+                title = "Two Pineapples (YouTube) — featured creator",
+                description = "Independent Hawaiʻi volcano coverage from Two Pineapples. Opens the active livestream when on air, otherwise the channel page.",
+                youtubeVideoId = null,
+                watchUrl = "https://www.youtube.com/@TwoPineapples/live",
+                thumbnailUrl = null,
+            ),
         )
     }
 }

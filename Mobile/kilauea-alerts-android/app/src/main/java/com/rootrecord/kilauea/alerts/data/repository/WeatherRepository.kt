@@ -47,7 +47,7 @@ class WeatherRepository @Inject constructor(
                         cacheKey = CacheKeys.dashboard(locationId),
                         payloadJson = AppJson.encodeToString(JsonObject.serializer(), json),
                         fetchedAtEpochMs = System.currentTimeMillis(),
-                        sourceUrl = "https://api.rootrecord.info/api/dashboard",
+                        sourceUrl = "https://rootrecord-api-kilauea.rootrecord.workers.dev/api/dashboard",
                     ),
                 )
             }

@@ -29,9 +29,9 @@ Release bundles use the same Gradle targets as other Root Record apps; staged co
 - **WorkManager**: `AlertPollWorker`, `LiveFeedsSyncWorker`, `HomeRefreshWorker`.
 - **FCM**: `KilaueaFirebaseMessagingService` triggers a one-shot alert poll.
 
-USGS and NWS are called **directly** from the device. Weather dashboards use **`https://api.rootrecord.info/api/dashboard`** with `X-Guest-Id`.
+USGS and NWS are called **directly** from the device. Weather dashboards use **`https://api-kilauea.rootrecord.info/api/dashboard`** (Worker `rootrecord-api-kilauea`) with `X-Guest-Id`.
 
-Signed-in users can send **feedback** from **More → Send feedback**; the app posts to **`POST https://api.rootrecord.info/api/feedback`** (same path as Business Manager; Worker forwards to Discord when configured).
+Signed-in users can send **feedback** from **More → Send feedback**; the app posts to **`POST https://api-kilauea.rootrecord.info/api/feedback`** (same route copied from the legacy primary; Worker forwards to Discord when configured).
 
 ## Beta testing
 

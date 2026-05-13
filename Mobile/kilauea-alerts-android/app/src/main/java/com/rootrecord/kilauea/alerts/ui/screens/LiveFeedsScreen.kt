@@ -66,7 +66,7 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
             }
             item {
                 Text(
-                    "Official USGS webcams and streams. Watch opens in your browser or video app.",
+                    "Official USGS webcams and streams, plus featured community creators. Watch opens in your browser or video app.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -77,6 +77,20 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
                         .launchUrl(ctx, Uri.parse("https://www.usgs.gov/volcanoes/kilauea/webcams"))
                 }) {
                     Text(stringResource(R.string.view_usgs_webcams))
+                }
+            }
+            item {
+                Button(onClick = {
+                    CustomTabsIntent.Builder().build()
+                        .launchUrl(ctx, Uri.parse("https://www.youtube.com/@TwoPineapples/live"))
+                }) {
+                    Row {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null)
+                        Text(
+                            "Watch TwoPineapples live (YouTube)",
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
                 }
             }
             items(state.catalog?.feeds.orEmpty()) { feed ->

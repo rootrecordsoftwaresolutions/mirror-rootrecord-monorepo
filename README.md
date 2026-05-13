@@ -23,7 +23,8 @@ MonoRepo/
 ├── commit-all.bat           Stage + commit + push (user runs)
 ├── cloudflare-update-all.bat        Workers + Pages deploy wrapper (user runs)
 ├── cloudflare-update-workers.bat    Workers only (user runs)
-└── cloudflare-update-pages.bat      Pages only (user runs)
+├── cloudflare-update-pages.bat      Pages only (user runs)
+└── cloudflare-delete-primary.bat    Decommission legacy `rootrecord-primary` Worker (user runs, interactive)
 ```
 
 ## Web vs Mobile — important rule
@@ -43,7 +44,13 @@ MonoRepo/
 | Marketing site | `Web/main/` → `rootrecord-website` | — | (Pages Functions in `Web/main/functions/`) |
 | Solana tools | `solana-rootrecord-site/` → `solana.rootrecord.info` | — | — |
 
-Other Workers in `Web/cloudflare/`: `rootrecord-license`, `rootrecord-solana-tx`, `rootrecord-app-build`, `rr-weather-manager-api`, `shared/` (importable code, e.g. `password-verify.ts`). `rootrecord-primary` is **legacy** and being phased out — do not deploy.
+Other Workers in `Web/cloudflare/`: `rootrecord-license`, `rootrecord-solana-tx`, `rootrecord-app-build`, `shared/` (importable code, e.g. `password-verify.ts`). `rootrecord-primary` is **legacy** — its source has been stripped of weather + duplicate crons but the deployed Worker still serves stale code and a redundant `*/5` NOAA poller until you run `cloudflare-delete-primary.bat` (interactive, destructive). Re-bind any routes that still point at `rootrecord-primary` first. `rr-weather-manager-api` is also **legacy and already deleted from Cloudflare** — its push routes (`push-token`, `push-broadcast`) are merged into every `rootrecord-api-*` shard via `src/push.ts`. The repo source remains for historical reference; it is no longer deployed by `cloudflare-update-workers.bat`.
+
+### Weather / AccuWeather notes (api-weather + api-kilauea only)
+
+- AccuWeather endpoints live ONLY on `rootrecord-api-weather` and `rootrecord-api-kilauea`. Other shards have no `weather.ts`.
+- Every external AccuWeather call goes through `accuFetchJson()`, which caches per-URL via the Cloudflare Cache API. Per-path TTLs: daily 5-day = 24h, hourly 72-hour = 1h, current conditions = 30min, alerts = 10min, location lookups = 30d. Cache key omits the API key, so api-weather and api-kilauea share cache fills automatically.
+- D1 bundle cache (`weather_data`) is keyed by `grid_key` only — any user fetching `lat,lon` populates the row for every other user (including cross-shard). Default TTL `WEATHER_DATA_TTL_SEC = 3600` (1h); override per Worker with the env var.
 
 ## Common tasks
 
@@ -74,6 +81,7 @@ Mobile\weather-manager-mobile\bump-and-build-release.bat
 Mobile\business-manager-app\bump-and-build-release.bat
 Mobile\account-hub-app\bump-and-build-release.bat
 Mobile\token-manager-app\bump-and-build-release.bat
+Mobile\kilauea-alerts-android\bump-and-build-release.bat    (native Kotlin; no web/cap step)
 ```
 Each one:
 1. Bumps `versionCode` +1 and the last segment of `versionName` +1 in `Mobile/<app>/android/app/build.gradle`.

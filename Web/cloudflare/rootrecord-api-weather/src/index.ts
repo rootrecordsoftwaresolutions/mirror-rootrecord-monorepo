@@ -1,9 +1,9 @@
 import { json } from "./cors";
-import { logHttpRequestJson, persistHttpErrorIfNeeded, pruneWorkerHttpErrorEvents } from "./observability";
+import { logHttpRequestJson, persistHttpErrorIfNeeded } from "./observability";
 import type { Env } from "./router";
 import { handleRequest } from "./router";
-import { runInactiveAccountCleanupCron } from "./inactive-account-cron";
 import { runNoaaAlertCron } from "./noaa-alert-cron";
+import { runDiscordDeveloperMessageSync } from "./discord-developer-sync";
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -49,18 +49,16 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const c = event.cron || "";
     const shard = workerShard(env);
-
-    if (c === "45 8 * * *") {
-      if (shard === "primary" || shard === "account") {
-        await runInactiveAccountCleanupCron(env);
-        await pruneWorkerHttpErrorEvents(env.DB).catch((e) => console.error("observability prune", String(e)));
-      }
-      return;
-    }
-    if (c === "*/5 * * * *") {
-      if (shard === "primary" || shard === "weather") {
-        await runNoaaAlertCron(env);
-      }
+    // Only the `weather` shard runs the NOAA push poller. `kilauea` shard registers no crons (wrangler.toml).
+    // `45 8 * * *` inactive-account cleanup is no longer registered here; it should move to api-account if revived.
+    if (c === "*/5 * * * *" && shard === "weather") {
+      await runNoaaAlertCron(env);
+      // Discord → D1 `developer_messages` (shared D1 — populates the feed seen by every
+      // product app). Previously ran on rootrecord-primary / rootrecord-solana-tx; both are
+      // decommissioned, so the sync moved here. Failure must not block the NOAA path.
+      await runDiscordDeveloperMessageSync(env).catch((e) =>
+        console.error("discord_developer_sync_err", e instanceof Error ? e.message : String(e)),
+      );
     }
   },
 };

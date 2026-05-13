@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { ScreenHeader, PageContainer, Section, Spinner } from "../ui/Shell";
+import { ScreenHeader, PageContainer, Section } from "../ui/Shell";
 import { useAuth } from "../../contexts/AuthContext";
-import { earnGetSummary } from "../../lib/api";
 import { REGISTERED_APPS } from "../../lib/apps";
 import { initialsFrom } from "../../lib/format";
 import {
@@ -20,25 +19,6 @@ const ICONS = { Cloud, Briefcase, ShieldCheck, Flame };
 
 export default function Home() {
   const { user } = useAuth();
-  const [earn, setEarn] = useState(null);
-  const [loadingEarn, setLoadingEarn] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const { data } = await earnGetSummary();
-        if (alive) setEarn(data);
-      } catch {
-        if (alive) setEarn(null);
-      } finally {
-        if (alive) setLoadingEarn(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const planLabel =
     user?.plan === "life"
@@ -80,36 +60,6 @@ export default function Home() {
                   </span>
                 )}
               </div>
-            </div>
-          </div>
-        </Section>
-
-        {/* Earn balance — shared pool across RootRecord apps */}
-        <Section title="Beta rewards">
-          <div className="p-4 flex items-center gap-3" data-testid="home-earn-card">
-            <div className="w-10 h-10 rounded-xl bg-brand/15 text-brand flex items-center justify-center">
-              <Coins size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              {loadingEarn ? (
-                <Spinner />
-              ) : earn ? (
-                <>
-                  <p className="font-heading text-lg text-ink-primary">
-                    {formatEarnValue(earn)}
-                  </p>
-                  <p className="text-xs text-ink-secondary">
-                    Shared balance across every RootRecord app you use.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-heading text-base text-ink-primary">—</p>
-                  <p className="text-xs text-ink-tertiary">
-                    Earn summary unavailable right now.
-                  </p>
-                </>
-              )}
             </div>
           </div>
         </Section>
@@ -237,19 +187,4 @@ function PlanBadge({ plan, label }) {
       {label}
     </span>
   );
-}
-
-/** Best-effort formatter — `/api/earn/summary` shape varies slightly per Worker. */
-function formatEarnValue(earn) {
-  if (!earn || typeof earn !== "object") return "—";
-  const num =
-    earn.balance_display ??
-    earn.balance ??
-    earn.total ??
-    earn.points ??
-    earn.balance_points ??
-    earn.credits ??
-    null;
-  if (num === null || num === undefined) return "Active";
-  return `${Number(num).toLocaleString()} pts`;
 }

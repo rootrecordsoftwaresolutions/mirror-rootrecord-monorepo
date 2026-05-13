@@ -15,7 +15,10 @@ import {
   MessageCircle,
   Send,
   Megaphone,
+  Monitor,
+  HelpCircle,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { NATIVE_APP_VERSION } from '../lib/nativeAppVersion';
 import { api, getCachedLocations, session } from '../lib/api';
 import { safeLocalStorage } from '../lib/storage';
@@ -27,9 +30,12 @@ const CONTACT = {
   contact: 'https://rootrecord.info/contact.html',
   discord: 'https://discord.gg/jBgRdgmsjB',
   telegram: 'https://t.me/rootrecordsupport',
-  rewards: String(process.env.REACT_APP_BETA_REWARDS_INFO_URL || 'https://rootrecord.info/beta-tester-rewards.html').trim() ||
-    'https://rootrecord.info/beta-tester-rewards.html',
+  desktopWeb: 'https://weather.rootrecord.info/',
 };
+
+const IS_NATIVE_ANDROID = (() => {
+  try { return Capacitor?.isNativePlatform?.() === true; } catch { return false; }
+})();
 
 function Section({ title, children, testId }) {
   return (
@@ -181,15 +187,6 @@ export default function Settings({ onSignedOut }) {
         )}
       </Section>
 
-      <Section title="Rewards" testId="settings-rewards-section">
-        <ExternalLinkRow
-          label="Rewards program"
-          hint="Beta tester rewards — details and policy"
-          href={CONTACT.rewards}
-          testId="settings-rewards-link"
-        />
-      </Section>
-
       <Section title="Updates" testId="settings-developer-messages-section">
         <Row
           icon={Megaphone}
@@ -258,7 +255,26 @@ export default function Settings({ onSignedOut }) {
         </div>
       </Section>
 
+      {IS_NATIVE_ANDROID && (
+        <Section title="Desktop version" testId="settings-desktop-section">
+          <ExternalLinkRow
+            icon={Monitor}
+            label="Open on desktop — Pro members"
+            hint="weather.rootrecord.info — full experience in any desktop or laptop browser"
+            href={CONTACT.desktopWeb}
+            testId="settings-desktop-link"
+          />
+        </Section>
+      )}
+
       <Section title="Contact & support" testId="settings-contact-section">
+        <Row
+          icon={HelpCircle}
+          label="About & Help"
+          value="Version, principles, and plans"
+          onClick={() => navigate('/about')}
+          testId="settings-open-about"
+        />
         <Row
           icon={Send}
           label="Send feedback"

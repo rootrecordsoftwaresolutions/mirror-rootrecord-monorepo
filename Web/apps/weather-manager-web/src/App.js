@@ -8,27 +8,16 @@ import Feedback from './pages/Feedback';
 import LocationMap from './pages/LocationMap';
 import TabBar from './components/TabBar';
 import GuestBanner from './components/GuestBanner';
+import ProPaywall from './components/ProPaywall';
+import UpsellModal from './components/UpsellModal';
 import DeveloperMessages from './pages/DeveloperMessages';
 import AlertDetail from './pages/AlertDetail';
-import { api, isBackendConfigured, session, RR_APP_ID, tryHydrateSessionFromCookie } from './lib/api';
-import { safeLocalStorage, safeSessionStorage } from './lib/storage';
+import About from './pages/About';
+import { api, isBackendConfigured, session, tryHydrateSessionFromCookie } from './lib/api';
+import { safeSessionStorage } from './lib/storage';
+import useAccess from './lib/useAccess';
 
-/** Same earn heartbeat pattern as Business Manager — shared `rr_earn_*` balance on the API Worker. */
-function EarnHeartbeat({ decided }) {
-  const location = useLocation();
-  useEffect(() => {
-    if (!decided || !session.isAuthed()) return undefined;
-    if (!isBackendConfigured()) return undefined;
-    const page = location.pathname || '/';
-    const tick = () => {
-      api.earnHeartbeat({ app_id: RR_APP_ID, page }).catch(() => {});
-    };
-    tick();
-    const id = setInterval(tick, 25_000);
-    return () => clearInterval(id);
-  }, [location.pathname, decided]);
-  return null;
-}
+const IS_NATIVE = typeof window !== 'undefined' && Boolean(window?.Capacitor?.isNativePlatform?.());
 
 /** FCM push registration calls into Firebase; without google-services.json the native app can crash. */
 const ENABLE_NATIVE_PUSH = process.env.REACT_APP_ENABLE_PUSH === '1';
@@ -59,19 +48,16 @@ function useGate() {
   return { decided, authed, guest, setAuthed, setGuest };
 }
 
-function utcYmd() {
-  // YYYY-MM-DD in UTC (matches Worker earn summary ymd).
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function App() {
   const { decided, authed, guest, setAuthed, setGuest } = useGate();
+  const { pro, life } = useAccess();
   const location = useLocation();
   const hideTabs =
     location.pathname.startsWith('/auth') ||
     location.pathname.startsWith('/locations/new') ||
     location.pathname.startsWith('/feedback') ||
     location.pathname.startsWith('/developer-messages') ||
+    location.pathname.startsWith('/about') ||
     location.pathname.startsWith('/alert');
 
   /** Best-effort: record latest device coordinates once per app session (MongoDB via FastAPI). */
@@ -97,34 +83,6 @@ export default function App() {
       { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
     );
   }, [decided, authed, guest]);
-
-  /** Automatically attempt daily check-in once per UTC day on app open / foreground. */
-  useEffect(() => {
-    if (!decided || !authed) return undefined;
-    if (!isBackendConfigured()) return undefined;
-    const KEY = 'rrwm.dailyCheckin.lastAttemptYmd';
-    let cancelled = false;
-    const attempt = async () => {
-      if (cancelled) return;
-      const today = utcYmd();
-      if (safeLocalStorage.getItem(KEY) === today) return;
-      safeLocalStorage.setItem(KEY, today);
-      try {
-        await api.earnCheckin({ app_id: RR_APP_ID });
-      } catch {
-        // Ignore network/server errors; we'll retry next foreground/open.
-      }
-    };
-    attempt();
-    const onVis = () => {
-      if (document.visibilityState === 'visible') attempt();
-    };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      cancelled = true;
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, [decided, authed]);
 
   /** Native only: register FCM token (opt-in — set REACT_APP_ENABLE_PUSH=1 when Firebase is configured). */
   useEffect(() => {
@@ -173,6 +131,20 @@ export default function App() {
   if (!decided) return <div className="h-screen w-screen bg-app" />;
   // Sign-in required.
 
+  // Web: Pro-only. Native (Capacitor Android) apps run free-with-restrictions; no paywall there.
+  const allowAppShell = pro || life || IS_NATIVE;
+  if (authed && !allowAppShell && !location.pathname.startsWith('/auth')) {
+    return (
+      <ProPaywall
+        onSignOut={() => {
+          session.clearSession();
+          setAuthed(false);
+          setGuest(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div
       className="weather-web-main min-h-screen bg-app text-white lg:pl-56 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-8"
@@ -181,7 +153,6 @@ export default function App() {
       }}
     >
       <GuestBanner />
-      {authed ? <EarnHeartbeat decided={decided} /> : null}
       <Routes>
         <Route
           path="/auth"
@@ -198,6 +169,7 @@ export default function App() {
             <Route path="/rootrecord" element={<Navigate to="/settings" replace />} />
             <Route path="/settings" element={<Settings onSignedOut={() => { setAuthed(false); setGuest(false); }} />} />
             <Route path="/feedback" element={<Feedback />} />
+            <Route path="/about" element={<About />} />
             <Route path="/developer-messages" element={<DeveloperMessages />} />
             <Route path="/locations/new" element={<LocationMap />} />
             <Route path="/alert" element={<AlertDetail />} />
@@ -206,6 +178,7 @@ export default function App() {
         )}
       </Routes>
       {!hideTabs && <TabBar />}
+      {authed && <UpsellModal />}
     </div>
   );
 }

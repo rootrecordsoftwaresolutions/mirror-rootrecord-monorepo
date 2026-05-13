@@ -3,4 +3,9 @@
     <files-path name="app_files" path="." />
     <external-path name="my_images" path="." />
     <cache-path name="my_cache_images" path="." />
+    <!-- Required for sharing files written to `Directory.External` (getExternalFilesDir).
+         Without this, FileProvider throws "Failed to find configured root that contains …"
+         when @capacitor-community/file-opener tries to hand a PDF off to a viewer. -->
+    <external-files-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
 </paths>

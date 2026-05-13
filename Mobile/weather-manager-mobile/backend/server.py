@@ -35,7 +35,7 @@ DB_NAME = os.environ["DB_NAME"]
 PRIMARY_API_BASE = (
     os.environ.get("WEATHER_API_PUBLIC_URL")
     or os.environ.get("ROOTRECORD_PRIMARY_API")
-    or "https://api.rootrecord.info"
+    or "https://api-weather.rootrecord.info"
 ).rstrip("/")
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
 

@@ -4,7 +4,7 @@ $appRoot     = Split-Path -Parent $PSScriptRoot
 $webRoot     = Resolve-Path (Join-Path $appRoot "..\..\Web\apps\weather-manager-web")
 $androidRoot = Join-Path $appRoot "android"
 $releaseDir  = Join-Path $appRoot "release"
-$apkPath     = Join-Path $androidRoot "app\build\outputs\apk\release\RootRecord-Weather-release.apk"
+$apkPath     = Join-Path $androidRoot "app\build\outputs\apk\release\app-release.apk"
 $keystorePropsPath  = Join-Path $androidRoot "app\keystore\keystore.properties"
 $googleServicesPath = Join-Path $androidRoot "app\google-services.json"
 

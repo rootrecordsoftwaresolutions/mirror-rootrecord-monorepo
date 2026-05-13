@@ -54,7 +54,7 @@ RRTT_DECIMALS = "9"
 CUSTODIAL_RPC_REFRESH_BUDGET_MS = "10000"
 # Native apps: GET /api/mobile/version-policy?app_id=… — bump when old builds must update.
 MIN_APP_VERSION_WEATHER = "1.0.16"
-MIN_APP_VERSION_BM = "1.06"
+MIN_APP_VERSION_BM = "1.0.0"
 PLAY_STORE_URL_WEATHER = "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager"
 PLAY_STORE_URL_BM = "https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager"
 MIN_APP_VERSION_TOKEN_MANAGER = "0.1.0"

@@ -42,6 +42,10 @@ class PhotosViewModel @Inject constructor(
 ) : ViewModel() {
 
     val signedIn = prefs.authSignedIn.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    // Photo submissions are a Pro/Lifetime perk — gallery viewing stays free. Mirrors the same
+    // `authProUnlocked` flag the rest of the app uses (set by RootRecordAuthRepository on login /
+    // /v1/auth/me refresh; Lifetime is rolled up server-side into proUnlocked = true).
+    val proUnlocked = prefs.authProUnlocked.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _state = MutableStateFlow(PhotosUiState())
     val state = _state.asStateFlow()
@@ -65,6 +69,13 @@ class PhotosViewModel @Inject constructor(
         viewModelScope.launch {
             if (!prefs.authSignedIn.first()) {
                 _state.update { it.copy(toast = "Sign in required to submit photos.") }
+                return@launch
+            }
+            // Belt-and-suspenders: the UI hides the picker for non-Pro users, but if someone routes
+            // around it (deep link, stale state) we still refuse client-side instead of wasting an
+            // R2 upload + server moderation slot.
+            if (!prefs.authProUnlocked.first()) {
+                _state.update { it.copy(toast = "Photo submissions are a Pro / Lifetime perk.") }
                 return@launch
             }
             _state.update { it.copy(uploading = true, error = null, toast = null) }

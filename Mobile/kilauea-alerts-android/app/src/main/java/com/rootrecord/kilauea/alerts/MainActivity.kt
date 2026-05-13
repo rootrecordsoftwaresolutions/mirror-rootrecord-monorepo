@@ -56,17 +56,40 @@ import com.rootrecord.kilauea.alerts.ui.screens.PhotosScreen
 import com.rootrecord.kilauea.alerts.ui.screens.WeatherDetailScreen
 import com.rootrecord.kilauea.alerts.ui.screens.WeatherScreen
 import com.rootrecord.kilauea.alerts.ui.theme.KilaueaTheme
+import com.rootrecord.kilauea.alerts.ui.upsell.UpsellEvents
+import com.rootrecord.kilauea.alerts.ui.upsell.UpsellOverlay
 import com.rootrecord.kilauea.alerts.ui.welcome.WelcomeTutorialOverlay
 import com.rootrecord.kilauea.alerts.work.WorkEnqueue
+import com.rootrecord.kilauea.alerts.data.local.KilaueaPreferences
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var prefs: KilaueaPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         WorkEnqueue.schedulePeriodic(applicationContext)
+
+        // Pro upsell counter — only bump on real launches, not config-change recreates.
+        // First open is silent; #2, #4, #6, … trigger the overlay for free accounts. Feature
+        // gates (e.g. non-Volcano location taps) fire UpsellEvents.trigger() independently.
+        if (savedInstanceState == null) {
+            lifecycleScope.launch {
+                val n = prefs.incrementAppOpenCount()
+                val pro = prefs.authProUnlocked.first()
+                if (!pro && n >= 2 && n % 2 == 0) {
+                    UpsellEvents.trigger()
+                }
+            }
+        }
+
         setContent {
             KilaueaTheme {
                 KilaueaApp(intent?.getStringExtra(EXTRA_OPEN_TAB))
@@ -193,5 +216,6 @@ private fun KilaueaApp(initialTab: String?) {
             }
         }
         WelcomeTutorialOverlay()
+        UpsellOverlay()
     }
 }

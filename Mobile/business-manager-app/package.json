@@ -1,6 +1,6 @@
 {
   "name": "rootrecord-business-android",
-  "version": "1.10",
+  "version": "1.0.19",
   "private": true,
   "description": "Android (Capacitor) wrapper for the Business Manager web app. Web source lives at Web/apps/business-manager-web.",
   "scripts": {
@@ -13,9 +13,13 @@
     "android:bundle:release": "pnpm run cap:sync && cd android && .\\gradlew.bat bundleRelease && cd .. && node scripts/copy-android-artifacts.js aab",
     "android:apk-and-bundle": "pnpm run cap:sync && cd android && .\\gradlew.bat clean assembleRelease bundleRelease && cd .. && node scripts/copy-android-artifacts.js all"
   },
-  "devDependencies": {
+  "dependencies": {
     "@capacitor/android": "^6.2.0",
-    "@capacitor/cli": "^6.2.0",
-    "@capacitor/core": "^6.2.0"
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.4",
+    "@capacitor-community/file-opener": "^6.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
   }
 }

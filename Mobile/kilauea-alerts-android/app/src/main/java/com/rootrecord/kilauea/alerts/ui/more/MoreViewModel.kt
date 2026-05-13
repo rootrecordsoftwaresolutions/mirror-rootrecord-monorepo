@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rootrecord.kilauea.alerts.data.local.KilaueaPreferences
+import com.rootrecord.kilauea.alerts.data.repository.DeveloperMessage
+import com.rootrecord.kilauea.alerts.data.repository.DeveloperMessagesRepository
 import com.rootrecord.kilauea.alerts.data.repository.RootRecordAuthRepository
 import com.rootrecord.kilauea.alerts.work.WorkEnqueue
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,6 +21,7 @@ import javax.inject.Inject
 class MoreViewModel @Inject constructor(
     private val prefs: KilaueaPreferences,
     private val authRepo: RootRecordAuthRepository,
+    private val devMessages: DeveloperMessagesRepository,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -37,6 +40,16 @@ class MoreViewModel @Inject constructor(
 
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError = _loginError.asStateFlow()
+
+    /** Latest team update (or null while loading / on error). Fetched once per VM. */
+    private val _latestDevMessage = MutableStateFlow<DeveloperMessage?>(null)
+    val latestDevMessage = _latestDevMessage.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            devMessages.latest().onSuccess { _latestDevMessage.value = it }
+        }
+    }
 
     fun setVolcano(v: Boolean) {
         viewModelScope.launch { prefs.setNotifyVolcano(v) }

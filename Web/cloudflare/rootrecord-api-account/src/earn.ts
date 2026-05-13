@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { json } from "./cors";
 import { resolveUserId } from "./auth";
+import { extendProRedeemedUntil } from "./accounts";
 import { getSignupBonusRow, SIGNUP_BONUS_UNITS } from "./earn-signup-bonus";
 import type { CustodialCacheRpcEnv } from "./custodial-onchain-cache";
 import { refreshCustodialOnchainCacheFromRpc } from "./custodial-onchain-cache";
@@ -57,6 +58,10 @@ function normalizePage(raw: string | undefined): string {
   return "/";
 }
 
+/** Rewards-for-Pro redemption: 100,000 testing-rewards points → 1 month of Pro membership. */
+export const PRO_REDEMPTION_UNIT_COST = 100_000;
+export const PRO_REDEMPTION_DAYS = 30;
+
 export async function handleEarnRoutes(
   request: Request,
   env: EarnEnv,
@@ -73,7 +78,95 @@ export async function handleEarnRoutes(
   if (sub === "/earn/checkin" && method === "POST") {
     return earnCheckin(request, env);
   }
+  if (sub === "/earn/redeem-pro-month" && method === "POST") {
+    return earnRedeemProMonth(request, env);
+  }
   return json({ detail: "Not found" }, 404);
+}
+
+/**
+ * Burns PRO_REDEMPTION_UNIT_COST rewards points and extends the caller's Pro window by
+ * PRO_REDEMPTION_DAYS. The balance debit and the `pro_redeemed_until` extension run in
+ * a single D1 batch so a partial credit can't happen on transient failure. Returns the
+ * new balance + new expiration ISO so the UI can refresh without an extra round-trip.
+ */
+async function earnRedeemProMonth(request: Request, env: EarnEnv): Promise<Response> {
+  if (!env.JWT_SECRET) return json({ detail: "Server is not configured for authenticated requests." }, 503);
+  const sess = await sessionFromRequest(env, request);
+  if (!sess) return json({ detail: "Sign in required." }, 401);
+  const email = (sess.email || "").trim().toLowerCase();
+  if (!email) return json({ detail: "Account email is required for redemption." }, 400);
+
+  const userId = "user:" + email;
+  const nowIso = new Date().toISOString();
+  await ensureBalance(env.DB, userId, nowIso);
+
+  const balance = await getBalance(env.DB, userId);
+  if (balance < PRO_REDEMPTION_UNIT_COST) {
+    return json(
+      {
+        detail: `You need ${PRO_REDEMPTION_UNIT_COST.toLocaleString()} testing rewards to redeem one month of Pro. Current balance: ${balance.toLocaleString()}.`,
+        balance,
+        cost: PRO_REDEMPTION_UNIT_COST,
+        short_by: PRO_REDEMPTION_UNIT_COST - balance,
+      },
+      400,
+    );
+  }
+
+  // Conditional UPDATE — if `balance >= cost` still holds at write time, the row is decremented.
+  // `changes` lets us detect a TOCTOU race where someone else spent the points first.
+  const debit = await env.DB
+    .prepare(
+      `UPDATE rr_earn_balance
+       SET balance = balance - ?, updated_at = ?
+       WHERE user_id = ? AND balance >= ?`,
+    )
+    .bind(PRO_REDEMPTION_UNIT_COST, nowIso, userId, PRO_REDEMPTION_UNIT_COST)
+    .run();
+  if ((debit.meta?.changes ?? 0) !== 1) {
+    return json({ detail: "Balance changed before we could complete the redemption. Please try again." }, 409);
+  }
+
+  let nextExpiresAt: string | null = null;
+  try {
+    nextExpiresAt = await extendProRedeemedUntil(env.DB, email, PRO_REDEMPTION_DAYS);
+  } catch (e) {
+    // Refund the debit so a write failure on user_accounts doesn't lose points silently.
+    await env.DB
+      .prepare(
+        `UPDATE rr_earn_balance SET balance = balance + ?, updated_at = ? WHERE user_id = ?`,
+      )
+      .bind(PRO_REDEMPTION_UNIT_COST, new Date().toISOString(), userId)
+      .run()
+      .catch(() => {});
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(JSON.stringify({ msg: "redeem_pro_month_extend_err", err: msg.slice(0, 200), email }));
+    return json({ detail: "Could not apply your Pro extension. Your points have been refunded." }, 500);
+  }
+  if (!nextExpiresAt) {
+    // No user_accounts row — shouldn't happen for a session-authenticated user, but refund to be safe.
+    await env.DB
+      .prepare(
+        `UPDATE rr_earn_balance SET balance = balance + ?, updated_at = ? WHERE user_id = ?`,
+      )
+      .bind(PRO_REDEMPTION_UNIT_COST, new Date().toISOString(), userId)
+      .run()
+      .catch(() => {});
+    return json({ detail: "Account profile is not ready for redemption yet. Sign out and back in, then try again." }, 409);
+  }
+
+  const newBalance = await getBalance(env.DB, userId);
+  return json(
+    {
+      ok: true,
+      balance: newBalance,
+      cost: PRO_REDEMPTION_UNIT_COST,
+      pro_redeemed_until: nextExpiresAt,
+      pro_unlocked: true,
+    },
+    200,
+  );
 }
 
 async function getBalance(db: D1Database, userId: string): Promise<number> {

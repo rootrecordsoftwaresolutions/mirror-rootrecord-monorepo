@@ -9,13 +9,16 @@ import {
   toProgramSettingsPatch,
 } from "../../lib/programSettings";
 import { useAuth } from "../../contexts/AuthContext";
-import { Sparkles, LogOut, LogIn, ExternalLink } from "lucide-react";
+import { Sparkles, LogOut, LogIn, ExternalLink, Monitor } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
+import { NATIVE_APP_VERSION } from "../../lib/nativeAppVersion";
 
-const BETA_REWARDS_INFO_URL =
-  String(process.env.REACT_APP_BETA_REWARDS_INFO_URL || "https://rootrecord.info/beta-tester-rewards.html").trim() ||
-  "https://rootrecord.info/beta-tester-rewards.html";
-const SOLANA_ACCOUNT_URL = "https://solana.rootrecord.info/account";
+const DESKTOP_WEB_URL = "https://business.rootrecord.info/";
+
+const IS_NATIVE_ANDROID = (() => {
+  try { return Capacitor?.isNativePlatform?.() === true; } catch { return false; }
+})();
 
 export function AccountSettings() {
   const { user, guest, logout, exitGuest, refreshEntitlement } = useAuth();
@@ -131,34 +134,25 @@ export function AccountSettings() {
           </div>
         </Section>
 
-        <Section title="Beta tester rewards">
-          <div className="p-4 space-y-3 text-sm text-ink-secondary">
-            <p>
-              Usage rewards accrue in the background while you are signed in (same program as Weather Manager). The in-app
-              Rewards tab was removed; view your balance and the full program on{" "}
-              <span className="text-ink-primary font-medium">rootrecord.info</span>. A <strong>daily check-in</strong> runs
-              automatically once per UTC day when you open the app.
-            </p>
-            <a
-              href={BETA_REWARDS_INFO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary w-full inline-flex items-center justify-center gap-2"
-              data-testid="account-beta-rewards-link"
-            >
-              Beta tester rewards <ExternalLink size={16} className="opacity-80" aria-hidden />
-            </a>
-            <a
-              href={SOLANA_ACCOUNT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-ghost w-full text-sm inline-flex items-center justify-center gap-2 border border-white/10"
-              data-testid="account-solana-withdraw-link"
-            >
-              Withdraw RRTT — Solana account <ExternalLink size={14} className="opacity-80" aria-hidden />
-            </a>
-          </div>
-        </Section>
+        {IS_NATIVE_ANDROID && (
+          <Section title="Desktop version">
+            <div className="p-4 space-y-3 text-sm text-ink-secondary">
+              <p>
+                <span className="text-ink-primary font-medium">Pro members</span> can open the full Business Manager in any desktop or laptop browser at{" "}
+                <span className="text-ink-primary font-medium">business.rootrecord.info</span>. Same account, same data.
+              </p>
+              <a
+                href={DESKTOP_WEB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary w-full inline-flex items-center justify-center gap-2"
+                data-testid="settings-desktop-link"
+              >
+                <Monitor size={16} /> Open on desktop <ExternalLink size={14} className="opacity-80" aria-hidden />
+              </a>
+            </div>
+          </Section>
+        )}
 
         <Section title="Plan overview">
           <div className="p-4 grid grid-cols-2 gap-3">
@@ -469,7 +463,10 @@ export function About() {
         <Section>
           <div className="p-4 space-y-3 text-sm">
             <p className="font-heading font-bold text-base text-ink-primary">RootRecord Business Manager</p>
-            <p className="text-ink-secondary">Mobile build · v1.0.2</p>
+            {/* Version comes from package.json at build time (nativeAppVersion.js) so the builder
+                bat (Mobile/business-manager-app/bump-and-build-release.bat) bumps it automatically
+                when the web bundle is rebuilt. Never hard-code a version here. */}
+            <p className="text-ink-secondary">Mobile build · v{NATIVE_APP_VERSION}</p>
             <p className="text-ink-secondary">Local-first time, money, clients, inventory, scheduling, and reports — designed to run wherever your business does.</p>
           </div>
         </Section>
@@ -499,8 +496,14 @@ export function About() {
           </div>
         </Section>
         <Section title="Where to get help">
-          <div className="p-4 text-sm text-ink-secondary">
+          <div className="p-4 text-sm text-ink-secondary space-y-2">
             <p>Use <b className="text-ink-primary">Feedback</b> in the More menu for bug reports, ideas, or subscription questions. Visit <a className="text-brand" href="https://rootrecord.info" target="_blank" rel="noreferrer">rootrecord.info</a> for the latest.</p>
+            <p>
+              Join the community on Discord:{" "}
+              <a className="text-brand font-semibold" href="https://discord.gg/jBgRdgmsjB" target="_blank" rel="noreferrer">
+                discord.gg/jBgRdgmsjB
+              </a>
+            </p>
           </div>
         </Section>
       </PageContainer>

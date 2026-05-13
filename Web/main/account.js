@@ -262,14 +262,10 @@
       ' <a href="/beta-tester-rewards.html" style="' +
       moss +
       '">Beta tester rewards</a>';
-    const withdraw =
-      ' · <a href="https://solana.rootrecord.info/account" target="_blank" rel="noopener" style="' +
-      moss +
-      '">Withdraw on Solana</a>';
     const note =
-      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full explanation and balance (same total) on the website. In-app rewards tabs were removed; apps may still earn in the background while you are signed in.</span>';
+      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and redemption are on the rewards page. 100,000 testing-rewards points trade for one month of Pro membership.</span>';
     if (!earn) {
-      return escapeHtml("—") + program + withdraw + note;
+      return escapeHtml("—") + program + note;
     }
     const n = Number(earn.balance);
     const b = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
@@ -278,7 +274,6 @@
       escapeHtml(String(b.toLocaleString())) +
       "</strong>" +
       program +
-      withdraw +
       note
     );
   }

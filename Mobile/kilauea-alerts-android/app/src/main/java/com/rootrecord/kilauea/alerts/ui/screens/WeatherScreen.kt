@@ -34,8 +34,11 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 import com.rootrecord.kilauea.alerts.ui.components.DisclaimerBanner
+import com.rootrecord.kilauea.alerts.ui.upsell.UpsellEvents
 import com.rootrecord.kilauea.alerts.ui.util.briefWeatherSummary
 import com.rootrecord.kilauea.alerts.ui.weather.WeatherViewModel
+
+private const val FREE_TIER_LOC_ID = "volcano"
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -45,6 +48,7 @@ fun WeatherScreen(
 ) {
     val state by vm.state.collectAsState()
     val useMyLocation by vm.useMyLocationWeather.collectAsState()
+    val proUnlocked by vm.proUnlocked.collectAsState()
     val ctx = LocalContext.current
     val fineLocation = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
@@ -102,13 +106,23 @@ fun WeatherScreen(
                 )
             }
             state.gpsWeather?.let { wx ->
+                val gpsLocked = !proUnlocked
                 Card(
                     Modifier
                         .padding(16.dp)
-                        .clickable { navController.navigate("weather_detail/gps") },
+                        .clickable {
+                            if (gpsLocked) {
+                                UpsellEvents.trigger()
+                            } else {
+                                navController.navigate("weather_detail/gps")
+                            }
+                        },
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("My location (GPS)", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (gpsLocked) "My location (GPS) — Pro" else "My location (GPS)",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                         Text(briefWeatherSummary(wx), style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -118,13 +132,21 @@ fun WeatherScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
             ) {
                 items(state.rows, key = { it.first.id }) { (loc, json) ->
+                    val locked = !proUnlocked && loc.id != FREE_TIER_LOC_ID
                     Card(
                         Modifier.clickable {
-                            navController.navigate("weather_detail/${loc.id}")
+                            if (locked) {
+                                UpsellEvents.trigger()
+                            } else {
+                                navController.navigate("weather_detail/${loc.id}")
+                            }
                         },
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(loc.label, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                if (locked) "${loc.label} — Pro" else loc.label,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             json?.let { Text(briefWeatherSummary(it), style = MaterialTheme.typography.bodySmall) }
                         }
                     }
