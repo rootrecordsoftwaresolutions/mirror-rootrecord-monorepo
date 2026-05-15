@@ -1,36 +1,48 @@
 @echo off
 setlocal EnableExtensions
-rem Deploy ONLY rootrecord-website (Web\main): discord-activity at /discord-activity/ plus _redirects
-rem and Pages Functions. Skips npm ci / other Pages apps.
-rem pages-deploy.ps1 passes --branch main so the custom domain updates (not only the hash *.pages.dev URL).
-rem If Web\main package.json or devDependencies changed, run: cloudflare-update-pages.bat website
+rem Discord stack only: (1) rootrecord-api-account Worker — NOT other Workers.
+rem                     (2) rootrecord-website (Web\main): /discord-activity/, _redirects, Pages Functions.
+rem pages:deploy uses --branch main so the custom domain updates.
 
 cd /d "%~dp0"
-set "STEP=rootrecord-website (Web\main) - discord-activity + marketing"
+
 echo.
-echo %STEP%
+echo [1/2] rootrecord-api-account Worker only
+echo.
+
+pushd "Web\cloudflare\shared"
+if errorlevel 1 goto ERR
+call npm ci
+if errorlevel 1 ( popd & goto ERR )
+popd
+
+pushd "Web\cloudflare\rootrecord-api-account"
+if errorlevel 1 goto ERR
+call npm ci
+if errorlevel 1 ( popd & goto ERR )
+call powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy.ps1"
+if errorlevel 1 ( popd & goto ERR )
+popd
+
+echo.
+echo [2/2] rootrecord-website (Web\main) - discord-activity + marketing
 echo.
 
 pushd "Web\main"
-if errorlevel 1 (
-  echo ERROR: cannot cd to Web\main
-  pause
-  exit /b 1
-)
-
+if errorlevel 1 goto ERR
 call npm run pages:deploy
-set "ERR=%ERRORLEVEL%"
+if errorlevel 1 ( popd & goto ERR )
 popd
 
-if not "%ERR%"=="0" (
-  echo.
-  echo ERROR: pages:deploy failed exit %ERR%
-  pause
-  exit /b %ERR%
-)
-
 echo.
-echo Done: rootrecord-website uploaded.
+echo Done: api-account + rootrecord-website.
 pause
 endlocal
 exit /b 0
+
+:ERR
+echo.
+echo ERROR: step failed (see output above).
+pause
+endlocal
+exit /b 1

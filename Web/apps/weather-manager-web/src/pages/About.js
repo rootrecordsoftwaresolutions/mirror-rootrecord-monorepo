@@ -30,7 +30,7 @@ export default function About() {
     <div className="min-h-screen bg-app pb-8" data-testid="about-page">
       <header
         className="flex items-center gap-3 p-4 border-b border-subtle"
-        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        style={{ paddingTop: '1rem' }}
       >
         <button
           type="button"
@@ -55,7 +55,7 @@ export default function About() {
             <p className="font-semibold text-base text-white">RootRecord Weather Manager</p>
             <p className="text-accent/90">Mobile build · v{NATIVE_APP_VERSION}</p>
             <p className="text-accent/90">
-              Hyperlocal weather, NOAA alerts, AccuWeather forecasts, and HVO volcanic notices —
+              Hyperlocal weather, NOAA alerts, extended forecasts, and HVO volcanic notices —
               purpose-built for the Pacific and beyond.
             </p>
           </div>

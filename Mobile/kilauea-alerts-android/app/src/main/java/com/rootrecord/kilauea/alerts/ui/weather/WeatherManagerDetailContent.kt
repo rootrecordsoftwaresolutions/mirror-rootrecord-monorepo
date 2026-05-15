@@ -7,22 +7,32 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.rootrecord.kilauea.alerts.ui.util.AirQualityBentoCard
 import com.rootrecord.kilauea.alerts.ui.util.formatDualFahrenheitPrimary
 import com.rootrecord.kilauea.alerts.ui.util.formatWeatherTimestampForDisplay
 import kotlinx.serialization.json.JsonArray
@@ -46,9 +56,14 @@ import kotlin.math.roundToInt
  * hero, bento metrics, hourly strip, NOAA/Canada alerts, nearby USGS events.
  */
 @Composable
-fun WeatherManagerDetailContent(bundle: JsonObject, modifier: Modifier = Modifier) {
+fun WeatherManagerDetailContent(
+    bundle: JsonObject,
+    airQuality: JsonObject? = null,
+    modifier: Modifier = Modifier,
+) {
     val ctx = LocalContext.current
     val model = parseWeatherManagerHome(bundle)
+    var selectedAlert by remember { mutableStateOf<AlertRow?>(null) }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         model.fetchedAt?.let { iso ->
@@ -70,11 +85,19 @@ fun WeatherManagerDetailContent(bundle: JsonObject, modifier: Modifier = Modifie
                     verticalAlignment = Alignment.Bottom,
                 ) {
                     Column {
+                        val heroParts = model.heroTemp.split(" (", limit = 2)
                         Text(
-                            model.heroTemp,
-                            style = MaterialTheme.typography.displayLarge,
+                            heroParts[0],
+                            style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
+                        if (heroParts.size == 2) {
+                            Text(
+                                "(${heroParts[1]}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Text(
                             model.condition,
                             style = MaterialTheme.typography.bodyMedium,
@@ -102,6 +125,8 @@ fun WeatherManagerDetailContent(bundle: JsonObject, modifier: Modifier = Modifie
             BentoTile("Pressure", model.pressure, null, Modifier.weight(1f))
             BentoTile("Visibility", model.visibility, null, Modifier.weight(1f))
         }
+
+        AirQualityBentoCard(airQuality, Modifier.fillMaxWidth())
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BentoTile("Feels like", model.feelsLike, null, Modifier.weight(1f))
@@ -165,7 +190,9 @@ fun WeatherManagerDetailContent(bundle: JsonObject, modifier: Modifier = Modifie
                 Column {
                     model.alerts.take(8).forEachIndexed { idx, a ->
                         Surface(
-                            Modifier.fillMaxWidth(),
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedAlert = a },
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                         ) {
                             Column(Modifier.padding(12.dp)) {
@@ -191,6 +218,19 @@ fun WeatherManagerDetailContent(bundle: JsonObject, modifier: Modifier = Modifie
                     }
                 }
             }
+        }
+
+        selectedAlert?.let { alert ->
+            AlertDetailDialog(
+                alert = alert,
+                onDismiss = { selectedAlert = null },
+                onOpenLink = alert.detailUrl?.let { url ->
+                    {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        selectedAlert = null
+                    }
+                },
+            )
         }
 
         if (model.usgsEvents.isNotEmpty()) {
@@ -266,7 +306,61 @@ private data class AlertRow(
     val title: String,
     val preview: String,
     val timeLine: String,
+    val body: String,
+    val headlineExtra: String?,
+    val instruction: String?,
+    val areaDesc: String?,
+    val detailUrl: String?,
 )
+
+@Composable
+private fun AlertDetailDialog(
+    alert: AlertRow,
+    onDismiss: () -> Unit,
+    onOpenLink: (() -> Unit)?,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(alert.title) },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "${alert.severityLabel} · ${alert.providerLabel}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(alert.timeLine, style = MaterialTheme.typography.labelSmall)
+                alert.areaDesc?.let {
+                    Text("Area", style = MaterialTheme.typography.labelMedium)
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
+                alert.headlineExtra?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (alert.body.isNotBlank()) {
+                    Text(alert.body, style = MaterialTheme.typography.bodySmall)
+                }
+                alert.instruction?.let {
+                    Text("What to do", style = MaterialTheme.typography.labelMedium)
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            if (onOpenLink != null) {
+                TextButton(onClick = onOpenLink) { Text("Open link") }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+    )
+}
 
 private data class UsgsRow(val magnitude: Double, val place: String, val subtitle: String, val json: JsonObject)
 
@@ -608,16 +702,49 @@ private fun alertRow(a: JsonObject, providerFallback: String, bundle: JsonObject
         sev is JsonPrimitive && sev.content.toDoubleOrNull() != null -> "Alert"
         else -> sev?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "Info"
     }
-    val title = a["event"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotBlank() }
-        ?: a["headline"]?.jsonPrimitive?.contentOrNull?.trim()
+    val eventText = coerceAlertNarrative(a["event"]).trim()
+    val headlineText = coerceAlertNarrative(a["headline"]).trim()
+    val descText = coerceAlertNarrative(a["description"]).let { Regex("\\s+").replace(it, " ") }.trim()
+    val title = eventText.takeIf { it.isNotBlank() }
+        ?: headlineText.takeIf { it.isNotBlank() }
         ?: "Alert"
-    val desc = a["description"]?.jsonPrimitive?.contentOrNull?.let { Regex("\\s+").replace(it, " ") }?.trim().orEmpty()
-    val hl = a["headline"]?.jsonPrimitive?.contentOrNull?.let { Regex("\\s+").replace(it, " ") }?.trim().orEmpty()
-    val preview = desc.takeIf { it.isNotBlank() } ?: hl
+    val body = descText.takeIf { it.isNotBlank() } ?: headlineText
+    val headlineExtra = headlineText.takeIf { it.isNotBlank() && it != title && it != body }
+    val instruction = coerceAlertNarrative(a["instruction"]).trim().takeIf { it.isNotBlank() }
+    val areaDesc = coerceAlertNarrative(a["areaDesc"]).trim().takeIf { it.isNotBlank() }
+    val detailUrl = a["detailUrl"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.startsWith("http", ignoreCase = true) }
+        ?: a["uri"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.startsWith("http", ignoreCase = true) }
+        ?: a["web"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.startsWith("http", ignoreCase = true) }
+    val preview = body.ifBlank { headlineText }.ifBlank { "—" }
     val clipped = if (preview.length > 220) preview.take(220) + "…" else preview
     val t = a["effective"]?.jsonPrimitive?.contentOrNull ?: a["sent"]?.jsonPrimitive?.contentOrNull
     val timeLine = t?.let { formatAlertTime(it) } ?: "—"
-    return AlertRow(severityLabel, providerLabel, title, clipped.ifBlank { "—" }, timeLine)
+    return AlertRow(
+        severityLabel = severityLabel,
+        providerLabel = providerLabel,
+        title = title,
+        preview = clipped,
+        timeLine = timeLine,
+        body = body.ifBlank { headlineText },
+        headlineExtra = headlineExtra,
+        instruction = instruction,
+        areaDesc = areaDesc,
+        detailUrl = detailUrl,
+    )
+}
+
+/** AccuWeather may send description/headline as `{ English, Localized }` objects. */
+private fun coerceAlertNarrative(el: kotlinx.serialization.json.JsonElement?): String {
+    if (el == null) return ""
+    if (el is JsonPrimitive) return el.contentOrNull.orEmpty()
+    if (el is JsonObject) {
+        coerceAlertNarrative(el["English"]).trim().takeIf { it.isNotEmpty() }?.let { return it }
+        coerceAlertNarrative(el["Localized"]).trim().takeIf { it.isNotEmpty() }?.let { return it }
+        val cat = el["Category"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+        val typ = el["Type"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+        return listOf(cat, typ).filter { it.isNotEmpty() }.joinToString(" · ")
+    }
+    return ""
 }
 
 private fun formatAlertTime(iso: String): String =

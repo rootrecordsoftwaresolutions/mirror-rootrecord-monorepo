@@ -6,13 +6,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,80 +38,71 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+private const val USGS_CARD_EXCERPT_CHARS = 900
+
 @Composable
 fun AlertsScreen(vm: AlertsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsState()
     val ctx = LocalContext.current
+    val usgsBody = formatUsgsNewestForAlerts(state.volcano?.get("newest"))
+    val feats = state.nws?.get("features")?.jsonArray ?: JsonArray(emptyList())
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { DisclaimerBanner() }
             item {
-                Text(
-                    "Volcano notices from the USGS and weather alerts for Hawaiʻi from the National Weather Service. Tap a card when you see a link.",
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                AlertsInfoCard(
+                    body = "Volcano notices from the USGS and weather alerts for Hawaiʻi from the National Weather Service. Tap a card when you see a link.",
                 )
             }
             item {
-                Text("Latest volcano notice (USGS)", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    formatUsgsNewestForAlerts(state.volcano?.get("newest")),
-                    modifier = Modifier.padding(top = 10.dp),
-                    style = usgsReadableBodyStyle(),
-                )
-                Text(
-                    "Full references → usgs.gov/volcanoes/kilauea",
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .clickable {
-                            ctx.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://www.usgs.gov/volcanoes/kilauea"),
-                                ),
-                            )
-                        },
-                    style = MaterialTheme.typography.titleSmall.copy(lineHeight = 24.sp),
-                    color = MaterialTheme.colorScheme.primary,
+                VolcanoNoticeCard(
+                    body = usgsBody,
+                    onOpenUsgs = {
+                        ctx.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://www.usgs.gov/volcanoes/kilauea"),
+                            ),
+                        )
+                    },
                 )
             }
-            item { Text("Hawaiʻi weather alerts (NWS)", style = MaterialTheme.typography.titleMedium) }
-            val feats = state.nws?.get("features")?.jsonArray ?: JsonArray(emptyList())
+            item {
+                Text(
+                    "Hawaiʻi weather alerts (NWS)",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+                )
+            }
             if (feats.isEmpty()) {
                 item {
-                    Text(
-                        "No active weather alerts for Hawaiʻi right now.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    AlertsInfoCard(
+                        body = "No active weather alerts for Hawaiʻi right now.",
+                        muted = true,
                     )
                 }
             }
             items(feats.size) { idx ->
                 val f = feats[idx].jsonObject
                 val props = f["properties"]?.jsonObject ?: JsonObject(emptyMap())
-                val headline = props["headline"]?.jsonPrimitive?.content ?: props["event"]?.jsonPrimitive?.content
+                val headline = props["headline"]?.jsonPrimitive?.content
+                    ?: props["event"]?.jsonPrimitive?.content
                 val detail = props["description"]?.jsonPrimitive?.content
                 val uri = props["uri"]?.jsonPrimitive?.content
-                Card(
-                    modifier = Modifier.clickable(enabled = uri != null) {
-                        uri?.let { u ->
+                NwsAlertCard(
+                    headline = headline ?: "Alert",
+                    detail = detail,
+                    onClick = uri?.let { u ->
+                        {
                             ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)))
                         }
                     },
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(headline ?: "Alert", style = MaterialTheme.typography.titleSmall)
-                        detail?.let {
-                            Text(
-                                it.take(400),
-                                style = nwsReadableBodyStyle(),
-                            )
-                        }
-                    }
-                }
+                )
             }
         }
         FloatingActionButton(
@@ -123,21 +116,99 @@ fun AlertsScreen(vm: AlertsViewModel = hiltViewModel()) {
     }
 }
 
-/** At least ~2× small body text (~12sp): larger type + generous line height for USGS excerpts. */
 @Composable
-private fun usgsReadableBodyStyle(): TextStyle {
-    val bodyLarge = MaterialTheme.typography.bodyLarge
-    return bodyLarge.copy(
-        fontSize = (bodyLarge.fontSize.value * 1.5f).coerceAtLeast(24f).sp,
-        lineHeight = (bodyLarge.fontSize.value * 2.5f).coerceAtLeast(38f).sp,
-    )
+private fun AlertsInfoCard(body: String, muted: Boolean = false) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        ),
+    ) {
+        Text(
+            text = body,
+            style = alertBodyStyle(),
+            color = if (muted) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier.padding(16.dp),
+        )
+    }
 }
 
 @Composable
-private fun nwsReadableBodyStyle(): TextStyle {
-    val m = MaterialTheme.typography.bodyMedium
-    return m.copy(
-        fontSize = (m.fontSize.value * 1.35f).coerceAtLeast(17f).sp,
-        lineHeight = (m.fontSize.value * 2.1f).coerceAtLeast(26f).sp,
-    )
+private fun VolcanoNoticeCard(body: String, onOpenUsgs: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Latest volcano notice (USGS)", style = MaterialTheme.typography.titleMedium)
+            val excerpt =
+                if (body.length > USGS_CARD_EXCERPT_CHARS) {
+                    body.take(USGS_CARD_EXCERPT_CHARS).trimEnd() + "…"
+                } else {
+                    body
+                }
+            Text(
+                text = excerpt,
+                style = alertBodyStyle(),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                if (body.length > USGS_CARD_EXCERPT_CHARS) {
+                    "Read full notice on USGS →"
+                } else {
+                    "Full report on USGS →"
+                },
+                modifier = Modifier.clickable(onClick = onOpenUsgs),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NwsAlertCard(headline: String, detail: String?, onClick: (() -> Unit)?) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(headline, style = MaterialTheme.typography.titleSmall)
+            detail?.let {
+                Text(
+                    text = it.take(500).trim(),
+                    style = alertBodyStyle(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (it.length > 500 && onClick != null) {
+                    Text(
+                        "Tap for full alert on NWS →",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Comfortable reading size inside cards (not full-screen wall of oversized type). */
+@Composable
+private fun alertBodyStyle(): TextStyle {
+    val base = MaterialTheme.typography.bodyMedium
+    return base.copy(lineHeight = 24.sp)
 }

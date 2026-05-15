@@ -3,6 +3,7 @@ package com.rootrecord.kilauea.alerts.ui.util
 import kotlin.math.abs
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -178,10 +179,7 @@ fun parseDashboardDetail(bundle: JsonObject): DashboardDetailSections {
     val bullets = periods.take(6).mapNotNull { p ->
         val o = p.jsonObject
         val name = o["name"]?.jsonPrimitive?.contentOrNull
-        val tempRaw = o["temperature"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
-        val tempFmt = tempRaw?.let { f ->
-            formatDualFahrenheitPrimary(fahrenheitToCelsius(f), f)
-        }
+        val tempFmt = formatDashboardForecastPeriodTemp(o)
         val short = o["shortForecast"]?.jsonPrimitive?.contentOrNull
             ?: o["detailedForecast"]?.jsonPrimitive?.contentOrNull?.take(120)
         listOfNotNull(name, tempFmt, short).joinToString(" — ").takeIf { it.isNotBlank() }
@@ -205,4 +203,25 @@ fun parseDashboardDetail(bundle: JsonObject): DashboardDetailSections {
         forecastBullets = bullets,
         alertSummary = alertSummary,
     )
+}
+
+/** Period `temperature` may be a number or NWS-style `{ value, unitCode }`; [temperatureUnit] is `C` for AccuWeather paths. */
+private fun JsonObject.forecastPeriodTemperatureC(): Double? {
+    val raw = this["temperature"] ?: return null
+    val n = when (raw) {
+        is JsonPrimitive -> raw.content.toDoubleOrNull()
+        is JsonObject -> raw["value"]?.jsonPrimitive?.content?.toDoubleOrNull()
+        else -> null
+    } ?: return null
+    val u = this["temperatureUnit"]?.jsonPrimitive?.contentOrNull?.trim()?.uppercase() ?: "F"
+    return when {
+        u == "C" || u.contains("CELSIUS") || u.contains("DEGC") -> n
+        u == "F" || u.contains("FAHREN") -> fahrenheitToCelsius(n)
+        else -> fahrenheitToCelsius(n)
+    }
+}
+
+private fun formatDashboardForecastPeriodTemp(o: JsonObject): String? {
+    val c = o.forecastPeriodTemperatureC() ?: return null
+    return formatDualFahrenheitPrimary(c, null)
 }

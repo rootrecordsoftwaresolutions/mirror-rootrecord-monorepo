@@ -24,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.rootrecord.kilauea.alerts.domain.BigIslandLocation
@@ -52,6 +53,9 @@ fun WeatherDetailScreen(
                             WeatherDetailViewModel.WEATHER_GPS_ROUTE_ID -> "My location (GPS)"
                             else -> BigIslandLocation.byId(locationId)?.label ?: locationId
                         },
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 navigationIcon = {
@@ -78,7 +82,11 @@ fun WeatherDetailScreen(
                 state.error != null ->
                     Text(state.error!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp))
                 state.bundle != null ->
-                    WeatherManagerDetailContent(state.bundle!!, Modifier.padding(top = 12.dp))
+                    WeatherManagerDetailContent(
+                        bundle = state.bundle!!,
+                        airQuality = state.airQuality,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
                 else ->
                     Column(
                         Modifier

@@ -3,7 +3,6 @@ import { logHttpRequestJson, persistHttpErrorIfNeeded } from "./observability";
 import type { Env } from "./router";
 import { handleRequest } from "./router";
 import { runNoaaAlertCron } from "./noaa-alert-cron";
-import { runDiscordDeveloperMessageSync } from "./discord-developer-sync";
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -53,12 +52,6 @@ export default {
     // `45 8 * * *` inactive-account cleanup is no longer registered here; it should move to api-account if revived.
     if (c === "*/5 * * * *" && shard === "weather") {
       await runNoaaAlertCron(env);
-      // Discord → D1 `developer_messages` (shared D1 — populates the feed seen by every
-      // product app). Previously ran on rootrecord-primary / rootrecord-solana-tx; both are
-      // decommissioned, so the sync moved here. Failure must not block the NOAA path.
-      await runDiscordDeveloperMessageSync(env).catch((e) =>
-        console.error("discord_developer_sync_err", e instanceof Error ? e.message : String(e)),
-      );
     }
   },
 };

@@ -107,6 +107,17 @@ const STORAGE_KEYS = {
 
 const ACCESS_EVENT = 'rrwm.access.changed';
 
+/** Capacitor Android: re-read Pro/Lifetime from localStorage and show or hide the native banner. */
+function notifyNativeAdsSync() {
+  try {
+    if (typeof window !== 'undefined' && window.RootRecordAds?.sync) {
+      window.RootRecordAds.sync();
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function ensureGuestId() {
   let g = safeLocalStorage.getItem(STORAGE_KEYS.guest);
   if (!g) {
@@ -131,6 +142,25 @@ client.interceptors.request.use((cfg) => {
   if (!isNativeAndroid()) cfg.withCredentials = true;
   return cfg;
 });
+
+// Auto-clear stale local session when the server rejects our Bearer. The Worker returns
+// this exact detail string ONLY from resolveUserId() when a Bearer was present but failed
+// to validate (signature mismatch, missing/revoked license_sessions row). Sign-in failures
+// return different detail strings ("Incorrect email or password."), so login isn't disrupted.
+// Without this, a single bad token in localStorage 401s every authed request forever and
+// the user has to manually sign out + back in to recover.
+client.interceptors.response.use(
+  (r) => r,
+  (e) => {
+    if (
+      e?.response?.status === 401 &&
+      e?.response?.data?.detail === 'Invalid or expired session.'
+    ) {
+      try { session.clearSession(); } catch { /* ignore */ }
+    }
+    return Promise.reject(e);
+  }
+);
 
 /**
  * SQLite / JSON sometimes yields numeric lat/lon as strings. Coerce so UI `.toFixed` never throws
@@ -186,12 +216,14 @@ export const session = {
     // If this user isn't lifetime, treat sign-in as a tier check.
     if (!lifeMember) safeLocalStorage.setItem(STORAGE_KEYS.proCheckedAt, String(Date.now()));
     try { window.dispatchEvent(new Event(ACCESS_EVENT)); } catch { /* ignore */ }
+    notifyNativeAdsSync();
   },
   setAccess: (pro, lifeMember) => {
     safeLocalStorage.setItem(STORAGE_KEYS.pro, pro ? '1' : '0');
     safeLocalStorage.setItem(STORAGE_KEYS.life, lifeMember ? '1' : '0');
     if (!lifeMember) safeLocalStorage.setItem(STORAGE_KEYS.proCheckedAt, String(Date.now()));
     try { window.dispatchEvent(new Event(ACCESS_EVENT)); } catch { /* ignore */ }
+    notifyNativeAdsSync();
   },
   clearSession: () => {
     safeLocalStorage.removeItem(STORAGE_KEYS.token);
@@ -200,6 +232,7 @@ export const session = {
     safeLocalStorage.removeItem(STORAGE_KEYS.life);
     safeLocalStorage.removeItem(STORAGE_KEYS.proCheckedAt);
     try { window.dispatchEvent(new Event(ACCESS_EVENT)); } catch { /* ignore */ }
+    notifyNativeAdsSync();
   },
   guestId: ensureGuestId,
   STORAGE_KEYS,
@@ -272,6 +305,7 @@ export const api = {
   current: (lat, lon) => client.get('/weather/current', { params: { lat, lon } }),
   forecast: (lat, lon) => client.get('/weather/forecast', { params: { lat, lon } }),
   alerts: (lat, lon) => client.get('/weather/alerts', { params: { lat, lon } }),
+  airQuality: (lat, lon) => client.get('/weather/air-quality', { params: { lat, lon } }),
   canada: (lat, lon) => client.get('/canada/alerts', { params: { lat, lon } }),
   dashboard: (lat, lon, opts = {}) =>
     client.get('/dashboard', {

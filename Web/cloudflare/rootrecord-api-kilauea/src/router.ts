@@ -1,4 +1,4 @@
-import type { D1Database, ExecutionContext } from "@cloudflare/workers-types";
+import type { D1Database, ExecutionContext, SendEmail } from "@cloudflare/workers-types";
 
 import { bindCorsRequest, cors, json } from "./cors";
 
@@ -57,10 +57,12 @@ import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
 import { readRecentHttpErrorEvents } from "./observability";
 import { handleMobileVersionPolicy } from "./mobile-client-version";
 import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./developer-messages";
+import { handleKilaueaLiveStreamsGet, handleKilaueaLiveStreamsPost } from "./kilauea-live-streams";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
 import { handleAqsHawaiiCountyDaily } from "./aqs-epa";
 import { handleAirNowCurrent } from "./airnow-proxy";
+import { handleAirQualityCurrent } from "./open-meteo-air-quality";
 
 import {
 
@@ -165,8 +167,12 @@ export interface Env {
    */
   SOLANA_TOOLS_API_FORWARD_URL?: string;
 
-  /** Optional Resend API for POST /api/me/email/request (`wrangler secret put RESEND_API_KEY`). */
+  /** Cloudflare Email Sending (`[[send_email]]` → EMAIL). Onboard domain in dashboard first. */
+  EMAIL?: SendEmail;
 
+  EMAIL_FROM?: string;
+
+  /** Optional Resend fallback for POST /api/me/email/request. */
   RESEND_API_KEY?: string;
 
   RESEND_FROM?: string;
@@ -710,6 +716,10 @@ export async function handleRequest(
     return handleDeveloperMessagesGet(env, url);
   }
 
+  if (method === "GET" && sub === "/mobile/kilauea-live-streams") {
+    return handleKilaueaLiveStreamsGet(env);
+  }
+
   if (method === "GET" && sub === "/aqs/hawaii-county-daily") {
     return handleAqsHawaiiCountyDaily(request, env);
   }
@@ -718,8 +728,16 @@ export async function handleRequest(
     return handleAirNowCurrent(request, env);
   }
 
+  if (method === "GET" && sub === "/air-quality/current") {
+    return handleAirQualityCurrent(request);
+  }
+
   if (method === "POST" && sub === "/internal/developer-messages") {
     return handleDeveloperMessagesPost(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/kilauea-live-streams") {
+    return handleKilaueaLiveStreamsPost(request, env);
   }
 
   if (method === "POST" && sub === "/auth/login") {

@@ -7,13 +7,15 @@ export type DiscordUserActivityEnv = {
   RR_PUSH_ADMIN_SECRET?: string;
 };
 
+const NO_STORE = { "Cache-Control": "no-store, max-age=0, must-revalidate" } as const;
+
 /** GET /api/internal/discord-user-activity — newest posters first (`X-RR-Push-Admin-Key`). */
 export async function handleDiscordUserActivityGet(request: Request, env: DiscordUserActivityEnv): Promise<Response> {
   const secret = (env.RR_PUSH_ADMIN_SECRET || "").trim();
-  if (!secret) return json({ detail: "RR_PUSH_ADMIN_SECRET is not set on this Worker." }, 503);
+  if (!secret) return json({ detail: "RR_PUSH_ADMIN_SECRET is not set on this Worker." }, 503, NO_STORE);
   if (!(await verifyWorkerOpsAdmin(request, env))) {
     const has = Boolean(request.headers.get("X-RR-Push-Admin-Key"));
-    return json({ detail: has ? "Invalid admin key." : "Missing X-RR-Push-Admin-Key header." }, 401);
+    return json({ detail: has ? "Invalid admin key." : "Missing X-RR-Push-Admin-Key header." }, 401, NO_STORE);
   }
 
   let limit = 100;
@@ -32,5 +34,5 @@ export async function handleDiscordUserActivityGet(request: Request, env: Discor
     .bind(limit)
     .all();
 
-  return json({ ok: true, rows: q.results ?? [] }, 200);
+  return json({ ok: true, rows: q.results ?? [] }, 200, NO_STORE);
 }

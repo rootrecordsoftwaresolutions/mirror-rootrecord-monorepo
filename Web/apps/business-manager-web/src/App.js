@@ -42,7 +42,9 @@ function AppLayoutShell() {
   const loc = useLocation();
   const padRail = !loc.pathname.startsWith("/auth");
   return (
-    <div className={`business-web-main min-h-[100dvh] ${padRail ? "lg:pl-56" : ""}`}>
+    <div
+      className={`business-web-main min-h-[100dvh] ${padRail ? "lg:pl-56" : ""} pt-[max(env(safe-area-inset-top,0px),var(--rr-native-ad-banner-height,0px))]`}
+    >
       <Outlet />
       <BottomNav />
       <UpsellModal />

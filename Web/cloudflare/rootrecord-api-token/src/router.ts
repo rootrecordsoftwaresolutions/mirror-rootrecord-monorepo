@@ -1,4 +1,4 @@
-import type { D1Database, ExecutionContext } from "@cloudflare/workers-types";
+import type { D1Database, ExecutionContext, SendEmail } from "@cloudflare/workers-types";
 
 import { bindCorsRequest, cors, json } from "./cors";
 
@@ -108,8 +108,12 @@ export interface Env {
    */
   SOLANA_TOOLS_API_FORWARD_URL?: string;
 
-  /** Optional Resend API for POST /api/me/email/request (`wrangler secret put RESEND_API_KEY`). */
+  /** Cloudflare Email Sending (`[[send_email]]` → EMAIL). Onboard domain in dashboard first. */
+  EMAIL?: SendEmail;
 
+  EMAIL_FROM?: string;
+
+  /** Optional Resend fallback for POST /api/me/email/request. */
   RESEND_API_KEY?: string;
 
   RESEND_FROM?: string;

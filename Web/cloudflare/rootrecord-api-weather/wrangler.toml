@@ -35,9 +35,13 @@ database_id = "0b49c598-1f91-4a09-84a8-6ba8241c6df3"
 binding = "VOLCANO_PHOTOS"
 bucket_name = "rootrecord-volcano-photos"
 
+[[send_email]]
+name = "EMAIL"
+
 [vars]
 WORKER_SHARD = "weather"
 SITE_URL = "https://rootrecord.info"
+EMAIL_FROM = "RootRecord <root@rootrecord.info>"
 # AccuWeather: API key is a Worker **Secret** (`deploy.ps1` from repo-root `credentials.env` → `wrangler secret put ACCUWEATHER_API_KEY`), not [vars] (avoids Secret + var name clash in dashboard).
 # Optional language locale for responses (default in code: en-us)
 ACCUWEATHER_LANGUAGE = "en-us"
@@ -74,17 +78,8 @@ MIN_APP_VERSION_ACCOUNT_HUB = "0.1.1"
 PLAY_STORE_URL_TOKEN_MANAGER = "https://play.google.com/store/apps/details?id=com.rootrecord.tokenmanager"
 PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.rootrecord.accounthub"
 # Developer feed (Settings → messages in mobile apps): GET /api/mobile/developer-messages?app_id=…
-# Publish (ops): POST https://api.rootrecord.info/api/internal/developer-messages
-#   Header: X-RR-Push-Admin-Key: <same as push-broadcast>
-#   JSON: { "title": "…", "body": "…", "app_scope": "all" | "weather" | "bm" | "token_manager" | "account_hub" }
-#
-# Discord → D1 `developer_messages` sync runs from this Worker's `*/5` cron (see `src/index.ts`).
-# Previously hosted on rootrecord-primary / rootrecord-solana-tx (both decommissioned). The D1
-# is shared across every shard so a single sync populates the feed for Weather + Business +
-# Account + Token + Kīlauea simultaneously. Bot needs: View Channel + Read Message History +
-# Privileged "Message Content" intent on the announcements channel.
-DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1500286864119038103"
-
+# Publish (ops): POST …/api/internal/developer-messages (X-RR-Push-Admin-Key).
+# Discord announcements → D1 sync runs on **rootrecord-api-account** (every-five-minutes cron), not this Worker.
 # Internal custodial wallet encryption (AES-256-GCM). deploy.ps1 uploads INTERNAL_WALLET_ENC_KEY_B64
 # Failsafe: application code never DELETEs `internal_solana_wallets` (encrypted keys) — even on DELETE /v1/me / inactive purge.
 # (from credentials.env, or .deploy-internal-wallet-key, or auto-generated like JWT_SECRET).
@@ -114,7 +109,7 @@ DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1500286864119038103"
 # (POST /api/internal/provision-custodial-wallets-missing, same X-RR-Push-Admin-Key as push-broadcast).
 # Run treasury SOL top-up + RRTT payout cron immediately (same as 07:00 UTC schedule):
 #   POST https://api.rootrecord.info/api/internal/run-rrtt-custodial-cron  (header X-RR-Push-Admin-Key: …)
-# Treasury checks (proxied to `ROOTRECORD_SOLANA_TX_URL`; schedules: SOL :00 UTC, RRTT/RRESERVE :10 UTC, both from `*/5`):
+# Treasury checks (proxied to `ROOTRECORD_SOLANA_TX_URL`; schedules: SOL :00 UTC, RRTT/RRESERVE :10 UTC, both from the five-minute NOAA cron on this Worker):
 #   POST https://api.rootrecord.info/api/internal/run-treasury-liquidity-check
 #   POST https://api.rootrecord.info/api/internal/run-treasury-sol-lp-check
 #   Header: X-RR-Push-Admin-Key (same as push-broadcast). Or call the solana-tx Worker `/api/internal/...` directly.
@@ -130,7 +125,8 @@ DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1500286864119038103"
 #   wrangler secret put FCM_SERVICE_ACCOUNT_JSON
 # (paste your Firebase service account JSON — one secret; optional split vars still supported)
 #
-# Email change (POST /api/me/email/request → Resend):
-#   wrangler secret put RESEND_API_KEY   # re_...
-#   wrangler secret put RESEND_FROM      # e.g. "RootRecord <mail@yourdomain.com>" (verified domain in Resend)
+# Email change (POST /api/me/email/request):
+#   Dashboard → Email Sending → onboard rootrecord.info (SPF/DKIM/DMARC on cf-bounce.*).
+#   Binding [[send_email]] name EMAIL is in this file; default from [vars] EMAIL_FROM.
+#   Optional Resend fallback: wrangler secret put RESEND_API_KEY / RESEND_FROM
 

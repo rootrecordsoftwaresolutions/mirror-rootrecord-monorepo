@@ -108,11 +108,24 @@ api.interceptors.request.use((cfg) => {
   return cfg;
 });
 
+// Auto-clear stale local session when the server rejects our Bearer. The Worker returns
+// this exact detail string ONLY when a Bearer was present but failed to validate
+// (signature mismatch, missing/revoked license_sessions row). Sign-in failures use a
+// different detail, so login isn't disrupted. AuthContext listens for the dispatched
+// event below and drops `user`, so the AuthGate re-renders instead of looping on 401s.
 api.interceptors.response.use(
   (r) => r,
   (e) => {
-    if (e?.response?.status === 401) {
-      /* AuthContext handles session */
+    if (
+      e?.response?.status === 401 &&
+      e?.response?.data?.detail === "Invalid or expired session."
+    ) {
+      try {
+        setToken("");
+        window.dispatchEvent(new Event("rrbm.session.invalidated"));
+      } catch {
+        /* ignore */
+      }
     }
     return Promise.reject(e);
   }

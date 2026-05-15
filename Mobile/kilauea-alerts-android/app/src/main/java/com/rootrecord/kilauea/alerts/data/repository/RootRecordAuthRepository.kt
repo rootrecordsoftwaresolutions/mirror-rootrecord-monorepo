@@ -30,6 +30,7 @@ private val JsonMedia = "application/json; charset=utf-8".toMediaType()
 // the Worker's *.workers.dev URL directly until that's fixed in Cloudflare.
 private const val LOGIN_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/auth/login"
 private const val LOGOUT_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/auth/logout"
+private const val ME_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/me"
 
 @Serializable
 private data class LoginBody(val email: String, val password: String)
@@ -87,6 +88,27 @@ class RootRecordAuthRepository @Inject constructor(
                 /* revoke may fail offline; always clear local session */
             }
             prefs.clearAuthSession()
+        }
+    }
+
+    /**
+     * Refreshes `auth_pro_unlocked` from GET `/v1/me` (same billing snapshot as the website).
+     * Bearer is attached by [com.rootrecord.kilauea.alerts.data.remote.AuthBearerInterceptor].
+     */
+    suspend fun refreshAccountAccess(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val token = prefs.getAuthAccessToken()
+            if (token.isNullOrBlank()) return@runCatching
+            val req = Request.Builder().url(ME_URL).get().build()
+            http.newCall(req).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) return@runCatching
+                val root = runCatching { AppJson.parseToJsonElement(text).jsonObject }.getOrNull()
+                    ?: return@runCatching
+                val pro = root["proUnlocked"]?.jsonPrimitive?.booleanLike() == true ||
+                    root["pro_unlocked"]?.jsonPrimitive?.booleanLike() == true
+                prefs.setAuthProUnlocked(pro)
+            }
         }
     }
 }

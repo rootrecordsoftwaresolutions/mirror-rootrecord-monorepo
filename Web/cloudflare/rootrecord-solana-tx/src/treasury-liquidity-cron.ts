@@ -16,7 +16,6 @@ import {
 import bs58 from "bs58";
 
 import { json } from "./cors";
-import { runDiscordDeveloperMessageSync } from "./discord-developer-sync";
 import { notifySolanaToolsDiscord } from "./discord-solana-notify";
 import { verifyWorkerOpsAdmin } from "./ops-auth";
 import type { SolanaTxEnv } from "./env";
@@ -475,9 +474,6 @@ export async function handleRunTreasuryLiquidityCheckRoute(
   }
   try {
     const result = await runTreasuryLiquidityReserveCheck(env);
-    await runDiscordDeveloperMessageSync(env).catch((e) =>
-      console.error("discord developer sync", e instanceof Error ? e.message : String(e)),
-    );
     if (result.skipped) {
       return json({ ok: true, detail: "Skipped.", result }, 200);
     }

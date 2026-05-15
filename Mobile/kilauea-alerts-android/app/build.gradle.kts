@@ -18,14 +18,20 @@ android {
         applicationId = "com.rootrecord.kilauea"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.10"
+        versionCode = 25
+        versionName = "1.0.25"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val props = Properties()
         rootProject.file("local.properties").takeIf { it.exists() }?.reader()?.use { props.load(it) }
         val ytKey = props.getProperty("YOUTUBE_API_KEY", "") ?: ""
         buildConfigField("String", "YOUTUBE_API_KEY", "\"$ytKey\"")
+        // Production banner unit; debug buildType overrides with Google test banner (policy-safe local testing).
+        buildConfigField(
+            "String",
+            "ADMOB_BANNER_AD_UNIT_ID",
+            "\"ca-app-pub-8245496571119619/7991546983\"",
+        )
     }
 
     signingConfigs {
@@ -55,6 +61,11 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            buildConfigField(
+                "String",
+                "ADMOB_BANNER_AD_UNIT_ID",
+                "\"ca-app-pub-3940256099942544/6300978111\"",
+            )
         }
     }
 
@@ -115,6 +126,7 @@ dependencies {
     implementation(libs.firebase.messaging)
 
     implementation(libs.play.services.location)
+    implementation(libs.play.services.ads)
     implementation(libs.browser)
 
     implementation(libs.accompanist.permissions)

@@ -17,12 +17,20 @@ import {
   Megaphone,
   Monitor,
   HelpCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { NATIVE_APP_VERSION } from '../lib/nativeAppVersion';
 import { api, getCachedLocations, session } from '../lib/api';
 import { safeLocalStorage } from '../lib/storage';
 import { getUnits, setUnits } from '../lib/format';
+import useAccess from '../lib/useAccess';
+import {
+  memberStatusHint,
+  memberStatusLabel,
+  refreshSessionAccess,
+  showUpsellModal,
+} from '../lib/tierAccess';
 
 /** Public RootRecord links (same as rootrecord.info / credentials). */
 const CONTACT = {
@@ -107,7 +115,16 @@ export default function Settings({ onSignedOut }) {
   };
   useEffect(() => { load(); }, []);
 
-  // No tier gates in mobile UI.
+  const isAuthed = session.isAuthed();
+  const email = session.getEmail();
+  const { pro, life } = useAccess();
+  const tierLabel = memberStatusLabel();
+  const tierHint = memberStatusHint();
+  const showUpgrade = isAuthed && !pro && !life;
+
+  useEffect(() => {
+    refreshSessionAccess();
+  }, []);
 
   useEffect(() => {
     if (!session.isAuthed()) return;
@@ -138,7 +155,13 @@ export default function Settings({ onSignedOut }) {
     setUnitsState(next);
   };
 
+  const alertsUnlocked = pro || life;
+
   const toggleNoaaAlerts = async () => {
+    if (!alertsUnlocked) {
+      showUpsellModal();
+      return;
+    }
     const next = !noaaAlertsEnabled;
     setNoaaAlertsEnabled(next);
     if (!session.isAuthed()) return;
@@ -153,9 +176,6 @@ export default function Settings({ onSignedOut }) {
     }
   };
 
-  const isAuthed = session.isAuthed();
-  const email = session.getEmail();
-
   return (
     <div
       className="animate-fadein pb-8 lg:mx-auto lg:max-w-[min(960px,calc(100%-2rem))] lg:px-10"
@@ -163,7 +183,7 @@ export default function Settings({ onSignedOut }) {
     >
       <header
         className="flex items-center justify-between p-4 lg:px-0"
-        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        style={{ paddingTop: '1rem' }}
       >
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
@@ -176,12 +196,24 @@ export default function Settings({ onSignedOut }) {
         {isAuthed ? (
           <>
             <Row icon={Mail} label="Signed in as" value={email || '—'} testId="settings-account-email" />
-            <Row icon={Globe} label="App features" value="All features enabled" testId="settings-tier" />
+            <Row icon={Globe} label="Member status" value={tierLabel} testId="settings-tier" />
+            <div className="px-4 py-2 border-b border-subtle text-[10px] font-mono text-accent/70" data-testid="settings-tier-hint">
+              {tierHint}
+            </div>
+            {showUpgrade && (
+              <Row
+                icon={ShieldCheck}
+                label="Upgrade to Pro or Lifetime"
+                value="Live hazards · 5-day forecast · unlimited refreshes"
+                onClick={() => showUpsellModal()}
+                testId="settings-upgrade"
+              />
+            )}
             <Row icon={LogOut} label="Sign out of this device" onClick={onSignOut} testId="settings-signout" danger />
           </>
         ) : (
           <>
-            <Row icon={User} label="Not signed in" value="All features enabled" testId="settings-guest" />
+            <Row icon={User} label="Not signed in" value="Sign in for synced locations" testId="settings-guest" />
             <Row icon={LogOut} label="Sign in" onClick={() => navigate('/auth')} testId="settings-signin" />
           </>
         )}
@@ -246,12 +278,14 @@ export default function Settings({ onSignedOut }) {
         <Row
           icon={Bell}
           label="Weather alert notifications (NOAA)"
-          value={noaaAlertsEnabled ? 'On' : 'Off'}
+          value={alertsUnlocked ? (noaaAlertsEnabled ? 'On' : 'Off') : 'Pro & Lifetime'}
           onClick={noaaBusy ? undefined : toggleNoaaAlerts}
           testId="settings-noaa-alerts-toggle"
         />
         <div className="p-4 pt-0 text-xs text-accent/70 leading-relaxed">
-          Receive push notifications for active NOAA alerts near your saved locations. US only.
+          {alertsUnlocked
+            ? 'Push notifications for active NOAA alerts near your saved locations (Android). Allow notifications when prompted. US locations only.'
+            : 'Upgrade to Pro or Lifetime for NOAA push alerts on Android. Browse hazard tabs on the free tier.'}
         </div>
       </Section>
 

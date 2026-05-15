@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Activity, Settings as SettingsIcon } from 'lucide-react';
+import { Home, Activity, Haze, Settings as SettingsIcon } from 'lucide-react';
 import { clsx } from '../lib/format';
 
 const tabs = [
   { to: '/', label: 'Home', icon: Home, testId: 'tab-home' },
   { to: '/hazards', label: 'Hazards', icon: Activity, testId: 'tab-hazards' },
+  { to: '/air-quality', label: 'Air', icon: Haze, testId: 'tab-air-quality' },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, testId: 'tab-settings' },
 ];
 
@@ -62,7 +63,7 @@ export default function TabBar() {
         }}
         data-testid="bottom-tab-bar"
       >
-        <ul className="grid h-full grid-cols-3">
+        <ul className="grid h-full grid-cols-4">
           {tabs.map((t) => (
             <li key={t.to} className="flex">
               <NavLink

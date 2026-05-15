@@ -63,6 +63,24 @@ if (-not $hasToken -and -not $hasGlobal) {
     exit 1
 }
 
+# Ensure deps are present for Wrangler bundling (nodejs_compat + Solana libs).
+$needInstall = $false
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot "node_modules"))) { $needInstall = $true }
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot "node_modules\\jose\\package.json"))) { $needInstall = $true }
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot "node_modules\\@solana\\spl-token\\package.json"))) { $needInstall = $true }
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot "node_modules\\@noble\\hashes\\esm\\sha3.js.map"))) { $needInstall = $true }
+if (-not $needInstall) {
+    try {
+        $map = Get-Item -LiteralPath (Join-Path $PSScriptRoot "node_modules\\@noble\\hashes\\esm\\sha3.js.map")
+        if ($map.Length -lt 8) { $needInstall = $true }
+    } catch {
+        $needInstall = $true
+    }
+}
+if ($needInstall) {
+    npm install
+}
+
 $jwtFile = Join-Path $PSScriptRoot ".deploy-jwt"
 $jwt = [string]$env:ROOTRECORD_PRIMARY_JWT_SECRET
 if (-not $jwt -or $jwt.Length -lt 16) {
@@ -77,7 +95,7 @@ if (-not $jwt -or $jwt.Length -lt 16) {
     Set-Content -LiteralPath $jwtFile -Value $jwt -NoNewline
     Write-Host "Generated JWT secret in .deploy-jwt (gitignored). Optional: ROOTRECORD_PRIMARY_JWT_SECRET in credentials.env."
 }
-$jwt | npx wrangler secret put JWT_SECRET
+$jwt | npx --yes wrangler@4.90.1 secret put JWT_SECRET
 
 function Test-InternalWalletEncKeyB64([string]$b64) {
     if (-not $b64) { return $false }
@@ -108,53 +126,42 @@ if (-not (Test-InternalWalletEncKeyB64 $encKey)) {
     Set-Content -LiteralPath $encFile -Value $encKey -NoNewline
     Write-Host "Generated INTERNAL_WALLET_ENC_KEY_B64 in .deploy-internal-wallet-key (gitignored). Optional: INTERNAL_WALLET_ENC_KEY_B64 in credentials.env for other machines/CI."
 }
-$encKey | npx wrangler secret put INTERNAL_WALLET_ENC_KEY_B64
+$encKey | npx --yes wrangler@4.90.1 secret put INTERNAL_WALLET_ENC_KEY_B64
 Write-Host "Uploaded INTERNAL_WALLET_ENC_KEY_B64 (custodial Solana wallet encryption)."
 
 $pushAdmin = [string]$env:RR_PUSH_ADMIN_SECRET
 if ($pushAdmin -and $pushAdmin.Length -ge 8) {
-  $pushAdmin | npx wrangler secret put RR_PUSH_ADMIN_SECRET
+  $pushAdmin | npx --yes wrangler@4.90.1 secret put RR_PUSH_ADMIN_SECRET
 }
 
 $usageAdmin = [string]$env:RR_USAGE_ADMIN_SECRET
 if ($usageAdmin -and $usageAdmin.Length -ge 8) {
-  $usageAdmin | npx wrangler secret put RR_USAGE_ADMIN_SECRET
+  $usageAdmin | npx --yes wrangler@4.90.1 secret put RR_USAGE_ADMIN_SECRET
 }
 
 $fcmPath = [string]$env:FCM_SERVICE_ACCOUNT_JSON_PATH
 if (-not $fcmPath) { $fcmPath = [string]$env:FCM_SERVICE_ACCOUNT_JSON_FILE }
 if ($fcmPath -and (Test-Path -LiteralPath $fcmPath)) {
-  (Get-Content -LiteralPath $fcmPath -Raw) | npx wrangler secret put FCM_SERVICE_ACCOUNT_JSON
+  (Get-Content -LiteralPath $fcmPath -Raw) | npx --yes wrangler@4.90.1 secret put FCM_SERVICE_ACCOUNT_JSON
 }
 
 $stripeSecret = [string]$env:STRIPE_SECRET_KEY
 if ($stripeSecret -match '^sk_(live|test)_' -and $stripeSecret.Length -gt 30) {
-  $stripeSecret | npx wrangler secret put STRIPE_SECRET_KEY
+  $stripeSecret | npx --yes wrangler@4.90.1 secret put STRIPE_SECRET_KEY
   Write-Host "Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env)."
 }
 
 $accuApiKey = [string]$env:ACCUWEATHER_API_KEY
 if ($accuApiKey -and $accuApiKey.Length -ge 16) {
-  $accuApiKey | npx wrangler secret put ACCUWEATHER_API_KEY
+  $accuApiKey | npx --yes wrangler@4.90.1 secret put ACCUWEATHER_API_KEY
   Write-Host "Uploaded ACCUWEATHER_API_KEY to Worker (from credentials.env)."
 }
 
 $discordFeedback = [string]$env:DISCORD_FEEDBACK_WEBHOOK_URL
 if ($discordFeedback -match '^https://discord(app)?\.com/api/webhooks/' -and $discordFeedback.Length -gt 60) {
-  $discordFeedback | npx wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL
+  $discordFeedback | npx --yes wrangler@4.90.1 secret put DISCORD_FEEDBACK_WEBHOOK_URL
   Write-Host "Uploaded DISCORD_FEEDBACK_WEBHOOK_URL (from credentials.env)."
 }
 
-# Global Updates → in-app developer messages (Worker cron). Bot token from Portal → Bot → Reset Token.
-$discordBot = [string]$env:DISCORD_BOT_TOKEN
-$discordBot = $discordBot.Trim()
-if ($discordBot -match '^(?i)bot\s+') {
-  $discordBot = ($discordBot -replace '^(?i)bot\s+', '').Trim()
-}
-if ($discordBot.Length -ge 45 -and $discordBot.Contains(".")) {
-  $discordBot | npx wrangler secret put DISCORD_BOT_TOKEN
-  Write-Host "Uploaded DISCORD_BOT_TOKEN (Discord → developer_messages sync)."
-}
-
-npx wrangler d1 migrations apply root-record --remote
-npx wrangler deploy
+npx --yes wrangler@4.90.1 d1 migrations apply root-record --remote
+npx --yes wrangler@4.90.1 deploy

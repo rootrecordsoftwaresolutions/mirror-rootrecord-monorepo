@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Activity, Waves, Wind, Flame, RefreshCw, Loader2, ArrowUpRight } from 'lucide-react';
+import { Activity, Waves, Wind, Flame, RefreshCw, Loader2, ArrowUpRight, ShieldCheck } from 'lucide-react';
 import { api, getCachedLocations } from '../lib/api';
 import { safeLocalStorage } from '../lib/storage';
 import { fmtMileOrKm, formatTime, timeAgo, clsx } from '../lib/format';
+import useAccess from '../lib/useAccess';
+import { BILLING_URL, showUpsellModal } from '../lib/tierAccess';
 
 const TAB_KEYS = [
   { id: 'earthquakes', label: 'Earthquakes', icon: Activity, testId: 'hazard-tab-earthquakes' },
@@ -20,7 +22,43 @@ function magClass(m) {
   return 'bg-mag-low text-black';
 }
 
+function HazardsProGate({ tabLabel }) {
+  return (
+    <div
+      className="bg-container border border-subtle p-6 text-center"
+      data-testid="hazards-pro-gate"
+    >
+      <ShieldCheck strokeWidth={1.5} className="w-8 h-8 text-accent mx-auto mb-3" />
+      <p className="text-sm text-white font-medium mb-1">Live {tabLabel} data is Pro &amp; Lifetime</p>
+      <p className="text-xs text-accent/70 mb-4 max-w-sm mx-auto">
+        Browse every hazard tab on the free tier. Upgrade to load USGS earthquakes, tsunami flags, cyclones, and wildfires.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+        <button
+          type="button"
+          onClick={() => showUpsellModal()}
+          className="px-4 py-2 rounded bg-accent text-black text-sm font-medium hover:opacity-90"
+          data-testid="hazards-upgrade-btn"
+        >
+          See Pro benefits
+        </button>
+        <a
+          href={BILLING_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2 rounded border border-subtle text-sm text-neutral-200 hover:bg-white/5 no-underline"
+          data-testid="hazards-billing-link"
+        >
+          Plans &amp; billing
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function Hazards() {
+  const { pro, life } = useAccess();
+  const hazardsUnlocked = pro || life;
   const [tab, setTab] = useState('earthquakes');
   const [activeLoc, setActiveLoc] = useState(null);
   const [eqs, setEqs] = useState([]); const [eqsLoad, setEqsLoad] = useState(false);
@@ -75,12 +113,30 @@ export default function Hazards() {
     catch (e) { setErr(String(e?.message || e)); } finally { setFiresLoad(false); }
   };
 
-  useEffect(() => { if (tab === 'earthquakes') loadEarthquakes(); }, [tab, activeLoc]); // eslint-disable-line
-  useEffect(() => { if (tab === 'tsunamis' && tsus.length === 0) loadTsunamis(); }, [tab]); // eslint-disable-line
-  useEffect(() => { if (tab === 'cyclones' && cyc.length === 0) loadCyclones(); }, [tab]); // eslint-disable-line
-  useEffect(() => { if (tab === 'wildfires' && fires.length === 0) loadWildfires(); }, [tab]); // eslint-disable-line
+  useEffect(() => {
+    if (!hazardsUnlocked || tab !== 'earthquakes') return;
+    loadEarthquakes();
+  }, [tab, activeLoc, hazardsUnlocked]); // eslint-disable-line
+  useEffect(() => {
+    if (!hazardsUnlocked || tab !== 'tsunamis' || tsus.length > 0) return;
+    loadTsunamis();
+  }, [tab, hazardsUnlocked]); // eslint-disable-line
+  useEffect(() => {
+    if (!hazardsUnlocked || tab !== 'cyclones' || cyc.length > 0) return;
+    loadCyclones();
+  }, [tab, hazardsUnlocked]); // eslint-disable-line
+  useEffect(() => {
+    if (!hazardsUnlocked || tab !== 'wildfires' || fires.length > 0) return;
+    loadWildfires();
+  }, [tab, hazardsUnlocked]); // eslint-disable-line
+
+  const activeTabLabel = TAB_KEYS.find((t) => t.id === tab)?.label || 'Hazard';
 
   const onRefresh = () => {
+    if (!hazardsUnlocked) {
+      showUpsellModal();
+      return;
+    }
     if (tab === 'earthquakes') loadEarthquakes();
     if (tab === 'tsunamis') loadTsunamis();
     if (tab === 'cyclones') loadCyclones();
@@ -95,7 +151,7 @@ export default function Hazards() {
     <div className="animate-fadein lg:mx-auto lg:max-w-[min(1400px,calc(100%-2rem))]" data-testid="hazards-page">
       <header
         className="flex items-center justify-between p-4 pb-2"
-        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        style={{ paddingTop: '1rem' }}
       >
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Hazards</h1>
@@ -129,14 +185,22 @@ export default function Hazards() {
           ))}
         </Tabs.List>
 
-        {err && (
+        {!hazardsUnlocked && (
+          <p className="text-[10px] font-mono text-accent/70 mb-3" data-testid="hazards-free-hint">
+            Free: preview tabs only — Pro or Lifetime unlocks live hazard feeds.
+          </p>
+        )}
+
+        {err && hazardsUnlocked && (
           <div className="text-xs bg-sev-severe/10 border border-sev-severe/40 text-sev-severe p-2 mb-3" data-testid="hazards-error">
             {err}
           </div>
         )}
 
         <Tabs.Content value="earthquakes">
-          {loading && eqs.length === 0 ? <ListSkeleton /> : (
+          {!hazardsUnlocked ? (
+            <HazardsProGate tabLabel={activeTabLabel} />
+          ) : loading && eqs.length === 0 ? <ListSkeleton /> : (
             <div className="bg-container border border-subtle" data-testid="earthquakes-list">
               {eqs.length === 0 && <Empty label="No earthquakes in the configured radius." />}
               {eqs.map((e) => (
@@ -167,7 +231,9 @@ export default function Hazards() {
         </Tabs.Content>
 
         <Tabs.Content value="tsunamis">
-          {loading && tsus.length === 0 ? <ListSkeleton /> : (
+          {!hazardsUnlocked ? (
+            <HazardsProGate tabLabel={activeTabLabel} />
+          ) : loading && tsus.length === 0 ? <ListSkeleton /> : (
             <div className="bg-container border border-subtle" data-testid="tsunamis-list">
               {tsus.length === 0 && <Empty label="No active tsunami-flagged events." />}
               {tsus.map((b) => (
@@ -211,7 +277,9 @@ export default function Hazards() {
         </Tabs.Content>
 
         <Tabs.Content value="wildfires">
-          {loading && fires.length === 0 ? <ListSkeleton /> : (
+          {!hazardsUnlocked ? (
+            <HazardsProGate tabLabel={activeTabLabel} />
+          ) : loading && fires.length === 0 ? <ListSkeleton /> : (
             <div className="bg-container border border-subtle" data-testid="wildfires-list">
               {fires.length === 0 && <Empty label="No active wildfire events." />}
               {fires.map((e) => (

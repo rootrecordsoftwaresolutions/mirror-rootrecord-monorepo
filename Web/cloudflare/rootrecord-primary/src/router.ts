@@ -1,4 +1,4 @@
-import type { D1Database, ExecutionContext } from "@cloudflare/workers-types";
+import type { D1Database, ExecutionContext, SendEmail } from "@cloudflare/workers-types";
 
 import { bindCorsRequest, cors, json } from "./cors";
 
@@ -26,12 +26,12 @@ import {
   handleRunRrttCustodialCronRoute,
   handleSolanaInternalWalletRoutes,
   handleSweepCustodialSolAllRoute,
-  provisionCustodialWalletIfMissing,
 } from "./solana-internal-wallet";
 import { proxyTreasurySolanaTxRoutes } from "./treasury-solana-tx-proxy";
 import { handleSolanaSiteLogRoute } from "./solana-site-log";
 import { handleSolanaSiteTokenDiscordNotifyRoute } from "./solana-site-token-discord-notify";
 import { maybeForwardSolanaToolsApi } from "./solana-tools-forward";
+import { maybeForwardWeatherShard } from "./weather-shard-forward";
 import { handleSolanaAppActivityRoute } from "./solana-app-activity";
 import { handleSolanaLinkedWalletRoute } from "./solana-linked-wallet";
 import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
@@ -108,8 +108,12 @@ export interface Env {
    */
   SOLANA_TOOLS_API_FORWARD_URL?: string;
 
-  /** Optional Resend API for POST /api/me/email/request (`wrangler secret put RESEND_API_KEY`). */
+  /** Cloudflare Email Sending (`[[send_email]]` → EMAIL). Onboard domain in dashboard first. */
+  EMAIL?: SendEmail;
 
+  EMAIL_FROM?: string;
+
+  /** Optional Resend fallback for POST /api/me/email/request. */
   RESEND_API_KEY?: string;
 
   RESEND_FROM?: string;
@@ -139,6 +143,9 @@ export interface Env {
 
   /** Base URL of Worker `rootrecord-solana-tx` (no trailing slash) — treasury cron + internal POSTs proxy there. */
   ROOTRECORD_SOLANA_TX_URL?: string;
+
+  /** Backwards-compat reverse-proxy target for /api/dashboard, /api/weather/*, /api/usgs/*, /api/eonet/*, /api/canada/* — see ./weather-shard-forward.ts. */
+  ROOTRECORD_API_WEATHER_BASE?: string;
 
   /**
    * Days without activity before scheduled purge (cron `45 8 * * * UTC`). Activity = latest session
@@ -398,18 +405,6 @@ export async function handleRequest(
       } catch {
 
         /* optional */
-
-      }
-
-      try {
-
-        const aid = String(data.account_id || "").trim();
-
-        if (aid) await provisionCustodialWalletIfMissing(env, aid);
-
-      } catch {
-
-        /* non-fatal */
 
       }
 
@@ -801,18 +796,6 @@ export async function handleRequest(
 
     }
 
-    try {
-
-      const aid = String(data.account_id || "").trim();
-
-      if (aid) await provisionCustodialWalletIfMissing(env, aid);
-
-    } catch {
-
-      /* non-fatal */
-
-    }
-
     return json(
 
       {
@@ -1040,6 +1023,14 @@ export async function handleRequest(
   const forwardRes = await maybeForwardSolanaToolsApi(request, env, pathname, method);
 
   if (forwardRes) return forwardRes;
+
+  // Legacy backward-compat: APKs still pointing at api.rootrecord.info expect
+  // /api/dashboard, /api/weather/*, /api/usgs/*, /api/eonet/*, /api/canada/* here.
+  // Those routes now live on rootrecord-api-weather; reverse-proxy them so
+  // already-installed devices keep working.
+  const weatherForward = await maybeForwardWeatherShard(request, env, pathname, method);
+
+  if (weatherForward) return weatherForward;
 
   return json({ detail: "Not Found" }, 404);
 

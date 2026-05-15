@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { json } from "./cors";
 import { resolveUserId } from "./auth";
+import { loadProFlags } from "./free-tier";
 
 export interface PrefsEnv {
   DB: D1Database;
@@ -26,6 +27,16 @@ export async function handlePrefsRoutes(
   }
 
   if (method === "POST") {
+    const { pro } = await loadProFlags(env.DB, user);
+    if (!pro) {
+      return json(
+        {
+          detail: "pro_required",
+          message: "Alert notification preferences require Pro or Lifetime membership.",
+        },
+        403
+      );
+    }
     let body: { noaa_alerts_enabled?: boolean };
     try {
       body = (await request.json()) as typeof body;

@@ -5,6 +5,7 @@ import { extendProRedeemedUntil } from "./accounts";
 import { getSignupBonusRow, SIGNUP_BONUS_UNITS } from "./earn-signup-bonus";
 import type { CustodialCacheRpcEnv } from "./custodial-onchain-cache";
 import { refreshCustodialOnchainCacheFromRpc } from "./custodial-onchain-cache";
+import { readCustodialTokenSlots } from "./custodial-wallet-token-slots";
 import { sessionFromRequest } from "./primary-auth";
 
 export interface EarnEnv {
@@ -105,7 +106,7 @@ async function earnRedeemProMonth(request: Request, env: EarnEnv): Promise<Respo
   if (balance < PRO_REDEMPTION_UNIT_COST) {
     return json(
       {
-        detail: `You need ${PRO_REDEMPTION_UNIT_COST.toLocaleString()} testing rewards to redeem one month of Pro. Current balance: ${balance.toLocaleString()}.`,
+        detail: `You need ${PRO_REDEMPTION_UNIT_COST.toLocaleString()} Root Units to redeem one month of Pro. Current balance: ${balance.toLocaleString()}.`,
         balance,
         cost: PRO_REDEMPTION_UNIT_COST,
         short_by: PRO_REDEMPTION_UNIT_COST - balance,
@@ -201,6 +202,46 @@ async function ensureBalance(db: D1Database, userId: string, nowIso: string) {
     .run();
 }
 
+/** Whole SPL units from `custodial_wallet_token_slots.amount_raw` + decimals. */
+function custodialSlotWholeUnits(amountRaw: string, decimals: number): number {
+  try {
+    const r = BigInt(String(amountRaw || "0").split(".")[0] || "0");
+    const d = Math.min(20, Math.max(0, Math.floor(decimals)));
+    if (d === 0) return Number(r);
+    const div = 10n ** BigInt(d);
+    const whole = r / div;
+    const n = Number(whole);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function rrttWholeUnitsFromSlots(
+  slots: { mint_base58: string; amount_raw: string; decimals: number }[],
+  mintB58: string,
+): number | null {
+  const m = String(mintB58 || "").trim();
+  if (!m || slots.length === 0) return null;
+  const row = slots.find((s) => String(s.mint_base58 || "").trim() === m);
+  if (!row) return null;
+  return custodialSlotWholeUnits(row.amount_raw, row.decimals);
+}
+
+function slotsAnyPositiveBalance(
+  slots: { mint_base58: string; amount_raw: string }[] | undefined,
+): boolean {
+  if (!slots || slots.length === 0) return false;
+  for (const t of slots) {
+    try {
+      if (BigInt(String(t.amount_raw || "0")) > 0n) return true;
+    } catch {
+      /* */
+    }
+  }
+  return false;
+}
+
 async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
   const u = await requireSignedUser(request, env);
   if (u instanceof Response) return u;
@@ -249,12 +290,24 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
   const wouldGrant = Math.min(DAILY_CHECKIN_UNITS, checkinLeft);
   const signupRow = await getSignupBonusRow(env.DB, userId);
 
+  let custodial_tokens:
+    | {
+        mint_base58: string;
+        token_program_id: string;
+        ata_pubkey: string;
+        decimals: number;
+        amount_raw: string;
+        updated_at: string;
+      }[]
+    | undefined;
+
   let custodial_pending_units = 0;
   let custodial_units_sent = 0;
   let custodial_available_withdraw_units = 0;
   let custodial_onchain_rrtt: number | null = null;
   let custodial_balances_rpc_ok = false;
   let custodial_sum_ledger_and_wallet_units = 0;
+  let rrtt_wallet_whole_units: number | null = null;
   try {
     if (env.JWT_SECRET) {
       const sess = await sessionFromRequest(env, request);
@@ -286,23 +339,29 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
         const onchainDb = csRow?.onchain != null ? Math.max(0, Math.floor(Number(csRow.onchain) || 0)) : null;
         custodial_units_sent = sent;
 
-        /** SPL whole units when the custodial refresh actually read token balances (includes legitimate 0). */
+        custodial_tokens = await readCustodialTokenSlots(env.DB, sess.accountId, 120).catch(() => undefined);
+
+        const rrttMint = String(env.RRTT_MINT_BASE58 || "").trim();
+        const rrttFromSlots =
+          custodial_tokens && rrttMint ? rrttWholeUnitsFromSlots(custodial_tokens, rrttMint) : null;
+
+        /** Prefer live mint read, then full-wallet slot scan (direct deposits), then D1 cache. */
         const rrttFromLiveRpc =
           cacheRes?.token_rpc_ok === true && typeof cacheRes.custodial_rrtt_onchain === "number"
             ? Math.max(0, Math.floor(cacheRes.custodial_rrtt_onchain))
             : null;
 
-        let walletWithdrawUnits: number;
-        if (rrttFromLiveRpc !== null) {
-          walletWithdrawUnits = rrttFromLiveRpc;
-        } else if (onchainDb != null && onchainDb > 0) {
-          walletWithdrawUnits = onchainDb;
-        } else {
-          walletWithdrawUnits = 0;
-        }
+        const rrttCandidates: number[] = [];
+        if (rrttFromLiveRpc != null) rrttCandidates.push(rrttFromLiveRpc);
+        if (rrttFromSlots != null) rrttCandidates.push(rrttFromSlots);
+        if (onchainDb != null) rrttCandidates.push(onchainDb);
+        const walletWithdrawUnits =
+          rrttCandidates.length > 0 ? Math.max(...rrttCandidates.map((n) => Math.floor(Number(n) || 0))) : 0;
 
         custodial_available_withdraw_units = walletWithdrawUnits;
-        custodial_onchain_rrtt = rrttFromLiveRpc !== null ? rrttFromLiveRpc : onchainDb;
+        custodial_onchain_rrtt =
+          rrttCandidates.length > 0 ? Math.max(...rrttCandidates.map((n) => Math.floor(Number(n) || 0))) : onchainDb;
+        rrtt_wallet_whole_units = rrttMint ? walletWithdrawUnits : null;
         /**
          * `balance` is lifetime earn credits; `sent` is how much was mirrored to custodial in DB.
          * Do not add balance + on-chain SPL (double-count). Headline total = not-yet-moved + in-wallet.
@@ -320,7 +379,8 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
     custodial_units_sent > 0 ||
     custodial_balances_rpc_ok ||
     (custodial_onchain_rrtt != null && Number.isFinite(Number(custodial_onchain_rrtt))) ||
-    custodial_pending_units < balance;
+    custodial_pending_units < balance ||
+    slotsAnyPositiveBalance(custodial_tokens);
   /** What users should see as “your RRTT total” after treasury→custodial: pending + SPL in RootRecord Wallet (not lifetime ledger alone). */
   const balance_display = Math.max(
     0,
@@ -339,7 +399,11 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
       custodial_onchain_rrtt,
       custodial_balances_rpc_ok,
       custodial_sum_ledger_and_wallet_units,
+      ...(custodial_tokens !== undefined ? { custodial_tokens } : {}),
+      ...(rrtt_wallet_whole_units != null ? { rrtt_wallet_whole_units } : {}),
       total_rewards_units: balance,
+      /** Same balance as `total_rewards_units`; preferred display name “Root Units”. */
+      root_units: balance,
       signup_bonus: {
         one_time_across_apps: true,
         program_units: SIGNUP_BONUS_UNITS,

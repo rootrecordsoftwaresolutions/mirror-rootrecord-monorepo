@@ -15,30 +15,6 @@ function whJson(data: unknown, status = 200): Response {
   });
 }
 
-function webhookSigningKeyBytes(whsec: string): Uint8Array | null {
-  if (!whsec.startsWith("whsec_")) return null;
-  try {
-    const b64 = whsec.slice(6);
-    const bin = atob(b64);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  } catch {
-    return null;
-  }
-}
-
-function hexToBytes(hex: string): Uint8Array | null {
-  if (hex.length % 2 !== 0) return null;
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    const v = parseInt(hex.slice(i, i + 2), 16);
-    if (Number.isNaN(v)) return null;
-    out[i / 2] = v;
-  }
-  return out;
-}
-
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   let x = 0;
@@ -46,9 +22,22 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return x === 0;
 }
 
-async function verifyStripeSignature(payload: string, sigHeader: string, whsec: string): Promise<boolean> {
-  const keyBytes = webhookSigningKeyBytes(whsec.trim());
-  if (!keyBytes) return false;
+function bytesToHex(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += bytes[i]!.toString(16).padStart(2, "0");
+  return out;
+}
+
+async function verifyStripeSignature(
+  payload: string,
+  sigHeader: string,
+  whsec: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!sigHeader.trim()) return { ok: false, reason: "missing_stripe_signature" };
+
+  const secret = whsec.trim().replace(/\r/g, "").replace(/^["']|["']$/g, "");
+  if (!secret.startsWith("whsec_")) return { ok: false, reason: "missing_whsec" };
+
   const parts = sigHeader.split(",").map((s) => s.trim());
   let t = "";
   const v1s: string[] = [];
@@ -56,19 +45,32 @@ async function verifyStripeSignature(payload: string, sigHeader: string, whsec: 
     if (p.startsWith("t=")) t = p.slice(2);
     else if (p.startsWith("v1=")) v1s.push(p.slice(3));
   }
-  if (!t || !v1s.length) return false;
+  if (!t || !v1s.length) return { ok: false, reason: "malformed_stripe_signature" };
+
   const ts = Number(t) * 1000;
-  if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 5 * 60 * 1000) return false;
+  // Allow delayed retries / clock skew (Stripe may resend over hours).
+  if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 72 * 60 * 60 * 1000) {
+    return { ok: false, reason: "stripe_timestamp_outside_tolerance" };
+  }
 
   const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
   const signed = `${t}.${payload}`;
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(signed)));
+  const macHex = bytesToHex(mac);
+  const macBytes = enc.encode(macHex);
   for (const v1 of v1s) {
-    const expected = hexToBytes(v1);
-    if (expected && timingSafeEqual(mac, expected)) return true;
+    const expectedHex = v1.toLowerCase();
+    if (!expectedHex || expectedHex.length !== macHex.length) continue;
+    if (timingSafeEqual(macBytes, enc.encode(expectedHex))) return { ok: true };
   }
-  return false;
+  return { ok: false, reason: "stripe_hmac_mismatch" };
 }
 
 async function stripeGet(secret: string, path: string): Promise<Record<string, unknown> | null> {
@@ -78,6 +80,24 @@ async function stripeGet(secret: string, path: string): Promise<Record<string, u
   const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok) return null;
   return data;
+}
+
+async function resolvePortalUserByCustomerEmail(
+  db: BillingD1,
+  secret: string,
+  customerId: string
+): Promise<{ accountId: string; email: string } | null> {
+  if (!secret.trim().startsWith("sk_")) return null;
+  if (!customerId.trim().startsWith("cus_")) return null;
+  const c = await stripeGet(secret, `/customers/${encodeURIComponent(customerId)}`);
+  const em = typeof c?.email === "string" ? c.email.trim().toLowerCase() : "";
+  if (!em) return null;
+  const row = await db
+    .prepare("SELECT id, email FROM license_accounts WHERE email = ?")
+    .bind(em)
+    .first<{ id: string; email: string }>();
+  if (!row?.email) return null;
+  return { accountId: row.id, email: row.email.trim().toLowerCase() };
 }
 
 async function insertWebhookEventOnce(db: BillingD1, id: string): Promise<boolean> {
@@ -192,13 +212,18 @@ async function onCheckoutSessionCompleted(
   }
 }
 
-async function onSubscriptionUpdated(db: BillingD1, sub: Record<string, unknown>): Promise<void> {
+async function onSubscriptionUpdated(
+  db: BillingD1,
+  secret: string,
+  sub: Record<string, unknown>
+): Promise<void> {
   const id = typeof sub.id === "string" ? sub.id : "";
   const customer = stripeCustomerId(sub.customer);
   if (!id) return;
 
   let user = await resolvePortalUserBySubscription(db, id);
   if (!user && customer) user = await resolvePortalUserByCustomer(db, customer);
+  if (!user && customer) user = await resolvePortalUserByCustomerEmail(db, secret, customer);
   if (!user) return;
 
   const st = typeof sub.status === "string" ? sub.status : "unknown";
@@ -247,7 +272,10 @@ async function onInvoiceEvent(
 ): Promise<void> {
   const subId = typeof invoice.subscription === "string" ? invoice.subscription : "";
   if (!subId) return;
-  const user = await resolvePortalUserBySubscription(db, subId);
+  let user = await resolvePortalUserBySubscription(db, subId);
+  const customer = stripeCustomerId(invoice.customer);
+  if (!user && customer) user = await resolvePortalUserByCustomer(db, customer);
+  if (!user && customer) user = await resolvePortalUserByCustomerEmail(db, secret, customer);
   if (!user) return;
 
   const sub = await stripeGet(secret, `/subscriptions/${encodeURIComponent(subId)}`);
@@ -273,8 +301,9 @@ export async function handleStripeWebhook(request: Request, env: StripeWebhookEn
 
   const sig = request.headers.get("Stripe-Signature") || "";
   const payload = await request.text();
-  if (!(await verifyStripeSignature(payload, sig, whsec))) {
-    return whJson({ detail: "Invalid signature." }, 400);
+  const v = await verifyStripeSignature(payload, sig, whsec);
+  if (!v.ok) {
+    return whJson({ detail: "Invalid signature.", reason: v.reason }, 400);
   }
 
   let evt: { id?: string; type?: string; data?: { object?: Record<string, unknown> } };
@@ -302,7 +331,7 @@ export async function handleStripeWebhook(request: Request, env: StripeWebhookEn
     if (type === "checkout.session.completed") {
       if (sk.startsWith("sk_")) await onCheckoutSessionCompleted(env.DB, sk, obj);
     } else if (type === "customer.subscription.updated") {
-      await onSubscriptionUpdated(env.DB, obj);
+      await onSubscriptionUpdated(env.DB, sk, obj);
     } else if (type === "customer.subscription.deleted") {
       await onSubscriptionDeleted(env.DB, obj);
     } else if (type === "invoice.paid" && sk.startsWith("sk_")) {

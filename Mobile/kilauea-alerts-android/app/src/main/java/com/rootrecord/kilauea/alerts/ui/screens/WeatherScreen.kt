@@ -35,6 +35,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 import com.rootrecord.kilauea.alerts.ui.components.DisclaimerBanner
 import com.rootrecord.kilauea.alerts.ui.upsell.UpsellEvents
+import com.rootrecord.kilauea.alerts.ui.util.briefAirQualityLine
 import com.rootrecord.kilauea.alerts.ui.util.briefWeatherSummary
 import com.rootrecord.kilauea.alerts.ui.weather.WeatherViewModel
 
@@ -52,8 +53,8 @@ fun WeatherScreen(
     val ctx = LocalContext.current
     val fineLocation = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
-    LaunchedEffect(useMyLocation, fineLocation.status.isGranted) {
-        if (useMyLocation && fineLocation.status.isGranted) {
+    LaunchedEffect(proUnlocked, useMyLocation, fineLocation.status.isGranted) {
+        if (proUnlocked && useMyLocation && fineLocation.status.isGranted) {
             val fused = LocationServices.getFusedLocationProviderClient(ctx)
             fused.lastLocation.addOnSuccessListener { loc ->
                 loc?.let { vm.loadGpsWeather(it.latitude, it.longitude, false) }
@@ -80,22 +81,30 @@ fun WeatherScreen(
                 Column(Modifier.weight(1f).padding(end = 8.dp)) {
                     Text("My location weather", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "When turned on, uses your location for this forecast. Kept only on this phone.",
+                        if (proUnlocked) {
+                            "When turned on, uses your location for this forecast. Kept only on this phone."
+                        } else {
+                            "Pro: GPS-based forecast row and refresh. Free tier uses Volcano Village only."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Switch(
-                    checked = useMyLocation,
+                    checked = useMyLocation && proUnlocked,
                     onCheckedChange = { on ->
-                        vm.setUseMyLocationWeather(on)
-                        if (on && !fineLocation.status.isGranted) {
-                            fineLocation.launchPermissionRequest()
+                        if (!proUnlocked) {
+                            UpsellEvents.trigger()
+                        } else {
+                            vm.setUseMyLocationWeather(on)
+                            if (on && !fineLocation.status.isGranted) {
+                                fineLocation.launchPermissionRequest()
+                            }
                         }
                     },
                 )
             }
-            if (useMyLocation && !fineLocation.status.isGranted) {
+            if (proUnlocked && useMyLocation && !fineLocation.status.isGranted) {
                 Text(
                     "Turn on location permission to load weather for where you are.",
                     modifier = Modifier
@@ -124,6 +133,11 @@ fun WeatherScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(briefWeatherSummary(wx), style = MaterialTheme.typography.bodySmall)
+                        state.airByLocationId["gps"]?.let { air ->
+                            briefAirQualityLine(air)?.let { line ->
+                                Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     }
                 }
             }
@@ -148,6 +162,15 @@ fun WeatherScreen(
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             json?.let { Text(briefWeatherSummary(it), style = MaterialTheme.typography.bodySmall) }
+                            state.airByLocationId[loc.id]?.let { air ->
+                                briefAirQualityLine(air)?.let { line ->
+                                    Text(
+                                        line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
                         }
                     }
                 }

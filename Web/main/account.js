@@ -5,8 +5,7 @@
   const BETA_EARN_APP_ID = "rootrecord_weather_manager_android";
   /** When "1", header nav hides Billing (lifetime members). Cleared on logout / 401. */
   const LIFETIME_NAV_KEY = "rootrecord_portal_lifetime_nav";
-  /** Lifetime license checkout (payment link from dashboard). */
-  const STRIPE_LIFETIME_CHECKOUT_URL = "https://buy.stripe.com/bJe3cvgZv5xj8ZecJ15gc05";
+  // Lifetime purchase is handled by the Stripe pricing table (which includes monthly + lifetime).
 
   function notifyPortalAuthChange() {
     try {
@@ -88,6 +87,41 @@
           ? j.error.trim()
           : "";
     if (msg && msg.length < 400 && !looksTechnicalMessage(msg)) return msg;
+    return "";
+  }
+
+  function stripDiscordQueryFromUrl() {
+    try {
+      const u = new URL(window.location.href);
+      if (!u.searchParams.has("discord")) return;
+      u.searchParams.delete("discord");
+      const q = u.searchParams.toString();
+      history.replaceState({}, "", u.pathname + (q ? "?" + q : "") + u.hash);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Human text for `account.html?discord=…` (OAuth return or unauthenticated /v1/discord/oauth/start redirect). */
+  function discordReturnUserMessage(code) {
+    const c = String(code || "").trim();
+    if (!c) return "";
+    if (c === "signin") {
+      return "Sign in with your RootRecord account, then click **Link Discord** (below after you sign in).";
+    }
+    if (c === "linked") {
+      return "Discord linked successfully. You should receive **@Verified** in the server within a few seconds.";
+    }
+    if (c === "expired") return "That Discord link expired. Click **Link Discord** again.";
+    if (c === "error") return "Discord linking did not complete. Click **Link Discord** and try again.";
+    if (c === "role_join") {
+      return "We could not assign **@Verified** because your Discord account is not in the server yet. Join the RootRecord Discord, then click **Link Discord** again.";
+    }
+    if (c === "role_forbidden") {
+      return "The bot could not assign **@Verified** (missing permission). Please contact an admin.";
+    }
+    if (c === "role_error") return "The bot could not assign **@Verified**. Please try again in a moment.";
+    if (c === "role_config") return "Discord verification is not fully configured on the server yet. Please try again later.";
     return "";
   }
 
@@ -261,9 +295,9 @@
     const program =
       ' <a href="/beta-tester-rewards.html" style="' +
       moss +
-      '">Beta tester rewards</a>';
+      '">Root Units</a>';
     const note =
-      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and redemption are on the rewards page. 100,000 testing-rewards points trade for one month of Pro membership.</span>';
+      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and redemption are on the Root Units page. 100,000 Root Units trade for one month of Pro membership. In Discord, use /bal and /send after linking your account.</span>';
     if (!earn) {
       return escapeHtml("—") + program + note;
     }
@@ -287,7 +321,7 @@
       ["Account created", escapeHtml(formatAccountCreatedAt(data))],
       ["Subscription", subscriptionAccountValueHtml(data)],
       ["Password on file", escapeHtml(data.has_password ? "Yes" : "No")],
-      ["Beta tester rewards", betaTesterRewardsValueHtml(earn)],
+      ["Root Units", betaTesterRewardsValueHtml(earn)],
     ];
     box.innerHTML = rows
       .map(
@@ -299,6 +333,39 @@
           "</span></div>"
       )
       .join("");
+
+    const st = el("discord-link-status");
+    const btn = el("btn-discord-link");
+    if (st && btn) {
+      if (data.discord_linked) {
+        const label = data.discord_global_name || data.discord_username || data.discord_user_id || "linked";
+        st.textContent = "Linked: " + String(label);
+        btn.textContent = "Re-link Discord";
+      } else {
+        st.textContent = "Not linked.";
+        btn.textContent = "Link Discord";
+      }
+      // Must stay a <button>: an <a href="/v1/..."> opens a new tab / middle-click without the Bearer token.
+      btn.onclick = async function () {
+        try {
+          const res = await apiFetch("/v1/discord/oauth/start?json=1", { method: "GET" });
+          const text = await res.text();
+          let j = {};
+          try {
+            j = text ? JSON.parse(text) : {};
+          } catch {
+            j = {};
+          }
+          if (!res.ok || !j || typeof j.url !== "string") {
+            setStatus("Please sign in, then try linking Discord again.", "warn");
+            return;
+          }
+          window.location.href = j.url;
+        } catch {
+          setStatus("Could not start Discord linking. Please try again.", "err");
+        }
+      };
+    }
   }
 
   function formatMyAppsLastConnected(iso) {
@@ -525,20 +592,10 @@
     const wrap = el("billing-lifetime-wrap");
     const link = el("billing-lifetime-link");
     if (!wrap || !link) return;
+    // The pricing table contains the lifetime option, so we don't need a separate CTA.
     wrap.hidden = true;
-    if (data.life_member || data.lifeMember) return;
-    const sub = String(data.subscription_status || "").toLowerCase();
-    const monthlyLike = sub === "active" || sub === "past_due" || sub === "trialing" || sub === "trial";
-    if (!monthlyLike) return;
-    try {
-      const u = new URL(STRIPE_LIFETIME_CHECKOUT_URL);
-      if (u.protocol === "https:" && u.hostname === "buy.stripe.com") {
-        link.href = u.toString();
-        wrap.hidden = false;
-      }
-    } catch {
-      /* keep hidden */
-    }
+    link.href = "#";
+    link.onclick = null;
   }
 
   function escapeHtml(s) {
@@ -565,6 +622,7 @@
       showPanel("panel-forms");
       return;
     }
+    const discordQs = new URLSearchParams(window.location.search).get("discord");
     showPanel("panel-loading");
     setStatus("");
     const res = await apiFetch("/v1/me", {});
@@ -573,7 +631,13 @@
       syncPortalLifetimeNav(null);
       notifyPortalAuthChange();
       showPanel("panel-forms");
-      setStatus("Your session ended. Please sign in again.", "warn");
+      const dm = discordReturnUserMessage(discordQs);
+      if (dm) {
+        setStatus(dm, discordQs === "linked" ? "ok" : "warn");
+      } else {
+        setStatus("Your session ended. Please sign in again.", "warn");
+      }
+      if (discordQs) stripDiscordQueryFromUrl();
       return;
     }
     if (!res.ok) {
@@ -586,6 +650,11 @@
     showPanel("panel-account");
     renderAccount(data, earn);
     syncPortalLifetimeNav(data);
+    const dm = discordReturnUserMessage(discordQs);
+    if (dm) {
+      setStatus(dm, discordQs === "linked" ? "ok" : "warn");
+      stripDiscordQueryFromUrl();
+    }
   }
 
   async function refreshBilling() {

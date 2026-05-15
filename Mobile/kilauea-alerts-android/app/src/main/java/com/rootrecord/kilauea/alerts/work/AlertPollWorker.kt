@@ -28,9 +28,10 @@ class AlertPollWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         notifications.ensureChannels()
-        val volcanoOn = prefs.notificationVolcano.first()
-        val nwsOn = prefs.notificationNws.first()
-        val eqOn = prefs.notificationEq.first()
+        val pro = prefs.authProUnlocked.first()
+        val volcanoOn = pro && prefs.notificationVolcano.first()
+        val nwsOn = pro && prefs.notificationNws.first()
+        val eqOn = pro && prefs.notificationEq.first()
         val threshold = prefs.eqMagnitudeThreshold.first()
         val bootstrapped = prefs.bootstrapNotifyComplete.first()
 

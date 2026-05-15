@@ -23,8 +23,9 @@ import nacl from "tweetnacl";
 import { json } from "./cors";
 import { verifyWorkerOpsAdmin } from "./push";
 import { extractAuthToken, sessionFromRequest, type AuthEnv } from "./primary-auth";
-import { notifySolanaToolsDiscord } from "./discord-solana-notify";
+import { isDiscordWebhookUrl, notifySolanaToolsDiscord } from "./discord-solana-notify";
 import { insertTreasuryToCustodialLedger } from "./earn-rewards-ledger";
+import { readCustodialTokenSlots, syncCustodialTokenSlotsFromRpc } from "./custodial-wallet-token-slots";
 import {
   CUSTODIAL_SOL_RESERVE_LAMPORTS,
   custodialSolSpendWouldViolateReserve,
@@ -159,7 +160,13 @@ export async function provisionCustodialWalletIfMissing(
 ): Promise<{ created: boolean }> {
   const suppressDiscord = Boolean(opts?.suppressDiscord);
   const aesKey = await importAesKeyFromEnv(env);
-  if (!aesKey) return { created: false };
+  if (!aesKey) {
+    console.warn(
+      "provisionCustodialWalletIfMissing: INTERNAL_WALLET_ENC_KEY_B64 missing or invalid — cannot create custodial wallet",
+      String(accountId || "").trim(),
+    );
+    return { created: false };
+  }
   const aid = String(accountId || "").trim();
   if (!aid) return { created: false };
 
@@ -191,13 +198,20 @@ export async function provisionCustodialWalletIfMissing(
       }
       await tryFundCustodialMinimumSolAfterCreate(env, kp.publicKey.toBase58());
       if (!suppressDiscord) {
-      const msg =
-        `**Solana tools — custodial wallet (signup auto)**\n` +
-        `**Account:** \`${aid}\`\n` +
-        `**Pubkey:** \`${kp.publicKey.toBase58()}\`\n`;
-      await notifySolanaToolsDiscord(env.DISCORD_WEBHOOK_SOLANA_TOOLS, msg);
-    }
-    return { created: true };
+        const msg =
+          `**Solana tools — custodial wallet (signup auto)**\n` +
+          `**Account:** \`${aid}\`\n` +
+          `**Pubkey:** \`${kp.publicKey.toBase58()}\`\n`;
+        const hook = String(env.DISCORD_WEBHOOK_SOLANA_TOOLS || "").trim();
+        if (!isDiscordWebhookUrl(hook)) {
+          console.warn(
+            "provisionCustodialWalletIfMissing: wallet created but DISCORD_WEBHOOK_SOLANA_TOOLS is missing or not a Discord webhook URL — no Solana-tools channel post.",
+            aid,
+          );
+        }
+        await notifySolanaToolsDiscord(env.DISCORD_WEBHOOK_SOLANA_TOOLS, msg);
+      }
+      return { created: true };
   } catch (e) {
     const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
     console.error("provisionCustodialWalletIfMissing", aid, msg);
@@ -544,6 +558,52 @@ export async function handleCustodialSolWalletV1(
   }
 
   return json({ detail: "Not found", ok: false }, 404);
+}
+
+const CUSTODIAL_TOKEN_SLOT_SCAN_MS = 18_000;
+
+/** GET `/v1/me/custodial-wallet-tokens` — scan chain and refresh `custodial_wallet_token_slots` (native SOL + SPL). */
+export async function handleCustodialWalletTokensV1(
+  request: Request,
+  env: InternalWalletEnv,
+  method: string,
+  pathname: string,
+): Promise<Response> {
+  if (method !== "GET") return json({ detail: "Method not allowed", ok: false }, 405);
+  const basePath = "/v1/me/custodial-wallet-tokens";
+  const rest = pathname === basePath ? "" : pathname.slice(basePath.length);
+  if (rest !== "") return json({ detail: "Not found", ok: false }, 404);
+
+  const sess = await sessionFromRequest(env, request);
+  if (!sess) {
+    return json(
+      {
+        ok: false,
+        detail: extractAuthToken(request) ? "Invalid or expired session." : "Sign in required.",
+      },
+      401,
+    );
+  }
+  const row = await env.DB
+    .prepare("SELECT pubkey FROM internal_solana_wallets WHERE account_id = ?")
+    .bind(sess.accountId)
+    .first<{ pubkey: string }>();
+  const pubkey = String(row?.pubkey || "").trim();
+
+  await syncCustodialTokenSlotsFromRpc(env, sess.accountId, CUSTODIAL_TOKEN_SLOT_SCAN_MS).catch(() => {});
+  const tokens = await readCustodialTokenSlots(env.DB, sess.accountId, 250);
+
+  return json(
+    {
+      ok: true,
+      account_id: sess.accountId,
+      custodial_pubkey: pubkey || null,
+      tokens,
+      note:
+        "Rows mirror on-chain balances (mint_base58 `native` = SOL). Internal P2P moves and withdraws are not enabled yet.",
+    },
+    200,
+  );
 }
 
 /** POST body `{ withdraw_dest_pubkey: string | null }` — optional self-custody destination when no linked wallet. */

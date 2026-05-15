@@ -14,7 +14,7 @@ function safeText(v, fallback = '—') {
 
 function alertProviderLabel(a) {
   const p = String(a?.provider || '').toLowerCase();
-  if (p === 'accuweather') return 'AccuWeather';
+  if (p === 'accuweather') return 'Weather';
   if (p === 'canada') return 'Environment Canada';
   if (p === 'noaa') return 'NOAA / NWS';
   return 'Weather';
@@ -142,7 +142,7 @@ export default function AlertDetail() {
           className="inline-flex items-center gap-2 mt-2 px-4 py-3 bg-container border border-accent/40 text-accent text-sm font-medium hover:bg-containerHover active:opacity-90"
         >
           {String(alert.provider || '').toLowerCase() === 'accuweather'
-            ? 'Open full alert on AccuWeather'
+            ? 'Open full alert details'
             : 'Open official alert page'}
           <ExternalLink strokeWidth={1.5} className="w-4 h-4 shrink-0" aria-hidden />
         </a>

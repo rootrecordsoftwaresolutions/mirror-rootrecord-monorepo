@@ -67,6 +67,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
 
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version = "21.3.0" }
+play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version = "23.6.0" }
 browser = { group = "androidx.browser", name = "browser", version = "1.8.0" }
 
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }

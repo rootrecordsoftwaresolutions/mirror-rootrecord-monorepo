@@ -85,6 +85,15 @@ export function AuthProvider({ children }) {
     refresh();
   }, [refresh]);
 
+  // api.js response interceptor dispatches this when the Worker rejects our Bearer with
+  // "Invalid or expired session." It already wiped the token; we just need to drop the
+  // in-memory user so the AuthScreen re-renders.
+  useEffect(() => {
+    const onInvalid = () => setUser(null);
+    window.addEventListener("rrah.session.invalidated", onInvalid);
+    return () => window.removeEventListener("rrah.session.invalidated", onInvalid);
+  }, []);
+
   const login = useCallback(async (email, password) => {
     const { data } = await postWithRetry("/auth/login", {
       email,

@@ -43,6 +43,20 @@ if (Test-Path -LiteralPath $mainDevEnv) {
         }
     }
 }
+# Optional shard-local overrides — loaded after repo credentials + Web/main/.env
+$shardEnv = Join-Path $PSScriptRoot ".env"
+if (Test-Path -LiteralPath $shardEnv) {
+    Get-Content $shardEnv | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith("#")) { return }
+        $p = $line.IndexOf("=")
+        if ($p -gt 0) {
+            $k = $line.Substring(0, $p).Trim()
+            $v = $line.Substring($p + 1).Trim()
+            Set-Item -Path "Env:$k" -Value $v
+        }
+    }
+}
 # Wrangler global key auth uses CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL (see Cloudflare system env docs).
 if ($env:CLOUDFLARE_GLOBAL_API_KEY -and -not $env:CLOUDFLARE_API_KEY) {
     Set-Item -Path "Env:CLOUDFLARE_API_KEY" -Value $env:CLOUDFLARE_GLOBAL_API_KEY
@@ -117,6 +131,14 @@ if ($pushAdmin -and $pushAdmin.Length -ge 8) {
   $pushAdmin | npx wrangler secret put RR_PUSH_ADMIN_SECRET
 }
 
+# Discord OAuth (account linking)
+$discordClientSecret = [string]$env:DISCORD_CLIENT_SECRET
+if ($discordClientSecret -and $discordClientSecret.Length -ge 12) {
+  $discordClientSecret | npx wrangler secret put DISCORD_CLIENT_SECRET
+}
+
+# DISCORD_PUBLIC_KEY: set in wrangler.toml [vars] (public verify key). Do not wrangler secret put the same name — Wrangler rejects duplicate bindings.
+
 # RR_USAGE_ADMIN_SECRET upload removed: only consumer was `/internal/usage/accuweather`,
 # which was deleted from every shard. Re-add here if a new admin route revives it.
 
@@ -155,7 +177,8 @@ if ($discordFeedback -match '^https://discord(app)?\.com/api/webhooks/' -and $di
   Write-Host "Uploaded DISCORD_FEEDBACK_WEBHOOK_URL (from credentials.env)."
 }
 
-# Global Updates → in-app developer messages (Worker cron). Bot token from Portal → Bot → Reset Token.
+# Discord announcements → D1 `developer_messages` (cron on this Worker only). Bot token: Portal → Bot → Reset Token.
+# Other API shards do not upload this secret; keep DISCORD_BOT_TOKEN in repo-root credentials.env.
 $discordBot = [string]$env:DISCORD_BOT_TOKEN
 $discordBot = $discordBot.Trim()
 if ($discordBot -match '^(?i)bot\s+') {

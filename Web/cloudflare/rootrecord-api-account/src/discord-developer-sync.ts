@@ -6,11 +6,15 @@
  * 2. Enable **Privileged Message Content Intent** (Bot tab) so the API returns `content` in guild channels.
  * 3. Invite bot to your server with **Read Messages/View Channel** + **Read Message History** on the announcements channel.
  * 4. Set `DISCORD_ANNOUNCEMENTS_CHANNEL_ID` in wrangler.toml [vars] (right-click channel → Copy ID with Dev Mode on).
+ * 5. Optional `DISCORD_GUILD_ID` [vars] — if unset, guild is resolved from the announcements channel (`GET /channels/:id`).
+ *    All guild **text** (0), **news** (5), **forum** (15), and **thread** (10/11/12) channels the bot can see are listed in `discord_discovered_channels` and polled
+ *    for **activity stats** only. Only the announcements channel writes `developer_messages` (mobile Settings feed).
  *
- * Cron: rootrecord-api-weather Worker, every-five-minutes schedule, calls runDiscordDeveloperMessageSync.
+ * Cron: rootrecord-api-account Worker, `* * * * *` (every minute) schedule, calls runDiscordDeveloperMessageSync.
  *
- * Also upserts `discord_user_activity` when a **new** `developer_messages` row is inserted
- * (same poll — not full-gateway presence). Ops on **weather** Worker (`X-RR-Push-Admin-Key`):
+ * Also upserts `discord_user_activity` once per Discord message id (`discord_channel_message_stats`)
+ * so channel backfill can populate member stats for messages already in `developer_messages`.
+ * Ops on **account** Worker (`X-RR-Push-Admin-Key`):
  * GET `/api/internal/discord-user-activity`, POST `/api/internal/discord-channel-backfill`
  * (paginated history scan; call repeatedly with body `{ "before": "<next_before>" }` until `done`).
  */
@@ -21,6 +25,8 @@ export interface DiscordDeveloperSyncEnv {
   DB: D1Database;
   DISCORD_ANNOUNCEMENTS_CHANNEL_ID?: string;
   DISCORD_BOT_TOKEN?: string;
+  /** Optional; otherwise resolved from the announcements channel. */
+  DISCORD_GUILD_ID?: string;
 }
 
 interface DiscordAuthor {
@@ -36,6 +42,15 @@ interface DiscordMessage {
   content?: string;
   timestamp?: string;
   author?: DiscordAuthor;
+}
+
+interface DiscordApiChannel {
+  id?: string;
+  type?: number;
+  name?: string;
+  position?: number | null;
+  parent_id?: string | null;
+  guild_id?: string;
 }
 
 /**
@@ -152,10 +167,138 @@ function isoFromDiscord(ts: string | undefined): string {
 
 const DISCORD_FETCH_UA = "RootRecordPrimaryWorker (discord sync; contact: root@rootrecord.info)";
 
+async function discordAuthorizedGet(token: string, path: string): Promise<Response> {
+  return fetch(`https://discord.com/api/v10${path.startsWith("/") ? path : `/${path}`}`, {
+    headers: {
+      Authorization: `Bot ${token}`,
+      "User-Agent": DISCORD_FETCH_UA,
+    },
+  });
+}
+
+async function resolveGuildId(
+  env: DiscordDeveloperSyncEnv,
+  token: string,
+  announcementsChannelId: string,
+): Promise<string | null> {
+  const fromEnv = String(env.DISCORD_GUILD_ID || "").trim();
+  if (fromEnv) return fromEnv;
+  const res = await discordAuthorizedGet(token, `/channels/${encodeURIComponent(announcementsChannelId)}`);
+  if (!res.ok) return null;
+  let ch: DiscordApiChannel;
+  try {
+    ch = (await res.json()) as DiscordApiChannel;
+  } catch {
+    return null;
+  }
+  const gid = ch?.guild_id != null ? String(ch.guild_id).trim() : "";
+  return gid || null;
+}
+
+/** Upserts `discord_discovered_channels` and returns guild text/news channels (types 0 and 5), sorted. */
+async function refreshDiscoveredChannelsInDb(
+  env: DiscordDeveloperSyncEnv,
+  token: string,
+  guildId: string,
+): Promise<{ id: string; type: number; name: string; position: number }[]> {
+  const res = await discordAuthorizedGet(token, `/guilds/${encodeURIComponent(guildId)}/channels`);
+  if (!res.ok) {
+    const snippet = (await res.text()).slice(0, 200);
+    console.error(JSON.stringify({ msg: "discord_guild_channels_http", status: res.status, snippet }));
+    return [];
+  }
+  let list: DiscordApiChannel[];
+  try {
+    list = (await res.json()) as DiscordApiChannel[];
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(list)) return [];
+  const now = new Date().toISOString();
+  /** Text, news, forum, and thread channel types that support message reads (best-effort). */
+  const ingestible: { id: string; type: number; name: string; position: number }[] = [];
+  for (const c of list) {
+    const id = c?.id != null ? String(c.id).trim() : "";
+    if (!id) continue;
+    const type = c.type != null ? Number(c.type) : -1;
+    const name = ((c.name != null ? String(c.name) : "") || "").trim() || id;
+    const position = c.position != null && Number.isFinite(Number(c.position)) ? Number(c.position) : 0;
+    const parent = c.parent_id != null ? String(c.parent_id) : null;
+    try {
+      await env.DB.prepare(
+        `INSERT INTO discord_discovered_channels (channel_id, guild_id, name, type, position, parent_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(channel_id) DO UPDATE SET
+           guild_id = excluded.guild_id,
+           name = excluded.name,
+           type = excluded.type,
+           position = excluded.position,
+           parent_id = excluded.parent_id,
+           updated_at = excluded.updated_at`,
+      )
+        .bind(id, guildId, name.slice(0, 120), type, position, parent, now)
+        .run();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(JSON.stringify({ msg: "discord_discovered_channels_upsert_err", err: msg.slice(0, 200), id }));
+    }
+    if (type === 0 || type === 5 || type === 10 || type === 11 || type === 12 || type === 15) {
+      ingestible.push({ id, type, name, position });
+    }
+  }
+  ingestible.sort((a, b) => (a.position !== b.position ? a.position - b.position : a.name.localeCompare(b.name)));
+  return ingestible;
+}
+
+async function loadIngestibleChannelsFromDb(db: D1Database, guildId: string): Promise<{ channel_id: string }[]> {
+  const q = await db
+    .prepare(
+      `SELECT channel_id FROM discord_discovered_channels WHERE guild_id = ? AND type IN (0, 5, 10, 11, 12, 15) ORDER BY position ASC, name ASC`,
+    )
+    .bind(guildId)
+    .all<{ channel_id: string }>();
+  return (q.results ?? []).filter((r) => Boolean(r?.channel_id));
+}
+
+async function persistDiscordMessageStat(
+  db: D1Database,
+  channelId: string,
+  messageId: string,
+  createdAtIso: string,
+): Promise<boolean> {
+  const r = await db
+    .prepare(
+      `INSERT OR IGNORE INTO discord_channel_message_stats (discord_message_id, channel_id, created_at) VALUES (?, ?, ?)`,
+    )
+    .bind(messageId, channelId, createdAtIso)
+    .run();
+  return (r.meta?.changes ?? 0) === 1;
+}
+
+async function bumpDiscordActivityAfterNewStat(db: D1Database, messageIsoUtc: string, channelId: string): Promise<void> {
+  const day = messageIsoUtc.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  await db
+    .prepare(
+      `INSERT INTO discord_activity_daily (day, message_count) VALUES (?, 1)
+       ON CONFLICT(day) DO UPDATE SET message_count = discord_activity_daily.message_count + 1`,
+    )
+    .bind(day)
+    .run();
+  await db
+    .prepare(
+      `INSERT INTO discord_activity_daily_by_channel (day, channel_id, message_count) VALUES (?, ?, 1)
+       ON CONFLICT(day, channel_id) DO UPDATE SET message_count = discord_activity_daily_by_channel.message_count + 1`,
+    )
+    .bind(day, channelId)
+    .run();
+}
+
 /** Oldest-first batch (same ordering contract as `runDiscordDeveloperMessageSync`). */
-async function processOrderedDiscordAnnouncementsMessages(
+async function processOrderedDiscordGuildMessages(
   env: DiscordDeveloperSyncEnv,
   ordered: DiscordMessage[],
+  ctx: { channelId: string; ingestDeveloperFeed: boolean },
 ): Promise<{ inserted: number; activityUpserts: number }> {
   let inserted = 0;
   let activityUpserts = 0;
@@ -172,30 +315,33 @@ async function processOrderedDiscordAnnouncementsMessages(
     const body = cleanedBody.slice(0, 8000);
     const created_at = isoFromDiscord(m.timestamp);
 
-    let anyNewInsert = false;
-    for (const scope of scopes) {
-      const rowId = `discord:${m.id}:${scope}`;
-      try {
-        const r = await env.DB.prepare(
-          `INSERT OR IGNORE INTO developer_messages (id, title, body, app_scope, created_at) VALUES (?, ?, ?, ?, ?)`,
-        )
-          .bind(rowId, title.slice(0, 200), body, scope, created_at)
-          .run();
-        if (r.meta?.changes === 1) {
-          inserted += 1;
-          anyNewInsert = true;
+    if (ctx.ingestDeveloperFeed) {
+      for (const scope of scopes) {
+        const rowId = `discord:${m.id}:${scope}`;
+        try {
+          const r = await env.DB.prepare(
+            `INSERT OR IGNORE INTO developer_messages (id, title, body, app_scope, created_at) VALUES (?, ?, ?, ?, ?)`,
+          )
+            .bind(rowId, title.slice(0, 200), body, scope, created_at)
+            .run();
+          if (r.meta?.changes === 1) inserted += 1;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(JSON.stringify({ msg: "discord_developer_sync_insert_err", err: msg.slice(0, 200), rowId }));
         }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(JSON.stringify({ msg: "discord_developer_sync_insert_err", err: msg.slice(0, 200), rowId }));
       }
     }
 
-    if (anyNewInsert && m.author?.id && !m.author.bot) {
+    const author = m.author;
+    const mid = String(m.id).trim();
+    if (author?.id && !author.bot && mid) {
       try {
-        await upsertDiscordUserActivity(env.DB, m.author, created_at, m.id);
-        await bumpDiscordActivityDaily(env.DB, created_at);
-        activityUpserts += 1;
+        const firstStat = await persistDiscordMessageStat(env.DB, ctx.channelId, mid, created_at);
+        if (firstStat) {
+          await upsertDiscordUserActivity(env.DB, author, created_at, m.id);
+          activityUpserts += 1;
+          await bumpDiscordActivityAfterNewStat(env.DB, created_at, ctx.channelId);
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(JSON.stringify({ msg: "discord_user_activity_upsert_err", err: msg.slice(0, 200), id: m.id }));
@@ -231,18 +377,6 @@ async function upsertDiscordUserActivity(
     .run();
 }
 
-async function bumpDiscordActivityDaily(db: D1Database, messageIsoUtc: string): Promise<void> {
-  const day = messageIsoUtc.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
-  await db
-    .prepare(
-      `INSERT INTO discord_activity_daily (day, message_count) VALUES (?, 1)
-       ON CONFLICT(day) DO UPDATE SET message_count = discord_activity_daily.message_count + 1`,
-    )
-    .bind(day)
-    .run();
-}
-
 export async function runDiscordDeveloperMessageSync(env: DiscordDeveloperSyncEnv): Promise<{
   ok: boolean;
   inserted: number;
@@ -250,39 +384,63 @@ export async function runDiscordDeveloperMessageSync(env: DiscordDeveloperSyncEn
   skipped: string;
 }> {
   const token = String(env.DISCORD_BOT_TOKEN || "").trim();
-  const channelId = String(env.DISCORD_ANNOUNCEMENTS_CHANNEL_ID || "").trim();
-  if (!token || !channelId) {
+  const announce = String(env.DISCORD_ANNOUNCEMENTS_CHANNEL_ID || "").trim();
+  if (!token || !announce) {
     return { ok: true, inserted: 0, activity_upserts: 0, skipped: "discord_not_configured" };
   }
 
-  const res = await fetch(`https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages?limit=25`, {
-    headers: {
-      Authorization: `Bot ${token}`,
-      "User-Agent": DISCORD_FETCH_UA,
-    },
-  });
+  const guildId = await resolveGuildId(env, token, announce);
+  let channelTargets: { id: string; ingestDeveloperFeed: boolean }[];
 
-  if (!res.ok) {
-    const snippet = (await res.text()).slice(0, 400);
-    console.error(
-      JSON.stringify({ msg: "discord_developer_sync_http", status: res.status, channel_id: channelId, snippet }),
+  if (guildId) {
+    await refreshDiscoveredChannelsInDb(env, token, guildId);
+    const fromDb = await loadIngestibleChannelsFromDb(env.DB, guildId);
+    channelTargets = fromDb.map((r) => ({
+      id: r.channel_id,
+      ingestDeveloperFeed: r.channel_id === announce,
+    }));
+    if (channelTargets.length === 0) {
+      channelTargets = [{ id: announce, ingestDeveloperFeed: true }];
+    }
+  } else {
+    channelTargets = [{ id: announce, ingestDeveloperFeed: true }];
+  }
+
+  let inserted = 0;
+  let activityUpserts = 0;
+
+  for (const ch of channelTargets) {
+    const res = await fetch(
+      `https://discord.com/api/v10/channels/${encodeURIComponent(ch.id)}/messages?limit=25`,
+      {
+        headers: {
+          Authorization: `Bot ${token}`,
+          "User-Agent": DISCORD_FETCH_UA,
+        },
+      },
     );
-    return { ok: false, inserted: 0, activity_upserts: 0, skipped: `discord_http_${res.status}` };
+    if (!res.ok) {
+      const snippet = (await res.text()).slice(0, 400);
+      console.error(
+        JSON.stringify({ msg: "discord_developer_sync_http", status: res.status, channel_id: ch.id, snippet }),
+      );
+      continue;
+    }
+    let messages: DiscordMessage[];
+    try {
+      messages = (await res.json()) as DiscordMessage[];
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(messages) || messages.length === 0) continue;
+    const ordered = [...messages].reverse();
+    const r = await processOrderedDiscordGuildMessages(env, ordered, {
+      channelId: ch.id,
+      ingestDeveloperFeed: ch.ingestDeveloperFeed,
+    });
+    inserted += r.inserted;
+    activityUpserts += r.activityUpserts;
   }
-
-  let messages: DiscordMessage[];
-  try {
-    messages = (await res.json()) as DiscordMessage[];
-  } catch {
-    return { ok: false, inserted: 0, activity_upserts: 0, skipped: "discord_json_parse" };
-  }
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return { ok: true, inserted: 0, activity_upserts: 0, skipped: "no_messages" };
-  }
-
-  /** Discord returns newest-first; insert oldest-first so ordering feels natural. */
-  const ordered = [...messages].reverse();
-  const { inserted, activityUpserts } = await processOrderedDiscordAnnouncementsMessages(env, ordered);
 
   if (inserted > 0 || activityUpserts > 0) {
     console.log(
@@ -290,7 +448,8 @@ export async function runDiscordDeveloperMessageSync(env: DiscordDeveloperSyncEn
         msg: "discord_developer_sync_ok",
         inserted,
         activity_upserts: activityUpserts,
-        channel_id: channelId,
+        guild_id: guildId || null,
+        channels_polled: channelTargets.length,
       }),
     );
   }
@@ -298,12 +457,13 @@ export async function runDiscordDeveloperMessageSync(env: DiscordDeveloperSyncEn
 }
 
 /**
- * Walk older messages via `before` pagination (100/msg page). Same insert rules as the cron
- * sync. Re-invoke with `before: next_before` from the JSON until `done` is true.
+ * Paginated history: walks all discovered guild text/news channels. Body JSON:
+ * `{ "before": "<snowflake>", "channel_id": "<id>", "max_pages": 30 }`
+ * — when a channel finishes, response includes `next_channel_id` (use with `before: null`).
  */
 export async function runDiscordAnnouncementsHistoryBackfill(
   env: DiscordDeveloperSyncEnv,
-  opts: { before?: string | null; max_pages?: number },
+  opts: { before?: string | null; max_pages?: number; channel_id?: string | null },
 ): Promise<{
   ok: boolean;
   skipped: string;
@@ -313,10 +473,13 @@ export async function runDiscordAnnouncementsHistoryBackfill(
   messages_scanned: number;
   done: boolean;
   next_before: string | null;
+  active_channel_id: string | null;
+  next_channel_id: string | null;
+  channel_done: boolean;
 }> {
   const token = String(env.DISCORD_BOT_TOKEN || "").trim();
-  const channelId = String(env.DISCORD_ANNOUNCEMENTS_CHANNEL_ID || "").trim();
-  if (!token || !channelId) {
+  const announce = String(env.DISCORD_ANNOUNCEMENTS_CHANNEL_ID || "").trim();
+  if (!token || !announce) {
     return {
       ok: true,
       skipped: "discord_not_configured",
@@ -326,10 +489,29 @@ export async function runDiscordAnnouncementsHistoryBackfill(
       messages_scanned: 0,
       done: true,
       next_before: null,
+      active_channel_id: null,
+      next_channel_id: null,
+      channel_done: false,
     };
   }
 
   const maxPages = Math.min(50, Math.max(1, Math.floor(opts.max_pages ?? 30)));
+  const guildId = await resolveGuildId(env, token, announce);
+
+  let chRows: { channel_id: string }[] = [];
+  if (guildId) {
+    await refreshDiscoveredChannelsInDb(env, token, guildId);
+    chRows = await loadIngestibleChannelsFromDb(env.DB, guildId);
+  }
+  if (chRows.length === 0) {
+    chRows = [{ channel_id: announce }];
+  }
+
+  const chIds = chRows.map((r) => r.channel_id);
+  let activeId = (opts.channel_id != null ? String(opts.channel_id).trim() : "") || chIds[0] || announce;
+  if (!chIds.includes(activeId)) activeId = chIds[0] || announce;
+
+  const announceIngest = activeId === announce;
   let beforeCursor = (opts.before != null ? String(opts.before) : "").trim() || null;
   let inserted = 0;
   let activityUpserts = 0;
@@ -338,7 +520,7 @@ export async function runDiscordAnnouncementsHistoryBackfill(
   let nextBefore: string | null = null;
 
   while (pages < maxPages) {
-    let url = `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages?limit=100`;
+    let url = `https://discord.com/api/v10/channels/${encodeURIComponent(activeId)}/messages?limit=100`;
     if (beforeCursor) url += `&before=${encodeURIComponent(beforeCursor)}`;
 
     const res = await fetch(url, {
@@ -350,7 +532,9 @@ export async function runDiscordAnnouncementsHistoryBackfill(
 
     if (!res.ok) {
       const snippet = (await res.text()).slice(0, 400);
-      console.error(JSON.stringify({ msg: "discord_backfill_http", status: res.status, channel_id: channelId, snippet }));
+      console.error(
+        JSON.stringify({ msg: "discord_backfill_http", status: res.status, channel_id: activeId, snippet }),
+      );
       return {
         ok: false,
         skipped: `discord_http_${res.status}`,
@@ -360,6 +544,9 @@ export async function runDiscordAnnouncementsHistoryBackfill(
         messages_scanned: scanned,
         done: false,
         next_before: beforeCursor,
+        active_channel_id: activeId,
+        next_channel_id: null,
+        channel_done: false,
       };
     }
 
@@ -376,10 +563,29 @@ export async function runDiscordAnnouncementsHistoryBackfill(
         messages_scanned: scanned,
         done: false,
         next_before: beforeCursor,
+        active_channel_id: activeId,
+        next_channel_id: null,
+        channel_done: false,
       };
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
+      const idx = chIds.indexOf(activeId);
+      const nextCh = idx >= 0 && idx + 1 < chIds.length ? chIds[idx + 1]! : null;
+      const allDone = nextCh == null;
+      console.log(
+        JSON.stringify({
+          msg: "discord_channel_backfill_batch",
+          channel_id: activeId,
+          pages,
+          scanned,
+          inserted,
+          activity_upserts: activityUpserts,
+          terminal: true,
+          channel_done: true,
+          next_channel_id: nextCh,
+        }),
+      );
       return {
         ok: true,
         skipped: "ok",
@@ -387,14 +593,20 @@ export async function runDiscordAnnouncementsHistoryBackfill(
         activity_upserts: activityUpserts,
         pages_fetched: pages,
         messages_scanned: scanned,
-        done: true,
+        done: allDone,
         next_before: null,
+        active_channel_id: activeId,
+        next_channel_id: nextCh,
+        channel_done: true,
       };
     }
 
     scanned += messages.length;
     const ordered = [...messages].reverse();
-    const r = await processOrderedDiscordAnnouncementsMessages(env, ordered);
+    const r = await processOrderedDiscordGuildMessages(env, ordered, {
+      channelId: activeId,
+      ingestDeveloperFeed: announceIngest,
+    });
     inserted += r.inserted;
     activityUpserts += r.activityUpserts;
 
@@ -405,15 +617,19 @@ export async function runDiscordAnnouncementsHistoryBackfill(
     pages += 1;
 
     if (messages.length < 100) {
+      const idx = chIds.indexOf(activeId);
+      const nextCh = idx >= 0 && idx + 1 < chIds.length ? chIds[idx + 1]! : null;
+      const allDone = nextCh == null;
       console.log(
         JSON.stringify({
           msg: "discord_channel_backfill_batch",
-          channel_id: channelId,
+          channel_id: activeId,
           pages,
           scanned,
           inserted,
           activity_upserts: activityUpserts,
           terminal: true,
+          next_channel_id: nextCh,
         }),
       );
       return {
@@ -423,8 +639,11 @@ export async function runDiscordAnnouncementsHistoryBackfill(
         activity_upserts: activityUpserts,
         pages_fetched: pages,
         messages_scanned: scanned,
-        done: true,
+        done: allDone,
         next_before: null,
+        active_channel_id: activeId,
+        next_channel_id: nextCh,
+        channel_done: true,
       };
     }
   }
@@ -432,7 +651,7 @@ export async function runDiscordAnnouncementsHistoryBackfill(
   console.log(
     JSON.stringify({
       msg: "discord_channel_backfill_batch",
-      channel_id: channelId,
+      channel_id: activeId,
       pages_fetched: pages,
       messages_scanned: scanned,
       inserted,
@@ -451,5 +670,8 @@ export async function runDiscordAnnouncementsHistoryBackfill(
     messages_scanned: scanned,
     done: false,
     next_before: nextBefore,
+    active_channel_id: activeId,
+    next_channel_id: null,
+    channel_done: false,
   };
 }

@@ -60,7 +60,7 @@ export default function Feedback() {
     <div className="min-h-screen bg-app text-white pb-8">
       <header
         className="sticky top-0 z-20 bg-app/95 backdrop-blur border-b border-subtle flex items-center gap-2 px-3 py-3"
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}
+        style={{ paddingTop: '0.75rem' }}
       >
         <button
           type="button"

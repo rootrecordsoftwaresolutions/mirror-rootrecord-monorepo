@@ -10,3 +10,6 @@ INTERNAL_WALLET_ENC_KEY_B64=paste-44-char-base64-here
 # Optional local overrides (otherwise wrangler.toml [vars] apply):
 # SITE_URL=http://127.0.0.1:8787
 # ACCUWEATHER_API_KEY=   (AccuWeather dev key for real weather in local dev)
+#
+# Optional: override wrangler.toml [vars] for local dev only:
+# DISCORD_PUBLIC_KEY=paste_hex_verify_key_here

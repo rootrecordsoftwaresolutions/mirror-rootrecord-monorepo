@@ -1,5 +1,6 @@
 # POST /api/internal/provision-custodial-wallets-missing in batches until no accounts lack custodial rows.
 # Requires RR_PUSH_ADMIN_SECRET (same as push-broadcast). Loads credentials.env like deploy.ps1.
+# API host: ROOTRECORD_ACCOUNT_API, else ROOTRECORD_PRIMARY_API, else WEATHER_API_PUBLIC_URL, else rootrecord-api-account.workers.dev
 $ErrorActionPreference = "Stop"
 $repoRoot = $null
 $probe = $PSScriptRoot
@@ -32,9 +33,12 @@ if (-not $admin -or $admin.Length -lt 8) {
     throw "RR_PUSH_ADMIN_SECRET missing or too short in credentials.env."
 }
 
-$api = [string]$env:ROOTRECORD_PRIMARY_API
+# Same D1 as other shards, but call a Worker that has INTERNAL_WALLET_ENC_KEY_B64 + RR_PUSH_ADMIN_SECRET applied.
+# Prefer explicit account URL (add to credentials.env): ROOTRECORD_ACCOUNT_API=https://rootrecord-api-account.rootrecord.workers.dev
+$api = [string]$env:ROOTRECORD_ACCOUNT_API
+if (-not $api) { $api = [string]$env:ROOTRECORD_PRIMARY_API }
 if (-not $api) { $api = [string]$env:WEATHER_API_PUBLIC_URL }
-if (-not $api) { $api = "https://api.rootrecord.info" }
+if (-not $api) { $api = "https://rootrecord-api-account.rootrecord.workers.dev" }
 $api = $api.TrimEnd("/")
 
 $uri = "$api/api/internal/provision-custodial-wallets-missing"

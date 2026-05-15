@@ -1,6 +1,6 @@
 {
   "name": "rootrecord-weather-android",
-  "version": "1.0.29",
+  "version": "1.0.43",
   "private": true,
   "description": "Android (Capacitor) wrapper for the Weather Manager web app. Web source lives at Web/apps/weather-manager-web.",
   "scripts": {

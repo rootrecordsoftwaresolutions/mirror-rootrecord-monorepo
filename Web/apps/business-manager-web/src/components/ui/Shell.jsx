@@ -10,8 +10,8 @@ export function ScreenHeader({ title, subtitle, back = true, right = null }) {
       style={{
         borderTop: "none",
         borderBottom: "1px solid rgba(255,255,255,0.05)",
-        /* Keep title/actions below system status bar / notch (viewport-fit=cover + translucent bar). */
-        paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)",
+        /* Safe area + native banner inset live on `.business-web-main` (App.js); header only needs spacing. */
+        paddingTop: "1rem",
       }}
     >
       <div className="flex items-center gap-2">

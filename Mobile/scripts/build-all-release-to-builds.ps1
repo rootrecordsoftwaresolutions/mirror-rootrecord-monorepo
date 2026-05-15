@@ -13,6 +13,9 @@ $ErrorActionPreference = "Stop"
 New-Item -ItemType Directory -Force -Path $OutRoot | Out-Null
 # Do not set CI=true — react-scripts treats ESLint warnings as errors under CI.
 $env:GENERATE_SOURCEMAP = "false"
+if ([string]::IsNullOrWhiteSpace($env:NODE_OPTIONS) -or $env:NODE_OPTIONS -notmatch "max-old-space-size") {
+    $env:NODE_OPTIONS = "--max-old-space-size=8192 --max-semi-space-size=128"
+}
 
 function Copy-BuildArtifacts {
     param(
@@ -114,8 +117,8 @@ function Invoke-KilaueaAlertsNative {
         $aab = Get-ChildItem -LiteralPath $aabDir -Filter "*.aab" -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $apk) { throw "No APK in $apkDir" }
         if (-not $aab) { throw "No AAB in $aabDir" }
-        Copy-Item -LiteralPath $apk.FullName -Destination (Join-Path $dest "RootRecord-KilaueaAlerts-$Version.apk") -Force
-        Copy-Item -LiteralPath $aab.FullName -Destination (Join-Path $dest "RootRecord-KilaueaAlerts-$Version.aab") -Force
+        Copy-Item -LiteralPath $apk.FullName -Destination (Join-Path $dest "RootRecord-Kilauea-Alerts-$Version.apk") -Force
+        Copy-Item -LiteralPath $aab.FullName -Destination (Join-Path $dest "RootRecord-Kilauea-Alerts-$Version.aab") -Force
         Write-Host "Copied Kilauea Alerts artifacts -> $dest" -ForegroundColor Green
     }
     finally {

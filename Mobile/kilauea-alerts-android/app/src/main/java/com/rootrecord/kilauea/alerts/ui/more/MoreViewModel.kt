@@ -13,6 +13,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -52,23 +53,36 @@ class MoreViewModel @Inject constructor(
     }
 
     fun setVolcano(v: Boolean) {
-        viewModelScope.launch { prefs.setNotifyVolcano(v) }
+        viewModelScope.launch {
+            if (!prefs.authProUnlocked.first()) return@launch
+            prefs.setNotifyVolcano(v)
+        }
     }
 
     fun setNws(v: Boolean) {
-        viewModelScope.launch { prefs.setNotifyNws(v) }
+        viewModelScope.launch {
+            if (!prefs.authProUnlocked.first()) return@launch
+            prefs.setNotifyNws(v)
+        }
     }
 
     fun setEq(v: Boolean) {
-        viewModelScope.launch { prefs.setNotifyEq(v) }
+        viewModelScope.launch {
+            if (!prefs.authProUnlocked.first()) return@launch
+            prefs.setNotifyEq(v)
+        }
     }
 
     fun setLive(v: Boolean) {
-        viewModelScope.launch { prefs.setNotifyLiveFeeds(v) }
+        viewModelScope.launch {
+            if (!prefs.authProUnlocked.first()) return@launch
+            prefs.setNotifyLiveFeeds(v)
+        }
     }
 
     fun setThreshold(v: Float) {
         viewModelScope.launch {
+            if (!prefs.authProUnlocked.first()) return@launch
             prefs.setEqThreshold(v.coerceIn(1f, 6f))
             WorkEnqueue.enqueueOneShotAlertPoll(appContext)
         }

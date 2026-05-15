@@ -38,16 +38,12 @@ interface RootRecordApi {
         @Part("caption") caption: String? = null,
     ): String
 
-    /** Near–real-time observations (AirNow); API key on Worker only. */
-    @GET("/api/airnow/current")
-    suspend fun airNowCurrent(
+    /** Near–real-time air quality (Open-Meteo model) for Volcano Village area. */
+    @GET("/api/air-quality/current")
+    suspend fun airQualityCurrent(
         @Query("lat") lat: Double,
         @Query("lon") lon: Double,
-        @Query("distance") distance: Int = 50,
     ): String
-
-    @GET("/api/aqs/hawaii-county-daily")
-    suspend fun aqsHawaiiCountyDaily(): String
 
     /** Serve photo bytes (approved only). Used by Coil (no auth). */
     @GET("/api/photos/file/{id}")
@@ -63,4 +59,8 @@ interface RootRecordApi {
     suspend fun developerMessages(
         @Query("app_id") appId: String = "rootrecord_kilauea_alerts_android",
     ): String
+
+    /** Ordered YouTube / live stream list for the Live Feeds pager (D1-backed). */
+    @GET("/api/mobile/kilauea-live-streams")
+    suspend fun kilaueaLiveStreams(): String
 }

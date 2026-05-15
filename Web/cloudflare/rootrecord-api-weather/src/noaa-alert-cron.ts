@@ -1,5 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { getFcmAccessToken, sendFcmNotification } from "./fcm-v1";
+import { loadProFlags } from "./free-tier";
 import { readNoaaAlertsEnabled } from "./prefs";
 
 type FcmCreds = { projectId: string; clientEmail: string; privateKey: string };
@@ -103,6 +104,21 @@ async function tokensForUser(db: D1Database, userId: string): Promise<string[]> 
   return out;
 }
 
+async function deletePushToken(db: D1Database, token: string): Promise<void> {
+  await db.prepare("DELETE FROM rrwm_push_tokens WHERE token = ?").bind(token).run();
+}
+
+function isStaleFcmTokenError(err: string): boolean {
+  const e = err.toLowerCase();
+  return (
+    e.includes("not_found") ||
+    e.includes("unregistered") ||
+    e.includes("invalid-registration") ||
+    e.includes("registration-token-not-registered") ||
+    e.includes("requested entity was not found")
+  );
+}
+
 export async function runNoaaAlertCron(env: {
   DB: D1Database;
   FCM_SERVICE_ACCOUNT_JSON?: string;
@@ -126,12 +142,21 @@ export async function runNoaaAlertCron(env: {
 
   const accessToken = await getFcmAccessToken({ clientEmail: fcm.clientEmail, privateKey: fcm.privateKey });
 
-  // Cache tokens per user for this run.
   const tokenCache = new Map<string, string[]>();
   const prefsCache = new Map<string, boolean>();
+  const proCache = new Map<string, boolean>();
   const nowIso = new Date().toISOString();
 
   for (const loc of locs) {
+    const isPro =
+      proCache.get(loc.user_id) ??
+      (await (async () => {
+        const { pro } = await loadProFlags(env.DB, loc.user_id);
+        proCache.set(loc.user_id, pro);
+        return pro;
+      })());
+    if (!isPro) continue;
+
     const enabled =
       prefsCache.get(loc.user_id) ??
       (await (async () => {
@@ -146,19 +171,9 @@ export async function runNoaaAlertCron(env: {
 
     const newIds: string[] = [];
     for (const id of ids) {
-      // Small optimization: only check D1 for ids we might need to notify.
       if (!(await wasSeen(env.DB, loc.user_id, loc.id, id))) newIds.push(id);
     }
     if (!newIds.length) continue;
-
-    // Mark seen before sending (best-effort dedupe on retries).
-    for (const id of newIds) {
-      try {
-        await markSeen(env.DB, loc.user_id, loc.id, id, nowIso);
-      } catch {
-        /* ignore */
-      }
-    }
 
     const tokens = tokenCache.get(loc.user_id) || (await tokensForUser(env.DB, loc.user_id));
     tokenCache.set(loc.user_id, tokens);
@@ -170,12 +185,34 @@ export async function runNoaaAlertCron(env: {
         ? `${loc.name}: ${headline || "New NOAA alert"}`
         : `${loc.name}: ${newIds.length} new NOAA alerts`;
 
-    // Send to all devices for the user.
+    let anyDelivered = false;
     const concurrency = 12;
     for (let i = 0; i < tokens.length; i += concurrency) {
       const chunk = tokens.slice(i, i + concurrency);
-      await Promise.all(chunk.map((t) => sendFcmNotification(fcm.projectId, accessToken, t, title, body)));
+      const part = await Promise.all(
+        chunk.map(async (t) => {
+          const r = await sendFcmNotification(fcm.projectId, accessToken, t, title, body);
+          if (!r.ok && isStaleFcmTokenError(r.error)) {
+            try {
+              await deletePushToken(env.DB, t);
+            } catch {
+              /* ignore */
+            }
+          }
+          return r;
+        })
+      );
+      if (part.some((r) => r.ok)) anyDelivered = true;
+    }
+
+    if (!anyDelivered) continue;
+
+    for (const id of newIds) {
+      try {
+        await markSeen(env.DB, loc.user_id, loc.id, id, nowIso);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
-

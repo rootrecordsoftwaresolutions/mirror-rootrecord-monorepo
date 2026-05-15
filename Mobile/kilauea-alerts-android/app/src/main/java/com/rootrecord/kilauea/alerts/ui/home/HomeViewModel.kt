@@ -2,8 +2,7 @@ package com.rootrecord.kilauea.alerts.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rootrecord.kilauea.alerts.data.repository.AirNowRepository
-import com.rootrecord.kilauea.alerts.data.repository.AqsRepository
+import com.rootrecord.kilauea.alerts.data.repository.AirQualityRepository
 import com.rootrecord.kilauea.alerts.data.repository.EarthquakeRepository
 import com.rootrecord.kilauea.alerts.data.repository.UsgVolcanoRepository
 import android.content.Context
@@ -26,12 +25,8 @@ data class HomeUiState(
     val volcano: JsonObject? = null,
     val earthquakes: JsonObject? = null,
     val volcanoVillageWeather: JsonObject? = null,
-    /** AirNow current observations near Volcano Village — optional until Worker has `AIRNOW_API_KEY`. */
-    val airNowSummary: JsonObject? = null,
-    val airNowError: String? = null,
-    /** EPA AQS daily summaries (Hawaiʻi County) — optional; null if Worker has no credentials or fetch failed. */
-    val aqsSummary: JsonObject? = null,
-    val aqsError: String? = null,
+    /** Open-Meteo air quality; null when unavailable (card hidden). */
+    val airQuality: JsonObject? = null,
     val error: String? = null,
 )
 
@@ -40,8 +35,7 @@ class HomeViewModel @Inject constructor(
     private val volcanoRepo: UsgVolcanoRepository,
     private val eqRepo: EarthquakeRepository,
     private val weatherRepo: WeatherRepository,
-    private val airNowRepo: AirNowRepository,
-    private val aqsRepo: AqsRepository,
+    private val airQualityRepo: AirQualityRepository,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -52,8 +46,6 @@ class HomeViewModel @Inject constructor(
 
     init {
         refresh(force = false)
-        // Soft refresh: keep USGS/FDSN reasonably fresh without `?refresh=1` on the dashboard
-        // (that bypasses Worker D1 and retriggers AccuWeather). User FAB still uses force = true.
         ticker = viewModelScope.launch {
             while (true) {
                 delay(2 * 60 * 1000L)
@@ -69,23 +61,19 @@ class HomeViewModel @Inject constructor(
 
     fun refresh(force: Boolean) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null, aqsError = null, airNowError = null) }
+            _state.update { it.copy(loading = true, error = null) }
             val v = volcanoRepo.offlineFirst(force)
             val eq = eqRepo.offlineFirst(force)
             val vv = BigIslandLocation.VolcanoVillage
             val wx = weatherRepo.observeOfflineFirst(vv.id, vv.latitude, vv.longitude, force)
-            val air = airNowRepo.offlineFirst(force)
-            val aqs = aqsRepo.offlineFirst(force)
+            val air = airQualityRepo.offlineFirst(vv.id, vv.latitude, vv.longitude, force)
             _state.update {
                 it.copy(
                     loading = false,
                     volcano = v.getOrNull(),
                     earthquakes = eq.getOrNull(),
                     volcanoVillageWeather = wx.getOrNull(),
-                    airNowSummary = air.getOrNull(),
-                    airNowError = air.exceptionOrNull()?.message,
-                    aqsSummary = aqs.getOrNull(),
-                    aqsError = aqs.exceptionOrNull()?.message,
+                    airQuality = air.getOrNull(),
                     error = listOfNotNull(
                         v.exceptionOrNull()?.message,
                         eq.exceptionOrNull()?.message,

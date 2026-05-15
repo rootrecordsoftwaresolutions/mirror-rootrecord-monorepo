@@ -7,6 +7,7 @@ export type BillingSnapshot = {
 /** Minimal D1 surface (avoids pulling `@cloudflare/workers-types` into `shared/`). */
 export type BillingD1Statement = {
   first: <T>() => Promise<T | null>;
+  all: <T>() => Promise<{ results: T[] }>;
   run: () => Promise<{ meta?: { rows_written?: number } }>;
 };
 

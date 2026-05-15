@@ -3,8 +3,10 @@ import { logHttpRequestJson, persistHttpErrorIfNeeded, pruneWorkerHttpErrorEvent
 import type { Env } from "./router";
 import { handleRequest } from "./router";
 import { runInactiveAccountCleanupCron } from "./inactive-account-cron";
+import { runDiscordDeveloperMessageSync } from "./discord-developer-sync";
+import { reconcileStaleStripeSubscriptions } from "../../shared/stripe-reconcile";
 // NOAA alert cron lives only on rootrecord-api-weather (and api-kilauea if it ever needs alerts).
-// This shard is wrangler `crons = []`, so even the shard gate below is belt-and-suspenders.
+// This Worker: `* * * * *` runs Discord → D1 stats + developer feed sync; `45 8` runs inactive-account cleanup + HTTP error prune.
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -58,6 +60,22 @@ export default {
       }
       return;
     }
-    // No `*/5` cron handler on this shard. NOAA alert cron is owned by rootrecord-api-weather.
+    if (c === "17 9 * * *" && shard === "account") {
+      const sk = String(env.STRIPE_SECRET_KEY || "").trim();
+      if (!sk.startsWith("sk_")) return;
+      const r = await reconcileStaleStripeSubscriptions({
+        db: env.DB,
+        stripeSecretKey: sk,
+        staleAfterDays: 32,
+        limit: 50,
+      });
+      console.log("stripe reconcile", JSON.stringify(r));
+      return;
+    }
+    if (c === "* * * * *" && shard === "account") {
+      await runDiscordDeveloperMessageSync(env).catch((e) =>
+        console.error("discord_developer_sync_err", e instanceof Error ? e.message : String(e)),
+      );
+    }
   },
 };

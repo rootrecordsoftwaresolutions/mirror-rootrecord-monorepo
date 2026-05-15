@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rootrecord.kilauea.alerts.data.local.KilaueaPreferences
+import com.rootrecord.kilauea.alerts.data.repository.AirQualityRepository
 import com.rootrecord.kilauea.alerts.data.repository.WeatherRepository
 import com.rootrecord.kilauea.alerts.domain.BigIslandLocation
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,12 +17,14 @@ import javax.inject.Inject
 
 data class WeatherDetailUiState(
     val bundle: JsonObject? = null,
+    val airQuality: JsonObject? = null,
     val error: String? = null,
 )
 
 @HiltViewModel
 class WeatherDetailViewModel @Inject constructor(
     private val repo: WeatherRepository,
+    private val airQualityRepo: AirQualityRepository,
     private val prefs: KilaueaPreferences,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -47,9 +50,11 @@ class WeatherDetailViewModel @Inject constructor(
                     }
                     val (lat, lon) = gps
                     val r = repo.observeOfflineFirst(WEATHER_GPS_ROUTE_ID, lat, lon, force)
+                    val air = airQualityRepo.offlineFirst(WEATHER_GPS_ROUTE_ID, lat, lon, force).getOrNull()
                     _state.update {
                         WeatherDetailUiState(
                             bundle = r.getOrNull(),
+                            airQuality = air,
                             error = r.exceptionOrNull()?.message,
                         )
                     }
@@ -60,9 +65,11 @@ class WeatherDetailViewModel @Inject constructor(
                         return@launch
                     }
                     val r = repo.observeOfflineFirst(loc.id, loc.latitude, loc.longitude, force)
+                    val air = airQualityRepo.offlineFirst(loc.id, loc.latitude, loc.longitude, force).getOrNull()
                     _state.update {
                         WeatherDetailUiState(
                             bundle = r.getOrNull(),
+                            airQuality = air,
                             error = r.exceptionOrNull()?.message,
                         )
                     }

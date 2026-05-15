@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ShieldCheck, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -18,9 +18,17 @@ export default function UpsellModal() {
   const { user } = useAuth();
   const isPro = user?.plan === "pro";
   const [open, setOpen] = useState(false);
+  const openCountedRef = useRef(false);
 
   useEffect(() => {
-    if (isPro) return;
+    if (isPro) {
+      setOpen(false);
+    }
+  }, [isPro]);
+
+  useEffect(() => {
+    if (user === undefined || isPro || openCountedRef.current) return;
+    openCountedRef.current = true;
     let n = 0;
     try {
       n = Number(window.localStorage.getItem(OPENS_KEY) || "0") + 1;
@@ -29,18 +37,18 @@ export default function UpsellModal() {
       /* private mode / quota */
     }
     if (n >= 2 && n % 2 === 0) setOpen(true);
-  }, []); // mount-only — see UPSELL_EVENT for re-trigger from feature gates
+  }, [user, isPro]);
 
   useEffect(() => {
     const on = () => {
-      if (isPro) return;
+      if (user?.plan === "pro") return;
       setOpen(true);
     };
     window.addEventListener(UPSELL_EVENT, on);
     return () => window.removeEventListener(UPSELL_EVENT, on);
-  }, [isPro]);
+  }, [user?.plan]);
 
-  if (!open) return null;
+  if (!open || isPro) return null;
 
   return (
     <div

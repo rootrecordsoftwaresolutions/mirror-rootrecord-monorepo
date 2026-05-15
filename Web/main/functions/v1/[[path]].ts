@@ -1,6 +1,9 @@
+import { accountApiBaseFromEnv } from "../_lib/accountApiBase";
+
 type Env = {
   ROOTRECORD_API_BASE?: string;
-}
+  ROOTRECORD_API_ACCOUNT_BASE?: string;
+};
 
 /** Used when Preview deployments have no `ROOTRECORD_API_BASE` in the dashboard (Production usually does). */
 const DEFAULT_PRIMARY_API = "https://rootrecord-primary.rootrecord.workers.dev";
@@ -12,18 +15,22 @@ function tailFromParams(path: string | string[] | undefined): string {
 }
 
 /**
- * Same-origin proxy: browser calls https://&lt;pages&gt;/v1/... → this forwards to the primary Worker.
- * Avoids ad blockers and privacy tools that block *.workers.dev while keeping the Worker URL server-side only.
+ * Same-origin proxy: browser calls https://&lt;pages&gt;/v1/... → Worker upstream.
+ * `/v1/auth/*` goes to **rootrecord-api-account** (custodial wallet creation on signup/login lives there only).
+ * Other `/v1/*` uses `ROOTRECORD_API_BASE` (defaults to primary) for backward compatibility.
  */
 export const onRequest = async (context: {
   request: Request;
   env: Env;
   params: Record<string, string | string[] | undefined>;
 }): Promise<Response> => {
-  const base =
-    (context.env.ROOTRECORD_API_BASE ?? "").trim().replace(/\/+$/, "") || DEFAULT_PRIMARY_API;
-
   const tail = tailFromParams(context.params.path);
+  const authTail = tail.replace(/^\/+/, "");
+  const useAccount = authTail === "auth" || authTail.startsWith("auth/");
+  const base = useAccount
+    ? accountApiBaseFromEnv(context.env)
+    : (context.env.ROOTRECORD_API_BASE ?? "").trim().replace(/\/+$/, "") || DEFAULT_PRIMARY_API;
+
   const url = new URL(context.request.url);
   const upstreamPath = tail ? `/v1/${tail}` : "/v1";
   const target = `${base}${upstreamPath}${url.search}`;

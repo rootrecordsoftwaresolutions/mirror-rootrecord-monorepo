@@ -1,6 +1,6 @@
 {
   "name": "rootrecord-business-web",
-  "version": "1.0.19",
+  "version": "1.0.31",
   "private": true,
   "homepage": ".",
   "dependencies": {

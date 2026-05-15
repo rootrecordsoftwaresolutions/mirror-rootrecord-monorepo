@@ -518,7 +518,7 @@ function normalizeAccuAlertRow(
     sent: a.Effective ?? a.Date ?? null,
     effective: a.Effective ?? a.Date ?? null,
     ends: a.Expires ?? null,
-    senderName: strFromUnknown(a.Source) || "AccuWeather",
+    senderName: strFromUnknown(a.Source) || "Weather alerts",
     provider: "accuweather",
     detailUrl,
   };
@@ -710,7 +710,7 @@ export async function weatherCurrent(
       return {
         available: true,
         source: "accuweather",
-        attribution: "AccuWeather",
+        attribution: "Forecast",
         raw: { location: loc, current: c },
         icon: Number.isFinite(icon) ? icon : null,
         observation: outObs,
@@ -912,7 +912,7 @@ export async function weatherForecast(
       return {
         available: true,
         source: "accuweather",
-        attribution: "AccuWeather",
+        attribution: "Forecast",
         raw: { location: loc, daily, hourly },
         periods: dailyPeriods,
         hourly: hourlyPeriods,
@@ -974,7 +974,7 @@ export async function weatherAlerts(
       const alerts = (((rows as unknown[]) || []) as Array<Record<string, unknown>>).map((a, i) =>
         normalizeAccuAlertRow(a, loc.key, i)
       );
-      return { available: true, source: "accuweather", attribution: "AccuWeather", raw: { location: loc, alerts: rows }, alerts };
+      return { available: true, source: "accuweather", attribution: "Weather alerts", raw: { location: loc, alerts: rows }, alerts };
     } catch {
       return { available: false, source: "accuweather", alerts: [] };
     }

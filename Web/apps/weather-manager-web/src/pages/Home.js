@@ -36,6 +36,8 @@ import {
 import AccuWeatherIcon from '../components/AccuWeatherIcon';
 import { safeLocalStorage } from '../lib/storage';
 import { alertDescriptionForDisplay } from '../lib/alertText';
+import useAccess from '../lib/useAccess';
+import { forecastDayLimit, FORECAST_DAYS_PRO, showUpsellModal } from '../lib/tierAccess';
 
 /** Skip `/api/dashboard` while a snapshot for this location is younger than this (matches server TTL). */
 const WEATHER_SNAPSHOT_MAX_AGE_MS = 15 * 60 * 1000;
@@ -115,7 +117,7 @@ function alertProviderLabel(a, bundle) {
     if (src === 'accuweather') p = 'accuweather';
     else if (src === 'noaa') p = 'noaa';
   }
-  if (p === 'accuweather') return 'AccuWeather';
+  if (p === 'accuweather') return 'Weather';
   if (p === 'canada') return 'Environment Canada';
   if (p === 'noaa') return 'NOAA';
   return 'Weather';
@@ -188,6 +190,8 @@ export default function Home() {
   const navigate = useNavigate();
   // Forces rerender when units change (Settings toggle).
   useUnits();
+  const { pro, life } = useAccess();
+  const maxForecastDays = forecastDayLimit();
   const [locations, setLocations] = useState([]);
   const [activeId, setActiveId] = useState(safeLocalStorage.getItem('rrwm.activeLocationId') || '');
   const [bundle, setBundle] = useState(null);
@@ -383,10 +387,7 @@ export default function Home() {
 
   return (
     <div className="animate-fadein lg:mx-auto lg:max-w-[min(1400px,calc(100%-2rem))]" data-testid="home-page">
-      <header
-        className="flex items-center justify-between p-4 lg:px-10"
-        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
-      >
+      <header className="flex items-center justify-between px-4 pb-4 pt-2 lg:px-10 lg:pt-4">
         <LocationPicker locations={locations} activeId={activeId} onPick={setActive} />
         <button
           aria-label="Refresh"
@@ -508,14 +509,14 @@ export default function Home() {
               </div>
             )}
 
-            {/* Next 5 days */}
+            {/* Daily forecast — 3 days free, 5 days Pro / Lifetime */}
             {forecastPeriods.length > 0 && (() => {
               // Pair Day/Night periods into one card per day. Handles both AccuWeather
               // (always Day 1 / Night 1 / Day 2 / Night 2…) and NWS (may start with a
               // standalone "Tonight" night period, then alternate).
               const pairs = [];
               let i = 0;
-              while (i < forecastPeriods.length && pairs.length < 5) {
+              while (i < forecastPeriods.length && pairs.length < maxForecastDays) {
                 const p = forecastPeriods[i];
                 if (!p) { i += 1; continue; }
                 if (p.isDaytime === true) {
@@ -551,7 +552,19 @@ export default function Home() {
               };
               return (
                 <div className="mb-6">
-                  <h2 className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-2">Next 5 days</h2>
+                  <h2 className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-2">
+                    Next {maxForecastDays} day{maxForecastDays === 1 ? '' : 's'}
+                  </h2>
+                  {!pro && !life && (
+                    <button
+                      type="button"
+                      onClick={() => showUpsellModal()}
+                      className="text-[10px] font-mono text-accent/80 mb-2 hover:text-accent text-left"
+                      data-testid="home-forecast-upsell"
+                    >
+                      Upgrade for {FORECAST_DAYS_PRO}-day forecast and live hazards →
+                    </button>
+                  )}
                   <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-0.5" data-testid="home-daily-strip">
                     {pairs.map((pair, idx) => {
                       const ref = pair.day || pair.night;

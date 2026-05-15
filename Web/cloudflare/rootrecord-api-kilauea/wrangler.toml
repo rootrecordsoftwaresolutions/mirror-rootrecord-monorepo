@@ -34,9 +34,13 @@ database_id = "0b49c598-1f91-4a09-84a8-6ba8241c6df3"
 binding = "VOLCANO_PHOTOS"
 bucket_name = "rootrecord-volcano-photos"
 
+[[send_email]]
+name = "EMAIL"
+
 [vars]
 WORKER_SHARD = "kilauea"
 SITE_URL = "https://rootrecord.info"
+EMAIL_FROM = "RootRecord <root@rootrecord.info>"
 # AccuWeather: API key is a Worker **Secret** (`deploy.ps1` from repo-root `credentials.env` → `wrangler secret put ACCUWEATHER_API_KEY`), not [vars] (avoids Secret + var name clash in dashboard).
 # Optional language locale for responses (default in code: en-us)
 ACCUWEATHER_LANGUAGE = "en-us"
@@ -74,6 +78,8 @@ PLAY_STORE_URL_TOKEN_MANAGER = "https://play.google.com/store/apps/details?id=co
 PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.rootrecord.accounthub"
 # Developer feed (Settings → messages in mobile apps): GET /api/mobile/developer-messages?app_id=…
 # Publish (ops): POST https://api.rootrecord.info/api/internal/developer-messages
+# Kīlauea live streams (Android Live Feeds pager): GET /api/mobile/kilauea-live-streams
+# Update one row (ops): POST …/api/internal/kilauea-live-streams  { id, watch_url, youtube_video_id?, title?, description?, sort_order? }
 #   Header: X-RR-Push-Admin-Key: <same as push-broadcast>
 #   JSON: { "title": "…", "body": "…", "app_scope": "all" | "weather" | "bm" | "token_manager" | "account_hub" }
 #
@@ -124,7 +130,8 @@ PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.
 #   wrangler secret put FCM_SERVICE_ACCOUNT_JSON
 # (paste your Firebase service account JSON — one secret; optional split vars still supported)
 #
-# Email change (POST /api/me/email/request → Resend):
-#   wrangler secret put RESEND_API_KEY   # re_...
-#   wrangler secret put RESEND_FROM      # e.g. "RootRecord <mail@yourdomain.com>" (verified domain in Resend)
+# Email change (POST /api/me/email/request):
+#   Dashboard → Email Sending → onboard rootrecord.info (SPF/DKIM/DMARC on cf-bounce.*).
+#   Binding [[send_email]] name EMAIL is in this file; default from [vars] EMAIL_FROM.
+#   Optional Resend fallback: wrangler secret put RESEND_API_KEY / RESEND_FROM
 

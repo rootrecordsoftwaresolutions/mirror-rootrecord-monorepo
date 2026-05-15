@@ -48,8 +48,14 @@ class KilaueaPreferences @Inject constructor(
         if (p[AUTH_ACCESS_TOKEN].isNullOrBlank()) null else p[AUTH_EMAIL]
     }
 
-    /** Server flag — used later for ad-free / Pro UI. */
-    val authProUnlocked: Flow<Boolean> = ds.data.map { it[AUTH_PRO_UNLOCKED] == true }
+    /**
+     * Server flag — Pro / Lifetime: hide banner ads and unlock gated features.
+     * Only applies when there is an active signed-in session token; this avoids stale stored
+     * `AUTH_PRO_UNLOCKED=true` hiding ads and unlocking features for guests.
+     */
+    val authProUnlocked: Flow<Boolean> = ds.data.map { p ->
+        !p[AUTH_ACCESS_TOKEN].isNullOrBlank() && p[AUTH_PRO_UNLOCKED] == true
+    }
 
     /** After first-run welcome + tutorial flow is dismissed. */
     val welcomeTutorialComplete: Flow<Boolean> = ds.data.map { it[WELCOME_TUTORIAL_COMPLETE] == true }
@@ -84,6 +90,14 @@ class KilaueaPreferences @Inject constructor(
             it.remove(AUTH_EMAIL)
             it.remove(AUTH_ACCOUNT_ID)
             it.remove(AUTH_PRO_UNLOCKED)
+        }
+    }
+
+    /** Updates Pro flag from GET `/v1/me` while a bearer session exists. No-op when signed out. */
+    suspend fun setAuthProUnlocked(v: Boolean) {
+        ds.edit { p ->
+            if (p[AUTH_ACCESS_TOKEN].isNullOrBlank()) return@edit
+            p[AUTH_PRO_UNLOCKED] = v
         }
     }
 

@@ -7,6 +7,8 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 
+import { syncCustodialTokenSlotsFromRpc } from "./custodial-wallet-token-slots";
+
 export type CustodialCacheRpcEnv = {
   DB: D1Database;
   SOLANA_RPC_URL?: string;
@@ -256,6 +258,7 @@ export async function refreshCustodialOnchainCacheFromRpc(
     bypassWriteThrottle?: boolean;
   },
 ): Promise<CustodialCacheRefreshResult | null> {
+  const refreshT0 = Date.now();
   const mintStr = String(env.RRTT_MINT_BASE58 || "").trim();
   if (!mintStr) return null;
   const aid = String(accountId || "").trim();
@@ -291,6 +294,14 @@ export async function refreshCustodialOnchainCacheFromRpc(
     () => rpcTimeoutFallback,
   );
   const rpc_ok = live.solOk || live.tokenOk;
+
+  if (opts?.bypassWriteThrottle) {
+    const elapsed = Date.now() - refreshT0;
+    const slotBudget = Math.max(1500, budgetMs - elapsed - 400);
+    if (slotBudget >= 1200) {
+      await syncCustodialTokenSlotsFromRpc(env, aid, slotBudget).catch(() => {});
+    }
+  }
 
   const rrttOut = live.tokenOk ? live.rrtt : prevRrtt;
   const solOut = live.solOk ? live.sol : prevSol;

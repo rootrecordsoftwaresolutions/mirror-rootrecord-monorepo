@@ -78,7 +78,7 @@
     const li = document.createElement("li");
     const a = document.createElement("a");
     a.href = "/beta-tester-rewards.html";
-    a.textContent = "Earn Rewards";
+    a.textContent = "Root Units";
     li.appendChild(a);
     ul.appendChild(li);
   }

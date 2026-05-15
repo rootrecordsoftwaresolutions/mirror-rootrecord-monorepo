@@ -26,6 +26,7 @@ import { getAppAssociationsForEmail } from "../../shared/app-associations";
 import { grantSignupBonusOnRegistration } from "./earn-signup-bonus";
 import { refreshCustodialOnchainCacheFromRpc } from "./custodial-onchain-cache";
 import type { CustodialCacheRpcEnv } from "./custodial-onchain-cache";
+import { readDiscordLink } from "./discord-account-link";
 
 
 
@@ -685,6 +686,13 @@ export async function authMe(
     );
   }
 
+  const discord = await readDiscordLink(env.DB, sess.accountId).catch(() => ({
+    linked: false,
+    discord_user_id: null,
+    discord_username: null,
+    discord_global_name: null,
+  }));
+
   return json(
 
     {
@@ -734,6 +742,11 @@ export async function authMe(
       rrtt_mint_base58: rrttMintB58,
 
       rrtt_mint_decimals: rrttMintDecimals,
+
+      discord_linked: Boolean(discord?.linked),
+      discord_user_id: discord?.discord_user_id ?? null,
+      discord_username: discord?.discord_username ?? null,
+      discord_global_name: discord?.discord_global_name ?? null,
 
       apps,
 

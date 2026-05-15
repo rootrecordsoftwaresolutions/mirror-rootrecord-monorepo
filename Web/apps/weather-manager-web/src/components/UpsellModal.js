@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, X } from 'lucide-react';
 import { session } from '../lib/api';
+import { BILLING_URL, UPSELL_EVENT } from '../lib/tierAccess';
 
-const BILLING_URL = 'https://rootrecord.info/billing';
 const OPENS_KEY = 'rrwm.upsell.opens';
 
 /**
@@ -10,13 +10,13 @@ const OPENS_KEY = 'rrwm.upsell.opens';
  *
  *   1. Counter increments by 1 on every app open (one effect run per mount). The first open
  *      never shows the modal; opens #2, #4, #6, … do. Pro/Lifetime never increment.
- *   2. Anywhere in the app can dispatch `window.dispatchEvent(new Event("rr.upsell.show"))`
+ *   2. Anywhere in the app can dispatch `window.dispatchEvent(new Event(UPSELL_EVENT))`
  *      to force the modal open regardless of the counter — used to gate Pro-only features.
  *
  * Dismissing only clears local state; the counter is untouched, so the next even-numbered
  * open prompts again as designed.
  */
-export const UPSELL_EVENT = 'rr.upsell.show';
+export { UPSELL_EVENT };
 
 export default function UpsellModal() {
   const [open, setOpen] = useState(false);
@@ -76,8 +76,11 @@ export default function UpsellModal() {
             Unlock Weather Manager Pro
           </h2>
           <ul className="text-sm text-neutral-200 space-y-1.5 list-disc pl-5 mb-4">
+            <li>Live earthquake, tsunami, cyclone, and wildfire feeds</li>
+            <li>Air quality index, pollutants, and forecasts</li>
+            <li>NOAA weather alert push notifications on Android</li>
+            <li>5-day forecast (free shows 3 days)</li>
             <li>Unlimited fresh updates (free is capped at two outside-data refreshes per day)</li>
-            <li>Full web dashboard at <span className="font-mono">weather.rootrecord.info</span></li>
             <li>Multiple saved locations synced across all your devices</li>
             <li>One subscription unlocks Business + Kīlauea too</li>
           </ul>

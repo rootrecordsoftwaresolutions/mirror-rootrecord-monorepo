@@ -1,4 +1,4 @@
-import type { D1Database, ExecutionContext } from "@cloudflare/workers-types";
+import type { D1Database, ExecutionContext, SendEmail } from "@cloudflare/workers-types";
 
 import { bindCorsRequest, cors, json } from "./cors";
 
@@ -38,9 +38,6 @@ import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
 import { readRecentHttpErrorEvents } from "./observability";
 import { handleMobileVersionPolicy } from "./mobile-client-version";
 import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./developer-messages";
-import { handleDiscordUserActivityGet } from "./discord-user-activity";
-import { handleDiscordChannelBackfillPost } from "./discord-channel-backfill";
-import { handleDiscordActivityDailyGet, handleDiscordActivityDailyRebuildPost } from "./discord-activity-stats";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
 
@@ -65,6 +62,8 @@ import {
   weatherForecast,
 
 } from "./weather";
+import { weatherAirQuality } from "./air-quality";
+import { loadProFlags } from "./free-tier";
 import { readUsageDaily } from "./usage";
 
 import { lifeMemberFromLicenseData, upsertUserAccountFromLicense } from "./accounts";
@@ -131,14 +130,6 @@ export interface Env {
 
   DISCORD_KILAUEA_USGS_WEBHOOK_URL?: string;
 
-  /** Discord bot token (read-only) for syncing the announcements channel → `developer_messages` D1. */
-
-  DISCORD_BOT_TOKEN?: string;
-
-  /** Discord channel ID to read announcements from (plain `[vars]`; bot must have View Channel + Read Message History). */
-
-  DISCORD_ANNOUNCEMENTS_CHANNEL_ID?: string;
-
   /** Bearer secret for POST /api/solana-site/log from the Next Solana Tools site (`wrangler secret put SOLANA_SITE_LOG_SECRET`). */
 
   SOLANA_SITE_LOG_SECRET?: string;
@@ -155,8 +146,12 @@ export interface Env {
    */
   SOLANA_TOOLS_API_FORWARD_URL?: string;
 
-  /** Optional Resend API for POST /api/me/email/request (`wrangler secret put RESEND_API_KEY`). */
+  /** Cloudflare Email Sending (`[[send_email]]` → EMAIL). Onboard domain in dashboard first. */
+  EMAIL?: SendEmail;
 
+  EMAIL_FROM?: string;
+
+  /** Optional Resend fallback for POST /api/me/email/request. */
   RESEND_API_KEY?: string;
 
   RESEND_FROM?: string;
@@ -698,22 +693,6 @@ export async function handleRequest(
     return handleDeveloperMessagesPost(request, env);
   }
 
-  if (method === "GET" && sub === "/internal/discord-user-activity") {
-    return handleDiscordUserActivityGet(request, env);
-  }
-
-  if (method === "POST" && sub === "/internal/discord-channel-backfill") {
-    return handleDiscordChannelBackfillPost(request, env);
-  }
-
-  if (method === "GET" && sub === "/internal/discord-activity-daily") {
-    return handleDiscordActivityDailyGet(request, env);
-  }
-
-  if (method === "POST" && sub === "/internal/discord-activity-daily-rebuild") {
-    return handleDiscordActivityDailyRebuildPost(request, env);
-  }
-
   if (method === "POST" && sub === "/auth/login") {
 
     let creds: { email?: string; password?: string; device_id?: string };
@@ -1107,6 +1086,22 @@ export async function handleRequest(
 
     return json(await weatherAlerts(lat, lon, env, env.DB), 200);
 
+  }
+
+  if (method === "GET" && sub === "/weather/air-quality" && lat != null && lon != null) {
+    const uidRes = await resolveUserId(request, env);
+    if (uidRes instanceof Response) return uidRes;
+    const { pro } = await loadProFlags(env.DB, uidRes);
+    if (!pro) {
+      return json(
+        {
+          detail: "pro_required",
+          message: "Air quality requires Pro or Lifetime membership.",
+        },
+        403
+      );
+    }
+    return json(await weatherAirQuality(lat, lon, env, env.DB), 200);
   }
 
   if (method === "GET" && sub === "/internal/usage/accuweather") {

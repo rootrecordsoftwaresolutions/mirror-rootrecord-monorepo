@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AuthGate from './pages/AuthGate';
 import Home from './pages/Home';
 import Hazards from './pages/Hazards';
+import AirQuality from './pages/AirQuality';
 import Settings from './pages/Settings';
 import Feedback from './pages/Feedback';
 import LocationMap from './pages/LocationMap';
@@ -16,11 +17,18 @@ import About from './pages/About';
 import { api, isBackendConfigured, session, tryHydrateSessionFromCookie } from './lib/api';
 import { safeSessionStorage } from './lib/storage';
 import useAccess from './lib/useAccess';
+import { refreshSessionAccess } from './lib/tierAccess';
 
 const IS_NATIVE = typeof window !== 'undefined' && Boolean(window?.Capacitor?.isNativePlatform?.());
 
-/** FCM push registration calls into Firebase; without google-services.json the native app can crash. */
-const ENABLE_NATIVE_PUSH = process.env.REACT_APP_ENABLE_PUSH === '1';
+/**
+ * FCM push registration (native Android). Enabled when REACT_APP_ENABLE_PUSH=1, or on
+ * production builds unless explicitly disabled (REACT_APP_ENABLE_PUSH=0).
+ * Requires google-services.json in the Android project.
+ */
+const ENABLE_NATIVE_PUSH =
+  process.env.REACT_APP_ENABLE_PUSH === '1' ||
+  (process.env.NODE_ENV === 'production' && process.env.REACT_APP_ENABLE_PUSH !== '0');
 
 function useGate() {
   const [decided, setDecided] = useState(false);
@@ -45,6 +53,14 @@ function useGate() {
     };
   }, []);
 
+  // Response interceptor clears the local session when the server rejects the Bearer.
+  // Listen for the clearSession dispatch so the AuthGate re-renders without a manual reload.
+  useEffect(() => {
+    const onAccess = () => setAuthed(session.isAuthed());
+    window.addEventListener(session.ACCESS_EVENT, onAccess);
+    return () => window.removeEventListener(session.ACCESS_EVENT, onAccess);
+  }, []);
+
   return { decided, authed, guest, setAuthed, setGuest };
 }
 
@@ -59,6 +75,12 @@ export default function App() {
     location.pathname.startsWith('/developer-messages') ||
     location.pathname.startsWith('/about') ||
     location.pathname.startsWith('/alert');
+
+  /** Keep Pro / Lifetime flags in sync with the server after sign-in or billing changes. */
+  useEffect(() => {
+    if (!decided || !authed) return;
+    refreshSessionAccess();
+  }, [decided, authed]);
 
   /** Best-effort: record latest device coordinates once per app session (MongoDB via FastAPI). */
   useEffect(() => {
@@ -84,10 +106,11 @@ export default function App() {
     );
   }, [decided, authed, guest]);
 
-  /** Native only: register FCM token (opt-in — set REACT_APP_ENABLE_PUSH=1 when Firebase is configured). */
+  /** Native only: register FCM token for Pro / Lifetime (server also enforces on /me/push-token). */
   useEffect(() => {
     if (!ENABLE_NATIVE_PUSH) return;
-    if (!decided || (!authed && !guest)) return;
+    if (!decided || !authed) return;
+    if (!pro && !life) return;
     if (!isBackendConfigured()) return;
     let cancelled = false;
     (async () => {
@@ -126,7 +149,7 @@ export default function App() {
         }
       })();
     };
-  }, [decided, authed, guest]);
+  }, [decided, authed, pro, life]);
 
   if (!decided) return <div className="h-screen w-screen bg-app" />;
   // Sign-in required.
@@ -147,10 +170,7 @@ export default function App() {
 
   return (
     <div
-      className="weather-web-main min-h-screen bg-app text-white lg:pl-56 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-8"
-      style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-      }}
+      className="weather-web-main min-h-screen bg-app text-white lg:pl-56 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 pt-[max(env(safe-area-inset-top,0px),var(--rr-native-ad-banner-height,0px))]"
     >
       <GuestBanner />
       <Routes>
@@ -166,6 +186,7 @@ export default function App() {
           <>
             <Route path="/" element={<Home />} />
             <Route path="/hazards" element={<Hazards />} />
+            <Route path="/air-quality" element={<AirQuality />} />
             <Route path="/rootrecord" element={<Navigate to="/settings" replace />} />
             <Route path="/settings" element={<Settings onSignedOut={() => { setAuthed(false); setGuest(false); }} />} />
             <Route path="/feedback" element={<Feedback />} />

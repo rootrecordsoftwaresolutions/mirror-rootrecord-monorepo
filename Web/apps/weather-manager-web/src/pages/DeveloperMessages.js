@@ -43,7 +43,7 @@ export default function DeveloperMessages() {
     <div className="min-h-screen bg-app pb-8" data-testid="developer-messages-page">
       <header
         className="flex items-center gap-3 p-4 border-b border-subtle"
-        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        style={{ paddingTop: '1rem' }}
       >
         <button
           type="button"

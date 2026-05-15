@@ -14,12 +14,14 @@ import {
   verifyLicenseAccountPassword,
 } from "../../shared/password-verify";
 import { fetchBillingSnapshot } from "../../shared/billing-state";
+import {
+  sendTransactionalEmail,
+  type TransactionalEmailEnv,
+} from "../../shared/send-transactional-email";
 import { readUserAccountAccessFlags } from "./accounts";
 
-export type MeAccountEnv = AuthEnv & {
+export type MeAccountEnv = AuthEnv & TransactionalEmailEnv & {
   SITE_URL?: string;
-  RESEND_API_KEY?: string;
-  RESEND_FROM?: string;
 };
 
 function ssoClearCookieLine(request: Request): string | undefined {
@@ -344,18 +346,6 @@ async function handleMeAppsGet(request: Request, env: MeAccountEnv): Promise<Res
   return json(out, 200);
 }
 
-async function sendResendEmail(env: MeAccountEnv, to: string, subject: string, html: string): Promise<boolean> {
-  const key = (env.RESEND_API_KEY || "").trim();
-  if (!key.startsWith("re_")) return false;
-  const from = (env.RESEND_FROM || "").trim() || "RootRecord <onboarding@resend.dev>";
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [to], subject, html }),
-  });
-  return res.ok;
-}
-
 async function handleEmailRequest(request: Request, env: MeAccountEnv): Promise<Response> {
   const sess = await sessionFromRequest(env, request);
   if (!sess) return json({ detail: "Unauthorized" }, 401);
@@ -405,13 +395,13 @@ async function handleEmailRequest(request: Request, env: MeAccountEnv): Promise<
   const link = `${site}/account.html?email_token=${encodeURIComponent(rawToken)}`;
   const html = `<p>Confirm your new RootRecord account email:</p><p><a href="${link}">${link}</a></p><p>If you did not request this, ignore this message.</p>`;
 
-  const sent = await sendResendEmail(env, new_email, "Confirm your RootRecord email change", html);
+  const sent = await sendTransactionalEmail(env, new_email, "Confirm your RootRecord email change", html);
   if (!sent) {
     await env.DB.prepare("DELETE FROM license_email_change WHERE id = ?").bind(id).run();
     return json(
       {
         detail:
-          "Outbound email is not configured. Set Worker secrets RESEND_API_KEY and RESEND_FROM (verified sender) to enable email change.",
+          "Outbound email is not configured. Onboard rootrecord.info in Cloudflare Email Sending (dashboard) and deploy Workers with the EMAIL binding, or set RESEND_API_KEY and RESEND_FROM.",
       },
       503
     );

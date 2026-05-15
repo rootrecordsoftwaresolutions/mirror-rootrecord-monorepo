@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -45,7 +48,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rootrecord.kilauea.alerts.ui.KilaueaNavRoutes
+import com.rootrecord.kilauea.alerts.ui.components.AdMobBanner
 import com.rootrecord.kilauea.alerts.ui.screens.AlertsScreen
 import com.rootrecord.kilauea.alerts.ui.screens.EarthquakesScreen
 import com.rootrecord.kilauea.alerts.ui.screens.FeedbackScreen
@@ -61,7 +66,7 @@ import com.rootrecord.kilauea.alerts.ui.upsell.UpsellOverlay
 import com.rootrecord.kilauea.alerts.ui.welcome.WelcomeTutorialOverlay
 import com.rootrecord.kilauea.alerts.work.WorkEnqueue
 import com.rootrecord.kilauea.alerts.data.local.KilaueaPreferences
-import androidx.lifecycle.lifecycleScope
+import com.rootrecord.kilauea.alerts.data.repository.RootRecordAuthRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -71,6 +76,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var prefs: KilaueaPreferences
+    @Inject lateinit var authRepo: RootRecordAuthRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,9 +96,19 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                authRepo.refreshAccountAccess()
+            }
+        }
+
         setContent {
+            val proUnlocked by prefs.authProUnlocked.collectAsStateWithLifecycle(initialValue = false)
             KilaueaTheme {
-                KilaueaApp(intent?.getStringExtra(EXTRA_OPEN_TAB))
+                KilaueaApp(
+                    initialTab = intent?.getStringExtra(EXTRA_OPEN_TAB),
+                    showBannerAds = !proUnlocked,
+                )
             }
         }
     }
@@ -106,7 +122,7 @@ class MainActivity : ComponentActivity() {
 private data class TabSpec(val route: String, val labelRes: Int, val icon: ImageVector)
 
 @Composable
-private fun KilaueaApp(initialTab: String?) {
+private fun KilaueaApp(initialTab: String?, showBannerAds: Boolean) {
     val navController = rememberNavController()
     LaunchedEffect(initialTab) {
         if (initialTab == MainActivity.TAB_ALERTS) {
@@ -144,42 +160,47 @@ private fun KilaueaApp(initialTab: String?) {
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             bottomBar = {
-                NavigationBar {
-                    val itemColors = NavigationBarItemDefaults.colors()
-                    tabs.forEach { tab ->
-                        val selected = current?.hierarchy?.any { it.route == tab.route } == true
-                        val labelText = stringResource(tab.labelRes)
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = labelText,
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = labelText,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            },
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                Column(Modifier.fillMaxWidth()) {
+                    if (showBannerAds) {
+                        AdMobBanner()
+                    }
+                    NavigationBar {
+                        val itemColors = NavigationBarItemDefaults.colors()
+                        tabs.forEach { tab ->
+                            val selected = current?.hierarchy?.any { it.route == tab.route } == true
+                            val labelText = stringResource(tab.labelRes)
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = labelText,
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = labelText,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                },
+                                selected = selected,
+                                onClick = {
+                                    navController.navigate(tab.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            alwaysShowLabel = false,
-                            colors = itemColors,
-                        )
+                                },
+                                alwaysShowLabel = false,
+                                colors = itemColors,
+                            )
+                        }
                     }
                 }
             },

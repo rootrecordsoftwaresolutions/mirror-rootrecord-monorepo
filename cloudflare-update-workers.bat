@@ -7,6 +7,7 @@ rem
 rem Usage:
 rem   cloudflare-update-workers.bat                  - deploy ALL workers
 rem   cloudflare-update-workers.bat <name>           - deploy ONE worker
+rem   cloudflare-update-workers.bat <name> nopause   - same, no pause (for calling scripts)
 rem
 rem Valid <name> values:
 rem   weather  business  account  token  kilauea    - per-product API shard
@@ -17,6 +18,9 @@ rem Skipped intentionally (legacy / frozen):
 rem   rootrecord-primary       (phased out; shards still read its .deploy-jwt read-only)
 rem   rootrecord-solana-tx     (frozen; manual `npx wrangler deploy` if ever needed)
 rem   rr-weather-manager-api   (decommissioned; routes merged into shards)
+rem
+rem DISCORD_BOT_TOKEN (developer feed sync): uploaded only by Web\cloudflare\rootrecord-api-account\deploy.ps1
+rem when DISCORD_BOT_TOKEN is set in repo-root credentials.env (not by other shard deploy.ps1).
 
 cd /d "%~dp0"
 set "LOGFILE=%~dp0cloudflare-update-workers.log"
@@ -86,6 +90,8 @@ rem ----------------------------------------------------------------------------
 rem Single-worker deploy path: skip everything except the one requested.
 rem ----------------------------------------------------------------------------
 :SINGLE
+set "NOPAUSE=0"
+if /I "%~2"=="nopause" set "NOPAUSE=1"
 echo.
 echo ================================
 echo RootRecord Cloudflare - Worker: %ONLY%
@@ -104,7 +110,7 @@ if /I "%ONLY%"=="app-build" set "TARGET=Web\cloudflare\rootrecord-app-build"
 if "%TARGET%"=="" (
   echo Unknown worker: %ONLY%
   echo Valid: weather business account token kilauea license app-build
-  pause
+  if not "%NOPAUSE%"=="1" pause
   endlocal
   exit /b 1
 )
@@ -131,7 +137,7 @@ popd
 echo.
 echo Worker %ONLY% done.
 echo Finished %DATE% %TIME% >> "%LOGFILE%"
-pause
+if not "%NOPAUSE%"=="1" pause
 endlocal
 exit /b 0
 
@@ -146,6 +152,6 @@ echo Exit code:  %ERR%
 echo CWD:        %CD%
 echo ============================================================
 echo FAILED at step "%STEP%" exit %ERR% >> "%LOGFILE%"
-pause
+if not "%NOPAUSE%"=="1" pause
 endlocal
 exit /b %ERR%

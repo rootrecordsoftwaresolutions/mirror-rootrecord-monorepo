@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { json } from "./cors";
 import { resolveUserId } from "./auth";
+import { loadProFlags } from "./free-tier";
 import { getFcmAccessToken, sendFcmNotification } from "./fcm-v1";
 
 export interface PushEnv {
@@ -75,6 +76,16 @@ export async function handlePushRoutes(
   if (method === "POST" && sub === "/me/push-token") {
     const user = await resolveUserId(request, env);
     if (user instanceof Response) return user;
+    const { pro } = await loadProFlags(env.DB, user);
+    if (!pro) {
+      return json(
+        {
+          detail: "pro_required",
+          message: "Push notifications require Pro or Lifetime membership.",
+        },
+        403
+      );
+    }
     let body: { token?: string; platform?: string };
     try {
       body = (await request.json()) as typeof body;

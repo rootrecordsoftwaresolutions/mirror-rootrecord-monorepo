@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -66,7 +67,33 @@ fun MoreScreen(
 
     var emailField by rememberSaveable { mutableStateOf("") }
     var passwordField by rememberSaveable { mutableStateOf("") }
+    var showPushProNotice by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
+
+    if (showPushProNotice) {
+        AlertDialog(
+            onDismissRequest = { showPushProNotice = false },
+            title = { Text("Pro / Lifetime") },
+            text = {
+                Text(
+                    "Push alerts for volcano, weather, and earthquakes are included with Root Record Pro or Lifetime. Sign in with a Pro or Lifetime account to turn them on.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPushProNotice = false
+                    uriHandler.openUri("https://rootrecord.info/billing")
+                }) {
+                    Text("See plans")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPushProNotice = false }) {
+                    Text("OK")
+                }
+            },
+        )
+    }
 
     LaunchedEffect(signedIn) {
         if (signedIn) passwordField = ""
@@ -100,7 +127,7 @@ fun MoreScreen(
                 if (authPro) {
                     "Pro active on this account."
                 } else {
-                    "Signed in. Pro / ad-free unlock will apply here once available."
+                    "Signed in. Pro removes banner ads and unlocks extra features."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -146,7 +173,16 @@ fun MoreScreen(
         Spacer(Modifier.height(8.dp))
 
         Text("Notification categories", style = MaterialTheme.typography.titleMedium)
-        if (postNotif != null && !postNotif.status.isGranted) {
+        Text(
+            if (authPro) {
+                "Choose which alerts you want on this phone."
+            } else {
+                "Push alerts — Pro or Lifetime."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (postNotif != null && !postNotif.status.isGranted && authPro) {
             Text(
                 "Android 13+ requires notification permission — grant when prompted after enabling alerts.",
                 style = MaterialTheme.typography.bodySmall,
@@ -154,28 +190,58 @@ fun MoreScreen(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
-        RowToggle("USGS volcano / Kīlauea", nv) {
-            if (postNotif != null && !postNotif.status.isGranted) postNotif.launchPermissionRequest()
-            vm.setVolcano(it)
-        }
-        RowToggle("NWS Hawaiʻi alerts", nn) {
-            if (postNotif != null && !postNotif.status.isGranted) postNotif.launchPermissionRequest()
-            vm.setNws(it)
-        }
-        RowToggle("Strong earthquakes (USGS)", ne) {
-            if (postNotif != null && !postNotif.status.isGranted) postNotif.launchPermissionRequest()
-            vm.setEq(it)
-        }
+        RowToggle(
+            label = "USGS volcano / Kīlauea",
+            checked = authPro && nv,
+            onCheckedChange = { on ->
+                if (!authPro) showPushProNotice = true
+                else {
+                    if (postNotif != null && !postNotif.status.isGranted) postNotif.launchPermissionRequest()
+                    vm.setVolcano(on)
+                }
+            },
+        )
+        RowToggle(
+            label = "NWS Hawaiʻi alerts",
+            checked = authPro && nn,
+            onCheckedChange = { on ->
+                if (!authPro) showPushProNotice = true
+                else {
+                    if (postNotif != null && !postNotif.status.isGranted) postNotif.launchPermissionRequest()
+                    vm.setNws(on)
+                }
+            },
+        )
+        RowToggle(
+            label = "Strong earthquakes (USGS)",
+            checked = authPro && ne,
+            onCheckedChange = { on ->
+                if (!authPro) showPushProNotice = true
+                else {
+                    if (postNotif != null && !postNotif.status.isGranted) postNotif.launchPermissionRequest()
+                    vm.setEq(on)
+                }
+            },
+        )
         Text("Earthquake notify magnitude ≥ ${"%.1f".format(th)}", style = MaterialTheme.typography.bodySmall)
         Slider(
             value = th.coerceIn(1f, 6f),
-            onValueChange = { vm.setThreshold(it.coerceIn(1f, 6f)) },
+            onValueChange = { v ->
+                if (!authPro) showPushProNotice = true
+                else vm.setThreshold(v.coerceIn(1f, 6f))
+            },
             valueRange = 1f..6f,
             steps = 5,
+            enabled = authPro,
         )
-        RowToggle("When the live stream list changes (optional)", nl) {
-            vm.setLive(it)
-        }
+        RowToggle(
+            label = "When the live stream list changes (optional)",
+            checked = authPro && nl,
+            onCheckedChange = { on ->
+                if (!authPro) showPushProNotice = true
+                else vm.setLive(on)
+            },
+        )
 
         // Latest team update — rendered immediately above the "Desktop version" card so the
         // signal-to-noise is good (settings/toggles above, outbound links below). Only shows when
@@ -339,7 +405,11 @@ fun MoreScreen(
 }
 
 @Composable
-private fun RowToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun RowToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier.fillMaxWidth(),

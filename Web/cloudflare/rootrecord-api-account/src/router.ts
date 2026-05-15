@@ -1,4 +1,4 @@
-import type { D1Database, ExecutionContext } from "@cloudflare/workers-types";
+import type { D1Database, ExecutionContext, SendEmail } from "@cloudflare/workers-types";
 
 import { bindCorsRequest, cors, json } from "./cors";
 
@@ -22,6 +22,7 @@ import { handleRewardsLedgerV1 } from "./earn-rewards-ledger";
 import {
   handleCustodialInternalBackfillRoute,
   handleCustodialSolWalletV1,
+  handleCustodialWalletTokensV1,
   handleCustodialWithdrawDestV1,
   handleRunRrttCustodialCronRoute,
   handleSolanaInternalWalletRoutes,
@@ -35,9 +36,22 @@ import { maybeForwardSolanaToolsApi } from "./solana-tools-forward";
 import { handleSolanaAppActivityRoute } from "./solana-app-activity";
 import { handleSolanaLinkedWalletRoute } from "./solana-linked-wallet";
 import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
+import {
+  handleWithdrawalIntentCreate,
+  handleWithdrawalIntentLegs,
+  handleWithdrawalIntentsList,
+  handleWithdrawalSettlementFrameworkGet,
+  handleWithdrawalSettlementInternalSummary,
+} from "./withdrawal-settlement-routes";
+import { handleRootUnitsTransferV1 } from "./root-units-transfer";
 import { readRecentHttpErrorEvents } from "./observability";
 import { handleMobileVersionPolicy } from "./mobile-client-version";
 import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./developer-messages";
+import { handleDiscordUserActivityGet } from "./discord-user-activity";
+import { handleDiscordChannelBackfillPost } from "./discord-channel-backfill";
+import { handleDiscordActivityDailyGet, handleDiscordActivityDailyRebuildPost } from "./discord-activity-stats";
+import { discordLinkCallback, discordLinkStart } from "./discord-account-link";
+import { handleDiscordInteractions } from "./discord-root-units";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
 
@@ -77,6 +91,7 @@ export interface Env {
 
   STRIPE_PRICE_ID?: string;
 
+
   /**
    * Internal custodial wallet encryption key (AES-256-GCM).
    * Base64-encoded 32-byte key. Must be set as a Worker secret/var.
@@ -91,6 +106,24 @@ export interface Env {
   /** Discord webhook for POST /api/feedback (`wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL`). */
 
   DISCORD_FEEDBACK_WEBHOOK_URL?: string;
+
+  /** Discord bot token (read-only) for announcements channel → D1 `developer_messages` (cron on this Worker). */
+  DISCORD_BOT_TOKEN?: string;
+
+  /** Discord announcements channel id (`[vars]`). Bot: View Channel + Read Message History + Message Content intent. */
+  DISCORD_ANNOUNCEMENTS_CHANNEL_ID?: string;
+
+  /** Discord application public key (hex) for `POST /v1/discord/interactions` signature verify. */
+  DISCORD_PUBLIC_KEY?: string;
+
+  /** Discord application id (`[vars]`). Slash commands + interaction PATCH. */
+  DISCORD_CLIENT_ID?: string;
+
+  /** Primary guild id (`[vars]`). Used by `/send role` (member list) and account link. */
+  DISCORD_GUILD_ID?: string;
+
+  /** Lookback days for `/send active` vs `discord_user_activity.last_message_at` (default 14, max 90). */
+  DISCORD_ACTIVE_LOOKBACK_DAYS?: string;
 
   /** Bearer secret for POST /api/solana-site/log from the Next Solana Tools site (`wrangler secret put SOLANA_SITE_LOG_SECRET`). */
 
@@ -108,8 +141,12 @@ export interface Env {
    */
   SOLANA_TOOLS_API_FORWARD_URL?: string;
 
-  /** Optional Resend API for POST /api/me/email/request (`wrangler secret put RESEND_API_KEY`). */
+  /** Cloudflare Email Sending (`[[send_email]]` → EMAIL). Onboard domain in dashboard first. */
+  EMAIL?: SendEmail;
 
+  EMAIL_FROM?: string;
+
+  /** Optional Resend fallback for POST /api/me/email/request. */
   RESEND_API_KEY?: string;
 
   RESEND_FROM?: string;
@@ -346,6 +383,18 @@ export async function handleRequest(
 
       }
 
+      try {
+
+        const aid = String(data.account_id || "").trim();
+
+        if (aid) await provisionCustodialWalletIfMissing(env, aid);
+
+      } catch {
+
+        /* non-fatal */
+
+      }
+
       const v1LoginTok = (data.access_token || data.token) as string | undefined;
       return json(data, 200, undefined, webSsoSetCookie(request, v1LoginTok));
 
@@ -441,6 +490,12 @@ export async function handleRequest(
 
     }
 
+    if (pathname === "/v1/me/custodial-wallet-tokens") {
+
+      return handleCustodialWalletTokensV1(request, env, method, pathname);
+
+    }
+
     if (pathname === "/v1/me/custodial-withdraw-dest") {
 
       return handleCustodialWithdrawDestV1(request, env, method);
@@ -450,6 +505,29 @@ export async function handleRequest(
     if (pathname === "/v1/me/custodial-withdraw-rrtt") {
 
       return handleCustodialRrttWithdrawV1(request, env, method);
+
+    }
+
+    if (method === "GET" && pathname === "/v1/me/withdrawal-settlement/framework") {
+      return handleWithdrawalSettlementFrameworkGet();
+    }
+
+    if (method === "GET" && pathname === "/v1/me/withdrawal-intents") {
+      return handleWithdrawalIntentsList(request, env);
+    }
+
+    if (method === "POST" && pathname === "/v1/me/withdrawal-intents") {
+      return handleWithdrawalIntentCreate(request, env);
+    }
+
+    if (method === "GET" && pathname.startsWith("/v1/me/withdrawal-intents/") && pathname.endsWith("/legs")) {
+      const mid = pathname.slice("/v1/me/withdrawal-intents/".length, pathname.length - "/legs".length).replace(/\/+$/, "");
+      return handleWithdrawalIntentLegs(request, env, mid);
+    }
+
+    if (method === "POST" && pathname === "/v1/me/root-units/transfer") {
+
+      return handleRootUnitsTransferV1(request, env);
 
     }
 
@@ -544,6 +622,51 @@ export async function handleRequest(
 
     }
 
+    if (method === "GET" && pathname === "/v1/discord/oauth/start") {
+
+      const sess = await sessionFromRequest(env, request);
+
+      const startUrl = new URL(request.url);
+      const wantJson = startUrl.searchParams.get("json") === "1";
+
+      if (!sess) {
+        // Browser navigation to this URL has no Bearer token; send humans to Account instead of raw JSON.
+        if (wantJson) {
+          return json({ detail: "Unauthorized" }, 401);
+        }
+        const site = String(env.SITE_URL || "https://rootrecord.info")
+          .trim()
+          .replace(/\/+$/, "");
+        return Response.redirect(`${site}/account.html?discord=signin`, 302);
+      }
+
+      return discordLinkStart({ request, env, accountId: sess.accountId });
+
+    }
+
+    if (method === "GET" && pathname === "/v1/discord/oauth/callback") {
+
+      return discordLinkCallback({ request, env, ctx });
+
+    }
+
+    if (method === "GET" && pathname === "/v1/discord/interactions") {
+      return json(
+        {
+          ok: true,
+          post_only: true,
+          hint:
+            "Slash commands are POSTed here by Discord with Ed25519 headers. Set Developer Portal → Your Application → General Information → Interactions Endpoint URL to this path (not only Settings → Webhooks / Events).",
+        },
+        200,
+      );
+    }
+
+    if (method === "POST" && pathname === "/v1/discord/interactions") {
+      return handleDiscordInteractions(request, env, ctx);
+    }
+
+
     return json({ ok: false, error: "not_found" }, 404);
 
   }
@@ -553,6 +676,22 @@ export async function handleRequest(
   const sub = apiSubpath(pathname);
 
   const q = url.searchParams;
+
+  if (method === "GET" && sub === "/v1/discord/interactions") {
+    return json(
+      {
+        ok: true,
+        post_only: true,
+        hint:
+          "Slash commands POST here. Set Discord → Application → General Information → Interactions Endpoint URL (not only Webhooks / Events).",
+      },
+      200,
+    );
+  }
+
+  if (method === "POST" && sub === "/v1/discord/interactions") {
+    return handleDiscordInteractions(request, env, ctx);
+  }
 
   /** Same handlers as `/v1/*` when the client uses `NEXT_PUBLIC_ROOTRECORD_API_BASE` with an `/api` prefix. */
   if (sub === "/v1/me/linked-wallet") {
@@ -578,6 +717,31 @@ export async function handleRequest(
 
   if (sub === "/v1/me/custodial-sol-wallet" || sub.startsWith("/v1/me/custodial-sol-wallet/")) {
     return handleCustodialSolWalletV1(request, env, method, sub);
+  }
+
+  if (sub === "/v1/me/custodial-wallet-tokens") {
+    return handleCustodialWalletTokensV1(request, env, method, sub);
+  }
+
+  if (method === "GET" && sub === "/v1/me/withdrawal-settlement/framework") {
+    return handleWithdrawalSettlementFrameworkGet();
+  }
+
+  if (method === "GET" && sub === "/v1/me/withdrawal-intents") {
+    return handleWithdrawalIntentsList(request, env);
+  }
+
+  if (sub === "/v1/me/withdrawal-intents" && method === "POST") {
+    return handleWithdrawalIntentCreate(request, env);
+  }
+
+  if (method === "GET" && sub.startsWith("/v1/me/withdrawal-intents/") && sub.endsWith("/legs")) {
+    const mid = sub.slice("/v1/me/withdrawal-intents/".length, sub.length - "/legs".length).replace(/\/+$/, "");
+    return handleWithdrawalIntentLegs(request, env, mid);
+  }
+
+  if (method === "POST" && sub === "/v1/me/root-units/transfer") {
+    return handleRootUnitsTransferV1(request, env);
   }
 
   if (sub === "/v1/me/rewards-ledger") {
@@ -651,6 +815,22 @@ export async function handleRequest(
     return handleDeveloperMessagesPost(request, env);
   }
 
+  if (method === "GET" && sub === "/internal/discord-user-activity") {
+    return handleDiscordUserActivityGet(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/discord-channel-backfill") {
+    return handleDiscordChannelBackfillPost(request, env);
+  }
+
+  if (method === "GET" && sub === "/internal/discord-activity-daily") {
+    return handleDiscordActivityDailyGet(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/discord-activity-daily-rebuild") {
+    return handleDiscordActivityDailyRebuildPost(request, env);
+  }
+
   if (method === "POST" && sub === "/auth/login") {
 
     let creds: { email?: string; password?: string; device_id?: string };
@@ -706,6 +886,18 @@ export async function handleRequest(
     } catch {
 
       /* D1 optional */
+
+    }
+
+    try {
+
+      const aid = String(data.account_id || "").trim();
+
+      if (aid) await provisionCustodialWalletIfMissing(env, aid);
+
+    } catch {
+
+      /* non-fatal */
 
     }
 
@@ -1035,6 +1227,10 @@ export async function handleRequest(
     const lim = Math.min(200, Math.max(1, Math.floor(num(q, "limit") ?? 50)));
     const events = await readRecentHttpErrorEvents(env.DB, lim);
     return json({ ok: true, events, limit: lim }, 200);
+  }
+
+  if (method === "GET" && sub === "/internal/withdrawal-settlement/summary") {
+    return handleWithdrawalSettlementInternalSummary(request, env);
   }
 
   const forwardRes = await maybeForwardSolanaToolsApi(request, env, pathname, method);

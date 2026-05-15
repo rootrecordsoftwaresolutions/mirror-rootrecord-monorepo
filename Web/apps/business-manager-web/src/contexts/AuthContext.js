@@ -15,6 +15,21 @@ function mergeDeviceProgramSettingsToCloud() {
 
 const AuthCtx = createContext(null);
 
+const PLAN_STORAGE_KEY = "rrbm.plan";
+
+/** Capacitor Android: native banner reads `rrbm.plan` from WebView localStorage. */
+function persistNativeAdTier(user) {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(PLAN_STORAGE_KEY, user?.plan === "pro" ? "pro" : "free");
+    if (typeof window !== "undefined" && window.RootRecordAds?.sync) {
+      window.RootRecordAds.sync();
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function isTransientNetworkError(e) {
   return e?.code === "ERR_NETWORK" || String(e?.message || "").toLowerCase().includes("network error");
 }
@@ -76,20 +91,36 @@ export function AuthProvider({ children }) {
       const { data } = await api.post("/auth/me");
       const tok = data.access_token || data.token;
       if (tok) setToken(tok);
-      setUser(userFromMePayload(data));
+      const u = userFromMePayload(data);
+      setUser(u);
+      persistNativeAdTier(u);
     } catch {
       setToken("");
       setUser(null);
+      persistNativeAdTier(null);
     }
   }, []);
 
   useEffect(() => {
     if (guest) {
       setUser(null);
+      persistNativeAdTier(null);
       return;
     }
     refresh();
   }, [guest, refresh]);
+
+  // api.js response interceptor dispatches this when the Worker rejects our Bearer with
+  // "Invalid or expired session." It already wiped the token; we just need to drop the
+  // in-memory user so the AuthGate re-renders to the sign-in screen.
+  useEffect(() => {
+    const onInvalid = () => {
+      setUser(null);
+      persistNativeAdTier(null);
+    };
+    window.addEventListener("rrbm.session.invalidated", onInvalid);
+    return () => window.removeEventListener("rrbm.session.invalidated", onInvalid);
+  }, []);
 
   const login = useCallback(async (email, password) => {
     const { data } = await postWithRetry("/auth/login", {
@@ -104,6 +135,7 @@ export function AuthProvider({ children }) {
     setGuest(false);
     const u = userFromAuthPayload(data);
     setUser(u);
+    persistNativeAdTier(u);
     mergeDeviceProgramSettingsToCloud();
     return u;
   }, []);
@@ -121,6 +153,7 @@ export function AuthProvider({ children }) {
     setGuest(false);
     const u = userFromAuthPayload(data, name);
     setUser(u);
+    persistNativeAdTier(u);
     mergeDeviceProgramSettingsToCloud();
     return u;
   }, []);
@@ -133,13 +166,18 @@ export function AuthProvider({ children }) {
     }
     setToken("");
     setUser(null);
+    persistNativeAdTier(null);
   }, []);
 
   const refreshEntitlement = useCallback(async () => {
     const { data } = await api.post("/auth/entitlement", { device_id: getDeviceId() });
-    setUser((prev) =>
-      prev ? { ...prev, plan: data.plan, subscription_status: data.subscription_status || prev.subscription_status } : prev
-    );
+    setUser((prev) => {
+      const next = prev
+        ? { ...prev, plan: data.plan, subscription_status: data.subscription_status || prev.subscription_status }
+        : prev;
+      persistNativeAdTier(next);
+      return next;
+    });
     return data;
   }, []);
 

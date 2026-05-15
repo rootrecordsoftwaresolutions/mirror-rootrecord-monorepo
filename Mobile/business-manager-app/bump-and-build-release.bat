@@ -39,6 +39,7 @@ if errorlevel 1 goto FAIL
 call pnpm install
 if errorlevel 1 ( popd & goto FAIL )
 set "GENERATE_SOURCEMAP=false"
+set "NODE_OPTIONS=--max-old-space-size=8192 --max-semi-space-size=128"
 call pnpm run build
 if errorlevel 1 ( popd & goto FAIL )
 popd

@@ -62,8 +62,8 @@
       btn.disabled = n < REDEEM_COST;
       btn.textContent =
         n < REDEEM_COST
-          ? "Need " + (REDEEM_COST - n).toLocaleString() + " more points"
-          : "Redeem 100,000 for 1 month Pro";
+          ? "Need " + (REDEEM_COST - n).toLocaleString() + " more Root Units"
+          : "Redeem 100,000 Root Units for 1 month Pro";
     }
     if (exp) {
       const formatted = formatExpiry(expiryIso);
@@ -101,6 +101,62 @@
   function formatBalance(n) {
     const b = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
     return String(b.toLocaleString());
+  }
+
+  function niceAppName(appId) {
+    const s = String(appId || "").trim();
+    if (!s) return "Unknown";
+    if (s === "rootrecord_weather_manager_android") return "Weather Manager (Android)";
+    if (s === "rootrecord_business_manager_android") return "Business Manager (Android)";
+    if (s === "rootrecord_account_hub_android") return "Account Hub (Android)";
+    if (s === "rootrecord_token_manager_android") return "Token Manager (Android)";
+    if (s === "rootrecord_kilauea_alerts_android") return "Kilauea Alerts (Android)";
+    return s.replace(/_/g, " ");
+  }
+
+  function renderSources(summary) {
+    const wrap = el("rewards-sources");
+    const list = el("rewards-sources-list");
+    if (!wrap || !list) return;
+
+    const arr = summary && typeof summary === "object" ? summary.per_app_total : null;
+    if (!Array.isArray(arr) || arr.length === 0) {
+      wrap.hidden = true;
+      list.innerHTML = "";
+      return;
+    }
+    const rows = arr
+      .map(function (r) {
+        const app = r && typeof r === "object" ? String(r.app_id || "") : "";
+        const total = r && typeof r === "object" ? Number(r.total_units) : NaN;
+        const n = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
+        return { app_id: app, total_units: n };
+      })
+      .filter(function (r) {
+        return r.app_id && r.total_units > 0;
+      })
+      .sort(function (a, b) {
+        return b.total_units - a.total_units;
+      });
+
+    if (rows.length === 0) {
+      wrap.hidden = true;
+      list.innerHTML = "";
+      return;
+    }
+
+    list.innerHTML =
+      "<div class=account-grid>" +
+      rows
+        .map(function (r) {
+          return (
+            "<div class=account-row><span class=account-k>" +
+            (niceAppName(r.app_id) + "</span><span class=account-v><strong>" + formatBalance(r.total_units) + "</strong></span></div>")
+          );
+        })
+        .join("") +
+      "</div>";
+    wrap.hidden = false;
   }
 
   async function refreshRewardsBalance() {
@@ -178,6 +234,7 @@
       bal.textContent = Number.isFinite(n) ? formatBalance(n) : "—";
     }
     showPanel("main");
+    renderSources(j);
     applyRedeemAvailability(Number.isFinite(n) ? n : 0, await fetchExistingProExpiry());
     if (!Number.isFinite(n)) {
       setStatus("Balance could not be read. Please try again in a moment.", "warn");

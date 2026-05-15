@@ -7,10 +7,10 @@
  * 3. Invite bot to your server with **Read Messages/View Channel** + **Read Message History** on the announcements channel.
  * 4. Set `DISCORD_ANNOUNCEMENTS_CHANNEL_ID` in wrangler.toml [vars] (right-click channel → Copy ID with Dev Mode on).
  *
- * Cron: rootrecord-api-weather Worker, every-five-minutes schedule, calls runDiscordDeveloperMessageSync.
+ * Cron: rootrecord-api-account Worker, every-five-minutes schedule, calls runDiscordDeveloperMessageSync.
  *
  * Also upserts `discord_user_activity` when a **new** `developer_messages` row is inserted
- * (same poll — not full-gateway presence). Ops on **weather** Worker (`X-RR-Push-Admin-Key`):
+ * (same poll — not full-gateway presence). Ops on **account** Worker (`X-RR-Push-Admin-Key`):
  * GET `/api/internal/discord-user-activity`, POST `/api/internal/discord-channel-backfill`
  * (paginated history scan; call repeatedly with body `{ "before": "<next_before>" }` until `done`).
  */

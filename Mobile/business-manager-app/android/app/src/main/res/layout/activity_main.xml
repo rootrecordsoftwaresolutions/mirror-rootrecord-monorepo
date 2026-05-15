@@ -7,6 +7,15 @@
     tools:context=".MainActivity">
 
     <WebView
+        android:id="@+id/webview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:clipToPadding="false" />
+
+    <com.google.android.gms.ads.AdView
+        android:id="@+id/adView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        app:layout_anchorGravity="top" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
