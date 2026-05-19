@@ -1,9 +1,10 @@
 @echo off
 setlocal EnableExtensions
-rem Manual commit for "Mobile App Development" pnpm workspace + nested weather-manager-mobile.
+rem LEGACY: MonoRepo uses a single git tree at the repo root. Prefer:
+rem   ..\commit-all.bat
+rem This script only commits from Mobile\ if you still use a nested weather-manager-mobile\.git.
 rem Usage:   commit-workspace.bat
 rem          commit-workspace.bat your commit message here
-rem If no message is given, a default subject is used (same for both repos when both commit).
 
 cd /d "%~dp0" || exit /b 1
 

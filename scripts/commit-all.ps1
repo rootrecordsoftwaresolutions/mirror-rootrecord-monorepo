@@ -28,10 +28,15 @@ function Test-ProjectRoot {
   $markers = @(
     (Join-Path $Dir "package.json"),
     (Join-Path $Dir "wrangler.toml"),
+    (Join-Path $Dir "pnpm-workspace.yaml"),
+    (Join-Path $Dir "capacitor.config.json"),
+    (Join-Path $Dir "requirements.txt"),
+    (Join-Path $Dir "pyproject.toml"),
+    (Join-Path $Dir "solana.json"),
     (Join-Path $Dir "android\app\build.gradle"),
     (Join-Path $Dir "android\app\build.gradle.kts"),
-    (Join-Path $Dir "app\build.gradle.kts"),
-    (Join-Path $Dir "pnpm-workspace.yaml")
+    (Join-Path $Dir "app\build.gradle"),
+    (Join-Path $Dir "app\build.gradle.kts")
   )
   foreach ($m in $markers) {
     if (Test-Path -LiteralPath $m) { return $true }
@@ -49,37 +54,49 @@ function Get-NestedGitRepos {
 function Get-MonoRepoProjectRoots {
   $roots = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 
-  function Add-Root([string] $Rel) {
+  function Add-Root([string] $Rel, [switch] $Force) {
     $full = Join-Path $repoRoot $Rel
-    if ((Test-Path -LiteralPath $full) -and (Test-ProjectRoot $full)) {
+    if (-not (Test-Path -LiteralPath $full)) { return }
+    if ($Force -or (Test-ProjectRoot $full)) {
       [void]$roots.Add($Rel.Replace("\", "/"))
     }
   }
 
+  function Add-RootsUnder([string] $ParentRel) {
+    $parent = Join-Path $repoRoot $ParentRel
+    if (-not (Test-Path -LiteralPath $parent)) { return }
+    Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue |
+      ForEach-Object { Add-Root ($ParentRel + "\" + $_.Name) }
+  }
+
   Add-Root "Web\main"
   Add-Root "solana-rootrecord-site"
+  Add-Root "Mobile"
   Add-Root "Web\cloudflare\shared"
 
-  Get-ChildItem -Path (Join-Path $repoRoot "Web\apps") -Directory -ErrorAction SilentlyContinue |
-    ForEach-Object { Add-Root ("Web\apps\" + $_.Name) }
+  Add-RootsUnder "Web\apps"
+  Add-RootsUnder "Web\tools"
+  Add-RootsUnder "Mobile"
 
   Get-ChildItem -Path (Join-Path $repoRoot "Web\cloudflare") -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -match "^(rootrecord-|rr-)" } |
     ForEach-Object { Add-Root ("Web\cloudflare\" + $_.Name) }
 
-  Get-ChildItem -Path (Join-Path $repoRoot "Mobile") -Directory -ErrorAction SilentlyContinue |
-    ForEach-Object { Add-Root ("Mobile\" + $_.Name) }
+  Add-RootsUnder "Bots"
+  $botsRoot = Join-Path $repoRoot "Bots"
+  if (Test-Path -LiteralPath $botsRoot) {
+    Get-ChildItem -Path $botsRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+      Get-ChildItem -Path $_.FullName -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { Add-Root ("Bots\" + $_.Parent.Name + "\" + $_.Name) }
+    }
+  }
 
-  Get-ChildItem -Path (Join-Path $repoRoot "Bots") -Directory -ErrorAction SilentlyContinue |
-    ForEach-Object { Add-Root ("Bots\" + $_.Name) }
-
-  foreach ($extra in @("Doc-Repo", "ebooks", "Web\tools")) {
-    Add-Root $extra
+  foreach ($extra in @("Doc-Repo", "ebooks", "scripts", "Web\scripts")) {
+    Add-Root $extra -Force
   }
 
   Get-ChildItem -Path $repoRoot -Directory -ErrorAction SilentlyContinue |
     Where-Object {
-      $_.Name -notin @(".git", ".cursor", ".wrangler", "node_modules", "Mobile", "Web", "Bots")
+      $_.Name -notin @(".git", ".cursor", ".wrangler", "node_modules", "Mobile", "Web", "Bots", "scripts")
     } |
     ForEach-Object { Add-Root $_.Name }
 
@@ -91,15 +108,21 @@ function Get-ChangedProjects {
   $porcelain = & $git status --porcelain 2>$null
   if ($LASTEXITCODE -ne 0) { return @() }
   $hit = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  $repoRootMarker = "(repo root)"
   foreach ($line in $porcelain) {
     if ($line.Length -lt 4) { continue }
     $path = $line.Substring(3).Trim().Trim('"')
     $norm = $path.Replace("\", "/")
+    $matched = $false
     foreach ($root in $ProjectRoots) {
       $prefix = $root.TrimEnd("/") + "/"
       if ($norm -eq $root -or $norm.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
         [void]$hit.Add($root)
+        $matched = $true
       }
+    }
+    if (-not $matched -and $norm -notmatch "/") {
+      [void]$hit.Add($repoRootMarker)
     }
   }
   $hit | Sort-Object
@@ -157,7 +180,11 @@ Write-Host "Staging all tracked + untracked files (git add -A)..." -ForegroundCo
 Invoke-Git -GitArgs @("add", "-A")
 
 $stagedSecrets = @(& $git diff --cached --name-only 2>$null | Where-Object {
-  $_ -match "(^|/)(credentials\.env|\.env)$" -and $_ -notmatch "\.example"
+  (
+    $_ -match "(^|/)(credentials\.env|\.env)$" -and $_ -notmatch "\.example"
+  ) -or (
+    $_ -match "(^|/)\.deploy-jwt$|\.(jks|p12)$|\.keystore$|firebase-adminsdk.*\.json$|service[-_]?account.*\.json$|(^|/)local\.properties$"
+  )
 })
 if ($stagedSecrets.Count -gt 0) {
   Write-Host ""

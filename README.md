@@ -61,7 +61,7 @@ commit-all.bat your commit message here
 ```
 Stages **all** changes in the monorepo (`git add -A`), commits (default message `chore: sync workspace` if none given), and pushes to `origin`. Run from repo root.
 
-`scripts\commit-all.ps1` **auto-discovers** project roots (`Web\apps\*`, `Mobile\*`, `Web\cloudflare\rootrecord-*`, `Web\main`, `solana-rootrecord-site`, new top-level folders with `package.json`, etc.) and lists which have pending changes before committing. Nested `.git` repos, if present, are committed first.
+`scripts\commit-all.ps1` **auto-discovers** project roots (`Web\apps\*`, `Web\tools\*`, `Mobile\*`, all `Web\cloudflare\*` workers, `Web\main`, `Web\scripts`, `solana-rootrecord-site`, `Bots\*`, `Doc-Repo`, `ebooks`, `scripts\`, top-level folders with `package.json`, etc.) and lists which have pending changes before committing. Root-level files (e.g. `cloudflare-update-*.bat`) show as `(repo root)`. Nested `.git` repos, if present, are committed first.
 
 ### Deploy Cloudflare (Pages + Workers)
 ```

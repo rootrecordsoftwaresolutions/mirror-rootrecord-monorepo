@@ -4,15 +4,12 @@ setlocal EnableExtensions
 rem =============================================================================
 rem  commit-all.bat — stage, commit, and push the entire MonoRepo
 rem
-rem  One git repo at the folder containing this script. All products live here:
-rem    Mobile\          Android (Capacitor + native)
-rem    Web\apps\        Product web apps (Pages)
-rem    Web\cloudflare\  Workers (auto-discovers rootrecord-* folders)
-rem    Web\main\        Marketing site
-rem    solana-rootrecord-site\, Bots\, Doc-Repo\, etc.
+rem  One git repo at the folder containing this script. Stages everything (git add -A).
+rem  Areas: Mobile\, Web\apps\, Web\cloudflare\, Web\main\, Web\tools\, Web\scripts\,
+rem    solana-rootrecord-site\, Bots\, Doc-Repo\, ebooks\, scripts\, repo-root *.bat.
 rem
-rem  New projects are picked up automatically when they have package.json,
-rem  wrangler.toml, or an Android Gradle project — no edit to this file needed.
+rem  scripts\commit-all.ps1 lists known project roots before commit; new apps/workers
+rem  are picked up via package.json, wrangler.toml, Gradle, requirements.txt, etc.
 rem
 rem  Usage:
 rem    commit-all.bat
