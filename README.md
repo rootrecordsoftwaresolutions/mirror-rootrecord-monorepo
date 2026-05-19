@@ -15,9 +15,11 @@ MonoRepo/
 │   ├── apps/                Product web apps (Cloudflare Pages)
 │   ├── cloudflare/          Cloudflare Workers (APIs, license, solana-tx, etc.)
 │   ├── main/                Marketing site (rootrecord-website, Pages + Functions)
-│   └── scripts/             Shared deploy scripts (Pages helpers, analytics injection)
+│   ├── scripts/             Shared deploy scripts (Pages helpers, analytics injection)
+│   └── tools/               Internal tools (e.g. custodial-wallet-manager)
+├── scripts/                 Repo automation (`commit-all.ps1`, release helpers)
 ├── solana-rootrecord-site/  Public Next.js site at solana.rootrecord.info
-├── Bots/                    solana-swing-bot / solana-arb-bot
+├── Bots/                    solana-swing-bot / solana-arb-bot / energy tools
 ├── Doc-Repo/                Long-form internal docs
 ├── ebooks/                  Static ebook assets
 ├── commit-all.bat           Stage + commit + push (user runs)
@@ -122,6 +124,17 @@ Never commit:
 - Stripe / API tokens of any kind
 
 The repo-root `.gitignore` plus per-area `.gitignore` files handle this. Env edits should always be surgical (touch only the keys you mean to change).
+
+## Marketing site checklist (`Web/main/`)
+
+Optional audit list for [rootrecord.info](https://rootrecord.info) (marketing Pages). Detailed notes may also live in `Doc-Repo/`.
+
+- **Structure:** folder layout under `Web/main/`; shared nav/footer; remove dead CSS/assets
+- **HTML:** consistent DOCTYPE/head; semantic tags; legal dates in sync
+- **CSS:** dark neon theme; hero/image classes as needed
+- **Features:** dynamic nav, CTAs, account handoff
+- **SEO:** OG tags, Schema.org, sitemap
+- **A11y / graphics / perf:** expand in Doc-Repo as needed
 
 ## Workflow rules (for assistant + dev)
 
