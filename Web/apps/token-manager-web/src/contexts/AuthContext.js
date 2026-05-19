@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { rrApi, getRrToken, setRrToken, getRrDeviceId, refreshEntitlement as postEntitlement } from "../lib/rrApi";
+import { rrApi, getRrToken, setRrToken, getRrDeviceId, refreshEntitlement as postEntitlement, RR_APP_ID } from "../lib/rrApi";
+import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from "../../../shared/accountNotifyApi";
 
 const AuthCtx = createContext(null);
 
@@ -61,6 +62,17 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!user) return;
+    notifyAppSessionStart({
+      apiOrigin: ROOTRECORD_ACCOUNT_API_ORIGIN,
+      appId: RR_APP_ID,
+      betaTester: false,
+      guestId: getRrDeviceId(),
+      getAuthToken: () => getRrToken(),
+    });
+  }, [user]);
 
   const refreshEntitlement = useCallback(async () => {
     const { data } = await postEntitlement();

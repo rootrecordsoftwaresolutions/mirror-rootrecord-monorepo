@@ -1,14 +1,14 @@
 [versions]
 agp = "8.8.0"
-kotlin = "2.0.21"
+kotlin = "2.2.0"
 composeBom = "2024.12.01"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
 navigation = "2.8.5"
-hilt = "2.52"
+hilt = "2.57.1"
 hiltNavigation = "1.2.0"
-room = "2.6.1"
+room = "2.7.2"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
 serializationJson = "1.7.3"
@@ -19,9 +19,9 @@ datastore = "1.1.1"
 maplibre = "11.7.1"
 youtubePlayer = "12.1.0"
 media3 = "1.5.0"
-firebaseBom = "33.7.0"
+firebaseBom = "34.12.0"
 accompanistPermissions = "0.36.0"
-ksp = "2.0.21-1.0.25"
+ksp = "2.2.0-2.0.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -64,10 +64,11 @@ media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", versi
 media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
-firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version = "21.3.0" }
-play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version = "23.6.0" }
+play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version = "25.2.0" }
 browser = { group = "androidx.browser", name = "browser", version = "1.8.0" }
 
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
@@ -81,4 +82,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-google-services = { id = "com.google.gms.google-services", version = "4.4.2" }
+google-services = { id = "com.google.gms.google-services", version = "4.4.4" }

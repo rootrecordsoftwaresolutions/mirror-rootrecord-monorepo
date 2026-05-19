@@ -1,3 +1,13 @@
-# Discord activity dashboard (static directory + trailing slash).
-/discord-activity /discord-activity/ 308
-/discord-activity.html /discord-activity/ 301
+/discord-verify.html /discord-verify 308
+/privacy.html /privacy 308
+/terms.html /terms 308
+
+# Charts (static directories + trailing slash).
+/charts /charts/ 308
+/charts/discord-activity /charts/discord-activity/ 308
+/charts/kilauea-eruption-summary /charts/kilauea-eruption-summary/ 308
+
+# Legacy Discord activity URLs → charts subtree.
+/discord-activity /charts/discord-activity/ 308
+/discord-activity/ /charts/discord-activity/ 308
+/discord-activity.html /charts/discord-activity/ 301

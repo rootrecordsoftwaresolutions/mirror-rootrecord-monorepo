@@ -177,6 +177,12 @@ if ($discordFeedback -match '^https://discord(app)?\.com/api/webhooks/' -and $di
   Write-Host "Uploaded DISCORD_FEEDBACK_WEBHOOK_URL (from credentials.env)."
 }
 
+$appSessionWebhook = [string]$env:DISCORD_APP_SESSION_WEBHOOK_URL
+if ($appSessionWebhook -match '^https://discord(app)?\.com/api/webhooks/' -and $appSessionWebhook.Length -gt 60) {
+  $appSessionWebhook | npx wrangler secret put DISCORD_APP_SESSION_WEBHOOK_URL
+  Write-Host "Uploaded DISCORD_APP_SESSION_WEBHOOK_URL (app session starts → Discord)."
+}
+
 # Discord announcements → D1 `developer_messages` (cron on this Worker only). Bot token: Portal → Bot → Reset Token.
 # Other API shards do not upload this secret; keep DISCORD_BOT_TOKEN in repo-root credentials.env.
 $discordBot = [string]$env:DISCORD_BOT_TOKEN

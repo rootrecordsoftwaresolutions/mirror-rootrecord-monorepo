@@ -1,4 +1,4 @@
-import { accountApiBaseFromEnv } from "../_lib/accountApiBase";
+import { accountApiBaseFromEnv, isAccountShardV1Tail } from "../_lib/accountApiBase";
 
 type Env = {
   ROOTRECORD_API_BASE?: string;
@@ -16,8 +16,8 @@ function tailFromParams(path: string | string[] | undefined): string {
 
 /**
  * Same-origin proxy: browser calls https://&lt;pages&gt;/v1/... → Worker upstream.
- * `/v1/auth/*` goes to **rootrecord-api-account** (custodial wallet creation on signup/login lives there only).
- * Other `/v1/*` uses `ROOTRECORD_API_BASE` (defaults to primary) for backward compatibility.
+ * Account portal routes (`/v1/auth/*`, `/v1/discord/*`, `/v1/me/*`, …) always use **rootrecord-api-account**
+ * so Discord OAuth and `discord_linked` on `/v1/me` work even when `ROOTRECORD_API_BASE` still points at primary.
  */
 export const onRequest = async (context: {
   request: Request;
@@ -25,8 +25,7 @@ export const onRequest = async (context: {
   params: Record<string, string | string[] | undefined>;
 }): Promise<Response> => {
   const tail = tailFromParams(context.params.path);
-  const authTail = tail.replace(/^\/+/, "");
-  const useAccount = authTail === "auth" || authTail.startsWith("auth/");
+  const useAccount = isAccountShardV1Tail(tail);
   const base = useAccount
     ? accountApiBaseFromEnv(context.env)
     : (context.env.ROOTRECORD_API_BASE ?? "").trim().replace(/\/+$/, "") || DEFAULT_PRIMARY_API;

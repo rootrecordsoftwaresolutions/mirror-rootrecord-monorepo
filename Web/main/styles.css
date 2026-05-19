@@ -304,6 +304,28 @@ html.nav-lifetime .nav-account-panel a[href="/billing.html"] {
   font-weight: 500;
 }
 
+.site-nav .nav-account-panel .nav-account-signout {
+  display: block;
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.45rem 0.65rem;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: #f87171;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.site-nav .nav-account-panel .nav-account-signout:hover,
+.site-nav .nav-account-panel .nav-account-signout:focus-visible {
+  background: rgba(248, 113, 113, 0.14);
+  outline: none;
+}
+
 .nav-toggle {
   display: none;
   background: transparent;
@@ -1309,6 +1331,58 @@ section { position: relative; }
 }
 
 .home-prerelease-foot a {
+  color: var(--moss);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.home-featured-public-app {
+  margin-top: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.home-featured-public-app-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 2rem 2.25rem;
+  background: linear-gradient(145deg, rgba(63, 226, 141, 0.12), var(--surface));
+  border: 1px solid rgba(63, 226, 141, 0.45);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.home-featured-public-app-card .product-card-tag {
+  color: var(--moss-glow);
+}
+
+.home-featured-public-app-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.home-featured-public-app-lead {
+  margin: 0;
+  max-width: 52rem;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+.home-featured-public-app-links {
+  margin: 0;
+  font-size: 0.875rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
+.home-featured-public-app-links a {
   color: var(--moss);
   text-decoration: underline;
   text-underline-offset: 3px;

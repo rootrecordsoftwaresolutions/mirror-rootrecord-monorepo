@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -18,8 +19,8 @@ android {
         applicationId = "com.rootrecord.kilauea"
         minSdk = 24
         targetSdk = 35
-        versionCode = 25
-        versionName = "1.0.25"
+        versionCode = 30
+        versionName = "1.0.30"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val props = Properties()
@@ -73,12 +74,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -123,7 +127,12 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.messaging)
+    implementation(libs.firebase.analytics) {
+        exclude(group = "com.google.firebase", module = "firebase-analytics-ktx")
+    }
+    implementation(libs.firebase.messaging) {
+        exclude(group = "com.google.firebase", module = "firebase-messaging-ktx")
+    }
 
     implementation(libs.play.services.location)
     implementation(libs.play.services.ads)

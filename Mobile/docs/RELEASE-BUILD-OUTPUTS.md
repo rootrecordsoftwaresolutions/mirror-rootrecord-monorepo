@@ -23,6 +23,7 @@ On a typical dev PC the absolute path matches your clone, for example:
 | `business-manager/` | `Web/apps/business-manager-web/` | `Mobile/business-manager-app/` |
 | `weather-manager/` | `Web/apps/weather-manager-web/` | `Mobile/weather-manager-mobile/` |
 | `kilauea-alerts/` | n/a (native) | `Mobile/kilauea-alerts-android/` (native Kotlin / Gradle) |
+| `root-farms/` | `Web/apps/root-farms-web/` | `Mobile/root-farms-app/` |
 
 Filenames follow the pattern **`RootRecord-<Product>-<version>.apk`** and **`.aab`** (version from each app’s `package.json` / Android `versionName` used by the build script).
 

@@ -1,4 +1,4 @@
-import { accountApiBaseFromEnv } from "../_lib/accountApiBase";
+import { accountApiBaseFromEnv, isAccountShardApiTail } from "../_lib/accountApiBase";
 
 type Env = {
   ROOTRECORD_API_BASE?: string;
@@ -14,7 +14,7 @@ function tailFromParams(path: string | string[] | undefined): string {
 
 /**
  * Same-origin proxy: /api/* on Pages → Worker upstream.
- * `/api/auth/*` goes to **rootrecord-api-account** (same as `/v1/auth/*` on the account Worker).
+ * `/api/auth/*` and `/api/earn/*` go to **rootrecord-api-account** (same DB as Discord `/bal` and Root Farms).
  * More specific routes (e.g. `site-config.ts`) take precedence.
  */
 export const onRequest = async (context: {
@@ -23,8 +23,7 @@ export const onRequest = async (context: {
   params: Record<string, string | string[] | undefined>;
 }): Promise<Response> => {
   const tail = tailFromParams(context.params.path);
-  const t = tail.replace(/^\/+/, "");
-  const useAccount = t === "auth" || t.startsWith("auth/");
+  const useAccount = isAccountShardApiTail(tail);
   const base = useAccount
     ? accountApiBaseFromEnv(context.env)
     : (context.env.ROOTRECORD_API_BASE ?? "").trim().replace(/\/+$/, "") || DEFAULT_PRIMARY_API;

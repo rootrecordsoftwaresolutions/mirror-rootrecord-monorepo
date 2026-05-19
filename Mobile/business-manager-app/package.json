@@ -1,6 +1,6 @@
 {
   "name": "rootrecord-business-android",
-  "version": "1.0.31",
+  "version": "1.0.35",
   "private": true,
   "description": "Android (Capacitor) wrapper for the Business Manager web app. Web source lives at Web/apps/business-manager-web.",
   "scripts": {

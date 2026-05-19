@@ -123,6 +123,7 @@ $analyticsEnvByProject = @{
   "rootrecord-account-web"   = "CF_WEB_ANALYTICS_TOKEN_ACCOUNT"
   "rootrecord-token-web"     = "CF_WEB_ANALYTICS_TOKEN_TOKEN"
   "rootrecord-kilauea-web"   = "CF_WEB_ANALYTICS_TOKEN_KILAUEA"
+  "rootrecord-root-farms-web" = "CF_WEB_ANALYTICS_TOKEN_ROOT_FARMS"
 }
 $analyticsVar = $analyticsEnvByProject[$ProjectName]
 if ($analyticsVar) {
@@ -135,4 +136,5 @@ if ($analyticsVar) {
   }
 }
 
-npx wrangler pages deploy build --project-name=$ProjectName @args
+$env:WRANGLER_CI = "1"
+npx wrangler pages deploy build --project-name=$ProjectName --branch=main @args

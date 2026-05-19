@@ -1,6 +1,28 @@
 /** Default account API (no trailing slash). */
 export const DEFAULT_ROOTRECORD_API_ACCOUNT_BASE = "https://rootrecord-api-account.rootrecord.workers.dev";
 
+/** Pages `/api/*` tails that must hit the account Worker (not legacy primary). */
+export function isAccountShardApiTail(tail: string): boolean {
+  const t = tail.replace(/^\/+/, "");
+  if (t === "auth" || t.startsWith("auth/")) return true;
+  if (t === "earn" || t.startsWith("earn/")) return true;
+  if (t === "v1/farms" || t.startsWith("v1/farms/")) return true;
+  if (t === "app-session" || t.startsWith("app-session/")) return true;
+  return false;
+}
+
+/** Pages `/v1/*` tails that must hit the account Worker (Discord link, portal `/v1/me`, etc.). */
+export function isAccountShardV1Tail(tail: string): boolean {
+  const t = tail.replace(/^\/+/, "");
+  if (t === "auth" || t.startsWith("auth/")) return true;
+  if (t === "discord" || t.startsWith("discord/")) return true;
+  if (t === "app-session" || t.startsWith("app-session/")) return true;
+  if (t === "me" || t.startsWith("me/")) return true;
+  if (t === "billing" || t.startsWith("billing/")) return true;
+  if (t === "economy" || t.startsWith("economy/")) return true;
+  return false;
+}
+
 /**
  * Pages env `ROOTRECORD_API_ACCOUNT_BASE` may be set in the dashboard without a scheme;
  * `new URL(base + path)` then throws → Cloudflare error 1101 on the Function.

@@ -10,6 +10,32 @@ export function fmtMoney(amount_cents, currency = "USD") {
   }
 }
 
+/** Compact currency for KPI cards (10k+ → K, 1M+ → M). Full value via `fmtMoney`. */
+export function fmtMoneyCompact(amount_cents, currency = "USD") {
+  const v = (cents(amount_cents) || 0) / 100;
+  const abs = Math.abs(v);
+  if (abs < 10_000) return fmtMoney(amount_cents, currency);
+
+  const sign = v < 0 ? "-" : "";
+  let body;
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    body = m >= 10 ? `${Math.round(m)}M` : `${m.toFixed(1).replace(/\.0$/, "")}M`;
+  } else {
+    const k = abs / 1_000;
+    body = k >= 100 ? `${Math.round(k)}K` : `${k.toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  try {
+    const sym =
+      new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 })
+        .formatToParts(0)
+        .find((p) => p.type === "currency")?.value || "$";
+    return `${sign}${sym}${body}`;
+  } catch {
+    return `${sign}$${body}`;
+  }
+}
+
 export function fmtHours(h) {
   if (!Number.isFinite(+h)) return "0.00 h";
   return `${(+h).toFixed(2)} h`;

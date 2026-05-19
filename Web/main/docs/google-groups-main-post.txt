@@ -1,0 +1,92 @@
+Subject: RootRecord — all app links (official reference)
+
+Use this post as the one pinned / welcome message for the group. Update the “Last updated” line when links change.
+
+Last updated: 2026-05-18
+
+————————————————————————————————————————
+ROOTRECORD — ALL APPS & LINKS
+————————————————————————————————————————
+
+One account at https://rootrecord.info works across RootRecord apps where sign-in is supported.
+
+Website (products, pricing, account, FAQ)
+https://rootrecord.info/
+https://rootrecord.info/products.html
+https://rootrecord.info/account.html
+https://rootrecord.info/pricing.html
+https://rootrecord.info/faq.html
+
+Root Units program (balance, Discord /bal and /send)
+https://rootrecord.info/beta-tester-rewards.html
+
+Discord community
+https://discord.gg/CPaDYuFkU
+
+————————————————————————————————————————
+NEWEST PUBLIC ANDROID APP
+————————————————————————————————————————
+
+Root Record Weather Manager
+• Google Play (public — install like any app):
+  https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager
+• Web app (any browser):
+  https://weather.rootrecord.info/
+• Product page:
+  https://rootrecord.info/rootrecord-weather-manager.html
+• Optional APK (GitHub Releases):
+  https://github.com/RootRecord/rootrecord-weather-manager-mobile/releases/latest
+
+————————————————————————————————————————
+ANDROID — GOOGLE PLAY CLOSED TESTING
+————————————————————————————————————————
+
+You must be a member of this Google Group to opt in to closed testing for these apps (same Google account on your phone as in the Play Store).
+
+Business Manager
+• Join closed testing:
+  https://play.google.com/apps/testing/com.rootrecord.businessmanager
+• Web app:
+  https://business.rootrecord.info/
+• Product page:
+  https://rootrecord.info/rootrecord-business-manager.html
+• Optional APK (GitHub Releases):
+  https://github.com/RootRecord/rootrecord-business-manager-download/releases/latest
+
+Kīlauea Alerts
+• Join closed testing:
+  https://play.google.com/apps/testing/com.rootrecord.kilauea
+• Web app:
+  https://kilauea.rootrecord.info/
+• Product page:
+  https://rootrecord.info/kilauea-alerts.html
+
+Root Units Idle Farmer (package: com.rootrecord.rootunits)
+• Web app:
+  https://farms.rootrecord.info/
+• Android: closed testing on Play when your invite is active (ask in Discord if you need the opt-in link).
+
+————————————————————————————————————————
+WEB-ONLY / ACCOUNT TOOLS
+————————————————————————————————————————
+
+Account Hub (profile, billing, connected apps)
+https://account.rootrecord.info/
+
+Token Manager (Solana / custodial tools — web)
+https://token.rootrecord.info/
+
+Solana tools (public site)
+https://solana.rootrecord.info/
+
+————————————————————————————————————————
+HOW TO INSTALL (CLOSED TESTING)
+————————————————————————————————————————
+
+1. Join this group: https://groups.google.com/g/rootrecordtesting
+2. On your Android device, open the “Join closed testing” link for the app (above).
+3. Sign in with the same Google account you use on the Play Store.
+4. Accept the test, then install or update from the Play Store.
+5. Sign in inside the app with your rootrecord.info account.
+
+Questions: https://rootrecord.info/contact.html

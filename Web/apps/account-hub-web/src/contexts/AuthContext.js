@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, getToken, setToken, getDeviceId } from "../lib/api";
+import { api, getToken, setToken, getDeviceId, RR_APP_ID } from "../lib/api";
+import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from "../../../shared/accountNotifyApi";
 
 const AuthCtx = createContext(null);
 
@@ -84,6 +85,17 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!user) return;
+    notifyAppSessionStart({
+      apiOrigin: ROOTRECORD_ACCOUNT_API_ORIGIN,
+      appId: RR_APP_ID,
+      betaTester: false,
+      guestId: getDeviceId(),
+      getAuthToken: () => getToken(),
+    });
+  }, [user]);
 
   // api.js response interceptor dispatches this when the Worker rejects our Bearer with
   // "Invalid or expired session." It already wiped the token; we just need to drop the

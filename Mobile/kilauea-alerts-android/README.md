@@ -19,7 +19,7 @@ Release bundles use the same Gradle targets as other Root Record apps; staged co
 |-------|---------|
 | `local.properties` → `sdk.dir` | Android SDK path (do not commit). |
 | `local.properties` → `YOUTUBE_API_KEY` | Optional YouTube Data API v3 key for live-feed discovery (never commit real keys). |
-| `app/google-services.json` | Firebase Cloud Messaging — replace the placeholder with your Firebase Android app config. |
+| `app/google-services.json` | Firebase (`root-record` project) — download from Firebase Console for package `com.rootrecord.kilauea`. |
 
 ## Architecture
 

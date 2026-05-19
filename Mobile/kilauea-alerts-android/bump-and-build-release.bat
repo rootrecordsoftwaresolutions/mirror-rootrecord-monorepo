@@ -11,6 +11,8 @@ rem Release signing: app/build.gradle.kts release signingConfig + secrets in loc
 rem   (RELEASE_STORE_*, keystore path under repo per local.properties.example).
 
 set "APP=%~dp0"
+set "APP_Q=%APP%"
+if "%APP_Q:~-1%"=="\" set "APP_Q=%APP_Q:~0,-1%"
 set "BUMP=%APP%..\scripts\bump-mobile-version.ps1"
 set "GRADLEW=%APP%gradlew.bat"
 
@@ -22,6 +24,12 @@ if not exist "%GRADLEW%" (
 )
 if not exist "%BUMP%" (
   echo bump-mobile-version.ps1 not found at: %BUMP%
+  goto FAIL
+)
+set "GJSON=%APP%app\google-services.json"
+if not exist "%GJSON%" (
+  echo ERROR: Missing Firebase config:
+  echo   %GJSON%
   goto FAIL
 )
 
@@ -45,35 +53,14 @@ if errorlevel 1 goto FAIL
 rem %VER% was set by [0/2] above (bump-mobile-version.ps1 stdout). Artifact names use that string
 rem so filenames match versionName written into app/build.gradle.kts.
 
-set "OUT_APK=%~dp0app\build\outputs\apk\release"
-set "OUT_AAB=%~dp0app\build\outputs\bundle\release"
-set "APK_SRC=%OUT_APK%\app-release.apk"
-set "AAB_SRC=%OUT_AAB%\app-release.aab"
-if not exist "%APK_SRC%" (
-  echo Expected APK not found: %APK_SRC%
-  echo If signing failed, look for *unsigned* under: %OUT_APK%
-  dir /b "%OUT_APK%" 2>nul
-  goto FAIL
-)
-if not exist "%AAB_SRC%" (
-  echo Expected AAB not found: %AAB_SRC%
-  dir /b "%OUT_AAB%" 2>nul
-  goto FAIL
-)
-
 set "DEST=%~dp0..\builds\kilauea-alerts"
-if not exist "%DEST%" mkdir "%DEST%"
-set "APK_DEST=%DEST%\RootRecord-Kilauea-Alerts-%VER%.apk"
-set "AAB_DEST=%DEST%\RootRecord-Kilauea-Alerts-%VER%.aab"
-copy /y "%APK_SRC%" "%APK_DEST%" >nul
-if errorlevel 1 goto FAIL
-copy /y "%AAB_SRC%" "%AAB_DEST%" >nul
+echo.
+echo [4/4] Stage APK + AAB -^> %DEST%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%..\scripts\stage-release-artifacts.ps1" -AppDir "%APP_Q%" -DestDir "%DEST%" -BaseName "RootRecord-Kilauea-Alerts" -Version "%VER%" -Native
 if errorlevel 1 goto FAIL
 
 echo.
-echo Done.
-echo   APK: %APK_DEST%
-echo   AAB: %AAB_DEST%
+echo Done. See %DEST% for RootRecord-Kilauea-Alerts-%VER%.apk and .aab
 pause
 endlocal
 exit /b 0

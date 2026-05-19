@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { api } from "../../lib/api";
 import { ScreenHeader, PageContainer, Section, Spinner, Empty, Toast, useToast } from "../ui/Shell";
-import { fmtMoney, fmtHours, MONTHS_SHORT, isoNow, durationHours } from "../../lib/format";
+import { fmtMoney, fmtMoneyCompact, fmtHours, MONTHS_SHORT, isoNow, durationHours } from "../../lib/format";
 import {
   computeDashboardRange,
   dashboardTimeZoneCaption,
@@ -303,9 +303,9 @@ export default function Dashboard() {
                 label="Hours"
                 value={fmtHours((summary.hours || 0) + liveSessionHoursInRange(session, start, end ?? undefined))}
               />
-              <Kpi testid="kpi-income" label="Income" value={fmtMoney(summary.income_cents)} accent="income" />
-              <Kpi testid="kpi-expenses" label="Expenses" value={fmtMoney(summary.expense_cents)} accent="expense" />
-              <Kpi testid="kpi-net" label="Net" value={fmtMoney(summary.net_cents)} accent={summary.net_cents >= 0 ? "income" : "expense"} bold />
+              <Kpi testid="kpi-income" label="Income" value={fmtMoneyCompact(summary.income_cents)} fullValue={fmtMoney(summary.income_cents)} accent="income" />
+              <Kpi testid="kpi-expenses" label="Expenses" value={fmtMoneyCompact(summary.expense_cents)} fullValue={fmtMoney(summary.expense_cents)} accent="expense" />
+              <Kpi testid="kpi-net" label="Net" value={fmtMoneyCompact(summary.net_cents)} fullValue={fmtMoney(summary.net_cents)} accent={summary.net_cents >= 0 ? "income" : "expense"} bold />
             </div>
 
             <Section title="By category">
@@ -360,12 +360,17 @@ export default function Dashboard() {
   );
 }
 
-function Kpi({ label, value, accent, bold, testid }) {
+function Kpi({ label, value, fullValue, accent, bold, testid }) {
   const color = accent === "income" ? "text-income" : accent === "expense" ? "text-expense" : "text-ink-primary";
   return (
-    <div data-testid={testid} className="card p-4 flex flex-col">
+    <div data-testid={testid} className="card p-4 flex flex-col min-w-0">
       <span className="label">{label}</span>
-      <span className={`font-heading ${bold ? "text-2xl" : "text-xl"} font-bold ${color} mt-1`}>{value}</span>
+      <span
+        className={`font-heading ${bold ? "text-2xl" : "text-xl"} font-bold ${color} mt-1 truncate tabular-nums leading-tight`}
+        title={fullValue || value}
+      >
+        {value}
+      </span>
     </div>
   );
 }

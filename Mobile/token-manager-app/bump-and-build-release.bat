@@ -9,6 +9,8 @@ rem 3) gradlew assembleRelease bundleRelease in android\              (signed AP
 rem 4) copy APK + AAB into Mobile\builds\token-manager\
 
 set "APP=%~dp0"
+set "APP_Q=%APP%"
+if "%APP_Q:~-1%"=="\" set "APP_Q=%APP_Q:~0,-1%"
 set "WEB=%APP%..\..\Web\apps\token-manager-web"
 set "ANDROID=%APP%android"
 set "DEST=%APP%..\builds\token-manager"
@@ -60,14 +62,13 @@ popd
 rem %VER% was set by [0/4] above (bump-mobile-version.ps1 output). No re-read here — we want
 rem the artifact filename to match exactly what was written into the JSON + gradle files.
 
-if not exist "%DEST%" mkdir "%DEST%"
-copy /y "%ANDROID%\app\build\outputs\apk\release\app-release.apk" "%DEST%\RootRecord-TokenManager-%VER%.apk" >nul
-copy /y "%ANDROID%\app\build\outputs\bundle\release\app-release.aab" "%DEST%\RootRecord-TokenManager-%VER%.aab" >nul
+echo.
+echo [5/5] Stage APK + AAB -^> %DEST%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%..\scripts\stage-release-artifacts.ps1" -AppDir "%APP_Q%" -DestDir "%DEST%" -BaseName "RootRecord-TokenManager" -Version "%VER%"
+if errorlevel 1 goto FAIL
 
 echo.
-echo Done.
-echo   APK: %DEST%\RootRecord-TokenManager-%VER%.apk
-echo   AAB: %DEST%\RootRecord-TokenManager-%VER%.aab
+echo Done. See %DEST% for RootRecord-TokenManager-%VER%.apk and .aab
 pause
 endlocal
 exit /b 0

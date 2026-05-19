@@ -1,46 +1,43 @@
 @echo off
 setlocal EnableExtensions
 
-rem Always run from this repo root (folder containing this script).
+rem =============================================================================
+rem  commit-all.bat — stage, commit, and push the entire MonoRepo
+rem
+rem  One git repo at the folder containing this script. All products live here:
+rem    Mobile\          Android (Capacitor + native)
+rem    Web\apps\        Product web apps (Pages)
+rem    Web\cloudflare\  Workers (auto-discovers rootrecord-* folders)
+rem    Web\main\        Marketing site
+rem    solana-rootrecord-site\, Bots\, Doc-Repo\, etc.
+rem
+rem  New projects are picked up automatically when they have package.json,
+rem  wrangler.toml, or an Android Gradle project — no edit to this file needed.
+rem
+rem  Usage:
+rem    commit-all.bat
+rem    commit-all.bat your commit message here
+rem    commit-all.bat nopause          (no pause at end — for scripts)
+rem
+rem  Nested .git folders (if any) are committed first, then the monorepo root.
+rem =============================================================================
+
 cd /d "%~dp0"
 
-set "GIT=%ProgramFiles%\Git\bin\git.exe"
-if not exist "%GIT%" set "GIT=git"
+set "NOPAUSE=0"
+if /I "%~1"=="nopause" set "NOPAUSE=1"
 
-"%GIT%" add -A
-"%GIT%" diff --staged --quiet
-if errorlevel 1 goto DO_COMMIT
-echo Nothing to commit.
-pause
-exit /b 0
+set "PS_ARGS=%*"
+if /I "%~1"=="nopause" set "PS_ARGS=%~2 %~3 %~4 %~5 %~6 %~7 %~8 %~9"
 
-:DO_COMMIT
-if not "%~1"=="" (
-  "%GIT%" commit -m "%~1"
-) else (
-  "%GIT%" commit -m "chore: sync workspace"
-)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\commit-all.ps1" %PS_ARGS%
 set "ERR=%ERRORLEVEL%"
 if not "%ERR%"=="0" (
   echo.
-  echo Commit failed with exit code %ERR%.
-  pause
+  echo commit-all failed with exit code %ERR%.
+  if not "%NOPAUSE%"=="1" pause
   exit /b %ERR%
 )
 
-echo.
-echo Pushing to origin...
-"%GIT%" remote get-url origin >nul 2>nul
-if errorlevel 1 (
-  echo No 'origin' remote configured. Skipping push.
-  pause
-  exit /b 0
-)
-"%GIT%" push
-set "ERR=%ERRORLEVEL%"
-if not "%ERR%"=="0" (
-  echo.
-  echo Push failed with exit code %ERR%.
-)
-pause
-exit /b %ERR%
+if not "%NOPAUSE%"=="1" pause
+exit /b 0

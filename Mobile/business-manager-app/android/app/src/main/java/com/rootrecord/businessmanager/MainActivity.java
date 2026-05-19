@@ -28,6 +28,9 @@ public class MainActivity extends BridgeActivity {
 
   private static final int FALLBACK_BANNER_HEIGHT_DP = 50;
 
+  /** No extra gap between banner bottom and first web row (avoids double spacing). */
+  private static final int BANNER_TOP_GAP_DP = 0;
+
   private AdView adView;
   private boolean adLoaded;
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -107,15 +110,40 @@ public class MainActivity extends BridgeActivity {
     ViewCompat.requestApplyInsets(adView);
   }
 
+  private int webTopInsetBelowAdPx(WebView webView) {
+    if (adView == null || webView == null || adView.getVisibility() != View.VISIBLE) {
+      return 0;
+    }
+    int[] adWin = new int[2];
+    int[] wvWin = new int[2];
+    adView.getLocationInWindow(adWin);
+    webView.getLocationInWindow(wvWin);
+    int bannerPx = adView.getHeight();
+    if (bannerPx <= 0) {
+      bannerPx =
+          (int) (FALLBACK_BANNER_HEIGHT_DP * getResources().getDisplayMetrics().density + 0.5f);
+    }
+    int adBottomInWindow = adWin[1] + bannerPx;
+    int inset = adBottomInWindow - wvWin[1];
+    if (inset < 0) {
+      inset = 0;
+    }
+    return inset + (int) (BANNER_TOP_GAP_DP * getResources().getDisplayMetrics().density + 0.5f);
+  }
+
   private int statusBarInsetPx() {
-    if (adView == null) {
-      return 0;
+    View decor = getWindow() != null ? getWindow().getDecorView() : null;
+    if (decor != null) {
+      WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(decor);
+      if (insets != null) {
+        return insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
+      }
     }
-    WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(adView);
-    if (insets == null) {
-      return 0;
+    int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+    if (resId > 0) {
+      return getResources().getDimensionPixelSize(resId);
     }
-    return insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
+    return 0;
   }
 
   private void attachWebAdsBridge() {
@@ -190,25 +218,8 @@ public class MainActivity extends BridgeActivity {
     adView.post(this::syncWebBannerInset);
   }
 
-  /** Pushes web content below the native top banner (status bar + banner only, no extra gap). */
+  /** Top padding for web = distance from WebView top to ad bottom (no double status-bar). */
   private void syncWebBannerInset() {
-    if (adView == null || adView.getVisibility() != View.VISIBLE) {
-      applyWebBannerInset(0);
-      return;
-    }
-    adView.post(
-        () -> {
-          int bannerPx = adView.getHeight();
-          if (bannerPx <= 0) {
-            bannerPx =
-                (int)
-                    (FALLBACK_BANNER_HEIGHT_DP * getResources().getDisplayMetrics().density + 0.5f);
-          }
-          applyWebBannerInset(statusBarInsetPx() + bannerPx);
-        });
-  }
-
-  private void applyWebBannerInset(int insetPx) {
     Bridge bridge = getBridge();
     if (bridge == null) {
       return;
@@ -217,16 +228,33 @@ public class MainActivity extends BridgeActivity {
     if (webView == null) {
       return;
     }
-    if (insetPx <= 0) {
-      webView.evaluateJavascript(
-          "document.documentElement.style.removeProperty('--rr-native-ad-banner-height');", null);
-      return;
+    Runnable apply =
+        () -> {
+          final String js;
+          if (adView != null && adView.getVisibility() == View.VISIBLE) {
+            int insetPx = webTopInsetBelowAdPx(webView);
+            js =
+                "document.documentElement.style.setProperty('--rr-native-ad-banner-height','"
+                    + insetPx
+                    + "px');";
+          } else {
+            int statusPx = statusBarInsetPx();
+            if (statusPx > 0) {
+              js =
+                  "document.documentElement.style.setProperty('--rr-native-ad-banner-height','"
+                      + statusPx
+                      + "px');";
+            } else {
+              js = "document.documentElement.style.removeProperty('--rr-native-ad-banner-height');";
+            }
+          }
+          webView.evaluateJavascript(js, null);
+        };
+    if (adView != null && adView.getVisibility() == View.VISIBLE) {
+      adView.post(apply);
+    } else {
+      apply.run();
     }
-    webView.evaluateJavascript(
-        "document.documentElement.style.setProperty('--rr-native-ad-banner-height','"
-            + insetPx
-            + "px');",
-        null);
   }
 
   private final class WebAdsBridge {

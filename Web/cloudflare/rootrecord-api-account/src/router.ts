@@ -15,6 +15,8 @@ import { handleLocations } from "./locations";
 import { handlePushRoutes, verifyWorkerOpsAdmin } from "./push";
 import { handlePrefsRoutes } from "./prefs";
 import { handleEarnRoutes } from "./earn";
+import { handleFarmsRoutes } from "./farms";
+import { handleMeProfilePatch, handleRootEconomyRoutes } from "./root-economy";
 import { handleBusinessRoutes, handleBusinessAuthEntitlement, bmWipeOwnedRows } from "./business-mobile";
 import { handleFeedbackRoute } from "./feedback-route";
 import { performAccountDeletion } from "./account-deletion";
@@ -34,6 +36,7 @@ import { handleSolanaSiteLogRoute } from "./solana-site-log";
 import { handleSolanaSiteTokenDiscordNotifyRoute } from "./solana-site-token-discord-notify";
 import { maybeForwardSolanaToolsApi } from "./solana-tools-forward";
 import { handleSolanaAppActivityRoute } from "./solana-app-activity";
+import { handleAppSessionStartRoute } from "./app-session-notify";
 import { handleSolanaLinkedWalletRoute } from "./solana-linked-wallet";
 import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
 import {
@@ -50,7 +53,7 @@ import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./devel
 import { handleDiscordUserActivityGet } from "./discord-user-activity";
 import { handleDiscordChannelBackfillPost } from "./discord-channel-backfill";
 import { handleDiscordActivityDailyGet, handleDiscordActivityDailyRebuildPost } from "./discord-activity-stats";
-import { discordLinkCallback, discordLinkStart } from "./discord-account-link";
+import { discordLinkCallback, discordLinkStart, discordUnlink } from "./discord-account-link";
 import { handleDiscordInteractions } from "./discord-root-units";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
@@ -478,6 +481,10 @@ export async function handleRequest(
 
     }
 
+    if (method === "PATCH" && pathname === "/v1/me/profile") {
+      return handleMeProfilePatch(request, env);
+    }
+
     if (pathname === "/v1/me/linked-wallet") {
 
       return handleSolanaLinkedWalletRoute(request, env, method);
@@ -637,11 +644,19 @@ export async function handleRequest(
         const site = String(env.SITE_URL || "https://rootrecord.info")
           .trim()
           .replace(/\/+$/, "");
-        return Response.redirect(`${site}/account.html?discord=signin`, 302);
+        const flow = String(startUrl.searchParams.get("flow") || "").trim().toLowerCase();
+        const path = flow === "verify" ? "/discord-verify" : "/account";
+        return Response.redirect(`${site}${path}?discord=signin`, 302);
       }
 
       return discordLinkStart({ request, env, accountId: sess.accountId });
 
+    }
+
+    if (method === "DELETE" && pathname === "/v1/discord/link") {
+      const sess = await sessionFromRequest(env, request);
+      if (!sess) return json({ detail: "Unauthorized" }, 401);
+      return discordUnlink({ env, accountId: sess.accountId });
     }
 
     if (method === "GET" && pathname === "/v1/discord/oauth/callback") {
@@ -666,6 +681,14 @@ export async function handleRequest(
       return handleDiscordInteractions(request, env, ctx);
     }
 
+    if (method === "GET" && pathname === "/v1/economy/leaderboard") {
+      const economyRes = await handleRootEconomyRoutes(request, env, pathname, method);
+      if (economyRes) return economyRes;
+    }
+
+    if (method === "PATCH" && pathname === "/v1/me/profile") {
+      return handleMeProfilePatch(request, env);
+    }
 
     return json({ ok: false, error: "not_found" }, 404);
 
@@ -1165,6 +1188,13 @@ export async function handleRequest(
 
   if (prefsRes) return prefsRes;
 
+  const economyRes = await handleRootEconomyRoutes(request, env, sub, method);
+  if (economyRes) return economyRes;
+
+  const farmsRes = await handleFarmsRoutes(request, env, sub, method);
+
+  if (farmsRes) return farmsRes;
+
   const earnRes = await handleEarnRoutes(request, env, sub, method);
 
   if (earnRes) return earnRes;
@@ -1185,6 +1215,10 @@ export async function handleRequest(
   const solAppActivityRes = await handleSolanaAppActivityRoute(request, env, sub, method);
 
   if (solAppActivityRes) return solAppActivityRes;
+
+  const appSessionRes = await handleAppSessionStartRoute(request, env, sub, method);
+
+  if (appSessionRes) return appSessionRes;
 
   const solRes = await handleSolanaInternalWalletRoutes(request, env, sub, method);
 

@@ -6,7 +6,7 @@ type SiteConfigEnv = {
 
 export const onRequestGet = async (context: { request: Request; env: SiteConfigEnv }) => {
   const origin = new URL(context.request.url).origin;
-  // Account portal calls /v1/* on this same origin; `functions/v1/[[path]].ts` proxies `/v1/auth/*` to the account Worker and other `/v1/*` to `ROOTRECORD_API_BASE`.
+  // Account portal calls /v1/* on this same origin; `functions/v1/[[path]].ts` proxies portal routes (auth, me, discord, …) to the account Worker.
   // Returning the worker URL here caused fetch() to fail when *.workers.dev is blocked (common on mobile).
   const apiBase = origin.replace(/\/+$/, "");
   const stripePricingTableId = String(context.env.STRIPE_PRICING_TABLE_ID || "").trim();

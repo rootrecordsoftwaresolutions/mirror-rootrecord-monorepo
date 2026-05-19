@@ -255,6 +255,7 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
 
   const sp = new URL(request.url).searchParams;
   const appId = normalizeAppId(sp.get("app_id") || undefined, "rootrecord_weather_manager_android");
+  const skipCustodialRefresh = sp.get("custodial_refresh") === "0" || sp.get("light") === "1";
   const balance = await getBalance(env.DB, userId);
   const appDay = await getAppDay(env.DB, userId, appId, ymd);
 
@@ -309,7 +310,7 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
   let custodial_sum_ledger_and_wallet_units = 0;
   let rrtt_wallet_whole_units: number | null = null;
   try {
-    if (env.JWT_SECRET) {
+    if (env.JWT_SECRET && !skipCustodialRefresh) {
       const sess = await sessionFromRequest(env, request);
       if (sess) {
         // `/auth/me` refreshes this cache in `waitUntil` (after respond), so mobile often loaded
@@ -404,6 +405,10 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
       total_rewards_units: balance,
       /** Same balance as `total_rewards_units`; preferred display name “Root Units”. */
       root_units: balance,
+      /** Full D1 ledger — same as Discord `/bal`. Not `custodial_pending_units` (balance − sent). */
+      root_units_balance: balance,
+      /** Spendable ledger in D1 — use this (not `balance_display`) for farms, account portal, purchases. */
+      ledger_balance: balance,
       signup_bonus: {
         one_time_across_apps: true,
         program_units: SIGNUP_BONUS_UNITS,

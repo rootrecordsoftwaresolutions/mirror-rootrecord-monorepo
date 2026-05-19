@@ -1,0 +1,8 @@
+{
+  "appId": "com.rootrecord.rootunits",
+  "appName": "Root Units Idle Farmer",
+  "webDir": "../../Web/apps/root-farms-mobile-web/build",
+  "server": {
+    "androidScheme": "https"
+  }
+}

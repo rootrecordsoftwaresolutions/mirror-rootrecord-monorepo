@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-5FWZH64B');</script>
+  <!-- End Google Tag Manager -->
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord verification &mdash; RootRecord</title>
+  <meta name="description" content="Link your RootRecord account to Discord for @Verified in the RootRecord server and Root Units slash commands.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..600,30..100;1,9..144,300..600,30..100&family=Geist:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#081C2B">
+  <link rel="canonical" href="https://rootrecord.info/discord-verify">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="RootRecord">
+  <meta property="og:title" content="Discord verification &mdash; RootRecord">
+  <meta property="og:description" content="Verify your RootRecord account with Discord for @Verified and /bal /send.">
+  <meta property="og:url" content="https://rootrecord.info/discord-verify">
+  <link rel="stylesheet" href="/styles.css?v=10">
+</head>
+<body data-account-page="discord-verify">
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5FWZH64B" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <div class="site">
+    <header class="site-header">
+      <div class="container site-header-inner">
+        <a class="brand" href="/"><img class="brand-mark" src="/favicon-180.png" alt="RootRecord logo" width="32" height="32">RootRecord</a>
+        <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" onclick="document.querySelector('.site-nav').classList.toggle('is-open');this.setAttribute('aria-expanded', this.getAttribute('aria-expanded')==='true'?'false':'true');">Menu</button>
+        <nav class="site-nav">
+          <a href="/">Home</a>
+          <a href="/products.html">Products</a>
+          <a href="/account.html">Account</a>
+          <a href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener">Discord</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="site-main">
+      <section class="page-header">
+        <div class="container">
+          <div class="page-header-inner">
+            <p class="breadcrumb"><a href="/account.html">Account</a> / Discord</p>
+            <h1 class="page-title">Discord <em>verification</em>.</h1>
+            <p class="page-lead">Sign in or create a <strong>rootrecord.info</strong> account, then authorize Discord. We link your account and assign <strong>@Verified</strong> in the RootRecord server when you are a member.</p>
+            <ol class="note" style="margin:1rem 0 0;padding-left:1.25rem;line-height:1.6">
+              <li>Sign in or create an account (same email as everywhere on RootRecord).</li>
+              <li>Click <strong>Verify with Discord</strong> and approve the connection.</li>
+              <li>Join the <a href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener" style="color:var(--moss)">RootRecord Discord</a> first if you are not in the server yet.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" style="padding-top:0">
+        <div class="container">
+          <div class="account-wrap">
+            <p id="status" class="status" role="status" data-testid="discord-verify-status"></p>
+
+            <section id="panel-loading" class="card-plain" hidden>
+              <p style="margin:0;color:var(--ink-muted)">Loading&hellip;</p>
+            </section>
+
+            <section id="panel-verify-forms" class="card-plain" hidden data-testid="discord-verify-forms">
+              <h2>Step 1 — Your RootRecord account</h2>
+              <p class="note">New here? <a href="/account-signup.html?return=/discord-verify" style="color:var(--moss)">Create an account</a>, then return here.</p>
+              <form id="form-login" class="stack-form" data-testid="discord-verify-login-form">
+                <label>Email <input type="email" id="login-email" name="email" autocomplete="username" required></label>
+                <label>Password <input type="password" id="login-password" name="password" autocomplete="current-password" required></label>
+                <button type="submit" class="btn btn-primary">Sign in and continue</button>
+              </form>
+            </section>
+
+            <section id="panel-verify-action" class="card-plain" hidden data-testid="discord-verify-action">
+              <h2>Step 2 — Link Discord</h2>
+              <p class="note" id="verify-signed-in-as" style="margin-top:0"></p>
+              <p class="note" id="discord-link-status" style="margin-top:0.5rem">Not linked.</p>
+              <p class="account-discord-actions" style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem">
+                <button type="button" class="btn btn-primary" id="btn-discord-link" data-testid="btn-discord-verify">Verify with Discord</button>
+                <button type="button" class="btn btn-ghost" id="btn-discord-unlink" data-testid="btn-discord-unlink" hidden>Unlink Discord</button>
+              </p>
+              <p style="margin-top:1rem;margin-bottom:0">
+                <button type="button" class="btn btn-ghost" id="btn-logout" data-testid="discord-verify-logout">Sign out</button>
+                <a class="btn btn-ghost" href="/account.html" style="margin-left:0.35rem">Account settings</a>
+              </p>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-bottom">
+          <span>&copy; <span id="yr">2026</span> RootRecord</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+  <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+  <script src="/site-nav.js?v=5" defer></script>
+  <script src="/account.js?v=34" defer></script>
+</body>
+</html>
+

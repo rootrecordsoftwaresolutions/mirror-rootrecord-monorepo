@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-store, max-age=0, must-revalidate">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kīlauea eruption summary</title>
+  <meta name="description" content="Kīlauea fountain-height timeline (broadcast-style board).">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#050505">
+  <style>
+    :root {
+      --lava-red: #ff3300;
+      --magma-orange: #ffcc00;
+      --pause-blue: #00ccff;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: #000;
+      font-family: Inter, system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+
+    #app {
+      position: relative;
+      background: #050505;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #ash-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .magma-glow {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(255, 51, 0, 0.14), transparent 55%);
+      pointer-events: none;
+    }
+
+    #sexy-dashboard {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      padding: clamp(16px, 3vw, 40px);
+      box-sizing: border-box;
+    }
+
+    .broadcast-header { margin-bottom: 10px; }
+
+    .h-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .h-left { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+    .status-pulse {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--lava-red);
+      box-shadow: 0 0 12px var(--lava-red);
+      animation: blink 1.2s infinite;
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+    .h-left .status-row { display: flex; align-items: flex-start; gap: 10px; }
+
+    .magma-title {
+      margin: 0;
+      font-size: clamp(1.75rem, 5vw, 4.5rem);
+      font-family: Oswald, sans-serif;
+      font-weight: 700;
+      line-height: 1.05;
+      background: linear-gradient(-90deg, #ffcc00, #ff3300, #ffcc00);
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: magmaFlow 6s ease infinite;
+    }
+
+    @keyframes magmaFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .date-range {
+      font-size: clamp(0.95rem, 2.2vw, 1.8rem);
+      color: #888;
+      letter-spacing: clamp(2px, 0.4vw, 5px);
+      font-weight: 300;
+      margin-top: -2px;
+    }
+    .date-range .arrow { color: var(--lava-red); font-weight: 900; }
+
+    .h-right {
+      text-align: right;
+      font-family: Oswald, sans-serif;
+      flex-shrink: 0;
+    }
+    .clock-display {
+      font-size: clamp(1.5rem, 4vw, 3rem);
+      color: #fff;
+      line-height: 1;
+      margin-bottom: 5px;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+    }
+    .date-display {
+      font-size: clamp(0.85rem, 1.6vw, 1.2rem);
+      color: var(--magma-orange);
+      letter-spacing: 2px;
+    }
+
+    .broadcast-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem 1.5rem;
+      margin-top: 12px;
+      font-size: clamp(11px, 1.2vw, 13px);
+      color: #777;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+    .broadcast-legend span { display: inline-flex; align-items: center; gap: 8px; }
+    .broadcast-legend .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      font-style: normal;
+    }
+    .broadcast-legend .dot.height {
+      background: linear-gradient(90deg, var(--lava-red), var(--magma-orange));
+    }
+    .broadcast-legend .dot.pause { background: var(--pause-blue); }
+
+    #broadcast-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+      gap: 10px;
+      flex: 1;
+      align-content: start;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .card-ep {
+      color: #ff3300;
+      font-weight: 900;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+    .card-stamp {
+      color: #888;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-align: right;
+    }
+    .card-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .card-meta-val {
+      color: #c4c4c8;
+      font-weight: 600;
+      margin-top: 1px;
+    }
+    .card-pause-line {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--pause-blue);
+      font-weight: 700;
+    }
+    .card-notes {
+      margin-top: 8px;
+      font-size: 10px;
+      line-height: 1.4;
+      color: #7d7d84;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4;
+      overflow: hidden;
+    }
+
+    button.sexy-card {
+      display: block;
+      width: 100%;
+      margin: 0;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .sexy-card {
+      background: rgba(15, 15, 15, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 12px;
+      transition: border-color 0.3s, transform 0.3s;
+      animation: fadeIn 0.4s ease backwards;
+    }
+    .sexy-card:hover {
+      border-color: rgba(255, 204, 0, 0.35);
+    }
+    .sexy-card:focus {
+      outline: none;
+    }
+    .sexy-card:focus-visible {
+      outline: 2px solid var(--magma-orange);
+      outline-offset: 2px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .label {
+      font-size: 0.6rem;
+      color: #555;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: -2px;
+    }
+
+    .s-height {
+      font-family: Oswald, sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.25rem, 2.5vw, 2.1rem);
+      color: var(--magma-orange);
+      line-height: 0.95;
+    }
+
+    .fill-h {
+      height: 100%;
+      background: linear-gradient(90deg, var(--lava-red), var(--magma-orange));
+      animation: pulseHeight 2s infinite alternate;
+    }
+
+    @keyframes pulseHeight {
+      from { filter: brightness(1); }
+      to { filter: brightness(1.35); }
+    }
+
+    .broadcast-footer {
+      border-top: 2px solid #333;
+      padding-top: clamp(12px, 2vw, 20px);
+      margin-top: auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px 20px;
+      font-size: clamp(0.85rem, 1.6vw, 1.4rem);
+      color: #888;
+    }
+
+    .footer-left, .footer-right { display: flex; flex-wrap: wrap; gap: clamp(12px, 3vw, 40px); }
+    .footer-left { flex: 1 1 200px; }
+    .footer-right { flex: 1 1 200px; justify-content: flex-end; }
+
+    .live-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      background: #ff3300;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    .kr-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      box-sizing: border-box;
+    }
+    .kr-modal[hidden] { display: none !important; }
+
+    .kr-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(6px);
+    }
+
+    .kr-modal-panel {
+      position: relative;
+      width: min(640px, 100%);
+      max-height: min(88vh, 900px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(165deg, #141414 0%, #0a0a0a 100%);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 51, 0, 0.08);
+    }
+
+    .kr-modal-head {
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    .kr-modal-title {
+      margin: 0;
+      font-family: Oswald, sans-serif;
+      font-weight: 700;
+      font-size: 1.35rem;
+      line-height: 1.15;
+      letter-spacing: 0.02em;
+      color: #fff;
+    }
+    .kr-modal-sub {
+      margin: 6px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--lava-red);
+    }
+
+    .kr-modal-close {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      margin: -6px -8px 0 0;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: #888;
+      font-size: 1.75rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .kr-modal-close:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .kr-modal-body {
+      flex: 1;
+      overflow: auto;
+      padding: 16px 20px 22px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: #c8c8cc;
+    }
+
+    .kr-modal-lead {
+      margin: 0 0 16px;
+      color: #ddd;
+    }
+
+    .kr-dl {
+      margin: 0 0 18px;
+      padding: 14px 14px 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .kr-dl-row {
+      display: grid;
+      grid-template-columns: minmax(0, 42%) 1fr;
+      gap: 6px 14px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .kr-dl-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .kr-dl-row:first-child { padding-top: 0; }
+    .kr-dt {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #666;
+    }
+    .kr-dd {
+      margin: 0;
+      font-family: Oswald, sans-serif;
+      font-size: 1.05rem;
+      color: var(--magma-orange);
+    }
+    .kr-dd-muted { font-size: 13px; color: #888; font-family: Inter, sans-serif; }
+
+    .kr-modal-h3 {
+      margin: 0 0 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #555;
+    }
+
+    .kr-modal-list {
+      margin: 0;
+      padding-left: 1.15rem;
+      color: #a8a8ae;
+    }
+    .kr-modal-list li { margin-bottom: 8px; }
+    .kr-modal-list li:last-child { margin-bottom: 0; }
+
+    .kr-modal-footnote {
+      margin: 18px 0 0;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #5c5c62;
+    }
+    .kr-modal-footnote a { color: #7a9cbd; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="ash-canvas" aria-hidden="true"></canvas>
+    <div class="magma-glow"></div>
+
+    <div id="sexy-dashboard">
+      <div class="broadcast-header">
+        <div class="h-main">
+          <div class="h-left">
+            <div class="status-row">
+              <span class="status-pulse" title="Live layout"></span>
+              <div>
+                <h1 class="magma-title">KĪLAUEA ERUPTION SUMMARY</h1>
+                <div class="date-range">DECEMBER 2024 <span class="arrow">→</span> MAY 2026</div>
+              </div>
+            </div>
+          </div>
+          <div class="h-right">
+            <div id="live-clock" class="clock-display">00:00:00 HST</div>
+            <div class="date-display" id="live-date">—</div>
+          </div>
+        </div>
+
+        <div class="broadcast-legend">
+          <span><i class="dot height"></i> FOUNTAIN MAX</span>
+          <span><i class="dot pause"></i> RECHARGE PAUSE</span>
+          <span style="margin-left:auto;color:#666;font-weight:500;letter-spacing:0.04em">Click a tile for episode details</span>
+        </div>
+      </div>
+
+      <div id="broadcast-grid"></div>
+
+      <div class="broadcast-footer">
+        <div class="footer-left">
+          <div class="f-item">SOURCE: <strong>USGS-HVO</strong></div>
+          <div class="f-item">PEAK: <strong>540m | 1,772ft</strong></div>
+        </div>
+
+        <div class="footer-right">
+          <div class="f-item"><span class="live-dot"></span> STATUS: <strong>ACTIVE MONITORING</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="kr-episode-modal" class="kr-modal" hidden aria-hidden="true">
+    <div class="kr-modal-backdrop" id="kr-modal-backdrop" tabindex="-1"></div>
+    <div class="kr-modal-panel" role="dialog" aria-modal="true" aria-labelledby="kr-modal-title">
+      <div class="kr-modal-head">
+        <div>
+          <p class="kr-modal-sub" id="kr-modal-sub">Episode</p>
+          <h2 class="kr-modal-title" id="kr-modal-title">Details</h2>
+        </div>
+        <button type="button" class="kr-modal-close" id="kr-modal-close" aria-label="Close details">&times;</button>
+      </div>
+      <div class="kr-modal-body" id="kr-modal-body"></div>
+    </div>
+  </div>
+
+  <script src="episodes-data.js"></script>
+  <script>
+(function () {
+  var eruptionData = window.KilaueaEpisodes;
+  if (!Array.isArray(eruptionData) || eruptionData.length === 0) return;
+
+  const gridEl = document.getElementById('broadcast-grid');
+  const MAX_H = 540;
+  const HST_OPTS = { timeZone: 'Pacific/Honolulu' };
+
+  function updateClock() {
+    const now = new Date();
+    const hstTime = now.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      ...HST_OPTS
+    });
+    const hstDate = now.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      ...HST_OPTS
+    }).toUpperCase();
+    document.getElementById('live-clock').textContent = hstTime + ' HST';
+    document.getElementById('live-date').textContent = hstDate;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  const canvas = document.getElementById('ash-canvas');
+  const ctx = canvas.getContext('2d');
+  const particles = [];
+  let cw = 0;
+  let ch = 0;
+
+  function resizeCanvas() {
+    const app = document.getElementById('app');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cw = Math.max(1, Math.floor(app.clientWidth));
+    ch = Math.max(1, Math.floor(app.clientHeight));
+    canvas.width = Math.floor(cw * dpr);
+    canvas.height = Math.floor(ch * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    particles.forEach(function (p) {
+      p.x = Math.min(p.x, cw);
+      p.y = Math.min(Math.max(p.y, -10), ch + 10);
+    });
+  }
+
+  class Particle {
+    constructor() { this.reset(true); }
+    reset(initial) {
+      this.x = Math.random() * cw || Math.random() * 400;
+      this.y = initial ? Math.random() * ch : ch + 10;
+      this.speed = Math.random() * 1.5 + 0.5;
+      this.size = Math.random() * 2 + 0.5;
+      this.opacity = Math.random() * 0.4 + 0.1;
+    }
+    update() {
+      this.y -= this.speed;
+      this.x += Math.sin(this.y / 60);
+      if (this.y < -10) this.reset(false);
+    }
+    draw() {
+      ctx.fillStyle = 'rgba(255, 100, 0, ' + this.opacity + ')';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  const particleCap = window.innerWidth < 640 ? 40 : 80;
+  resizeCanvas();
+  window.addEventListener('resize', function () {
+    resizeCanvas();
+  });
+  for (let i = 0; i < particleCap; i++) particles.push(new Particle());
+
+  function animate() {
+    ctx.clearRect(0, 0, cw, ch);
+    particles.forEach(function (p) { p.update(); p.draw(); });
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  var modalEl = document.getElementById('kr-episode-modal');
+  var modalBody = document.getElementById('kr-modal-body');
+  var modalTitle = document.getElementById('kr-modal-title');
+  var modalSub = document.getElementById('kr-modal-sub');
+  var modalClose = document.getElementById('kr-modal-close');
+  var modalBackdrop = document.getElementById('kr-modal-backdrop');
+  var lastFocusEl = null;
+
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function truncNotes(s, n) {
+    s = String(s || '').replace(/\s+/g, ' ').trim();
+    if (s.length <= n) return s;
+    return s.slice(0, n - 1).trim() + '\u2026';
+  }
+
+  var USGS_ERUPTION_INFO = 'https://www.usgs.gov/volcanoes/kilauea/science/eruption-information';
+
+  function openEpisodeModal(d, trigger) {
+    lastFocusEl = trigger || null;
+    var feet = Math.round(d.h * 3.28084);
+    var pct = Math.round((d.h / MAX_H) * 100);
+    modalSub.textContent = 'USGS episode ' + d.ep;
+    modalTitle.textContent = d.stamp + ' · Halemaʻumaʻu fountains';
+
+    var heightExtra = '';
+    if (d.heightNote) {
+      heightExtra = '<div class="kr-dd-muted" style="margin-top:6px;font-size:12px;line-height:1.4">' + escHtml(d.heightNote) + '</div>';
+    }
+
+    var ctxHtml = '';
+    if (d.ctx && d.ctx.length) {
+      ctxHtml = '<h3 class="kr-modal-h3">Related USGS reporting</h3><ul class="kr-modal-list">' +
+        d.ctx.map(function (x) { return '<li>' + escHtml(x) + '</li>'; }).join('') +
+        '</ul>';
+    }
+
+    modalBody.innerHTML =
+      '<p class="kr-modal-lead">Started <strong>' + escHtml(d.startHST) + '</strong>; paused by <strong>' + escHtml(d.endHST) + '</strong> (Hawaiʻi Standard Time), per the preliminary episode table.</p>' +
+      '<div class="kr-dl">' +
+      '<div class="kr-dl-row"><div class="kr-dt">Episode</div><p class="kr-dd">' + escHtml(String(d.ep)) + '</p></div>' +
+      '<div class="kr-dl-row"><div class="kr-dt">Max fountain height</div><div><p class="kr-dd" style="margin:0">' + escHtml(String(d.h)) + ' m <span class="kr-dd-muted">(~' + feet + ' ft)</span></p>' + heightExtra + '</div></div>' +
+      '<div class="kr-dl-row"><div class="kr-dt">Lava volume</div><p class="kr-dd">' + escHtml(String(d.volMm3)) + ' <span class="kr-dd-muted">million m\u00B3 (approx.)</span></p></div>' +
+      '<div class="kr-dl-row"><div class="kr-dt">Fountaining span</div><p class="kr-dd">' + escHtml(d.eruptDur) + '</p></div>' +
+      '<div class="kr-dl-row"><div class="kr-dt">Pause after episode</div><p class="kr-dd">' + escHtml(d.pauseAfter) + '</p></div>' +
+      '<div class="kr-dl-row"><div class="kr-dt">Relative scale</div><p class="kr-dd">' + pct + '% <span class="kr-dd-muted">of ~540 m summit record (this sequence)</span></p></div>' +
+      '</div>' +
+      '<h3 class="kr-modal-h3">Venting summary</h3>' +
+      '<p style="margin:0 0 14px;color:#b8b8bf;font-size:13px;line-height:1.55">' + escHtml(d.notes) + '</p>' +
+      ctxHtml +
+      '<p class="kr-modal-footnote">Values follow the USGS Hawaiian Volcano Observatory &ldquo;Timeline of Eruptive Episodes&rdquo; (preliminary / subject to revision). Confirm updates and hazards on <a href="' + USGS_ERUPTION_INFO + '" target="_blank" rel="noopener">USGS Kīlauea eruption information</a>.</p>';
+
+    modalEl.hidden = false;
+    modalEl.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    modalClose.focus();
+  }
+
+  function closeEpisodeModal() {
+    modalEl.hidden = true;
+    modalEl.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    if (lastFocusEl && typeof lastFocusEl.focus === 'function') lastFocusEl.focus();
+    lastFocusEl = null;
+  }
+
+  modalClose.addEventListener('click', closeEpisodeModal);
+  modalBackdrop.addEventListener('click', closeEpisodeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modalEl.hidden) {
+      e.preventDefault();
+      closeEpisodeModal();
+    }
+  });
+
+  eruptionData.forEach(function (data, index) {
+    var hWidth = (data.h / MAX_H) * 100;
+    var feet = Math.round(data.h * 3.28084);
+    var notePreview = escHtml(truncNotes(data.notes, 240));
+    var heightWarn = data.heightNote
+      ? '<p style="margin:4px 0 0;font-size:10px;color:#ca8a04;line-height:1.35">' + escHtml(data.heightNote) + '</p>'
+      : '';
+    var card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'sexy-card';
+    card.style.animationDelay = (index * 0.02) + 's';
+    card.setAttribute('aria-haspopup', 'dialog');
+    card.setAttribute('aria-label', 'USGS episode ' + data.ep + ', ' + data.stamp);
+    card.innerHTML =
+      '<div class="card-top">' +
+      '<span class="card-ep">EP ' + data.ep + '</span>' +
+      '<span class="card-stamp">' + escHtml(data.stamp) + '</span>' +
+      '</div>' +
+      '<span class="label">Approx. max fountain</span>' +
+      '<div class="s-height">' + data.h + ' m <span style="font-size:0.85rem;color:#666">' + feet + ' ft</span></div>' +
+      heightWarn +
+      '<div class="card-meta-grid">' +
+      '<div><span class="label">Lava output</span><div class="card-meta-val">' + escHtml(String(data.volMm3)) + ' M m\u00B3</div></div>' +
+      '<div><span class="label">Fountaining</span><div class="card-meta-val">' + escHtml(data.eruptDur) + '</div></div>' +
+      '</div>' +
+      '<div style="margin-top:6px"><span class="label">Intermission after</span><div class="card-pause-line">\uD83D\uDCA4 ' + escHtml(data.pauseAfter) + '</div></div>' +
+      '<div class="card-notes">' + notePreview + '</div>' +
+      '<div style="height:4px;background:#111;margin-top:8px;border-radius:2px;overflow:hidden">' +
+      '<div class="fill-h" style="width:' + hWidth + '%"></div>' +
+      '</div>';
+    card.addEventListener('click', function () {
+      openEpisodeModal(data, card);
+    });
+    gridEl.appendChild(card);
+  });
+})();
+  </script>
+</body>
+</html>

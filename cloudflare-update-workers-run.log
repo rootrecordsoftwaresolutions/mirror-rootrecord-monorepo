@@ -1,0 +1,541 @@
+Log: C:\Users\rrdeveloper\MonoRepo\cloudflare-update-workers.log
+
+================================
+RootRecord Cloudflare - Workers (ALL)
+================================
+Repo: C:\Users\rrdeveloper\MonoRepo
+
+[1/4] shared (node_modules for Web\cloudflare\shared)
+
+added 1 package, and audited 2 packages in 4s
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+[2/4] API shards (weather/business/account/token/kilauea)
+
+========== rootrecord-api-weather ==========
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 112 packages, and audited 113 packages in 2m
+
+17 packages are looking for funding
+  run `npm fund` for details
+
+3 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+ ⛅️ wrangler 4.90.0
+───────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-weather" 
+✨ Success! Uploaded secret JWT_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-weather" 
+✨ Success! Uploaded secret INTERNAL_WALLET_ENC_KEY_B64
+Uploaded INTERNAL_WALLET_ENC_KEY_B64 (custodial Solana wallet encryption).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-weather" 
+✨ Success! Uploaded secret RR_PUSH_ADMIN_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-weather" 
+✨ Success! Uploaded secret STRIPE_SECRET_KEY
+Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-weather" 
+✨ Success! Uploaded secret ACCUWEATHER_API_KEY
+Uploaded ACCUWEATHER_API_KEY to rootrecord-api-weather (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Resource location: remote 
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Total Upload: 1275.29 KiB / gzip: 260.75 KiB
+Worker Startup Time: 31 ms
+Your Worker has access to the following bindings:
+Binding                                                                               Resource                  
+env.EMAIL (unrestricted)                                                              Send Email                
+env.DB (root-record)                                                                  D1 Database               
+env.VOLCANO_PHOTOS (rootrecord-volcano-photos)                                        R2 Bucket                 
+env.WORKER_SHARD ("weather")                                                          Environment Variable      
+env.SITE_URL ("https://rootrecord.info")                                              Environment Variable      
+env.EMAIL_FROM ("RootRecord <root@rootrecord.info>")                                  Environment Variable      
+env.ACCUWEATHER_LANGUAGE ("en-us")                                                    Environment Variable      
+env.WEATHER_DATA_TTL_SEC ("900")                                                      Environment Variable      
+env.ACCUWEATHER_REUSE_RADIUS_MILES ("25")                                             Environment Variable      
+env.STRIPE_PRICE_ID ("price_1TQIpzIaRpbMiAov5g5iTPh9")                                Environment Variable      
+env.STRIPE_PRICING_TABLE_ID ("prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ")                       Environment Variable      
+env.STRIPE_PUBLISHABLE_KEY ("pk_live_51T3sezIaRpbMiAov6SUJgKLGR1ig...")               Environment Variable      
+env.ROOTRECORD_SOLANA_TX_URL ("https://rootrecord-solana-tx.rootreco...")             Environment Variable      
+env.RRTT_MINT_BASE58 ("6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEV...")                     Environment Variable      
+env.RRTT_DECIMALS ("9")                                                               Environment Variable      
+env.CUSTODIAL_RPC_REFRESH_BUDGET_MS ("10000")                                         Environment Variable      
+env.MIN_APP_VERSION_WEATHER ("1.0.16")                                                Environment Variable      
+env.MIN_APP_VERSION_BM ("1.0.0")                                                      Environment Variable      
+env.PLAY_STORE_URL_WEATHER ("https://play.google.com/store/apps/de...")               Environment Variable      
+env.PLAY_STORE_URL_BM ("https://play.google.com/store/apps/de...")                    Environment Variable      
+env.MIN_APP_VERSION_TOKEN_MANAGER ("0.1.0")                                           Environment Variable      
+env.MIN_APP_VERSION_ACCOUNT_HUB ("0.1.1")                                             Environment Variable      
+env.PLAY_STORE_URL_TOKEN_MANAGER ("https://play.google.com/store/apps/de...")         Environment Variable      
+env.PLAY_STORE_URL_ACCOUNT_HUB ("https://play.google.com/store/apps/de...")           Environment Variable      
+
+Uploaded rootrecord-api-weather (20.77 sec)
+Deployed rootrecord-api-weather triggers (2.24 sec)
+  api-weather.rootrecord.info (custom domain)
+  schedule: */5 * * * *
+Current Version ID: a46d4387-8d60-4d7c-aa68-96bb353c4957
+
+========== rootrecord-api-business ==========
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 112 packages, and audited 113 packages in 2m
+
+17 packages are looking for funding
+  run `npm fund` for details
+
+3 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-business" 
+✨ Success! Uploaded secret JWT_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-business" 
+✨ Success! Uploaded secret INTERNAL_WALLET_ENC_KEY_B64
+Uploaded INTERNAL_WALLET_ENC_KEY_B64 (custodial Solana wallet encryption).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-business" 
+✨ Success! Uploaded secret RR_PUSH_ADMIN_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-business" 
+✨ Success! Uploaded secret STRIPE_SECRET_KEY
+Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Resource location: remote 
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Total Upload: 1202.41 KiB / gzip: 243.40 KiB
+Worker Startup Time: 34 ms
+Your Worker has access to the following bindings:
+Binding                                                                               Resource                  
+env.EMAIL (unrestricted)                                                              Send Email                
+env.DB (root-record)                                                                  D1 Database               
+env.VOLCANO_PHOTOS (rootrecord-volcano-photos)                                        R2 Bucket                 
+env.WORKER_SHARD ("business")                                                         Environment Variable      
+env.SITE_URL ("https://rootrecord.info")                                              Environment Variable      
+env.EMAIL_FROM ("RootRecord <root@rootrecord.info>")                                  Environment Variable      
+env.ACCUWEATHER_LANGUAGE ("en-us")                                                    Environment Variable      
+env.WEATHER_DATA_TTL_SEC ("900")                                                      Environment Variable      
+env.ACCUWEATHER_REUSE_RADIUS_MILES ("25")                                             Environment Variable      
+env.STRIPE_PRICE_ID ("price_1TQIpzIaRpbMiAov5g5iTPh9")                                Environment Variable      
+env.STRIPE_PRICING_TABLE_ID ("prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ")                       Environment Variable      
+env.STRIPE_PUBLISHABLE_KEY ("pk_live_51T3sezIaRpbMiAov6SUJgKLGR1ig...")               Environment Variable      
+env.ROOTRECORD_SOLANA_TX_URL ("https://rootrecord-solana-tx.rootreco...")             Environment Variable      
+env.RRTT_MINT_BASE58 ("6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEV...")                     Environment Variable      
+env.RRTT_DECIMALS ("9")                                                               Environment Variable      
+env.CUSTODIAL_RPC_REFRESH_BUDGET_MS ("10000")                                         Environment Variable      
+env.MIN_APP_VERSION_WEATHER ("1.0.16")                                                Environment Variable      
+env.MIN_APP_VERSION_BM ("1.0.0")                                                      Environment Variable      
+env.PLAY_STORE_URL_WEATHER ("https://play.google.com/store/apps/de...")               Environment Variable      
+env.PLAY_STORE_URL_BM ("https://play.google.com/store/apps/de...")                    Environment Variable      
+env.MIN_APP_VERSION_TOKEN_MANAGER ("0.1.0")                                           Environment Variable      
+env.MIN_APP_VERSION_ACCOUNT_HUB ("0.1.1")                                             Environment Variable      
+env.PLAY_STORE_URL_TOKEN_MANAGER ("https://play.google.com/store/apps/de...")         Environment Variable      
+env.PLAY_STORE_URL_ACCOUNT_HUB ("https://play.google.com/store/apps/de...")           Environment Variable      
+
+Uploaded rootrecord-api-business (10.27 sec)
+Deployed rootrecord-api-business triggers (2.37 sec)
+  api-business.rootrecord.info (custom domain)
+Current Version ID: d35a89fe-dc27-4cd5-b618-e775378587d7
+
+========== rootrecord-api-account ==========
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 112 packages, and audited 113 packages in 41s
+
+17 packages are looking for funding
+  run `npm fund` for details
+
+3 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-account" 
+✨ Success! Uploaded secret JWT_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-account" 
+✨ Success! Uploaded secret INTERNAL_WALLET_ENC_KEY_B64
+Uploaded INTERNAL_WALLET_ENC_KEY_B64 (custodial Solana wallet encryption).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-account" 
+✨ Success! Uploaded secret RR_PUSH_ADMIN_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-account" 
+✨ Success! Uploaded secret DISCORD_CLIENT_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-account" 
+✨ Success! Uploaded secret STRIPE_SECRET_KEY
+Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-account" 
+✨ Success! Uploaded secret DISCORD_BOT_TOKEN
+Uploaded DISCORD_BOT_TOKEN (Discord �+' developer_messages sync).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Resource location: remote 
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.90.0
+───────────────────
+Total Upload: 1528.74 KiB / gzip: 294.94 KiB
+Worker Startup Time: 40 ms
+Your Worker has access to the following bindings:
+Binding                                                                                Resource                  
+env.EMAIL (unrestricted)                                                               Send Email                
+env.DB (root-record)                                                                   D1 Database               
+env.VOLCANO_PHOTOS (rootrecord-volcano-photos)                                         R2 Bucket                 
+env.WORKER_SHARD ("account")                                                           Environment Variable      
+env.SITE_URL ("https://rootrecord.info")                                               Environment Variable      
+env.EMAIL_FROM ("RootRecord <root@rootrecord.info>")                                   Environment Variable      
+env.DISCORD_CLIENT_ID ("1500289560343740566")                                          Environment Variable      
+env.DISCORD_PUBLIC_KEY ("7c708f3b7e1712bb90017ced01ec2d9630406...")                    Environment Variable      
+env.DISCORD_GUILD_ID ("1497039564345442406")                                           Environment Variable      
+env.DISCORD_ACTIVE_LOOKBACK_DAYS ("14")                                                Environment Variable      
+env.DISCORD_VERIFIED_ROLE_ID ("1504042901963804742")                                   Environment Variable      
+env.DISCORD_DEVELOPER_ROLE_ID ("1497040541559558175")                                  Environment Variable      
+env.DISCORD_VERIFIED_CHAT_CHANNEL_ID ("1497039565461000214")                           Environment Variable      
+env.DISCORD_WELCOME_CHANNEL_ID ("1497160346358644767")                                 Environment Variable      
+env.ACCUWEATHER_LANGUAGE ("en-us")                                                     Environment Variable      
+env.WEATHER_DATA_TTL_SEC ("900")                                                       Environment Variable      
+env.ACCUWEATHER_REUSE_RADIUS_MILES ("25")                                              Environment Variable      
+env.STRIPE_PRICE_ID ("price_1TQIpzIaRpbMiAov5g5iTPh9")                                 Environment Variable      
+env.STRIPE_PRICING_TABLE_ID ("prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ")                        Environment Variable      
+env.STRIPE_PUBLISHABLE_KEY ("pk_live_51T3sezIaRpbMiAov6SUJgKLGR1ig...")                Environment Variable      
+env.ROOTRECORD_SOLANA_TX_URL ("https://rootrecord-solana-tx.rootreco...")              Environment Variable      
+env.RRTT_MINT_BASE58 ("6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEV...")                      Environment Variable      
+env.RRTT_DECIMALS ("9")                                                                Environment Variable      
+env.CUSTODIAL_RPC_REFRESH_BUDGET_MS ("10000")                                          Environment Variable      
+env.MIN_APP_VERSION_WEATHER ("1.0.16")                                                 Environment Variable      
+env.MIN_APP_VERSION_BM ("1.0.0")                                                       Environment Variable      
+env.PLAY_STORE_URL_WEATHER ("https://play.google.com/store/apps/de...")                Environment Variable      
+env.PLAY_STORE_URL_BM ("https://play.google.com/store/apps/de...")                     Environment Variable      
+env.MIN_APP_VERSION_TOKEN_MANAGER ("0.1.0")                                            Environment Variable      
+env.MIN_APP_VERSION_ACCOUNT_HUB ("0.1.1")                                              Environment Variable      
+env.PLAY_STORE_URL_TOKEN_MANAGER ("https://play.google.com/store/apps/de...")          Environment Variable      
+env.PLAY_STORE_URL_ACCOUNT_HUB ("https://play.google.com/store/apps/de...")            Environment Variable      
+env.DISCORD_ANNOUNCEMENTS_CHANNEL_ID ("1500286864119038103")                           Environment Variable      
+
+Uploaded rootrecord-api-account (16.86 sec)
+Deployed rootrecord-api-account triggers (1.44 sec)
+  https://rootrecord-api-account.rootrecord.workers.dev
+  schedule: * * * * *
+  schedule: 45 8 * * *
+  schedule: 17 9 * * *
+Current Version ID: 7ae27697-1ec6-4f9c-be9a-b2189ffdba34
+
+========== rootrecord-api-token ==========
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 112 packages, and audited 113 packages in 1m
+
+17 packages are looking for funding
+  run `npm fund` for details
+
+3 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-token" 
+✨ Success! Uploaded secret JWT_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-token" 
+✨ Success! Uploaded secret INTERNAL_WALLET_ENC_KEY_B64
+Uploaded INTERNAL_WALLET_ENC_KEY_B64 (custodial Solana wallet encryption).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-token" 
+✨ Success! Uploaded secret RR_PUSH_ADMIN_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-token" 
+✨ Success! Uploaded secret STRIPE_SECRET_KEY
+Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Resource location: remote 
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Total Upload: 1202.41 KiB / gzip: 243.40 KiB
+Worker Startup Time: 31 ms
+Your Worker has access to the following bindings:
+Binding                                                                               Resource                  
+env.EMAIL (unrestricted)                                                              Send Email                
+env.DB (root-record)                                                                  D1 Database               
+env.VOLCANO_PHOTOS (rootrecord-volcano-photos)                                        R2 Bucket                 
+env.WORKER_SHARD ("token")                                                            Environment Variable      
+env.SITE_URL ("https://rootrecord.info")                                              Environment Variable      
+env.EMAIL_FROM ("RootRecord <root@rootrecord.info>")                                  Environment Variable      
+env.ACCUWEATHER_LANGUAGE ("en-us")                                                    Environment Variable      
+env.WEATHER_DATA_TTL_SEC ("900")                                                      Environment Variable      
+env.ACCUWEATHER_REUSE_RADIUS_MILES ("25")                                             Environment Variable      
+env.STRIPE_PRICE_ID ("price_1TQIpzIaRpbMiAov5g5iTPh9")                                Environment Variable      
+env.STRIPE_PRICING_TABLE_ID ("prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ")                       Environment Variable      
+env.STRIPE_PUBLISHABLE_KEY ("pk_live_51T3sezIaRpbMiAov6SUJgKLGR1ig...")               Environment Variable      
+env.ROOTRECORD_SOLANA_TX_URL ("https://rootrecord-solana-tx.rootreco...")             Environment Variable      
+env.RRTT_MINT_BASE58 ("6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEV...")                     Environment Variable      
+env.RRTT_DECIMALS ("9")                                                               Environment Variable      
+env.CUSTODIAL_RPC_REFRESH_BUDGET_MS ("10000")                                         Environment Variable      
+env.MIN_APP_VERSION_WEATHER ("1.0.16")                                                Environment Variable      
+env.MIN_APP_VERSION_BM ("1.0.0")                                                      Environment Variable      
+env.PLAY_STORE_URL_WEATHER ("https://play.google.com/store/apps/de...")               Environment Variable      
+env.PLAY_STORE_URL_BM ("https://play.google.com/store/apps/de...")                    Environment Variable      
+env.MIN_APP_VERSION_TOKEN_MANAGER ("0.1.0")                                           Environment Variable      
+env.MIN_APP_VERSION_ACCOUNT_HUB ("0.1.1")                                             Environment Variable      
+env.PLAY_STORE_URL_TOKEN_MANAGER ("https://play.google.com/store/apps/de...")         Environment Variable      
+env.PLAY_STORE_URL_ACCOUNT_HUB ("https://play.google.com/store/apps/de...")           Environment Variable      
+
+Uploaded rootrecord-api-token (9.83 sec)
+Deployed rootrecord-api-token triggers (0.95 sec)
+  https://rootrecord-api-token.rootrecord.workers.dev
+Current Version ID: c1ee30ef-63cb-4631-ba09-aed1089e6aff
+
+========== rootrecord-api-kilauea ==========
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 112 packages, and audited 113 packages in 40s
+
+17 packages are looking for funding
+  run `npm fund` for details
+
+3 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-kilauea" 
+✨ Success! Uploaded secret JWT_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-kilauea" 
+✨ Success! Uploaded secret INTERNAL_WALLET_ENC_KEY_B64
+Uploaded INTERNAL_WALLET_ENC_KEY_B64 (custodial Solana wallet encryption).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-kilauea" 
+✨ Success! Uploaded secret RR_PUSH_ADMIN_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-kilauea" 
+✨ Success! Uploaded secret STRIPE_SECRET_KEY
+Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-kilauea" 
+✨ Success! Uploaded secret ACCUWEATHER_API_KEY
+Uploaded ACCUWEATHER_API_KEY to rootrecord-api-kilauea (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-api-kilauea" 
+✨ Success! Uploaded secret DISCORD_KILAUEA_USGS_WEBHOOK_URL
+Uploaded DISCORD_KILAUEA_USGS_WEBHOOK_URL to rootrecord-api-kilauea (from credentials.env).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Resource location: remote 
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Total Upload: 1285.42 KiB / gzip: 263.22 KiB
+Worker Startup Time: 48 ms
+Your Worker has access to the following bindings:
+Binding                                                                               Resource                  
+env.EMAIL (unrestricted)                                                              Send Email                
+env.DB (root-record)                                                                  D1 Database               
+env.VOLCANO_PHOTOS (rootrecord-volcano-photos)                                        R2 Bucket                 
+env.WORKER_SHARD ("kilauea")                                                          Environment Variable      
+env.SITE_URL ("https://rootrecord.info")                                              Environment Variable      
+env.EMAIL_FROM ("RootRecord <root@rootrecord.info>")                                  Environment Variable      
+env.ACCUWEATHER_LANGUAGE ("en-us")                                                    Environment Variable      
+env.WEATHER_DATA_TTL_SEC ("900")                                                      Environment Variable      
+env.ACCUWEATHER_REUSE_RADIUS_MILES ("25")                                             Environment Variable      
+env.STRIPE_PRICE_ID ("price_1TQIpzIaRpbMiAov5g5iTPh9")                                Environment Variable      
+env.STRIPE_PRICING_TABLE_ID ("prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ")                       Environment Variable      
+env.STRIPE_PUBLISHABLE_KEY ("pk_live_51T3sezIaRpbMiAov6SUJgKLGR1ig...")               Environment Variable      
+env.ROOTRECORD_SOLANA_TX_URL ("https://rootrecord-solana-tx.rootreco...")             Environment Variable      
+env.RRTT_MINT_BASE58 ("6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEV...")                     Environment Variable      
+env.RRTT_DECIMALS ("9")                                                               Environment Variable      
+env.CUSTODIAL_RPC_REFRESH_BUDGET_MS ("10000")                                         Environment Variable      
+env.MIN_APP_VERSION_WEATHER ("1.0.16")                                                Environment Variable      
+env.MIN_APP_VERSION_BM ("1.0.0")                                                      Environment Variable      
+env.PLAY_STORE_URL_WEATHER ("https://play.google.com/store/apps/de...")               Environment Variable      
+env.PLAY_STORE_URL_BM ("https://play.google.com/store/apps/de...")                    Environment Variable      
+env.MIN_APP_VERSION_TOKEN_MANAGER ("0.1.0")                                           Environment Variable      
+env.MIN_APP_VERSION_ACCOUNT_HUB ("0.1.1")                                             Environment Variable      
+env.PLAY_STORE_URL_TOKEN_MANAGER ("https://play.google.com/store/apps/de...")         Environment Variable      
+env.PLAY_STORE_URL_ACCOUNT_HUB ("https://play.google.com/store/apps/de...")           Environment Variable      
+
+Uploaded rootrecord-api-kilauea (14.00 sec)
+Deployed rootrecord-api-kilauea triggers (1.03 sec)
+  https://rootrecord-api-kilauea.rootrecord.workers.dev
+  schedule: */10 * * * *
+Current Version ID: e5fa39ff-04f8-401c-95cf-e55cc2f82775
+
+All API shards deployed.
+[3/4] rootrecord-license
+
+added 37 packages, and audited 38 packages in 16s
+
+7 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Resource location: remote 
+
+✅ No migrations to apply!
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-license" 
+✨ Success! Uploaded secret JWT_SECRET
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-license" 
+✨ Success! Uploaded secret STRIPE_SECRET_KEY
+Uploaded STRIPE_SECRET_KEY to rootrecord-license (webhook subscription/invoice handlers).
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+🌀 Creating the secret for the Worker "rootrecord-license" 
+✨ Success! Uploaded secret STRIPE_WEBHOOK_SECRET
+Uploaded STRIPE_WEBHOOK_SECRET. Stripe webhook: https://rootrecord-license.rootrecord.workers.dev/v1/billing/webhook
+
+ ⛅️ wrangler 4.90.0 (update available 4.92.0)
+─────────────────────────────────────────────
+Total Upload: 62.84 KiB / gzip: 15.96 KiB
+Your Worker has access to the following bindings:
+Binding                                                                       Resource                  
+env.DB (root-record)                                                          D1 Database               
+env.CORS_ALLOW_ORIGIN ("*")                                                   Environment Variable      
+env.STRIPE_PRICING_TABLE_ID ("prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ")               Environment Variable      
+env.STRIPE_PUBLISHABLE_KEY ("pk_live_51T3sezIaRpbMiAov6SUJgKLGR1ig...")       Environment Variable      
+
+Uploaded rootrecord-license (3.15 sec)
+Deployed rootrecord-license triggers (1.05 sec)
+  https://rootrecord-license.rootrecord.workers.dev
+Current Version ID: eaff3191-a398-430a-aae5-a15020055418
+Done. rootrecord-license: https://rootrecord-license.rootrecord.workers.dev
+[4/4] rootrecord-app-build
+npm warn deprecated rollup-plugin-inject@3.0.2: This package has been deprecated and is no longer maintained. Please use @rollup/plugin-inject.
+npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+
+added 60 packages, and audited 61 packages in 18s
+
+5 packages are looking for funding
+  run `npm fund` for details
+
+4 vulnerabilities (3 moderate, 1 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
+
+ ⛅️ wrangler 3.114.17 (update available 4.92.0)
+-----------------------------------------------
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+
+  Please update to the latest version to prevent critical errors.
+  Run `npm install --save-dev wrangler@4` to update to the latest version.
+  After installation, run Wrangler with `npx wrangler`.
+
+
+Total Upload: 10.54 KiB / gzip: 3.12 KiB
+No bindings found.
+Uploaded rootrecord-app-build (2.26 sec)
+Deployed rootrecord-app-build triggers (0.20 sec)
+  https://rootrecord-app-build.rootrecord.workers.dev
+Current Version ID: cf5dc1d6-29a3-44e2-a537-98d5dd58f5ba
+Done. rootrecord-app-build: https://rootrecord-app-build.rootrecord.workers.dev
+
+Workers done.
+Press any key to continue . . . 

@@ -608,6 +608,7 @@ export async function authMe(
       rootrecord_business_manager_android: { associated: false, last_connected_at: null },
       rootrecord_weather_manager_windows: { associated: false, last_connected_at: null },
       rootrecord_weather_manager_android: { associated: false, last_connected_at: null },
+      usage: [],
       signals: { mobile_push: false, saved_locations: false, weather_cache: false },
     };
   }
@@ -693,6 +694,14 @@ export async function authMe(
     discord_global_name: null,
   }));
 
+  let public_display_name: string | null = null;
+  try {
+    const { readPublicDisplayName } = await import("./root-economy");
+    public_display_name = await readPublicDisplayName(env.DB, sess.accountId);
+  } catch {
+    /* column may be missing until migration */
+  }
+
   return json(
 
     {
@@ -702,6 +711,8 @@ export async function authMe(
       email: sess.email,
 
       account_id: sess.accountId,
+
+      public_display_name,
 
       has_password: true,
 

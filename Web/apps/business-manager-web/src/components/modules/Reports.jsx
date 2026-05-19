@@ -6,7 +6,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { api } from "../../lib/api";
 import { ScreenHeader, PageContainer, Spinner, Empty, Toast, useToast } from "../ui/Shell";
-import { fmtMoney, fmtHours, fmtDateShort, durationHours } from "../../lib/format";
+import { fmtMoney, fmtMoneyCompact, fmtHours, fmtDateShort, durationHours } from "../../lib/format";
 import { rechartsTooltipProps } from "../../lib/rechartsTooltipProps";
 import { Download, FileText } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
@@ -743,9 +743,9 @@ export default function Reports() {
               <>
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <Mini label="Hours" value={fmtHours(data.hours)} />
-                  <Mini label="Net" value={fmtMoney(data.net_cents)} accent={data.net_cents >= 0 ? "income" : "expense"} />
-                  <Mini label="Income" value={fmtMoney(data.income_cents)} accent="income" />
-                  <Mini label="Expenses" value={fmtMoney(data.expense_cents)} accent="expense" />
+                  <Mini label="Net" value={fmtMoneyCompact(data.net_cents)} fullValue={fmtMoney(data.net_cents)} accent={data.net_cents >= 0 ? "income" : "expense"} />
+                  <Mini label="Income" value={fmtMoneyCompact(data.income_cents)} fullValue={fmtMoney(data.income_cents)} accent="income" />
+                  <Mini label="Expenses" value={fmtMoneyCompact(data.expense_cents)} fullValue={fmtMoney(data.expense_cents)} accent="expense" />
                 </div>
 
                 {data.breakdown.length > 0 && (
@@ -834,12 +834,14 @@ export default function Reports() {
   );
 }
 
-function Mini({ label, value, accent }) {
+function Mini({ label, value, fullValue, accent }) {
   const color = accent === "income" ? "text-income" : accent === "expense" ? "text-expense" : "text-ink-primary";
   return (
-    <div className="card p-3">
+    <div className="card p-3 min-w-0">
       <p className="text-[10px] uppercase tracking-widest text-ink-tertiary">{label}</p>
-      <p className={`font-heading text-lg font-bold ${color}`}>{value}</p>
+      <p className={`font-heading text-lg font-bold ${color} truncate tabular-nums`} title={fullValue || value}>
+        {value}
+      </p>
     </div>
   );
 }

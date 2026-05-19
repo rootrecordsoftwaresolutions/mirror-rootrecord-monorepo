@@ -25,16 +25,13 @@ function Copy-BuildArtifacts {
         [string]$Version
     )
     $dest = Join-Path $OutRoot $Subfolder
-    New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    $apkDir = Join-Path $AppDir "android\app\build\outputs\apk\release"
-    $aabDir = Join-Path $AppDir "android\app\build\outputs\bundle\release"
-    $apk = Get-ChildItem -LiteralPath $apkDir -Filter "*.apk" -ErrorAction SilentlyContinue | Select-Object -First 1
-    $aab = Get-ChildItem -LiteralPath $aabDir -Filter "*.aab" -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (-not $apk) { throw "No APK in $apkDir" }
-    if (-not $aab) { throw "No AAB in $aabDir" }
-    Copy-Item -LiteralPath $apk.FullName -Destination (Join-Path $dest "$BaseName-$Version.apk") -Force
-    Copy-Item -LiteralPath $aab.FullName -Destination (Join-Path $dest "$BaseName-$Version.aab") -Force
-    Write-Host "Copied $($apk.Name) + $($aab.Name) -> $dest"
+    $stageScript = Join-Path $PSScriptRoot "stage-release-artifacts.ps1"
+    $lines = & powershell -NoProfile -ExecutionPolicy Bypass -File $stageScript `
+        -AppDir $AppDir -DestDir $dest -BaseName $BaseName -Version $Version
+    if ($LASTEXITCODE -ne 0) { throw "stage-release-artifacts.ps1 failed for $Subfolder" }
+    foreach ($line in $lines) {
+        if ($line -match '^(APK|AAB)\|') { Write-Host "  $line" }
+    }
 }
 
 function Invoke-OneApp {
@@ -90,6 +87,7 @@ function Invoke-OneApp {
 }
 
 # Order: smaller apps first (faster feedback), Weather last (Firebase + signing heavier).
+Invoke-OneApp -Subfolder "root-farms"       -WebRel "Web\apps\root-farms-mobile-web" -AppRel "root-farms-app"         -BaseName "RootRecord-RootFarms"       -Version "0.1.0"
 Invoke-OneApp -Subfolder "token-manager"    -WebRel "Web\apps\token-manager-web"    -AppRel "token-manager-app"      -BaseName "RootRecord-TokenManager"    -Version "0.1.1"
 Invoke-OneApp -Subfolder "account-hub"      -WebRel "Web\apps\account-hub-web"      -AppRel "account-hub-app"        -BaseName "RootRecord-AccountHub"      -Version "0.1.2"
 Invoke-OneApp -Subfolder "business-manager" -WebRel "Web\apps\business-manager-web" -AppRel "business-manager-app"   -BaseName "RootRecord-BusinessManager" -Version "1.09"
@@ -109,17 +107,14 @@ function Invoke-KilaueaAlertsNative {
     try {
         & .\gradlew.bat bundleRelease assembleRelease --no-daemon
         if ($LASTEXITCODE -ne 0) { throw "kilauea-alerts-android gradle bundleRelease assembleRelease failed" }
-        $apkDir = Join-Path $proj "app\build\outputs\apk\release"
-        $aabDir = Join-Path $proj "app\build\outputs\bundle\release"
         $dest = Join-Path $OutRoot "kilauea-alerts"
-        New-Item -ItemType Directory -Force -Path $dest | Out-Null
-        $apk = Get-ChildItem -LiteralPath $apkDir -Filter "*.apk" -ErrorAction SilentlyContinue | Select-Object -First 1
-        $aab = Get-ChildItem -LiteralPath $aabDir -Filter "*.aab" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $apk) { throw "No APK in $apkDir" }
-        if (-not $aab) { throw "No AAB in $aabDir" }
-        Copy-Item -LiteralPath $apk.FullName -Destination (Join-Path $dest "RootRecord-Kilauea-Alerts-$Version.apk") -Force
-        Copy-Item -LiteralPath $aab.FullName -Destination (Join-Path $dest "RootRecord-Kilauea-Alerts-$Version.aab") -Force
-        Write-Host "Copied Kilauea Alerts artifacts -> $dest" -ForegroundColor Green
+        $stageScript = Join-Path $PSScriptRoot "stage-release-artifacts.ps1"
+        $lines = & powershell -NoProfile -ExecutionPolicy Bypass -File $stageScript `
+            -AppDir $proj -DestDir $dest -BaseName "RootRecord-Kilauea-Alerts" -Version $Version -Native
+        if ($LASTEXITCODE -ne 0) { throw "stage-release-artifacts.ps1 failed for kilauea-alerts" }
+        foreach ($line in $lines) {
+            if ($line -match '^(APK|AAB)\|') { Write-Host "  $line" }
+        }
     }
     finally {
         Pop-Location

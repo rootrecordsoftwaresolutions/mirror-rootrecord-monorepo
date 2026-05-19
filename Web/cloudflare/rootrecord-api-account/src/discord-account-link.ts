@@ -37,6 +37,40 @@ async function discordGetMe(accessToken: string): Promise<Record<string, unknown
   return j;
 }
 
+const VERIFY_STATE_PREFIX = "v";
+
+function returnPageUrl(site: string, state: string, query?: string): string {
+  const root = String(site || "https://rootrecord.info").trim().replace(/\/+$/, "");
+  const path = state.startsWith(VERIFY_STATE_PREFIX) ? "/discord-verify" : "/account";
+  const base = `${root}${path}`;
+  return query ? `${base}?${query}` : base;
+}
+
+async function discordBotDeleteRole(
+  token: string,
+  guildId: string,
+  userId: string,
+  roleId: string,
+): Promise<void> {
+  const path = `/guilds/${encodeURIComponent(guildId)}/members/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`;
+  const res = await fetch(`https://discord.com/api/v10${path}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bot ${token.trim()}`,
+      "User-Agent": "RootRecordAccountWorker (discord unlink)",
+    },
+  });
+  if (res.status === 204 || res.status === 404) return;
+  const t = await res.text().catch(() => "");
+  console.error(
+    JSON.stringify({
+      msg: "discord_role_remove_http",
+      status: res.status,
+      snippet: t.slice(0, 200),
+    }),
+  );
+}
+
 export type DiscordLinkEnv = {
   DB: D1Database;
   SITE_URL?: string;
@@ -120,7 +154,8 @@ export async function discordLinkStart(params: {
     return json({ detail: "Discord linking is not configured yet." }, 503);
   }
 
-  const state = randState();
+  const flow = String(reqUrl.searchParams.get("flow") || "").trim().toLowerCase();
+  const state = (flow === "verify" ? VERIFY_STATE_PREFIX : "") + randState();
   const created_at = nowIso();
   const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   await params.env.DB.prepare(
@@ -153,8 +188,8 @@ export async function discordLinkCallback(params: {
   const state = String(url.searchParams.get("state") || "").trim();
   const err = String(url.searchParams.get("error") || "").trim();
   const site = String(params.env.SITE_URL || "https://rootrecord.info").trim().replace(/\/+$/, "");
-  if (err) return Response.redirect(`${site}/account.html?discord=error`, 302);
-  if (!code || !state) return Response.redirect(`${site}/account.html?discord=error`, 302);
+  if (err) return Response.redirect(returnPageUrl(site, state, "discord=error"), 302);
+  if (!code || !state) return Response.redirect(returnPageUrl(site, state || "", "discord=error"), 302);
 
   const row = await params.env.DB.prepare(
     "SELECT account_id, expires_at FROM discord_oauth_states WHERE state = ?",
@@ -164,15 +199,15 @@ export async function discordLinkCallback(params: {
 
   await params.env.DB.prepare("DELETE FROM discord_oauth_states WHERE state = ?").bind(state).run();
 
-  if (!row?.account_id) return Response.redirect(`${site}/account.html?discord=expired`, 302);
+  if (!row?.account_id) return Response.redirect(returnPageUrl(site, state, "discord=expired"), 302);
   const expMs = Date.parse(row.expires_at || "");
   if (!Number.isFinite(expMs) || expMs < Date.now()) {
-    return Response.redirect(`${site}/account.html?discord=expired`, 302);
+    return Response.redirect(returnPageUrl(site, state, "discord=expired"), 302);
   }
 
   const cid = String(params.env.DISCORD_CLIENT_ID || "").trim();
   const secret = String(params.env.DISCORD_CLIENT_SECRET || "").trim();
-  if (!cid || !secret) return Response.redirect(`${site}/account.html?discord=error`, 302);
+  if (!cid || !secret) return Response.redirect(returnPageUrl(site, state, "discord=error"), 302);
 
   const redirectUri = `${site}/v1/discord/oauth/callback`;
   const tokenBody = new URLSearchParams();
@@ -184,34 +219,19 @@ export async function discordLinkCallback(params: {
 
   const tok = await stripeFormPost("https://discord.com/api/oauth2/token", tokenBody);
   const accessToken = typeof tok?.access_token === "string" ? tok.access_token : "";
-  if (!accessToken) return Response.redirect(`${site}/account.html?discord=error`, 302);
+  if (!accessToken) return Response.redirect(returnPageUrl(site, state, "discord=error"), 302);
 
   const me = await discordGetMe(accessToken);
   const discord_user_id = typeof me?.id === "string" ? me.id : "";
   const discord_username = typeof me?.username === "string" ? me.username : null;
   const discord_global_name = typeof me?.global_name === "string" ? me.global_name : null;
   const discord_email = typeof me?.email === "string" ? me.email : null;
-  if (!discord_user_id) return Response.redirect(`${site}/account.html?discord=error`, 302);
+  if (!discord_user_id) return Response.redirect(returnPageUrl(site, state, "discord=error"), 302);
 
   const acct = await params.env.DB.prepare("SELECT id, email FROM license_accounts WHERE id = ?")
     .bind(row.account_id)
     .first<{ id: string; email: string }>();
-  if (!acct?.email) return Response.redirect(`${site}/account.html?discord=error`, 302);
-
-  // Assign @Verified role (STRICT when configured).
-  const bot = String(params.env.DISCORD_BOT_TOKEN || "").trim();
-  const guildId = String(params.env.DISCORD_GUILD_ID || "").trim();
-  const roleId = String(params.env.DISCORD_VERIFIED_ROLE_ID || "").trim();
-  const roleStrict = Boolean(guildId && roleId);
-  if (roleStrict) {
-    if (!bot) return Response.redirect(`${site}/account.html?discord=role_config`, 302);
-    const put = await discordBotPutRole(bot, guildId, discord_user_id, roleId);
-    if (!put.ok) {
-      // 404 usually means user isn't in the guild. 403 can mean role hierarchy/perms.
-      const code = put.status === 404 ? "role_join" : put.status === 403 ? "role_forbidden" : "role_error";
-      return Response.redirect(`${site}/account.html?discord=${code}`, 302);
-    }
-  }
+  if (!acct?.email) return Response.redirect(returnPageUrl(site, state, "discord=error"), 302);
 
   const now = nowIso();
   await params.env.DB.prepare(
@@ -238,14 +258,63 @@ export async function discordLinkCallback(params: {
     )
     .run();
 
+  // Assign @Verified when configured (link is already saved so /bal and Account show "linked").
+  const bot = String(params.env.DISCORD_BOT_TOKEN || "").trim();
+  const guildId = String(params.env.DISCORD_GUILD_ID || "").trim();
+  const roleId = String(params.env.DISCORD_VERIFIED_ROLE_ID || "").trim();
+  const roleStrict = Boolean(guildId && roleId);
+  let roleCode: string | null = null;
+  if (roleStrict) {
+    if (!bot) {
+      roleCode = "role_config";
+    } else {
+      const put = await discordBotPutRole(bot, guildId, discord_user_id, roleId);
+      if (!put.ok) {
+        // 404 usually means user isn't in the guild. 403 can mean role hierarchy/perms.
+        roleCode = put.status === 404 ? "role_join" : put.status === 403 ? "role_forbidden" : "role_error";
+      }
+    }
+  }
+
   const chatId = String(params.env.DISCORD_VERIFIED_CHAT_CHANNEL_ID || "").trim();
-  if (bot && chatId) {
+  if (bot && chatId && !roleCode) {
     const p = discordBotPostVerifyChatNotice(bot, chatId, discord_user_id);
     if (params.ctx) params.ctx.waitUntil(p);
     else await p;
   }
 
-  return Response.redirect(`${site}/account.html?discord=linked`, 302);
+  if (roleCode) {
+    return Response.redirect(returnPageUrl(site, state, `discord=linked&role=${roleCode}`), 302);
+  }
+  return Response.redirect(returnPageUrl(site, state, "discord=linked"), 302);
+}
+
+export async function discordUnlink(params: {
+  env: DiscordLinkEnv;
+  accountId: string;
+}): Promise<Response> {
+  const row = await params.env.DB.prepare(
+    "SELECT discord_user_id FROM discord_account_links WHERE account_id = ?",
+  )
+    .bind(params.accountId)
+    .first<{ discord_user_id: string }>();
+
+  if (!row?.discord_user_id) {
+    return json({ ok: true, linked: false }, 200);
+  }
+
+  const bot = String(params.env.DISCORD_BOT_TOKEN || "").trim();
+  const guildId = String(params.env.DISCORD_GUILD_ID || "").trim();
+  const roleId = String(params.env.DISCORD_VERIFIED_ROLE_ID || "").trim();
+  if (bot && guildId && roleId) {
+    await discordBotDeleteRole(bot, guildId, row.discord_user_id, roleId);
+  }
+
+  await params.env.DB.prepare("DELETE FROM discord_account_links WHERE account_id = ?")
+    .bind(params.accountId)
+    .run();
+
+  return json({ ok: true, linked: false }, 200);
 }
 
 export async function readDiscordLink(db: D1Database, accountId: string): Promise<{

@@ -14,7 +14,8 @@ import UpsellModal from './components/UpsellModal';
 import DeveloperMessages from './pages/DeveloperMessages';
 import AlertDetail from './pages/AlertDetail';
 import About from './pages/About';
-import { api, isBackendConfigured, session, tryHydrateSessionFromCookie } from './lib/api';
+import { api, isBackendConfigured, RR_APP_ID, session, tryHydrateSessionFromCookie } from './lib/api';
+import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from '../../shared/accountNotifyApi';
 import { safeSessionStorage } from './lib/storage';
 import useAccess from './lib/useAccess';
 import { refreshSessionAccess } from './lib/tierAccess';
@@ -80,6 +81,19 @@ export default function App() {
   useEffect(() => {
     if (!decided || !authed) return;
     refreshSessionAccess();
+  }, [decided, authed]);
+
+  /** Discord: signed-in session start (account Worker → `DISCORD_APP_SESSION_WEBHOOK_URL`). */
+  useEffect(() => {
+    if (!decided || !authed) return;
+    notifyAppSessionStart({
+      apiOrigin: ROOTRECORD_ACCOUNT_API_ORIGIN,
+      appId: RR_APP_ID,
+      betaTester: false,
+      guestId: session.guestId(),
+      getAuthToken: () => session.getToken(),
+      includeCredentials: !IS_NATIVE,
+    });
   }, [decided, authed]);
 
   /** Best-effort: record latest device coordinates once per app session (MongoDB via FastAPI). */

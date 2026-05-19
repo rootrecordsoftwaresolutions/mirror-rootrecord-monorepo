@@ -57,8 +57,11 @@ Other Workers in `Web/cloudflare/`: `rootrecord-license`, `rootrecord-solana-tx`
 ### Commit + push
 ```
 commit-all.bat
+commit-all.bat your commit message here
 ```
-Stages all changes, commits with prompt or default message, and pushes to `origin`. Run from repo root.
+Stages **all** changes in the monorepo (`git add -A`), commits (default message `chore: sync workspace` if none given), and pushes to `origin`. Run from repo root.
+
+`scripts\commit-all.ps1` **auto-discovers** project roots (`Web\apps\*`, `Mobile\*`, `Web\cloudflare\rootrecord-*`, `Web\main`, `solana-rootrecord-site`, new top-level folders with `package.json`, etc.) and lists which have pending changes before committing. Nested `.git` repos, if present, are committed first.
 
 ### Deploy Cloudflare (Pages + Workers)
 ```

@@ -210,52 +210,39 @@ if ($cfg.native) {
 
 Write-Host ""
 Write-Host "[3/3] Stage APK + AAB" -ForegroundColor Cyan
-if ($cfg.native) {
-    $apkDir = Join-Path $appRoot "app\build\outputs\apk\release"
-    $aabDir = Join-Path $appRoot "app\build\outputs\bundle\release"
-} else {
-    $apkDir = Join-Path $appRoot "android\app\build\outputs\apk\release"
-    $aabDir = Join-Path $appRoot "android\app\build\outputs\bundle\release"
-}
-
-# Hard rule: only accept artifacts from the release/ output dir, with "release" in the filename
-# and no "debug" anywhere. Refuses to ship a debug variant even if one somehow sat in release/.
-function Select-ReleaseArtifact([string]$Dir, [string]$Ext, [string]$Label) {
-    if (-not (Test-Path -LiteralPath $Dir)) { throw "No $Label release output dir: $Dir" }
-    $candidates = Get-ChildItem -LiteralPath $Dir -Filter "*.$Ext" -File -ErrorAction SilentlyContinue
-    $debug = $candidates | Where-Object { $_.Name -match '(?i)debug' }
-    if ($debug) { throw ("$Label release dir contains debug-tagged file(s); refusing to ship: " + ($debug.Name -join ', ')) }
-    $releaseFiles = $candidates | Where-Object { $_.Name -match '(?i)release' }
-    if (-not $releaseFiles) { $releaseFiles = $candidates }
-    $pick = $releaseFiles | Select-Object -First 1
-    if (-not $pick) { throw "No $Label found under $Dir" }
-    return $pick
-}
-
-$apk = Select-ReleaseArtifact $apkDir 'apk' 'APK'
-$aab = Select-ReleaseArtifact $aabDir 'aab' 'AAB'
-
-$apkUnsigned = $apk.Name -match '(?i)unsigned'
-$aabUnsigned = $aab.Name -match '(?i)unsigned'
-
 $dest = Join-Path $OutRoot $cfg.subfolder
-New-Item -ItemType Directory -Force -Path $dest | Out-Null
-$apkSuffix = if ($apkUnsigned) { "-unsigned.apk" } else { ".apk" }
-$aabSuffix = if ($aabUnsigned) { "-unsigned.aab" } else { ".aab" }
-$apkDest = Join-Path $dest ("{0}-{1}{2}" -f $cfg.baseName, $newName, $apkSuffix)
-$aabDest = Join-Path $dest ("{0}-{1}{2}" -f $cfg.baseName, $newName, $aabSuffix)
-Copy-Item -LiteralPath $apk.FullName -Destination $apkDest -Force
-Copy-Item -LiteralPath $aab.FullName -Destination $aabDest -Force
+$stageScript = Join-Path $PSScriptRoot "stage-release-artifacts.ps1"
+$stageArgs = @(
+    "-AppDir", $appRoot,
+    "-DestDir", $dest,
+    "-BaseName", $cfg.baseName,
+    "-Version", $newName
+)
+if ($cfg.native) { $stageArgs += "-Native" }
+$lines = & powershell -NoProfile -ExecutionPolicy Bypass -File $stageScript @stageArgs
+if ($LASTEXITCODE -ne 0) { throw "stage-release-artifacts.ps1 failed" }
+
+$apkDest = $null
+$aabDest = $null
+$apkSrcName = $null
+$aabSrcName = $null
+foreach ($line in $lines) {
+    if ($line -match '^APK\|([^|]+)\|(.+)$') { $apkDest = $Matches[1]; $apkSrcName = $Matches[2] }
+    if ($line -match '^AAB\|([^|]+)\|(.+)$') { $aabDest = $Matches[1]; $aabSrcName = $Matches[2] }
+}
+if (-not $apkDest -or -not $aabDest) { throw "stage-release-artifacts.ps1 did not return APK and AAB paths" }
 
 $apkHash = (Get-FileHash -LiteralPath $apkDest -Algorithm SHA256).Hash
 $aabHash = (Get-FileHash -LiteralPath $aabDest -Algorithm SHA256).Hash
+$apkUnsigned = $apkDest -match '(?i)-unsigned\.apk$'
+$aabUnsigned = $aabDest -match '(?i)-unsigned\.aab$'
 
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
 Write-Host "  Version:        $newName ($newCode)"
 Write-Host "  Variant:        release"
-Write-Host "  APK source:     $($apk.Name)"
-Write-Host "  AAB source:     $($aab.Name)"
+Write-Host "  APK source:     $apkSrcName"
+Write-Host "  AAB source:     $aabSrcName"
 Write-Host "  APK staged:     $apkDest"
 Write-Host "  AAB staged:     $aabDest"
 Write-Host "  SHA256 (APK):   $apkHash"

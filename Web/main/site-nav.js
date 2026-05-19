@@ -62,6 +62,47 @@
     else openAccountPanel();
   }
 
+  async function portalSignOut() {
+    const headers = { "Content-Type": "application/json" };
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) headers.Authorization = "Bearer " + token;
+    try {
+      await fetch("/v1/auth/logout-all", {
+        method: "POST",
+        credentials: "include",
+        headers,
+        body: "{}",
+      });
+    } catch {
+      /* ignore */
+    }
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem("rootrecord_portal_device_id");
+    localStorage.removeItem(LIFETIME_NAV_KEY);
+    clearWebSessionHint();
+    window.dispatchEvent(new CustomEvent("rootrecord-portal-auth-change"));
+    window.location.href = "/account.html";
+  }
+
+  function ensureNavSignOut() {
+    const panel = document.getElementById("nav-account-panel");
+    if (!panel || panel.querySelector("[data-nav-signout]")) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.role = "menuitem";
+    btn.className = "nav-account-signout";
+    btn.setAttribute("data-nav-signout", "1");
+    btn.setAttribute("data-testid", "nav-sign-out");
+    btn.textContent = "Sign out";
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      closeAccountPanel();
+      void portalSignOut();
+    });
+    panel.appendChild(btn);
+  }
+
   function ensureFooterTesterRewardsLink() {
     const footer = document.querySelector(".site-footer");
     if (!footer) return;
@@ -87,6 +128,7 @@
     syncNavSignedIn();
     syncLifetimeNav();
     ensureFooterTesterRewardsLink();
+    ensureNavSignOut();
     void probeWebSession().then(() => {
       syncNavSignedIn();
       syncLifetimeNav();

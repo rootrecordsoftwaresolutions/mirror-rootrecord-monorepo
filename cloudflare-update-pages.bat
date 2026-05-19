@@ -11,7 +11,7 @@ rem   cloudflare-update-pages.bat <name>         - deploy ONE Pages project
 rem
 rem Valid <name> values:
 rem   website                                    - Web\main (marketing)
-rem   weather  business  account  token  kilauea - per-product web app
+rem   weather  business  account  token  kilauea  farms - per-product web app
 
 cd /d "%~dp0"
 set "LOGFILE=%~dp0cloudflare-update-pages.log"
@@ -31,7 +31,7 @@ echo.
 set "STEP=init"
 set "ERR=0"
 
-set "STEP=[1/6] Pages: rootrecord-website (marketing, Web\main)"
+set "STEP=[1/7] Pages: rootrecord-website (marketing, Web\main)"
 echo %STEP%
 pushd "Web\main"
 if errorlevel 1 goto FAIL
@@ -41,7 +41,7 @@ call npm run pages:deploy --silent
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[2/6] Pages: rootrecord-weather-web (Web\apps\weather-manager-web)"
+set "STEP=[2/7] Pages: rootrecord-weather-web (Web\apps\weather-manager-web)"
 echo %STEP%
 pushd "Web\apps\weather-manager-web"
 if errorlevel 1 goto FAIL
@@ -51,7 +51,7 @@ call pnpm run pages:deploy
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[3/6] Pages: rootrecord-business-web (Web\apps\business-manager-web)"
+set "STEP=[3/7] Pages: rootrecord-business-web (Web\apps\business-manager-web)"
 echo %STEP%
 pushd "Web\apps\business-manager-web"
 if errorlevel 1 goto FAIL
@@ -61,7 +61,7 @@ call pnpm run pages:deploy
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[4/6] Pages: rootrecord-account-web (Web\apps\account-hub-web)"
+set "STEP=[4/7] Pages: rootrecord-account-web (Web\apps\account-hub-web)"
 echo %STEP%
 pushd "Web\apps\account-hub-web"
 if errorlevel 1 goto FAIL
@@ -71,7 +71,7 @@ call pnpm run pages:deploy
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[5/6] Pages: rootrecord-token-web (Web\apps\token-manager-web)"
+set "STEP=[5/7] Pages: rootrecord-token-web (Web\apps\token-manager-web)"
 echo %STEP%
 pushd "Web\apps\token-manager-web"
 if errorlevel 1 goto FAIL
@@ -81,9 +81,19 @@ call pnpm run pages:deploy
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[6/6] Pages: rootrecord-kilauea-web (Web\apps\kilauea-alerts-web)"
+set "STEP=[6/7] Pages: rootrecord-kilauea-web (Web\apps\kilauea-alerts-web)"
 echo %STEP%
 pushd "Web\apps\kilauea-alerts-web"
+if errorlevel 1 goto FAIL
+call pnpm install
+if errorlevel 1 ( popd & goto FAIL )
+call pnpm run pages:deploy
+if errorlevel 1 ( popd & goto FAIL )
+popd
+
+set "STEP=[7/7] Pages: rootrecord-root-farms-web (Web\apps\root-farms-web)"
+echo %STEP%
+pushd "Web\apps\root-farms-web"
 if errorlevel 1 goto FAIL
 call pnpm install
 if errorlevel 1 ( popd & goto FAIL )
@@ -116,10 +126,11 @@ if /I "%ONLY%"=="business" ( set "TARGET=Web\apps\business-manager-web"       & 
 if /I "%ONLY%"=="account"  ( set "TARGET=Web\apps\account-hub-web"            & set "PKG=pnpm" )
 if /I "%ONLY%"=="token"    ( set "TARGET=Web\apps\token-manager-web"          & set "PKG=pnpm" )
 if /I "%ONLY%"=="kilauea"  ( set "TARGET=Web\apps\kilauea-alerts-web"         & set "PKG=pnpm" )
+if /I "%ONLY%"=="farms"    ( set "TARGET=Web\apps\root-farms-web"             & set "PKG=pnpm" )
 
 if "%TARGET%"=="" (
   echo Unknown Pages project: %ONLY%
-  echo Valid: website weather business account token kilauea
+  echo Valid: website weather business account token kilauea farms
   pause
   endlocal
   exit /b 1

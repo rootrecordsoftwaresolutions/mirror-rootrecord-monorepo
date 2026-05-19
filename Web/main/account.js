@@ -42,6 +42,117 @@
     return (document.body && document.body.getAttribute("data-account-page")) || "login";
   }
 
+  function isDiscordVerifyPage() {
+    return pageMode() === "discord-verify";
+  }
+
+  function discordOAuthFlowParam() {
+    return isDiscordVerifyPage() ? "verify" : "account";
+  }
+
+  function showVerifyPanel(name) {
+    ["panel-loading", "panel-verify-forms", "panel-verify-action"].forEach((id) => {
+      const n = el(id);
+      if (n) n.hidden = id !== name;
+    });
+  }
+
+  async function startDiscordOAuth(flow) {
+    const f = flow === "verify" ? "verify" : "account";
+    try {
+      const res = await apiFetch(
+        "/v1/discord/oauth/start?json=1&flow=" + encodeURIComponent(f),
+        { method: "GET" },
+      );
+      const text = await res.text();
+      let j = {};
+      try {
+        j = text ? JSON.parse(text) : {};
+      } catch {
+        j = {};
+      }
+      if (res.status === 401) {
+        setStatus("Please sign in, then try linking Discord again.", "warn");
+        if (isDiscordVerifyPage()) showVerifyPanel("panel-verify-forms");
+        else showPanel("panel-forms");
+        return;
+      }
+      if (!res.ok || !j || typeof j.url !== "string") {
+        const detail =
+          j && typeof j.detail === "string" && j.detail.trim() && !looksTechnicalMessage(j.detail)
+            ? j.detail.trim()
+            : res.status === 404
+              ? "Discord linking is not available on this site copy yet. Please try again later."
+              : res.status === 503
+                ? "Discord linking is not configured yet. Please try again later."
+                : "Could not start Discord linking. Please try again.";
+        setStatus(detail, res.status === 503 ? "warn" : "err");
+        return;
+      }
+      window.location.href = j.url;
+    } catch {
+      setStatus("Could not start Discord linking. Please try again.", "err");
+    }
+  }
+
+  async function unlinkDiscordAccount() {
+    if (
+      !window.confirm(
+        "Unlink Discord from your RootRecord account? You may lose @Verified in the server until you link again.",
+      )
+    ) {
+      return;
+    }
+    setStatus("Unlinking Discord…", "");
+    try {
+      const res = await apiFetch("/v1/discord/link", { method: "DELETE" });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        setStatus(friendlyFromApiError(j) || "Could not unlink Discord.", "err");
+        return;
+      }
+      setStatus("Discord unlinked.", "ok");
+      if (isDiscordVerifyPage()) await refreshVerify();
+      else await refreshMe();
+    } catch {
+      setStatus("Could not unlink Discord. Please try again.", "err");
+    }
+  }
+
+  function bindDiscordUi(data) {
+    const st = el("discord-link-status");
+    const linkBtn = el("btn-discord-link");
+    const unlinkBtn = el("btn-discord-unlink");
+    const signedInAs = el("verify-signed-in-as");
+    if (signedInAs && data && data.email) {
+      signedInAs.textContent = "Signed in as " + String(data.email);
+    }
+    if (st && linkBtn) {
+      const linked = Boolean(data && data.discord_linked);
+      const label =
+        (data && (data.discord_global_name || data.discord_username || data.discord_user_id)) || "";
+      if (linked) {
+        st.textContent = "Linked: " + String(label || "Discord account");
+        linkBtn.textContent = isDiscordVerifyPage() ? "Re-verify with Discord" : "Re-link Discord";
+      } else {
+        st.textContent = "Not linked.";
+        linkBtn.textContent = isDiscordVerifyPage() ? "Verify with Discord" : "Link Discord";
+      }
+      linkBtn.onclick = function () {
+        void startDiscordOAuth(discordOAuthFlowParam());
+      };
+    }
+    if (unlinkBtn) {
+      unlinkBtn.hidden = !(data && data.discord_linked);
+      if (!unlinkBtn.dataset.bound) {
+        unlinkBtn.dataset.bound = "1";
+        unlinkBtn.onclick = function () {
+          void unlinkDiscordAccount();
+        };
+      }
+    }
+  }
+
   function hexDeviceId() {
     const bytes = new Uint8Array(24);
     crypto.getRandomValues(bytes);
@@ -91,25 +202,30 @@
   }
 
   function stripDiscordQueryFromUrl() {
-    try {
-      const u = new URL(window.location.href);
-      if (!u.searchParams.has("discord")) return;
-      u.searchParams.delete("discord");
-      const q = u.searchParams.toString();
-      history.replaceState({}, "", u.pathname + (q ? "?" + q : "") + u.hash);
-    } catch {
-      /* ignore */
-    }
+    stripDiscordQueryFromUrlFull();
   }
 
-  /** Human text for `account.html?discord=…` (OAuth return or unauthenticated /v1/discord/oauth/start redirect). */
-  function discordReturnUserMessage(code) {
+  /** Human text for `/account?discord=…` (OAuth return or unauthenticated /v1/discord/oauth/start redirect). */
+  function discordReturnUserMessage(code, roleCode) {
     const c = String(code || "").trim();
+    const role = String(roleCode || "").trim();
     if (!c) return "";
     if (c === "signin") {
       return "Sign in with your RootRecord account, then click **Link Discord** (below after you sign in).";
     }
     if (c === "linked") {
+      if (role === "role_join") {
+        return "Discord is linked to your account, but **@Verified** was not assigned because you are not in the server yet. Join the RootRecord Discord, then click **Re-link Discord**.";
+      }
+      if (role === "role_forbidden") {
+        return "Discord is linked, but the bot could not assign **@Verified** (missing permission). Please contact an admin, then try **Re-link Discord**.";
+      }
+      if (role === "role_error") {
+        return "Discord is linked, but **@Verified** could not be assigned. Try **Re-link Discord** in a moment.";
+      }
+      if (role === "role_config") {
+        return "Discord is linked. **@Verified** is not fully configured on the server yet; an admin may need to fix bot settings.";
+      }
       return "Discord linked successfully. You should receive **@Verified** in the server within a few seconds.";
     }
     if (c === "expired") return "That Discord link expired. Click **Link Discord** again.";
@@ -123,6 +239,31 @@
     if (c === "role_error") return "The bot could not assign **@Verified**. Please try again in a moment.";
     if (c === "role_config") return "Discord verification is not fully configured on the server yet. Please try again later.";
     return "";
+  }
+
+  function discordQueryFromUrl() {
+    const qs = new URLSearchParams(window.location.search);
+    return { discord: qs.get("discord"), role: qs.get("role") };
+  }
+
+  function stripDiscordQueryFromUrlFull() {
+    try {
+      const u = new URL(window.location.href);
+      let changed = false;
+      if (u.searchParams.has("discord")) {
+        u.searchParams.delete("discord");
+        changed = true;
+      }
+      if (u.searchParams.has("role")) {
+        u.searchParams.delete("role");
+        changed = true;
+      }
+      if (!changed) return;
+      const q = u.searchParams.toString();
+      history.replaceState({}, "", u.pathname + (q ? "?" + q : "") + u.hash);
+    } catch {
+      /* ignore */
+    }
   }
 
   async function loadConfig() {
@@ -275,13 +416,18 @@
 
   async function fetchBetaTesterRewardsSummary() {
     try {
-      const res = await apiFetch("/api/earn/summary?app_id=" + encodeURIComponent(BETA_EARN_APP_ID), {});
+      const res = await apiFetch("/api/earn/summary?app_id=" + encodeURIComponent(BETA_EARN_APP_ID), {
+        cache: "no-store",
+      });
       if (!res.ok) return null;
       const j = await res.json();
       if (j && typeof j === "object") {
-        const n = Number(j.balance);
+        const n =
+          typeof parseRootUnitsBalanceFromSummary === "function"
+            ? parseRootUnitsBalanceFromSummary(j)
+            : Number(j.root_units_balance ?? j.ledger_balance ?? j.balance ?? j.root_units);
         if (Number.isFinite(n)) {
-          return { ...j, balance: n };
+          return { ...j, balance: n, ledger_balance: n, root_units_balance: n };
         }
       }
       return null;
@@ -297,7 +443,7 @@
       moss +
       '">Root Units</a>';
     const note =
-      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and redemption are on the Root Units page. 100,000 Root Units trade for one month of Pro membership. In Discord, use /bal and /send after linking your account.</span>';
+      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and program details are on the Root Units page. In Discord, use /bal and /send after linking your account.</span>';
     if (!earn) {
       return escapeHtml("—") + program + note;
     }
@@ -315,9 +461,16 @@
   function renderAccount(data, earn) {
     const box = el("account-details");
     if (!box) return;
+    const custodial = String(data.custodial_wallet_pubkey || "").trim();
+    const custodialShort =
+      custodial.length > 12
+        ? escapeHtml(custodial.slice(0, 4) + "…" + custodial.slice(-4))
+        : escapeHtml(custodial || "—");
+
     const rows = [
       ["Email", escapeHtml(String(data.email || "—"))],
       ["Your RootRecord ID", escapeHtml(String(data.account_id || "—"))],
+      ["Custodial Solana address", custodialShort],
       ["Account created", escapeHtml(formatAccountCreatedAt(data))],
       ["Subscription", subscriptionAccountValueHtml(data)],
       ["Password on file", escapeHtml(data.has_password ? "Yes" : "No")],
@@ -334,38 +487,57 @@
       )
       .join("");
 
-    const st = el("discord-link-status");
-    const btn = el("btn-discord-link");
-    if (st && btn) {
-      if (data.discord_linked) {
-        const label = data.discord_global_name || data.discord_username || data.discord_user_id || "linked";
-        st.textContent = "Linked: " + String(label);
-        btn.textContent = "Re-link Discord";
-      } else {
-        st.textContent = "Not linked.";
-        btn.textContent = "Link Discord";
-      }
-      // Must stay a <button>: an <a href="/v1/..."> opens a new tab / middle-click without the Bearer token.
-      btn.onclick = async function () {
+    const nameInput = el("public-display-name");
+    const nameForm = el("form-public-display-name");
+    const nameStatus = el("public-display-name-status");
+    if (nameInput) {
+      nameInput.value = String(data.public_display_name || "").trim();
+    }
+    if (nameForm && !nameForm.dataset.bound) {
+      nameForm.dataset.bound = "1";
+      nameForm.addEventListener("submit", async function (ev) {
+        ev.preventDefault();
+        if (!apiBase) return;
+        const raw = nameInput ? nameInput.value : "";
         try {
-          const res = await apiFetch("/v1/discord/oauth/start?json=1", { method: "GET" });
-          const text = await res.text();
-          let j = {};
-          try {
-            j = text ? JSON.parse(text) : {};
-          } catch {
-            j = {};
-          }
-          if (!res.ok || !j || typeof j.url !== "string") {
-            setStatus("Please sign in, then try linking Discord again.", "warn");
+          const res = await apiFetch("/v1/me/profile", {
+            method: "PATCH",
+            body: JSON.stringify({ public_display_name: raw.trim() }),
+          });
+          const { j } = await parseJsonRes(res);
+          if (!res.ok) {
+            const msg = friendlyFromApiError(j) || "Could not save display name.";
+            if (nameStatus) {
+              nameStatus.hidden = false;
+              nameStatus.textContent = msg;
+              nameStatus.className = "note";
+              nameStatus.style.color = "var(--amber, #fbbf24)";
+            }
             return;
           }
-          window.location.href = j.url;
+          if (nameInput && j && j.public_display_name != null) {
+            nameInput.value = String(j.public_display_name || "");
+          } else if (nameInput && raw.trim() === "") {
+            nameInput.value = "";
+          }
+          if (nameStatus) {
+            nameStatus.hidden = false;
+            nameStatus.textContent = "Display name saved.";
+            nameStatus.className = "note";
+            nameStatus.style.color = "var(--moss, #6b8f71)";
+          }
         } catch {
-          setStatus("Could not start Discord linking. Please try again.", "err");
+          if (nameStatus) {
+            nameStatus.hidden = false;
+            nameStatus.textContent = "Could not save display name. Try again.";
+            nameStatus.className = "note";
+            nameStatus.style.color = "var(--amber, #fbbf24)";
+          }
         }
-      };
+      });
     }
+
+    bindDiscordUi(data);
   }
 
   function formatMyAppsLastConnected(iso) {
@@ -382,57 +554,125 @@
     return { iso: raw, label };
   }
 
-  function renderMyApps(data) {
-    const box = el("my-apps-list");
-    if (!box) return;
-    const apps = data.apps || {};
+  const MY_APPS_CATALOG = {
+    rootrecord_business_manager_android: {
+      title: "RootRecord Business Manager",
+      platform: "Android / web",
+      href: "/rootrecord-business-manager.html",
+      webAppUrl: "https://business.rootrecord.info/",
+      playTestUrl:
+        "https://play.google.com/apps/testing/com.rootrecord.businessmanager",
+      note: "Cloud business workspace or Root Units activity on this account.",
+    },
+    rootrecord_weather_manager_windows: {
+      title: "Root Record Weather Manager",
+      platform: "Windows / web",
+      href: "/rootrecord-weather-manager.html",
+      webAppUrl: "https://weather.rootrecord.info/",
+      note: "Saved locations, synced weather, or earn activity for this account.",
+    },
+    rootrecord_weather_manager_android: {
+      title: "Root Record Weather Manager",
+      platform: "Android / web",
+      href: "/rootrecord-weather-manager.html",
+      webAppUrl: "https://weather.rootrecord.info/",
+      playStoreUrl:
+        "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager",
+      note: "Mobile notifications, earn activity, or signed-in weather app use.",
+    },
+    rootrecord_kilauea_alerts_android: {
+      title: "Kilauea Alerts",
+      platform: "Android / web",
+      href: "/kilauea-alerts.html",
+      webAppUrl: "https://kilauea.rootrecord.info/",
+      playTestUrl: "https://play.google.com/apps/testing/com.rootrecord.kilauea",
+      note: "Signed-in Kīlauea dashboard or earn activity on this account.",
+    },
+    rootrecord_token_manager_android: {
+      title: "RootRecord Token Manager",
+      platform: "Android / web",
+      href: "/products.html",
+      webAppUrl: "https://token.rootrecord.info/",
+      note: "Signed-in token manager or earn activity on this account.",
+    },
+    rootrecord_account_hub_android: {
+      title: "RootRecord Account Hub",
+      platform: "Android",
+      href: "/products.html",
+      note: "Account Hub app session or earn activity on this account.",
+    },
+    root_farms: {
+      title: "Root Units Idle Farmer",
+      platform: "Web",
+      href: "https://farms.rootrecord.info/",
+      external: true,
+      note: "Root Farms progress or earn activity saved for this account.",
+    },
+  };
+
+  function collectMyAppsRows(appsPayload) {
+    const apps = appsPayload || {};
+    const sig = apps.signals || {};
+    const seen = new Set();
+    const rows = [];
+
+    function addRow(appId, lastAt) {
+      const id = String(appId || "").trim().toLowerCase();
+      if (!id || seen.has(id)) return;
+      const cat = MY_APPS_CATALOG[id];
+      if (!cat) return;
+      seen.add(id);
+      rows.push({
+        title: cat.title,
+        platform: cat.platform,
+        href: cat.href,
+        external: Boolean(cat.external),
+        webAppUrl: cat.webAppUrl || "",
+        playTestUrl: cat.playTestUrl || "",
+        playStoreUrl: cat.playStoreUrl || "",
+        note: cat.note,
+        last_connected_at: typeof lastAt === "string" ? lastAt : null,
+      });
+    }
+
+    const usage = Array.isArray(apps.usage) ? apps.usage : [];
+    for (const u of usage) {
+      if (u && u.app_id) addRow(u.app_id, u.last_connected_at);
+    }
+
     const bma = apps.rootrecord_business_manager_android || {};
     const wwx = apps.rootrecord_weather_manager_windows || {};
     const wma = apps.rootrecord_weather_manager_android || {};
-    const sig = apps.signals || {};
-    const rows = [];
-    if (bma.associated) {
-      rows.push({
-        title: "RootRecord Business Manager",
-        platform: "Android",
-        href: "/rootrecord-business-manager.html",
-        playTestUrl:
-          "https://play.google.com/apps/testing/com.rootrecord.businessmanager",
-        note:
-          "Cloud business workspace on api.rootrecord.info is tied to this account.",
-        last_connected_at:
-          typeof bma.last_connected_at === "string" ? bma.last_connected_at : null,
-      });
-    }
-    if (wwx.associated) {
-      rows.push({
-        title: "Root Record Weather Manager",
-        platform: "Windows",
-        href: "/rootrecord-weather-manager.html",
-        note:
-          "Saved locations or synced weather history found for this account.",
-        last_connected_at:
-          typeof wwx.last_connected_at === "string" ? wwx.last_connected_at : null,
-      });
-    }
-    if (wma.associated) {
-      rows.push({
-        title: "Root Record Weather Manager",
-        platform: "Android",
-        href: "/rootrecord-weather-manager.html",
-        playTestUrl:
-          "https://play.google.com/apps/testing/com.rootrecord.weathermanager",
-        note:
-          "A mobile notification registration exists for this account.",
-        last_connected_at:
-          typeof wma.last_connected_at === "string" ? wma.last_connected_at : null,
-      });
-    }
+    if (bma.associated) addRow("rootrecord_business_manager_android", bma.last_connected_at);
+    if (wwx.associated) addRow("rootrecord_weather_manager_windows", wwx.last_connected_at);
+    if (wma.associated) addRow("rootrecord_weather_manager_android", wma.last_connected_at);
+
+    rows.sort((a, b) => {
+      const ta = a.last_connected_at || "";
+      const tb = b.last_connected_at || "";
+      if (ta === tb) return a.title.localeCompare(b.title);
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return tb.localeCompare(ta);
+    });
+
     const detailParts = [];
     if (bma.associated) detailParts.push("Business Manager cloud workspace");
     if (sig.mobile_push) detailParts.push("mobile notifications");
     if (sig.saved_locations) detailParts.push("saved locations");
     if (sig.weather_cache) detailParts.push("weather cache rows");
+    if (usage.length) detailParts.push(usage.length + " app usage record(s)");
+    return { rows, detailParts };
+  }
+
+  function renderMyApps(data) {
+    const box = el("my-apps-list");
+    if (!box) return;
+    const apps = data.apps || {};
+    const sig = apps.signals || {};
+    const collected = collectMyAppsRows(apps);
+    const rows = collected.rows;
+    const detailParts = collected.detailParts;
     const detail =
       detailParts.length > 0
         ? "Server signals: " + detailParts.join(", ") + "."
@@ -459,11 +699,20 @@
             typeof r.playTestUrl === "string" && r.playTestUrl.trim()
               ? r.playTestUrl.trim()
               : "";
+          const playStoreUrl =
+            typeof r.playStoreUrl === "string" && r.playStoreUrl.trim()
+              ? r.playStoreUrl.trim()
+              : "";
           const playBtn = playTestUrl
             ? '<a class="btn btn-secondary" href="' +
               escapeHtml(playTestUrl) +
               '" target="_blank" rel="noopener">Google Play testing</a>'
-            : "";
+            : playStoreUrl
+              ? '<a class="btn btn-secondary" href="' +
+                escapeHtml(playStoreUrl) +
+                '" target="_blank" rel="noopener">Google Play</a>'
+              : "";
+          const productTarget = r.external ? ' target="_blank" rel="noopener"' : "";
           return (
             '<article class="my-apps-card" data-testid="my-app-card">' +
             '<div class="my-apps-card-head">' +
@@ -477,7 +726,16 @@
             lastHtml +
             '<p class="my-apps-card-actions"><a class="btn btn-secondary" href="' +
             escapeHtml(r.href) +
-            '">Product page</a>' +
+            '"' +
+            productTarget +
+            '">' +
+            (r.external ? "Open app" : "Product page") +
+            "</a>" +
+            (typeof r.webAppUrl === "string" && r.webAppUrl.trim()
+              ? ' <a class="btn btn-secondary" href="' +
+                escapeHtml(r.webAppUrl.trim()) +
+                '" target="_blank" rel="noopener">Open web app</a>'
+              : "") +
             (playBtn ? " " + playBtn : "") +
             "</p></article>"
           );
@@ -622,7 +880,7 @@
       showPanel("panel-forms");
       return;
     }
-    const discordQs = new URLSearchParams(window.location.search).get("discord");
+    const discordQ = discordQueryFromUrl();
     showPanel("panel-loading");
     setStatus("");
     const res = await apiFetch("/v1/me", {});
@@ -631,13 +889,13 @@
       syncPortalLifetimeNav(null);
       notifyPortalAuthChange();
       showPanel("panel-forms");
-      const dm = discordReturnUserMessage(discordQs);
+      const dm = discordReturnUserMessage(discordQ.discord, discordQ.role);
       if (dm) {
-        setStatus(dm, discordQs === "linked" ? "ok" : "warn");
+        setStatus(dm, discordQ.discord === "linked" && !discordQ.role ? "ok" : "warn");
       } else {
         setStatus("Your session ended. Please sign in again.", "warn");
       }
-      if (discordQs) stripDiscordQueryFromUrl();
+      if (discordQ.discord) stripDiscordQueryFromUrl();
       return;
     }
     if (!res.ok) {
@@ -650,10 +908,53 @@
     showPanel("panel-account");
     renderAccount(data, earn);
     syncPortalLifetimeNav(data);
-    const dm = discordReturnUserMessage(discordQs);
+    const dm = discordReturnUserMessage(discordQ.discord, discordQ.role);
     if (dm) {
-      setStatus(dm, discordQs === "linked" ? "ok" : "warn");
+      setStatus(dm, discordQ.discord === "linked" && !discordQ.role ? "ok" : "warn");
       stripDiscordQueryFromUrl();
+    }
+  }
+
+  async function refreshVerify(autoStartOAuth) {
+    if (!apiBase) {
+      showVerifyPanel("panel-verify-forms");
+      return;
+    }
+    const discordQ = discordQueryFromUrl();
+    showVerifyPanel("panel-loading");
+    setStatus("");
+    const res = await apiFetch("/v1/me", {});
+    if (res.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      syncPortalLifetimeNav(null);
+      notifyPortalAuthChange();
+      showVerifyPanel("panel-verify-forms");
+      const dm = discordReturnUserMessage(discordQ.discord, discordQ.role);
+      if (dm) {
+        setStatus(dm, discordQ.discord === "linked" && !discordQ.role ? "ok" : "warn");
+      } else {
+        setStatus("Sign in to link Discord.", "warn");
+      }
+      if (discordQ.discord) stripDiscordQueryFromUrl();
+      return;
+    }
+    if (!res.ok) {
+      showVerifyPanel("panel-verify-action");
+      setStatus("We could not load your account. Please try again in a moment.", "err");
+      return;
+    }
+    const data = await res.json();
+    syncPortalLifetimeNav(data);
+    notifyPortalAuthChange();
+    showVerifyPanel("panel-verify-action");
+    bindDiscordUi(data);
+    const dm = discordReturnUserMessage(discordQ.discord, discordQ.role);
+    if (dm) {
+      setStatus(dm, discordQ.discord === "linked" && !discordQ.role ? "ok" : "warn");
+      stripDiscordQueryFromUrl();
+    }
+    if (autoStartOAuth && !data.discord_linked && !discordQ.discord) {
+      await startDiscordOAuth("verify");
     }
   }
 
@@ -713,7 +1014,11 @@
         localStorage.setItem(TOKEN_KEY, j.access_token);
         notifyPortalAuthChange();
       }
-      await refreshMe();
+      if (isDiscordVerifyPage()) {
+        await refreshVerify(true);
+      } else {
+        await refreshMe();
+      }
     } catch (e) {
       const net = e && typeof e.message === "string" ? e.message : "";
       setStatus(
@@ -754,10 +1059,16 @@
         notifyPortalAuthChange();
       }
       if (document.body && document.body.getAttribute("data-account-page") === "signup") {
-        window.location.href = "/account.html";
+        const ret = new URLSearchParams(window.location.search).get("return");
+        const dest = ret && String(ret).startsWith("/") ? String(ret) : "/account.html";
+        window.location.href = dest;
         return;
       }
-      await refreshMe();
+      if (isDiscordVerifyPage()) {
+        await refreshVerify(true);
+      } else {
+        await refreshMe();
+      }
     } catch (e) {
       const net = e && typeof e.message === "string" ? e.message : "";
       setStatus(
@@ -786,6 +1097,8 @@
       showMyAppsPanel("guest");
     } else if (pageMode() === "development-notice") {
       showDevNoticePanel("guest");
+    } else if (isDiscordVerifyPage()) {
+      showVerifyPanel("panel-verify-forms");
     } else {
       showPanel("panel-forms");
     }
@@ -894,6 +1207,13 @@
       if (ps) ps.hidden = false;
       const pl = el("panel-loading");
       if (pl) pl.hidden = true;
+      return;
+    }
+
+    if (page === "discord-verify") {
+      el("form-login")?.addEventListener("submit", onLogin);
+      el("btn-logout")?.addEventListener("click", onLogout);
+      await refreshVerify(false);
       return;
     }
 

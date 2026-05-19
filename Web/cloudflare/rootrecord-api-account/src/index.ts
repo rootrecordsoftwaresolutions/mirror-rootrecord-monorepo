@@ -5,6 +5,7 @@ import { handleRequest } from "./router";
 import { runInactiveAccountCleanupCron } from "./inactive-account-cron";
 import { runDiscordDeveloperMessageSync } from "./discord-developer-sync";
 import { reconcileStaleStripeSubscriptions } from "../../shared/stripe-reconcile";
+import { runFarmsVarmintCron } from "./farms-varmint";
 // NOAA alert cron lives only on rootrecord-api-weather (and api-kilauea if it ever needs alerts).
 // This Worker: `* * * * *` runs Discord → D1 stats + developer feed sync; `45 8` runs inactive-account cleanup + HTTP error prune.
 
@@ -76,6 +77,13 @@ export default {
       await runDiscordDeveloperMessageSync(env).catch((e) =>
         console.error("discord_developer_sync_err", e instanceof Error ? e.message : String(e)),
       );
+      const vr = await runFarmsVarmintCron(env.DB).catch((e) => {
+        console.error("farms_varmint_cron_err", e instanceof Error ? e.message : String(e));
+        return { sampled: 0, processed: 0 };
+      });
+      if (vr.sampled > 0) {
+        console.log("farms_varmint_cron", JSON.stringify(vr));
+      }
     }
   },
 };

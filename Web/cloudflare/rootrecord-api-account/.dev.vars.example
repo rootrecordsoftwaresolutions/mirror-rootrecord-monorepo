@@ -13,3 +13,6 @@ INTERNAL_WALLET_ENC_KEY_B64=paste-44-char-base64-here
 #
 # Optional: override wrangler.toml [vars] for local dev only:
 # DISCORD_PUBLIC_KEY=paste_hex_verify_key_here
+#
+# App session start → Discord (POST /api/app-session/start from mobile/web apps):
+# DISCORD_APP_SESSION_WEBHOOK_URL=https://discord.com/api/webhooks/…

@@ -26,7 +26,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="RootRecord">
   <meta property="og:title" content="Root Units (beta) &mdash; RootRecord">
-  <meta property="og:description" content="Root Units balance for signed-in testers: earn in apps, redeem for Pro, send peer-to-peer on Discord with /send and /bal.">
+  <meta property="og:description" content="Root Units balance for signed-in testers: earn in apps, send peer-to-peer on Discord with /send and /bal.">
   <meta property="og:url" content="https://rootrecord.info/beta-tester-rewards.html">
   <meta property="og:image" content="https://rootrecord.info/assets/og.jpg">
   <meta name="twitter:card" content="summary_large_image">
@@ -113,16 +113,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             </div>
           </section>
 
-          <section class="card-plain rewards-redeem-card" id="rewards-redeem-card" style="margin: 0 0 1.5rem;" aria-label="Redeem rewards for Pro membership" hidden>
-            <h2 class="rewards-balance-card-title">Redeem Root Units for Pro</h2>
-            <p style="margin:0.35rem 0 0">Trade <strong>100,000 Root Units</strong> for <strong>1 month of Pro membership</strong>. You can redeem again to stack additional months as your balance allows.</p>
-            <p class="note" id="rewards-redeem-expiry" style="margin-top:0.5rem;margin-bottom:0" hidden></p>
-            <p id="rewards-redeem-status" class="status" role="status" hidden style="margin-top:0.75rem;margin-bottom:0"></p>
-            <p style="margin-top:1rem;margin-bottom:0">
-              <button type="button" class="btn btn-primary" id="rewards-redeem-btn" data-testid="rewards-redeem-pro-btn">Redeem 100,000 for 1 month Pro</button>
-            </p>
-          </section>
-
           <p><strong>How to get the downloads:</strong> join the Google Group above. That group is where we grant internal-testing access on Google Play.</p>
           <ul style="margin:0.5rem 0 1rem 1.25rem;padding:0">
             <li style="margin:0.35rem 0"><a href="https://play.google.com/apps/testing/com.rootrecord.businessmanager" target="_blank" rel="noopener">Business Manager &mdash; Google Play closed testing</a></li>
@@ -130,7 +120,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           </ul>
 
           <h2>Where you see Root Units</h2>
-          <p><strong>On the web:</strong> this page (after sign-in) and your signed-in <a href="/account.html">Account</a> summary show your balance. Redeem for Pro membership here.</p>
+          <p><strong>On the web:</strong> this page (after sign-in) and your signed-in <a href="/account.html">Account</a> summary show your balance.</p>
           <p><strong>On Discord:</strong> after you <a href="/account.html">link Discord</a>, use slash commands <strong>/bal</strong> (your balance) and <strong>/send</strong> with a recipient and amount to move Root Units to another linked member.</p>
           <p><strong>In the apps:</strong> participating Android builds may still credit usage in the background while you are signed in. They do <strong>not</strong> replace this page: for example, <strong>Root Record Weather Manager</strong> no longer includes a dedicated Rewards tab; open <strong>Settings</strong> for a link back to <a href="/beta-tester-rewards.html">Root Units</a> on rootrecord.info.</p>
           <div class="cta-row" style="margin: 1rem 0 0;">
@@ -142,14 +132,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <p>Rewards are earned while you are signed in and using the app in good faith. The system measures session activity (including time in different parts of the app) and may apply <strong>per-screen limits</strong> so the program stays fair. <strong>Daily earning limits apply per app</strong> (each participating app has its own cap for the calendar day), so using more than one app can add up to more than a single app&rsquo;s limit. Your <strong>Root Units balance</strong> on this page is your running total across the program. From time to time a <strong>one-time daily check-in bonus</strong> may be available in each app; the app will show if you have already claimed it for that app today.</p>
           <p>Exact rates, caps, and eligibility <strong>can change</strong> during the beta. We will keep this page updated when something material changes.</p>
 
-          <h2>Redemption details</h2>
-          <p>Redeeming <strong>100,000 Root Units</strong> debits your balance and extends your <strong>Pro membership</strong> by <strong>30 days</strong>. If you already have an active Pro window (paid subscription, lifetime plan, or a previous redemption that hasn't expired), the 30 days are added on top of your current expiration &mdash; you don't lose any time. Pro perks unlock immediately on this account across web and Android apps.</p>
-
           <h2>Your account</h2>
           <p>Root Unit balances are associated with the same email you use to sign in on <a href="/account.html">Account</a>. If you have billing or subscription questions, that is separate from this program&mdash;see <a href="/billing.html">Billing</a> when you need to manage a paid plan.</p>
 
           <h2>Not financial advice</h2>
-          <p>This program is an experimental <strong>loyalty and usage</strong> feature. Redeemed Pro time is a non-cash benefit on your RootRecord account. It is not a guarantee of any future payment, monetary value, or redemption outside of the Pro extension on this site. Nothing on this page is tax, legal, or investment advice. Participation may be changed or ended at any time, subject to the <a href="/terms.html">Terms</a> and <a href="/privacy.html">Privacy</a> where they apply to our services.</p>
+          <p>This program is an experimental <strong>loyalty and usage</strong> feature. Root Units are non-cash credits on your RootRecord account. They are not a guarantee of any future payment or monetary value. Nothing on this page is tax, legal, or investment advice. Participation may be changed or ended at any time, subject to the <a href="/terms.html">Terms</a> and <a href="/privacy.html">Privacy</a> where they apply to our services.</p>
 
           <h2>Questions</h2>
           <p>Use <a href="/contact.html">Contact</a> and mention &ldquo;Root Units&rdquo; in your message, or ask in the community links in the site footer if we list them for your product.</p>
@@ -175,7 +162,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </footer>
   </div>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
-  <script src="/site-nav.js?v=4" defer></script>
+  <script src="/site-nav.js?v=5" defer></script>
   <script>
     (function () {
       var TOKEN_KEY = "rootrecord_portal_token";
@@ -194,6 +181,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       }
     })();
   </script>
-  <script src="/beta-tester-rewards.js?v=3" defer></script>
+  <script src="/earn-balance.js?v=1" defer></script>
+  <script src="/beta-tester-rewards.js?v=4" defer></script>
 </body>
 </html>
