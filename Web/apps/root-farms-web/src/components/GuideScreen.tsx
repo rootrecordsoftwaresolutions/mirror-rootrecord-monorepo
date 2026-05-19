@@ -93,7 +93,7 @@ export function GuideScreen() {
       <article className="guide-section">
         <h2>Root Economy</h2>
         <p>
-          <strong>Root Economy</strong> shows a live leaderboard of the top balances in the game. You can optionally set a <strong>public display name</strong> in your account settings on the Root Record website; otherwise the board shows a shortened wallet-style address. Discord usernames from your profile may appear when linked.
+          <strong>Root Economy</strong> shows a live leaderboard of the top balances in the game, plus <strong>internal circulation</strong> — the total Root Units held across linked accounts. Use <strong>/economy</strong> in Discord for the same summary. You can optionally set a <strong>public display name</strong> in your account settings on the Root Record website; otherwise the board shows a shortened wallet-style address. Discord usernames from your profile may appear when linked.
         </p>
         <p>This board is for fun and bragging rights — it does not change how your farm earns.</p>
       </article>

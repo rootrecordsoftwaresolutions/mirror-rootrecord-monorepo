@@ -46,6 +46,13 @@ export function RootEconomyScreen({ variant = "web" }: { variant?: "web" | "mobi
       <header className="economy-head">
         <h1>Root Economy</h1>
         <p className="economy-lead">Live Root Units balances for the top 100 accounts on Root Record.</p>
+        {board ? (
+          <p className="economy-circulation" aria-label="Total Root Units in internal circulation">
+            <span className="economy-circulation-label">Internal circulation</span>
+            <span className="economy-circulation-value">{formatRu(board.total_circulation ?? 0)}</span>
+            <span className="economy-circulation-raw">{(board.total_circulation ?? 0).toLocaleString()} RU</span>
+          </p>
+        ) : null}
         {updatedLabel ? <p className="economy-updated">Updated {updatedLabel}</p> : null}
       </header>
 

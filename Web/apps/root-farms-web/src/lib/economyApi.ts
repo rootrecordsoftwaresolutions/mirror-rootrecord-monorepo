@@ -12,6 +12,7 @@ export type EconomyLeaderEntry = {
 export type EconomyLeaderboard = {
   ok: boolean;
   updated_at: string;
+  total_circulation: number;
   count: number;
   entries: EconomyLeaderEntry[];
 };

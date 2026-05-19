@@ -158,6 +158,11 @@ const commands = [
     type: 1,
   },
   {
+    name: "economy",
+    description: "Root Economy leaderboard + total internal Root Units circulation",
+    type: 1,
+  },
+  {
     name: "send",
     description: "Send RUNIT (Root Units) or RRTT: user / everyone / active / role",
     type: 1,

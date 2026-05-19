@@ -8,6 +8,7 @@ import {
 } from "./custodial-wallet-token-slots";
 import { transferRrttCustodialPeerViaTreasury } from "./discord-rrtt-peer-send";
 import type { InternalWalletEnv } from "./solana-internal-wallet";
+import { buildEconomyDiscordMessage, loadEconomyLeaderboardData } from "./root-economy";
 
 export type DiscordRootUnitsEnv = {
   DB: D1Database;
@@ -767,6 +768,11 @@ function rollD6(): number {
   return 1 + (u[0] % 6);
 }
 
+async function handleEconomy(db: D1Database): Promise<Response> {
+  const data = await loadEconomyLeaderboardData(db);
+  return interactionResponse(4, { content: buildEconomyDiscordMessage(data) });
+}
+
 async function handleWalletDeposit(db: D1Database, fromDiscordId: string): Promise<Response> {
   const row = await db
     .prepare(
@@ -1172,7 +1178,7 @@ async function handleMessageComponent(body: Record<string, unknown>, env: Discor
         data: {
           flags: 64,
           content:
-            "**Commands:** `/bal`, `/send` (**RUNIT** or **RRTT** + user / everyone / active / role), `/wallet`, `/deposit`, `/menu`, `/faucet`, `/dice`. `/withdraw` & `/airdrop` soon.",
+            "**Commands:** `/bal`, `/economy`, `/send` (**RUNIT** or **RRTT** + user / everyone / active / role), `/wallet`, `/deposit`, `/menu`, `/faucet`, `/dice`. `/withdraw` & `/airdrop` soon.",
         },
       });
     }
@@ -1198,6 +1204,10 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
 
   if (name === "bal") {
     return handleBal(env.DB, fromDiscordId, env);
+  }
+
+  if (name === "economy") {
+    return handleEconomy(env.DB);
   }
 
   if (name === "wallet" || name === "deposit") {
