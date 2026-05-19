@@ -51,7 +51,7 @@
   }
 
   function showVerifyPanel(name) {
-    ["panel-loading", "panel-verify-forms", "panel-verify-action"].forEach((id) => {
+    ["panel-loading", "panel-verify-forms", "panel-verify-action", "panel-verify-success"].forEach((id) => {
       const n = el(id);
       if (n) n.hidden = id !== name;
     });
@@ -1153,6 +1153,8 @@
       showMyAppsPanel("loading");
     } else if (page === "development-notice") {
       showDevNoticePanel("loading");
+    } else if (page === "discord-verify") {
+      return;
     } else {
       showPanel("panel-loading");
     }
@@ -1207,13 +1209,6 @@
       if (ps) ps.hidden = false;
       const pl = el("panel-loading");
       if (pl) pl.hidden = true;
-      return;
-    }
-
-    if (page === "discord-verify") {
-      el("form-login")?.addEventListener("submit", onLogin);
-      el("btn-logout")?.addEventListener("click", onLogout);
-      await refreshVerify(false);
       return;
     }
 

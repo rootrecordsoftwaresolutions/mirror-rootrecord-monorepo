@@ -34,6 +34,26 @@ export type DiscordRootUnitsEnv = {
 
 const MAX_SEND = 10_000_000;
 const FAUCET_COOLDOWN_MS = 12 * 3600 * 1000;
+const DISCORD_VERIFY_URL = "https://rootrecord.info/discord-verify";
+const ACCOUNT_URL = "https://rootrecord.info/account";
+
+function sendAssetDisplayName(asset: "RUNIT" | "RRTT"): string {
+  return asset === "RRTT" ? "RRTT" : "Root Units";
+}
+
+/** Public reply: ping recipient so they see verify link + failed amount (not ephemeral). */
+function unlinkedRecipientSendFailedContent(
+  toDiscordId: string,
+  units: number,
+  asset: "RUNIT" | "RRTT",
+): string {
+  const label = sendAssetDisplayName(asset);
+  const amt = units.toLocaleString();
+  return (
+    `<@${toDiscordId}> — a **${amt} ${label}** transfer could not be delivered because your Discord is not linked to RootRecord.\n\n` +
+    `Link at **${DISCORD_VERIFY_URL}**. Once you're verified, incoming sends are **auto-credited** to your account — this **${amt} ${label}** would have been claimed automatically.`
+  );
+}
 
 function hexToUint8(hex: string): Uint8Array | null {
   const s = hex.replace(/^0x/i, "").trim();
@@ -347,7 +367,7 @@ async function handleBal(db: D1Database, fromDiscordId: string, env: DiscordRoot
   if (!e || !e.includes("@")) {
     return interactionResponse(4, {
       content:
-        "No linked RootRecord account for this Discord user. Open **https://rootrecord.info/account.html** → **Link Discord**, then try `/bal` again.",
+        `No linked RootRecord account for this Discord user. Open **${DISCORD_VERIFY_URL}** to link Discord, then try \`/bal\` again.`,
     });
   }
   const uid = `user:${e}`;
@@ -360,7 +380,7 @@ async function handleBal(db: D1Database, fromDiscordId: string, env: DiscordRoot
     "**Tokens you added:** Anything you've sent to your RootRecord deposit address can show below. When you move those tokens to someone else through RootRecord (outside this `/send` flow), their account balances update there too.",
   ];
   if (!accountId) {
-    lines.push("\n**Deposit-address tokens:** we couldn't load this section. Try **https://rootrecord.info/account.html** if it keeps happening.");
+    lines.push(`\n**Deposit-address tokens:** we couldn't load this section. Try **${ACCOUNT_URL}** if it keeps happening.`);
   } else {
     await syncCustodialTokenSlotsFromRpc(env, accountId, custodialSyncBudgetMs(env)).catch(() => {});
     const slotsAll = await readCustodialTokenSlots(db, accountId, 200);
@@ -377,7 +397,7 @@ async function handleBal(db: D1Database, fromDiscordId: string, env: DiscordRoot
         const ui = formatSlotUiAmount(s.amount_raw, s.decimals);
         lines.push(`• **${label}:** ${ui}`);
       }
-      if (slots.length > cap) lines.push(`… +${slots.length - cap} more — see **https://rootrecord.info/account.html** for the full list.`);
+      if (slots.length > cap) lines.push(`… +${slots.length - cap} more — see **${ACCOUNT_URL}** for the full list.`);
     }
   }
   let content = lines.join("\n");
@@ -495,10 +515,14 @@ async function handleSendRrttUser(
     .first<{ account_id: string }>();
   const fromAid = String(fromLink?.account_id || "").trim();
   const toAid = String(toLink?.account_id || "").trim();
-  if (!fromAid || !toAid) {
+  if (!fromAid) {
     return interactionResponse(4, {
-      content:
-        "Could not resolve both accounts. Each person must **link Discord** at **https://rootrecord.info/account.html**.",
+      content: `Your Discord must be linked at **${DISCORD_VERIFY_URL}** before sending **RRTT**.`,
+    });
+  }
+  if (!toAid) {
+    return interactionResponse(4, {
+      content: unlinkedRecipientSendFailedContent(toDiscordId, units, "RRTT"),
     });
   }
 
@@ -626,8 +650,8 @@ async function handleSendBulk(
       mode === "active"
         ? `No **linked** members have Discord message rows in \`discord_user_activity\` within the last **${activeLookbackDays(env)}** days (cron must be ingesting channels).`
         : mode === "role"
-          ? "No **linked** members have that role. They must **Link Discord** on **https://rootrecord.info/account.html** and hold the role in this server."
-          : "No other linked RootRecord members. People must **Link Discord** on **https://rootrecord.info/account.html** before they can receive a split.";
+          ? `No **linked** members have that role. They must link Discord at **${DISCORD_VERIFY_URL}** and hold the role in this server.`
+          : `No other linked RootRecord members. People must link Discord at **${DISCORD_VERIFY_URL}** before they can receive a split.`;
     return interactionResponse(4, { content: empty });
   }
   if (n > MAX_BULK_RECIPIENTS) {
@@ -756,7 +780,7 @@ async function handleWalletDeposit(db: D1Database, fromDiscordId: string): Promi
   if (!pk) {
     return interactionResponse(4, {
       content:
-        "No deposit address is set up for this account yet. Sign in at **https://rootrecord.info/account.html** — your wallet is created with your account.",
+        `No deposit address is set up for this account yet. Sign in at **${ACCOUNT_URL}** — your wallet is created with your account.`,
     });
   }
   const qrUrl = custodialDepositQrImageUrl(pk);
@@ -803,7 +827,7 @@ async function handleFaucetClaim(db: D1Database, discordUserId: string, interact
   const uid = await earnUserIdForDiscord(db, discordUserId);
   if (!uid) {
     return interactionResponse(4, {
-      content: "Link Discord on **https://rootrecord.info/account.html** before using the faucet.",
+      content: `Link Discord on **${DISCORD_VERIFY_URL}** before using the faucet.`,
     });
   }
   const now = new Date().toISOString();
@@ -919,7 +943,7 @@ async function handleDiceCreate(
   const opUid = await earnUserIdForDiscord(db, opponentId);
   if (!chUid || !opUid) {
     return interactionResponse(4, {
-      content: "Both players must be **linked** to RootRecord (**https://rootrecord.info/account.html**).",
+      content: `Both players must be **linked** to RootRecord (**${DISCORD_VERIFY_URL}**).`,
     });
   }
   const have = await getEarnBalance(db, chUid);
@@ -1208,7 +1232,7 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
     const fromUid = await earnUserIdForDiscord(env.DB, fromDiscordId);
     if (!fromUid) {
       return interactionResponse(4, {
-        content: "Your Discord account is not linked. Open **https://rootrecord.info/account.html** → **Link Discord**.",
+        content: `Your Discord account is not linked. Open **${DISCORD_VERIFY_URL}** to link Discord.`,
       });
     }
     const sc = invokedSubcommand(opts);
@@ -1239,7 +1263,7 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
     if (!fromUid) {
       return interactionResponse(4, {
         content:
-          "Your Discord account is not linked to RootRecord. Open **https://rootrecord.info/account.html** → **Link Discord**.",
+          `Your Discord account is not linked to RootRecord. Open **${DISCORD_VERIFY_URL}** to link Discord.`,
       });
     }
 
@@ -1323,8 +1347,7 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
       const toUid = await earnUserIdForDiscord(env.DB, toDiscordId);
       if (!toUid) {
         return interactionResponse(4, {
-          content:
-            "That user is not linked to RootRecord yet. They must **link Discord** on **https://rootrecord.info/account.html** before receiving this send.",
+          content: unlinkedRecipientSendFailedContent(toDiscordId, units, sendAsset),
         });
       }
       if (sendAsset === "RRTT") {

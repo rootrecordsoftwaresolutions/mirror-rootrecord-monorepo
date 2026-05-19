@@ -81,7 +81,8 @@
     localStorage.removeItem(LIFETIME_NAV_KEY);
     clearWebSessionHint();
     window.dispatchEvent(new CustomEvent("rootrecord-portal-auth-change"));
-    window.location.href = "/account.html";
+    const page = document.body && document.body.getAttribute("data-account-page");
+    window.location.href = page === "discord-verify" ? "/discord-verify" : "/account.html";
   }
 
   function ensureNavSignOut() {

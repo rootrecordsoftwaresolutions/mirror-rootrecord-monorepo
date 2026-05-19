@@ -8,6 +8,8 @@ import { PlotsGridScreen } from "./components/PlotsGridScreen";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { FarmhandsScreen } from "./components/FarmhandsScreen";
 import { GuideScreen } from "./components/GuideScreen";
+import { BottomNav } from "./components/BottomNav";
+import { MobileWebHeader } from "./components/MobileWebHeader";
 import { SideNav } from "./components/SideNav";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { VarmintAlertModal } from "./components/VarmintAlertModal";
@@ -39,13 +41,22 @@ function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
     body = <PlaceholderTab title="Replant" blurb="Reset for permanent multipliers — prestige for Root Farms." />;
   }
 
+  const onTab = (t: TabId) => {
+    setTab(t);
+    setPlotId(null);
+  };
+
   return (
     <div className="app-shell app-shell--web">
-      <SideNav tab={tab} onTab={(t) => { setTab(t); setPlotId(null); }} />
-      <main className="app-main app-main--web">
-        <BetaTesterBanner onSignIn={onSignIn} />
-        {body}
-      </main>
+      <SideNav tab={tab} onTab={onTab} />
+      <div className="app-main-column">
+        <MobileWebHeader />
+        <main className="app-main app-main--web">
+          <BetaTesterBanner onSignIn={onSignIn} />
+          {body}
+        </main>
+      </div>
+      <BottomNav tab={tab} onTab={onTab} />
       <WelcomeBackModal />
       <VarmintAlertModal />
     </div>

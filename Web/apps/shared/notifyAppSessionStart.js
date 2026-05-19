@@ -8,10 +8,28 @@
  * @param {() => string | null | undefined} [opts.getAuthToken]
  * @param {boolean} [opts.includeCredentials]
  */
-export async function notifyAppSessionStart(opts) {
-  const apiOrigin = String(opts?.apiOrigin || "")
+const ACCOUNT_API_FALLBACK = "https://rootrecord-api-account.rootrecord.workers.dev";
+
+/** Prefer same-origin `/api` on `*.rootrecord.info` so session notify matches login cookies. */
+export function resolveAccountNotifyOrigin(preferred) {
+  const fallback = String(preferred || ACCOUNT_API_FALLBACK)
     .trim()
     .replace(/\/+$/, "");
+  if (typeof window !== "undefined") {
+    try {
+      const h = window.location.hostname.toLowerCase();
+      if (h === "rootrecord.info" || h.endsWith(".rootrecord.info")) {
+        return window.location.origin.replace(/\/+$/, "");
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return fallback;
+}
+
+export async function notifyAppSessionStart(opts) {
+  const apiOrigin = resolveAccountNotifyOrigin(opts?.apiOrigin);
   const appId = String(opts?.appId || "").trim();
   if (!apiOrigin || !appId) return;
 

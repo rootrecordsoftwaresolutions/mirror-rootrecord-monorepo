@@ -155,5 +155,11 @@ if ($discordFeedback -match '^https://discord(app)?\.com/api/webhooks/' -and $di
   Write-Host "Uploaded DISCORD_FEEDBACK_WEBHOOK_URL (from credentials.env)."
 }
 
+$appSessionWebhook = [string]$env:DISCORD_APP_SESSION_WEBHOOK_URL
+if ($appSessionWebhook -match '^https://discord(app)?\.com/api/webhooks/' -and $appSessionWebhook.Length -gt 60) {
+  $appSessionWebhook | npx wrangler secret put DISCORD_APP_SESSION_WEBHOOK_URL
+  Write-Host "Uploaded DISCORD_APP_SESSION_WEBHOOK_URL (app session starts → Discord)."
+}
+
 npx wrangler d1 migrations apply root-record --remote
 npx wrangler deploy

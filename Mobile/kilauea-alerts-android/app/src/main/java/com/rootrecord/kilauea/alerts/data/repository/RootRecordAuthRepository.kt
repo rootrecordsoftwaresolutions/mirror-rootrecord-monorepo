@@ -33,7 +33,11 @@ private const val LOGOUT_URL = "https://rootrecord-api-kilauea.rootrecord.worker
 private const val ME_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/me"
 
 @Serializable
-private data class LoginBody(val email: String, val password: String)
+private data class LoginBody(
+    val email: String,
+    val password: String,
+    val app_id: String = "rootrecord_kilauea_alerts_android",
+)
 
 /**
  * Root Record account session (see POST /v1/auth/login on api-kilauea.rootrecord.info — Worker `rootrecord-api-kilauea`).
@@ -51,6 +55,7 @@ class RootRecordAuthRepository @Inject constructor(
             val payload = AppJson.encodeToString(LoginBody.serializer(), LoginBody(trimmed, password))
             val req = Request.Builder()
                 .url(LOGIN_URL)
+                .header("X-RR-App-Id", "rootrecord_kilauea_alerts_android")
                 .post(payload.toRequestBody(JsonMedia))
                 .build()
             http.newCall(req).execute().use { resp ->

@@ -693,19 +693,31 @@ button.plot-card {
   color: var(--muted);
 }
 
+.app-main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mobile-web-header {
+  display: none;
+}
+
 .bottom-nav {
+  display: none;
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   bottom: 0;
   width: 100%;
-  max-width: 480px;
+  max-width: none;
+  transform: none;
   height: var(--nav-h);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  display: flex;
   background: #070c16;
   border-top: 1px solid var(--border);
-  z-index: 20;
+  z-index: 30;
 }
 
 .bottom-nav-btn {
@@ -1084,4 +1096,220 @@ button.plot-card {
 .store-card-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* —— Mobile web (phones / narrow viewports) —— */
+@media (max-width: 768px) {
+  .app-shell--web {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    min-height: 100svh;
+  }
+
+  .side-nav {
+    display: none;
+  }
+
+  .mobile-web-header {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-shrink: 0;
+    padding: max(0.65rem, env(safe-area-inset-top, 0px)) 1rem 0.5rem;
+    background: #070c16;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-web-header-logo {
+    font-size: 1.35rem;
+    color: var(--cyan);
+    line-height: 1;
+  }
+
+  .mobile-web-header-title {
+    margin: 0;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .mobile-web-header-tag {
+    margin: 0.1rem 0 0;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .app-main-column {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-main--web {
+    flex: 1;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+
+  .bottom-nav {
+    display: flex;
+  }
+
+  .bottom-nav-btn {
+    min-width: 0;
+    padding: 0.25rem 0.15rem;
+  }
+
+  .bottom-nav-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 0.1rem;
+  }
+
+  .screen {
+    padding: 0.85rem 1rem 1.25rem;
+  }
+
+  .hud--web {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .hud--web .hud-side {
+    text-align: center;
+  }
+
+  .hud--web .hud-harvest-row {
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .hud--web .btn-harvest-now {
+    width: 100%;
+    max-width: 16rem;
+    margin-inline: auto;
+  }
+
+  .hud-balance {
+    font-size: 2rem;
+  }
+
+  .hud-sync {
+    max-width: none;
+  }
+
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+  }
+
+  .plots-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .plot-card--grid {
+    min-height: auto;
+  }
+
+  .plot-yield {
+    font-size: 0.8rem;
+  }
+
+  .stat-row {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+  .stat-row > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .stat-row .stat-k,
+  .stat-row .stat-v {
+    display: inline;
+    margin: 0;
+  }
+
+  .stat-row .stat-v {
+    font-size: 0.95rem;
+  }
+
+  .row-grid--web,
+  .row-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .store-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .store-balance {
+    text-align: left;
+    width: 100%;
+  }
+
+  .app-shell--web .store-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-card {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+  }
+
+  .upgrade-card .btn-buy {
+    width: 100%;
+    text-align: center;
+  }
+
+  .beta-tester-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .beta-tester-banner .btn-sm {
+    width: 100%;
+  }
+
+  .economy-row {
+    grid-template-columns: 2rem minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .economy-balance {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 0.15rem;
+  }
+
+  .plot-detail--web .upgrade-card {
+    max-width: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .bottom-nav-label {
+    font-size: 0.55rem;
+  }
+
+  .bottom-nav-icon {
+    font-size: 0.9rem;
+  }
 }

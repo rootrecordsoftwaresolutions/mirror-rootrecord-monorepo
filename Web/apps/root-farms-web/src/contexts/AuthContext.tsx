@@ -59,9 +59,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!canPlay || sessionNotified) return;
-    notifyFarmsSessionStart(guestMode && !authed);
+    notifyFarmsSessionStart(!authed);
     setSessionNotified(true);
-  }, [canPlay, sessionNotified, guestMode, authed]);
+  }, [canPlay, sessionNotified, authed]);
 
   const login = useCallback(
     async (email: string, password: string) => {

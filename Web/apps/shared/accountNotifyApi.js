@@ -2,4 +2,4 @@
 export const ROOTRECORD_ACCOUNT_API_ORIGIN =
   "https://rootrecord-api-account.rootrecord.workers.dev";
 
-export { notifyAppSessionStart } from "./notifyAppSessionStart.js";
+export { notifyAppSessionStart, resolveAccountNotifyOrigin } from "./notifyAppSessionStart.js";

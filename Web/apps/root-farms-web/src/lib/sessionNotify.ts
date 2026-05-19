@@ -6,6 +6,12 @@ export const FARMS_APP_ID = "root_farms";
 const ACCOUNT_API_FALLBACK = "https://rootrecord-api-account.rootrecord.workers.dev";
 
 function sessionNotifyOrigin(): string {
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname.toLowerCase();
+    if (h === "rootrecord.info" || h.endsWith(".rootrecord.info")) {
+      return window.location.origin.replace(/\/+$/, "");
+    }
+  }
   const env = (import.meta.env.VITE_ROOTRECORD_API_ORIGIN as string | undefined)?.trim();
   if (env) return env.replace(/\/+$/, "").replace(/\/api$/i, "");
   const fromApi = getApiOrigin();

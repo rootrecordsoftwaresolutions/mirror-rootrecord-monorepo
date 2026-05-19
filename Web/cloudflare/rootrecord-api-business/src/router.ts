@@ -5,6 +5,7 @@ import { bindCorsRequest, cors, json } from "./cors";
 import { resolveUserId } from "./auth";
 
 import { authLogin, authMe, authSignup, extractAuthToken, sessionFromRequest } from "./primary-auth";
+import { scheduleAuthLoginDiscordSessionNotify } from "../../shared/discord-app-session-notify";
 import { buildSessionCookieHeader, ssoCookieDomainForApiHost } from "./web-sso";
 import { buildSessionInsertMeta, handleAuthLogout, handleAuthLogoutAll, handleMeAccountRoutes } from "./me-account-routes";
 
@@ -350,6 +351,15 @@ export async function handleRequest(
 
       }
 
+      scheduleAuthLoginDiscordSessionNotify(
+        ctx,
+        env,
+        request,
+        creds as Record<string, unknown>,
+        data,
+        licenseDeviceId(creds, request),
+      );
+
       const v1LoginTok = (data.access_token || data.token) as string | undefined;
       return json(data, 200, undefined, webSsoSetCookie(request, v1LoginTok));
 
@@ -416,6 +426,15 @@ export async function handleRequest(
         /* non-fatal */
 
       }
+
+      scheduleAuthLoginDiscordSessionNotify(
+        ctx,
+        env,
+        request,
+        creds as Record<string, unknown>,
+        data,
+        licenseDeviceId(creds, request),
+      );
 
       const v1SignupTok = (data.access_token || data.token) as string | undefined;
       return json(data, 200, undefined, webSsoSetCookie(request, v1SignupTok));

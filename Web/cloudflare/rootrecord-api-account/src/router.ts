@@ -36,7 +36,7 @@ import { handleSolanaSiteLogRoute } from "./solana-site-log";
 import { handleSolanaSiteTokenDiscordNotifyRoute } from "./solana-site-token-discord-notify";
 import { maybeForwardSolanaToolsApi } from "./solana-tools-forward";
 import { handleSolanaAppActivityRoute } from "./solana-app-activity";
-import { handleAppSessionStartRoute } from "./app-session-notify";
+import { handleAppSessionStartRoute, scheduleAuthLoginDiscordSessionNotify } from "./app-session-notify";
 import { handleSolanaLinkedWalletRoute } from "./solana-linked-wallet";
 import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
 import {
@@ -398,6 +398,15 @@ export async function handleRequest(
 
       }
 
+      scheduleAuthLoginDiscordSessionNotify(
+        ctx,
+        env,
+        request,
+        creds as Record<string, unknown>,
+        data,
+        licenseDeviceId(creds, request),
+      );
+
       const v1LoginTok = (data.access_token || data.token) as string | undefined;
       return json(data, 200, undefined, webSsoSetCookie(request, v1LoginTok));
 
@@ -465,9 +474,23 @@ export async function handleRequest(
 
       }
 
+      scheduleAuthLoginDiscordSessionNotify(
+        ctx,
+        env,
+        request,
+        creds as Record<string, unknown>,
+        data,
+        licenseDeviceId(creds, request),
+      );
+
       const v1SignupTok = (data.access_token || data.token) as string | undefined;
       return json(data, 200, undefined, webSsoSetCookie(request, v1SignupTok));
 
+    }
+
+    if (method === "POST" && pathname === "/v1/app-session/start") {
+      const appSessionRes = await handleAppSessionStartRoute(request, env, "/app-session/start", method);
+      if (appSessionRes) return appSessionRes;
     }
 
     if (method === "GET" && pathname === "/v1/me") {
@@ -924,6 +947,8 @@ export async function handleRequest(
 
     }
 
+    scheduleAuthLoginDiscordSessionNotify(ctx, env, request, creds as Record<string, unknown>, data, deviceId);
+
     return json(
 
       {
@@ -1027,6 +1052,8 @@ export async function handleRequest(
       /* non-fatal */
 
     }
+
+    scheduleAuthLoginDiscordSessionNotify(ctx, env, request, creds as Record<string, unknown>, data, deviceId);
 
     return json(
 

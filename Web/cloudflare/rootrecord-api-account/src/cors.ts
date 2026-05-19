@@ -18,7 +18,7 @@ export function cors(): Record<string, string> {
       "Vary": "Origin",
       "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
       "Access-Control-Allow-Headers":
-        "Authorization, Cookie, X-Guest-Id, Content-Type, Cache-Control, Pragma",
+        "Authorization, Cookie, X-Guest-Id, X-RR-App-Id, Content-Type, Cache-Control, Pragma",
       "Access-Control-Max-Age": "86400",
     };
   }
@@ -26,7 +26,7 @@ export function cors(): Record<string, string> {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers":
-      "Authorization, Cookie, X-Guest-Id, Content-Type, Cache-Control, Pragma",
+      "Authorization, Cookie, X-Guest-Id, X-RR-App-Id, Content-Type, Cache-Control, Pragma",
     "Access-Control-Max-Age": "86400",
   };
 }

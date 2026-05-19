@@ -26,8 +26,11 @@ import { getAppAssociationsForEmail } from "../../shared/app-associations";
 import { grantSignupBonusOnRegistration } from "./earn-signup-bonus";
 import { refreshCustodialOnchainCacheFromRpc } from "./custodial-onchain-cache";
 import type { CustodialCacheRpcEnv } from "./custodial-onchain-cache";
-
-
+import {
+  isMergedLoginAliasEmail,
+  resolveLicenseLoginRow,
+  verifyPasswordForLoginRow,
+} from "../../shared/license-login";
 
 export interface AuthEnv {
 
@@ -399,6 +402,18 @@ export async function authSignup(
 
   }
 
+  if (await isMergedLoginAliasEmail(env.DB, email)) {
+
+    return json(
+
+      { detail: "This email is linked to an existing RootRecord account. Sign in instead." },
+
+      409,
+
+    );
+
+  }
+
   const id = crypto.randomUUID();
 
   let salt: string;
@@ -502,15 +517,7 @@ export async function authLogin(
 
   }
 
-  const row = await env.DB.prepare(
-
-    "SELECT id, email, password_hash, salt FROM license_accounts WHERE email = ?"
-
-  )
-
-    .bind(email)
-
-    .first<{ id: string; email: string; password_hash: string; salt: string }>();
+  const row = await resolveLicenseLoginRow(env.DB, email);
 
   if (!row) {
 
@@ -518,15 +525,9 @@ export async function authLogin(
 
   }
 
-  if (typeof row.password_hash !== "string" || !row.password_hash || typeof row.salt !== "string" || !row.salt) {
-
-    return json({ detail: "Incorrect email or password." }, 401);
-
-  }
-
   try {
 
-    const v = await verifyLicenseAccountPassword(password, row.salt, row.password_hash);
+    const v = await verifyPasswordForLoginRow(password, row);
 
     if (!v.ok) {
 
@@ -538,17 +539,33 @@ export async function authLogin(
 
     if (v.needsUpgrade) {
 
-      await env.DB.prepare(
+      if (row.via_alias) {
 
-        "UPDATE license_accounts SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?"
+        await env.DB.prepare(
 
-      )
+          "UPDATE license_account_login_aliases SET password_hash = ?, salt = ? WHERE email = ?",
 
-        .bind(v.password_hash, v.salt, now, row.id)
+        )
 
-        .run();
+          .bind(v.password_hash, v.salt, row.login_email)
 
-    } else {
+          .run();
+
+      } else {
+
+        await env.DB.prepare(
+
+          "UPDATE license_accounts SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?",
+
+        )
+
+          .bind(v.password_hash, v.salt, now, row.id)
+
+          .run();
+
+      }
+
+    } else if (!row.via_alias) {
 
       await env.DB.prepare("UPDATE license_accounts SET updated_at = ? WHERE id = ?").bind(now, row.id).run();
 
@@ -558,7 +575,7 @@ export async function authLogin(
 
     const token = await issueToken(env.JWT_SECRET, row.email, row.id, sid);
 
-    return json(authSuccessJson(row, token), 200);
+    return json(authSuccessJson({ id: row.id, email: row.email }, token), 200);
 
   } catch {
 
