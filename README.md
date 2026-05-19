@@ -127,14 +127,29 @@ The repo-root `.gitignore` plus per-area `.gitignore` files handle this. Env edi
 
 ## Marketing site checklist (`Web/main/`)
 
-Optional audit list for [rootrecord.info](https://rootrecord.info) (marketing Pages). Detailed notes may also live in `Doc-Repo/`.
+**For [rootrecord.info](https://rootrecord.info) (marketing Pages).** Expand in `Doc-Repo/` as needed.
 
-- **Structure:** folder layout under `Web/main/`; shared nav/footer; remove dead CSS/assets
-- **HTML:** consistent DOCTYPE/head; semantic tags; legal dates in sync
-- **CSS:** dark neon theme; hero/image classes as needed
-- **Features:** dynamic nav, CTAs, account handoff
-- **SEO:** OG tags, Schema.org, sitemap
-- **A11y / graphics / perf:** expand in Doc-Repo as needed
+### 1. Core structure and file organization
+- [ ] Folder layout aligned with `Web/main/`
+- [ ] Shared components (nav/footer) — reduce duplication
+- [ ] Dead files: `.banner` CSS if unused, legacy files
+
+### 2. HTML structure and semantics
+- [ ] Consistent DOCTYPE/head, semantic tags
+- [ ] Legal dates synced
+
+### 3. CSS and styling
+- [ ] Dark neon theme strong
+- [ ] Add hero/image classes as needed
+
+### 4. Functionality and features
+- [ ] Dynamic nav, CTAs, account handoff
+
+### 5. Performance and SEO
+- [ ] OG tags, Schema.org, sitemap
+
+### 6–10. Accessibility, graphics, perf
+- [ ] Track detailed items in Doc-Repo when you start a pass
 
 ## Workflow rules (for assistant + dev)
 
