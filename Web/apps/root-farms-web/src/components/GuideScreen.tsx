@@ -4,7 +4,7 @@ export function GuideScreen() {
       <header className="guide-header">
         <h1>How Root Farms works</h1>
         <p className="guide-lead">
-          A plain-language guide to growing crops, earning Root Units, protecting your fields, and comparing your balance with other players.
+          A plain-language guide to growing crops, earning ROOTS, protecting your fields, using The Well, and comparing your balance with other players.
         </p>
       </header>
 
@@ -15,40 +15,46 @@ export function GuideScreen() {
       <article className="guide-section">
         <h2>What is Root Farms?</h2>
         <p>
-          Root Farms is a farming game tied to your Root Record account. You unlock crop plots, add rows, wait for crops to finish growing, and earn <strong>Root Units</strong> — the same balance you see in your account and in Discord. The more active rows you run, the more you can earn over time.
+          Root Farms is a farming game tied to your Root Record account. You unlock crop plots, add rows, wait for crops to finish growing, and earn <strong>ROOTS</strong> — the same internal balance you see in your account and in Discord. The more active rows and bonus sources you run, the more you can earn over time.
         </p>
       </article>
 
       <article className="guide-section">
         <h2>Your balance</h2>
         <p>
-          At the top of the game you see your <strong>available Root Units</strong>. That number is your real spendable balance across Root Record, not a separate fake wallet.
+          At the top of the game you see your <strong>available ROOTS</strong>. That number is your spendable internal Root Record balance, not a separate farm-only wallet.
         </p>
         <p>
-          While crops are growing, part of your earnings may show as <strong>Pending Harvest</strong>. Use <strong>Harvest now</strong> to move that pending amount into your available balance. You can only harvest manually about once per minute — the game also settles earnings in the background when you play or return after being away.
+          While crops are growing, part of your earnings may show as <strong>Pending Harvest</strong>. Use <strong>Harvest now</strong> to move that pending amount into your available balance. You can only harvest manually about once per minute. The game also settles earnings in the background when you play or return after being away.
+        </p>
+        <p>
+          ROOTS display with decimals. The smallest unit shown by the game is <strong>0.00000001 ROOTS</strong>, matching the 8-decimal ROOTS token format used for future web-only token features.
         </p>
       </article>
 
       <article className="guide-section">
         <h2>Plots and rows</h2>
         <p>
-          Each <strong>plot</strong> is a type of crop (for example onion, potato, or another entry in the catalog). Plots start locked until you meet their unlock requirement, usually based on how much you have earned over your lifetime on this farm.
+          <strong>Roots</strong> are the main crop category. Each root plot is a type of crop (for example carrot, potato, onion, or another catalog entry). Plots start locked until you meet their unlock requirements.
         </p>
         <p>
-          Inside a plot you add <strong>rows</strong>. Each row you activate contributes to that plot&apos;s income. Rows have a growing cycle: when the cycle completes, you earn Root Units for that harvest. Open a plot to see its grow time, how much each harvest pays, and how many rows you can add.
+          Inside a plot you add <strong>rows</strong>. Each row contributes to that plot&apos;s income. Rows have a growing cycle: when the cycle completes, you earn ROOTS for that harvest. Open a plot to see its grow time, harvest amount, and row limits.
         </p>
         <p>
-          You spend Root Units to unlock new plots and to add more rows. Plan spending between expanding to new crops and deepening rows on crops you already run.
+          You spend ROOTS to unlock new plots and add more rows. Plan spending between expanding into new crops, deepening rows on crops you already run, and saving for The Well or later features.
         </p>
       </article>
 
       <article className="guide-section">
         <h2>Earning and income rate</h2>
         <p>
-          Your farm produces income based on which plots are unlocked, how many rows are active, and each crop&apos;s payout per harvest. The game may show an <strong>income rate</strong> (Root Units per second) as a handy summary — it is derived from your current setup, not a fixed global number.
+          Your farm produces income from multiple sources: <strong>Roots</strong>, <strong>Vegetables</strong>, purchased <strong>Root Cluster Trees</strong>, and active <strong>app trees</strong>. The top summary shows the total income rate for all sources plus a breakdown for roots, vegetables, trees, and apps.
         </p>
         <p>
-          Income rates, grow times, unlock costs, and per-harvest payouts can be tuned as the game evolves. Always check your plots in-game for current numbers.
+          The income rate is shown as ROOTS per second. Harvest values show what each source pays when its cycle completes. Farmhands may reduce the rate while protection is active, while cluster trees and app trees can increase it.
+        </p>
+        <p>
+          Income rates, grow times, unlock costs, and per-harvest payouts can be tuned as the game evolves. Always check your in-game screens for current numbers.
         </p>
       </article>
 
@@ -69,7 +75,10 @@ export function GuideScreen() {
           </li>
         </ul>
         <p>
-          While a plan is <strong>on</strong>, your farm&apos;s <strong>income rate</strong> is reduced by that plan&apos;s percentage (1% for gopher or field mice, 3% for rabbit). This is not taken from your spendable balance — you simply earn slightly slower. All active plans stack (up to 5% slower with every plan on). You can toggle plans anytime when signed in.
+          While a plan is <strong>on</strong>, your farm&apos;s <strong>income rate</strong> is reduced by that plan&apos;s percentage. This is not taken from your spendable balance — you simply earn slightly slower. You can toggle plans anytime when signed in.
+        </p>
+        <p>
+          Farmhand protection only counts as active if you have checked into Root Farms recently. If you have not opened Root Farms within about 48 hours, farmhands stop protecting until you return.
         </p>
       </article>
 
@@ -79,7 +88,7 @@ export function GuideScreen() {
           From <strong>Ginger</strong> with at least two rows, <strong>wind</strong> can wipe a whole crop plot and <strong>lightning</strong> can strike one shared row number across all farms that day. Buy a <strong>lightning rod</strong> once, hire a <strong>lightning meteorologist</strong> (−1% income), or plant <strong>cypress windbreaks</strong> (−5% income, strong wind block).
         </p>
         <p>
-          Classic gopher, mice, and rabbit attacks apply only on <strong>Carrot through Garlic</strong> plots.
+          Varmints and lightning can also affect orchard and cluster-tree progress as those systems grow. Read the Farmhands notifications after an alert so you know exactly what happened.
         </p>
       </article>
 
@@ -92,7 +101,34 @@ export function GuideScreen() {
           Purchased <strong>Root Cluster Trees</strong> also live in Orchards after you cluster a completed 10-plot root section. Each cluster tree adds +5% total income.
         </p>
         <p>
-          At <strong>root level 20</strong> (your highest unlocked root plot), <strong>Vegetable plots</strong> open as a separate tier with its own unlock and row costs. Vegetables are protected when you own the lightning rod and have at least one farmhand active.
+          At <strong>farm level 20</strong>, <strong>Vegetable plots</strong> open as a separate tier with their own unlock and row costs. Farm level combines unlocked root and vegetable plots plus row progress. Vegetables are protected when you own the lightning rod and have at least one active farmhand.
+        </p>
+      </article>
+
+      <article className="guide-section">
+        <h2>The Well</h2>
+        <p>
+          <strong>The Well</strong> is the social and game table area for internal ROOTS. You can post dice requests for other farmers, spin the wheel, play roulette, try Hi-Lo, and make community donations.
+        </p>
+        <ul className="guide-list">
+          <li>
+            <strong>Dice requests</strong> — post a ROOTS stake for another farmer to join. Higher D6 roll wins the escrowed stakes; ties refund both players.
+          </li>
+          <li>
+            <strong>Spin the wheel</strong> — costs 0.001 ROOTS per spin, has 100 visual pegs, and includes small prizes plus a rare 1 ROOT jackpot.
+          </li>
+          <li>
+            <strong>Roulette</strong> — bet 0.001 to 1 ROOTS on red/black, odd/even, low/high, zero, or a straight number.
+          </li>
+          <li>
+            <strong>Hi-Lo</strong> — guess whether the next card is higher or lower. Wins pay 1.95x; ties push and refund the stake.
+          </li>
+          <li>
+            <strong>Community donations</strong> — donate ROOTS to The Well and split the amount evenly across other signed-in farmers. Donations are recorded as internal ROOTS transactions and posted to the ROOTS economy webhook.
+          </li>
+        </ul>
+        <p>
+          The Well is house-favored over time. Use it for fun, but do not spend ROOTS you need for farm upgrades.
         </p>
       </article>
 
@@ -116,9 +152,19 @@ export function GuideScreen() {
       <article className="guide-section">
         <h2>Root Economy</h2>
         <p>
-          <strong>Root Economy</strong> shows a live leaderboard of the top balances in the game, plus <strong>internal circulation</strong> — the total Root Units held across linked accounts. Use <strong>/economy</strong> in Discord for the same summary. You can optionally set a <strong>public display name</strong> in your account settings on the Root Record website; otherwise the board shows a shortened wallet-style address. Discord usernames from your profile may appear when linked.
+          <strong>Root Economy</strong> shows a live leaderboard of top balances plus <strong>internal circulation</strong> — the total ROOTS held across linked accounts. Use <strong>/economy</strong> in Discord for the same summary. You can optionally set a <strong>public display name</strong> in your account settings on the Root Record website; otherwise the board shows a shortened wallet-style address. Discord usernames from your profile may appear when linked.
         </p>
         <p>This board is for fun and bragging rights — it does not change how your farm earns.</p>
+      </article>
+
+      <article className="guide-section">
+        <h2>Mint Machine</h2>
+        <p>
+          <strong>Mint Machine</strong> is a coming-soon web-only feature for farm level 30. It is planned to let signed-in users mint eligible internal ROOTS balance to an on-chain address after the Solana switch is ready.
+        </p>
+        <p>
+          Until it launches, Root Farms remains internal. The app-facing game does not require crypto activity.
+        </p>
       </article>
 
       <article className="guide-section">
@@ -134,8 +180,10 @@ export function GuideScreen() {
       <article className="guide-section guide-section--tips">
         <h2>Quick tips</h2>
         <ul className="guide-list">
-          <li>Check pending harvest before spending your last Root Units on upgrades.</li>
+          <li>Check pending harvest before spending your last ROOTS on upgrades or The Well.</li>
           <li>Balance row upgrades on your best plots with unlocking new crops.</li>
+          <li>Cluster completed root sections to move them into Orchards and gain +5% total income per cluster tree.</li>
+          <li>Open the Volcano, Business, and Weather apps once per day if you want the matching +10% app tree bonuses.</li>
           <li>Turn on farmhand protection when you cannot check the game often — weigh the income-rate reduction against varmint risk.</li>
           <li>Read Farmhands notifications after an alert so you know whether an attack was blocked.</li>
         </ul>
