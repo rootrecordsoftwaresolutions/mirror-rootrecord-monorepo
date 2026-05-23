@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { AdSenseAd } from "./components/AdSenseAd";
 import { AuthScreen } from "./components/AuthScreen";
 import { BetaTesterBanner } from "./components/BetaTesterBanner";
 import { PlaceholderTab } from "./components/PlaceholderTab";
@@ -122,9 +121,7 @@ function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
         <MobileWebHeader />
         <main className="app-main app-main--web">
           <BetaTesterBanner onSignIn={onSignIn} />
-          <AdSenseAd placement="top" />
           {body}
-          <AdSenseAd placement="bottom" />
         </main>
       </div>
       <BottomNav tab={tab} onTab={onTab} />
@@ -145,9 +142,7 @@ function RootFarmsGate() {
   if (showSignIn && !auth.authed) {
     return (
       <div className="auth-ad-shell">
-        <AdSenseAd placement="top" />
         <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />
-        <AdSenseAd placement="bottom" />
       </div>
     );
   }
@@ -155,9 +150,7 @@ function RootFarmsGate() {
   if (!auth.canPlay) {
     return (
       <div className="auth-ad-shell">
-        <AdSenseAd placement="top" />
         <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />
-        <AdSenseAd placement="bottom" />
       </div>
     );
   }
