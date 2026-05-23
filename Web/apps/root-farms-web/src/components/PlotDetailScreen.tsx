@@ -55,7 +55,7 @@ export function PlotDetailScreen({
       </button>
       <AccountBalanceHud variant={variant} className="plot-detail-balance-hud" />
 
-      <header className={`detail-hero accent-${cat.accent}`}>
+      <header className={`detail-hero accent-${cat.accent}`} data-plot-id={plotId}>
         <p className="detail-plot-num">
           Plot {plotId} / {PLOT_COUNT}
         </p>
@@ -94,6 +94,7 @@ export function PlotDetailScreen({
           <div
             key={i}
             className={`row-card accent-${cat.accent}`}
+            data-plot-id={plotId}
             style={{ ["--grow" as any]: Math.min(1, Math.max(0, plot.cycleProgress)) }}
           >
             <span className="row-plant" aria-hidden>

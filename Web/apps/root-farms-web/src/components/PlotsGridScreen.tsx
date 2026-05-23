@@ -250,6 +250,7 @@ function PlotGridCard({ plot, onOpen }: { plot: PlotProgress; onOpen: () => void
       type="button"
       className={`plot-card plot-card--grid accent-${cat.accent}`}
       onClick={onOpen}
+      data-plot-id={plot.id}
       style={{ ["--grow" as any]: grow }}
     >
       <span className="plot-plant" aria-hidden data-stage={grow >= 0.95 ? "ripe" : grow >= 0.5 ? "mid" : "sprout"}>
@@ -318,7 +319,7 @@ function LockedPlotGridCard({
   };
 
   return (
-    <div className="plot-card plot-card--grid plot-card-locked">
+    <div className="plot-card plot-card--grid plot-card-locked" data-plot-id={plotId}>
       <span className="plot-icon" aria-hidden>
         🔒
       </span>

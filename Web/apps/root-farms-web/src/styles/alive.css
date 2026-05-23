@@ -1285,3 +1285,282 @@ button.plot-card:hover .plot-plant {
 
 .tier-plot-card-locked .plot-card-main,
 .tier-plot-card-locked .plot-yield { opacity: 0.7; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Per-plot accent themes (P2)
+   Each accent class declares CSS variables that the plant, glow, and card
+   gradient consume. Per-species overrides via data-plot-id="N" then layer
+   on top for hero plots (Carrot, Beetroot, Ginger, etc.) — wiring untouched.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Defaults if no accent class matched */
+.plot-card,
+.row-card,
+.detail-hero {
+  --acc: var(--green);
+  --acc-2: var(--green-deep);
+  --acc-soft: rgba(123, 214, 106, 0.10);
+  --acc-strong: rgba(123, 214, 106, 0.28);
+  --acc-glow: rgba(123, 214, 106, 0.45);
+}
+
+/* Group accents — bigger visual swing than just border color */
+.plot-card.accent-green,
+.row-card.accent-green,
+.detail-hero.accent-green {
+  --acc: #7bd66a;
+  --acc-2: #2f8a3a;
+  --acc-soft: rgba(123, 214, 106, 0.12);
+  --acc-strong: rgba(123, 214, 106, 0.32);
+  --acc-glow: rgba(123, 214, 106, 0.45);
+}
+
+.plot-card.accent-cyan,
+.row-card.accent-cyan,
+.detail-hero.accent-cyan {
+  --acc: #5ce0d4;
+  --acc-2: #1a8a82;
+  --acc-soft: rgba(92, 224, 212, 0.12);
+  --acc-strong: rgba(92, 224, 212, 0.32);
+  --acc-glow: rgba(92, 224, 212, 0.50);
+}
+
+.plot-card.accent-blue,
+.row-card.accent-blue,
+.detail-hero.accent-blue {
+  --acc: #74b9e8;
+  --acc-2: #2a5f9c;
+  --acc-soft: rgba(116, 185, 232, 0.12);
+  --acc-strong: rgba(116, 185, 232, 0.32);
+  --acc-glow: rgba(116, 185, 232, 0.45);
+}
+
+.plot-card.accent-purple,
+.row-card.accent-purple,
+.detail-hero.accent-purple {
+  --acc: #c9a7ff;
+  --acc-2: #6e3fb8;
+  --acc-soft: rgba(201, 167, 255, 0.14);
+  --acc-strong: rgba(201, 167, 255, 0.34);
+  --acc-glow: rgba(201, 167, 255, 0.50);
+}
+
+.plot-card.accent-amber,
+.row-card.accent-amber,
+.detail-hero.accent-amber {
+  --acc: #ffc46b;
+  --acc-2: #b46d1a;
+  --acc-soft: rgba(255, 196, 107, 0.14);
+  --acc-strong: rgba(255, 196, 107, 0.36);
+  --acc-glow: rgba(255, 196, 107, 0.55);
+}
+
+/* Per-species hero overrides — picks one signature plant per group */
+.plot-card[data-plot-id="1"],
+.row-card[data-plot-id="1"],
+.detail-hero[data-plot-id="1"] {
+  /* Carrot — classic orange */
+  --acc: #ff8e3c;
+  --acc-2: #b04612;
+  --acc-soft: rgba(255, 142, 60, 0.14);
+  --acc-strong: rgba(255, 142, 60, 0.40);
+  --acc-glow: rgba(255, 142, 60, 0.55);
+}
+.plot-card[data-plot-id="4"],
+.row-card[data-plot-id="4"],
+.detail-hero[data-plot-id="4"] {
+  /* Beetroot — deep magenta */
+  --acc: #ff5d9d;
+  --acc-2: #8a1a4f;
+  --acc-soft: rgba(255, 93, 157, 0.14);
+  --acc-strong: rgba(255, 93, 157, 0.38);
+  --acc-glow: rgba(255, 93, 157, 0.55);
+}
+.plot-card[data-plot-id="5"],
+.row-card[data-plot-id="5"],
+.detail-hero[data-plot-id="5"] {
+  /* Radish — coral pink */
+  --acc: #ff7a8a;
+  --acc-2: #9a2536;
+  --acc-soft: rgba(255, 122, 138, 0.13);
+  --acc-strong: rgba(255, 122, 138, 0.36);
+  --acc-glow: rgba(255, 122, 138, 0.50);
+}
+.plot-card[data-plot-id="10"],
+.row-card[data-plot-id="10"],
+.detail-hero[data-plot-id="10"] {
+  /* Ginger — warm gold */
+  --acc: #f0b657;
+  --acc-2: #8c5a1a;
+  --acc-soft: rgba(240, 182, 87, 0.14);
+  --acc-strong: rgba(240, 182, 87, 0.36);
+  --acc-glow: rgba(240, 182, 87, 0.55);
+}
+.plot-card[data-plot-id="14"],
+.row-card[data-plot-id="14"],
+.detail-hero[data-plot-id="14"] {
+  /* Taro — soft lilac */
+  --acc: #b8a5e8;
+  --acc-2: #5a3f8c;
+  --acc-soft: rgba(184, 165, 232, 0.14);
+  --acc-strong: rgba(184, 165, 232, 0.36);
+  --acc-glow: rgba(184, 165, 232, 0.50);
+}
+.plot-card[data-plot-id="16"],
+.row-card[data-plot-id="16"],
+.detail-hero[data-plot-id="16"] {
+  /* Turmeric — vivid saffron */
+  --acc: #ffae3c;
+  --acc-2: #b56612;
+  --acc-soft: rgba(255, 174, 60, 0.14);
+  --acc-strong: rgba(255, 174, 60, 0.42);
+  --acc-glow: rgba(255, 174, 60, 0.60);
+}
+.plot-card[data-plot-id="23"],
+.row-card[data-plot-id="23"],
+.detail-hero[data-plot-id="23"] {
+  /* Lotus root — pale pond rose */
+  --acc: #f3b6c7;
+  --acc-2: #aa5a72;
+  --acc-soft: rgba(243, 182, 199, 0.14);
+  --acc-strong: rgba(243, 182, 199, 0.34);
+  --acc-glow: rgba(243, 182, 199, 0.50);
+}
+.plot-card[data-plot-id="28"],
+.row-card[data-plot-id="28"],
+.detail-hero[data-plot-id="28"] {
+  /* Wasabi — vivid bright green */
+  --acc: #b7ff5c;
+  --acc-2: #4a8c1a;
+  --acc-soft: rgba(183, 255, 92, 0.14);
+  --acc-strong: rgba(183, 255, 92, 0.38);
+  --acc-glow: rgba(183, 255, 92, 0.55);
+}
+.plot-card[data-plot-id="62"],
+.row-card[data-plot-id="62"],
+.detail-hero[data-plot-id="62"] {
+  /* Ube — vivid purple yam */
+  --acc: #b063ff;
+  --acc-2: #4d1e8a;
+  --acc-soft: rgba(176, 99, 255, 0.16);
+  --acc-strong: rgba(176, 99, 255, 0.40);
+  --acc-glow: rgba(176, 99, 255, 0.60);
+}
+
+/* Pipe the accent into every visual surface */
+.plot-card.accent-green,
+.plot-card.accent-cyan,
+.plot-card.accent-blue,
+.plot-card.accent-purple,
+.plot-card.accent-amber {
+  border-color: var(--acc-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 40%),
+    radial-gradient(140% 90% at 100% 0%, var(--acc-soft), transparent 55%),
+    linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+}
+
+button.plot-card:hover {
+  border-color: var(--acc-strong);
+  box-shadow: var(--shadow-card),
+              0 0 0 1px var(--acc-strong),
+              0 0 28px -6px var(--acc-glow);
+}
+
+/* Plot name dot tinted to accent */
+.plot-card .plot-dot {
+  background: var(--acc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 18%, transparent),
+              0 0 12px var(--acc);
+}
+
+/* Plot yield + accent name color */
+.plot-card .plot-yield { color: var(--acc); }
+.plot-card .plot-name { color: var(--acc); }
+
+/* Cycle bar uses accent */
+.plot-card .plot-cycle {
+  background: linear-gradient(90deg, var(--acc-2), var(--acc));
+  box-shadow: 0 0 14px var(--acc-glow);
+}
+
+/* Seg bar fills tinted to accent */
+.plot-card.accent-green .seg-bar span.on,
+.plot-card.accent-cyan .seg-bar span.on,
+.plot-card.accent-blue .seg-bar span.on,
+.plot-card.accent-purple .seg-bar span.on,
+.plot-card.accent-amber .seg-bar span.on {
+  background: linear-gradient(90deg, var(--acc-2), var(--acc));
+}
+
+/* Decorative top-right halo on grid cards now uses accent */
+.plot-card--grid::after {
+  background: radial-gradient(circle, var(--acc-soft), transparent 65%);
+}
+
+/* The plant: stem + leaves tinted by accent (was pure green) */
+.plot-card .plot-plant-stem {
+  background: linear-gradient(180deg, var(--acc) 0%, var(--acc-2) 100%);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--acc-glow) 70%, transparent);
+}
+.plot-card .plot-plant-leaf {
+  background: linear-gradient(135deg, var(--acc) 0%, var(--acc-2) 100%);
+}
+.plot-card .plot-plant-leaf--c {
+  background: radial-gradient(circle at 35% 30%, var(--acc) 0%, var(--acc-2) 80%);
+}
+.plot-card .plot-plant {
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35))
+          drop-shadow(0 0 14px color-mix(in srgb, var(--acc-glow) calc(var(--g, 0) * 70%), transparent));
+}
+
+/* Row card mini-plant follows accent too */
+.row-card .row-plant-stem {
+  background: linear-gradient(180deg, var(--acc), var(--acc-2));
+}
+.row-card .row-plant-leaf {
+  background: linear-gradient(135deg, var(--acc), var(--acc-2));
+}
+.row-card .row-progress {
+  background: linear-gradient(90deg, var(--acc-2), var(--acc));
+  box-shadow: 0 0 10px var(--acc-glow);
+}
+.row-card .row-name { color: var(--acc); }
+.row-card.accent-green,
+.row-card.accent-cyan,
+.row-card.accent-blue,
+.row-card.accent-purple,
+.row-card.accent-amber {
+  border-color: var(--acc-strong);
+  background:
+    radial-gradient(140% 90% at 100% 0%, var(--acc-soft), transparent 55%),
+    linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+}
+
+/* Detail hero — tint title gradient by accent */
+.detail-hero h1 {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 30%, #ffffff) 0%, var(--acc) 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.detail-hero {
+  border-color: var(--acc-strong);
+  background:
+    radial-gradient(140% 90% at 0% 0%, var(--acc-soft), transparent 55%),
+    linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+}
+
+/* Locked card chevron icon uses accent (when known) */
+.plot-card-locked { border-color: color-mix(in srgb, var(--acc-strong) 60%, transparent); }
+.plot-card-locked .plot-name { color: var(--text); }
+
+/* Cluster card keeps its signature green */
+.plot-card--cluster {
+  --acc: var(--green);
+  --acc-2: var(--green-deep);
+  --acc-soft: rgba(123, 214, 106, 0.16);
+  --acc-strong: rgba(123, 214, 106, 0.40);
+  --acc-glow: rgba(123, 214, 106, 0.55);
+}
