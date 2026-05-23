@@ -836,3 +836,200 @@ button.plot-card--grid:hover::after { transform: scale(1.6); opacity: 1; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ───────── Growing plant art (P1 — plot + row cycle) ───────── */
+
+/* Per-card sprite, anchored bottom-right of the plot card */
+.plot-plant {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 1rem;
+  width: 56px;
+  height: 64px;
+  pointer-events: none;
+  z-index: 1;
+  --g: var(--grow, 0);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35))
+          drop-shadow(0 0 14px rgba(123, 214, 106, calc(var(--g) * 0.35)));
+}
+
+/* mound of soil — always visible on unlocked plot */
+.plot-plant-soil {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 40px;
+  height: 10px;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(ellipse at 50% 100%, #6a4424 0%, #4a2d16 60%, transparent 75%);
+  border-radius: 50% / 80%;
+}
+.plot-plant-soil::after {
+  /* tiny seed/dots speckle */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 28% 55%, rgba(0, 0, 0, 0.35) 1px, transparent 1.5px),
+    radial-gradient(circle at 72% 65%, rgba(255, 255, 255, 0.08) 1px, transparent 1.5px),
+    radial-gradient(circle at 50% 45%, rgba(0, 0, 0, 0.3) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+  opacity: 0.9;
+}
+
+/* stem grows up from soil; height ties to --grow */
+.plot-plant-stem {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 2.5px;
+  height: calc(8px + var(--g) * 34px);
+  background: linear-gradient(180deg, var(--leaf) 0%, var(--green) 55%, var(--green-deep) 100%);
+  border-radius: 3px;
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+  transition: height 0.4s var(--ease-organic);
+  box-shadow: 0 0 6px rgba(123, 214, 106, calc(var(--g) * 0.5));
+  animation: plant-sway 4.5s ease-in-out infinite;
+}
+@keyframes plant-sway {
+  0%, 100% { transform: translateX(-50%) rotate(0deg); }
+  50%      { transform: translateX(-50%) rotate(2deg); }
+}
+
+/* three leaves — emerge at thresholds, scale + tilt by --g */
+.plot-plant-leaf {
+  position: absolute;
+  bottom: calc(8px + var(--g) * 18px);
+  left: 50%;
+  width: 14px;
+  height: 9px;
+  background: linear-gradient(135deg, var(--leaf) 0%, var(--green-deep) 100%);
+  border-radius: 100% 0 100% 0;
+  opacity: 0;
+  transform-origin: 0% 100%;
+  transition: opacity 0.5s var(--ease-organic),
+              transform 0.5s var(--ease-organic),
+              bottom 0.5s var(--ease-organic);
+}
+.plot-plant-leaf--l {
+  /* left leaf — appears earliest */
+  border-radius: 100% 0 100% 0;
+  transform: translateX(-100%) rotate(-30deg) scale(calc(0.4 + var(--g) * 0.9));
+  opacity: clamp(0, calc((var(--g) - 0.05) * 4), 1);
+  animation: leaf-bob 5.5s ease-in-out infinite;
+}
+.plot-plant-leaf--r {
+  border-radius: 0 100% 0 100%;
+  transform: translateX(0%) rotate(30deg) scale(calc(0.4 + var(--g) * 0.9));
+  opacity: clamp(0, calc((var(--g) - 0.2) * 3), 1);
+  animation: leaf-bob 5.5s ease-in-out infinite reverse;
+  animation-delay: 0.4s;
+}
+.plot-plant-leaf--c {
+  /* crown leaf, only in late grow */
+  bottom: calc(14px + var(--g) * 32px);
+  width: 12px;
+  height: 12px;
+  border-radius: 60% 60% 30% 30%;
+  background: radial-gradient(circle at 35% 30%, var(--leaf), var(--green-deep) 75%);
+  transform: translateX(-50%) scale(calc(0.2 + var(--g) * 1));
+  opacity: clamp(0, calc((var(--g) - 0.55) * 2.8), 1);
+  animation: leaf-bob 6s ease-in-out infinite;
+}
+@keyframes leaf-bob {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50%      { filter: brightness(1.1) saturate(1.15); }
+}
+
+/* ripe glow — full grown plant pulses to signal harvest */
+.plot-plant[data-stage="ripe"] {
+  animation: ripe-glow 1.8s ease-in-out infinite;
+}
+@keyframes ripe-glow {
+  0%, 100% { filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35))
+                     drop-shadow(0 0 12px rgba(245, 196, 90, 0.35)); }
+  50%      { filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35))
+                     drop-shadow(0 0 24px rgba(245, 196, 90, 0.75)); }
+}
+
+/* keep plant clear of bottom progress bar */
+.plot-card--grid .plot-cycle { z-index: 2; }
+
+/* on hover, plants pop forward a touch */
+button.plot-card:hover .plot-plant {
+  transform: scale(1.06);
+  transition: transform 0.35s var(--ease-out-soft);
+}
+
+/* hide plant on locked / cluster cards (no plant there) */
+.plot-card-locked .plot-plant,
+.plot-card--cluster .plot-plant,
+.orchard-tree-card .plot-plant,
+.orchard-empty-card .plot-plant { display: none; }
+
+/* shift the plot-yield label slightly to avoid overlap with plant */
+.plot-card--grid .plot-card-top { padding-right: 4rem; }
+.plot-card--grid:not(.plot-card-locked):not(.plot-card--cluster) .plot-yield {
+  position: relative;
+  z-index: 1;
+}
+
+/* ───────── Row-card mini plants (in plot detail) ───────── */
+
+.row-card {
+  padding-bottom: 1.1rem;
+  min-height: 5.25rem;
+}
+.row-plant {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.5rem;
+  width: 26px;
+  height: 30px;
+  pointer-events: none;
+  --g: var(--grow, 0);
+  filter: drop-shadow(0 0 8px rgba(123, 214, 106, calc(var(--g) * 0.4)));
+}
+.row-plant-stem {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  height: calc(3px + var(--g) * 22px);
+  background: linear-gradient(180deg, var(--leaf), var(--green-deep));
+  border-radius: 2px;
+  transform: translateX(-50%);
+  transition: height 0.35s var(--ease-organic);
+  animation: plant-sway 4s ease-in-out infinite;
+}
+.row-plant-leaf {
+  position: absolute;
+  bottom: calc(3px + var(--g) * 12px);
+  left: 50%;
+  width: 9px;
+  height: 6px;
+  background: linear-gradient(135deg, var(--leaf), var(--green-deep));
+  opacity: 0;
+  transition: opacity 0.45s var(--ease-organic),
+              transform 0.45s var(--ease-organic),
+              bottom 0.45s var(--ease-organic);
+}
+.row-plant-leaf--l {
+  border-radius: 100% 0 100% 0;
+  transform: translateX(-100%) rotate(-28deg) scale(calc(0.4 + var(--g) * 0.9));
+  opacity: clamp(0, calc((var(--g) - 0.1) * 3), 1);
+}
+.row-plant-leaf--r {
+  border-radius: 0 100% 0 100%;
+  transform: translateX(0%) rotate(28deg) scale(calc(0.4 + var(--g) * 0.9));
+  opacity: clamp(0, calc((var(--g) - 0.25) * 2.6), 1);
+}
+.row-card .row-name,
+.row-card .row-rate {
+  position: relative;
+  z-index: 1;
+  padding-right: 2rem;
+}

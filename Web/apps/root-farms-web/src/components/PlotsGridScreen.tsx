@@ -243,9 +243,22 @@ function RootClusterCard({
 function PlotGridCard({ plot, onOpen }: { plot: PlotProgress; onOpen: () => void }) {
   const cat = getPlotCatalog(plot.id);
   const perHarvest = plotRuPerCycle(cat, plot.rowsActive, plot.rowCount);
+  const grow = Math.min(1, Math.max(0, plot.cycleProgress));
 
   return (
-    <button type="button" className={`plot-card plot-card--grid accent-${cat.accent}`} onClick={onOpen}>
+    <button
+      type="button"
+      className={`plot-card plot-card--grid accent-${cat.accent}`}
+      onClick={onOpen}
+      style={{ ["--grow" as any]: grow }}
+    >
+      <span className="plot-plant" aria-hidden data-stage={grow >= 0.95 ? "ripe" : grow >= 0.5 ? "mid" : "sprout"}>
+        <span className="plot-plant-leaf plot-plant-leaf--l" />
+        <span className="plot-plant-leaf plot-plant-leaf--r" />
+        <span className="plot-plant-leaf plot-plant-leaf--c" />
+        <span className="plot-plant-stem" />
+        <span className="plot-plant-soil" />
+      </span>
       <div className="plot-card-top">
         <div className="plot-card-main">
           <span className="plot-name">

@@ -91,7 +91,16 @@ export function PlotDetailScreen({
 
       <div className={`row-grid row-grid--${variant}`}>
         {Array.from({ length: plot.rowCount }, (_, i) => (
-          <div key={i} className={`row-card accent-${cat.accent}`}>
+          <div
+            key={i}
+            className={`row-card accent-${cat.accent}`}
+            style={{ ["--grow" as any]: Math.min(1, Math.max(0, plot.cycleProgress)) }}
+          >
+            <span className="row-plant" aria-hidden>
+              <span className="row-plant-leaf row-plant-leaf--l" />
+              <span className="row-plant-leaf row-plant-leaf--r" />
+              <span className="row-plant-stem" />
+            </span>
             <p className="row-name">Row {i + 1}</p>
             <p className="row-rate">{formatRu(cat.baseRuPerRow)} / harvest</p>
             <div className="row-progress" style={{ width: `${Math.min(100, plot.cycleProgress * 100)}%` }} />
