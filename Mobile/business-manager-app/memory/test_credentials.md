@@ -26,7 +26,7 @@ Use the email/password the user already has on rootrecord.info. Plan (Free vs Pr
 The signup endpoint hits the real Worker, so any unique email works:
 
 ```bash
-API="https://15689350-c999-4107-934a-1701fd2675bc.preview.emergentagent.com/api"
+API="https://roots-comes-alive.preview.emergentagent.com/api"
 EMAIL="bm-test-$(date +%s)@rootrecord-test.com"
 PASS="TestPass1234!"
 RESP=$(curl -s -X POST $API/auth/register \

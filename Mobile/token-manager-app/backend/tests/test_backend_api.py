@@ -8,7 +8,7 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://40b48fc1-bc8d-40bb-a9a3-ba2758566476.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://roots-comes-alive.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
 # Two valid base58 pubkeys that decode to 32 bytes (from the test context).
