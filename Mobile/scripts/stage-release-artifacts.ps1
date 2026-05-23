@@ -114,15 +114,22 @@ function Select-ReleaseArtifact([string]$Dir, [string]$Ext, [string]$Label) {
         Get-ChildItem -LiteralPath $Dir -Filter "*.$Ext" -File -ErrorAction SilentlyContinue
         Get-ChildItem -LiteralPath $Dir -Filter "*.$Ext" -File -Recurse -Depth 2 -ErrorAction SilentlyContinue
     ) | Sort-Object FullName -Unique
-    $candidates = $candidates | Where-Object {
+    $signedCandidates = $candidates | Where-Object {
         $_.Name -notmatch '(?i)debug' -and $_.Name -notmatch '(?i)unsigned'
     }
-    if (-not $candidates) {
-        throw "No signed $Label (*.$Ext) under $Dir. Check android\keystore.properties and rebuild."
+    if (-not $signedCandidates) {
+        $unsignedCandidates = $candidates | Where-Object {
+            $_.Name -notmatch '(?i)debug'
+        }
+        if (-not $unsignedCandidates) {
+            throw "No release $Label (*.$Ext) under $Dir. Check the Gradle release build output."
+        }
+        Write-Host "WARNING: No signed $Label under $Dir; staging unsigned release output for local review." -ForegroundColor Yellow
+        return $unsignedCandidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     }
-    $named = $candidates | Where-Object { $_.Name -match "(?i)app-release\.$Ext`$" }
+    $named = $signedCandidates | Where-Object { $_.Name -match "(?i)app-release\.$Ext`$" }
     if ($named) { return $named | Sort-Object LastWriteTime -Descending | Select-Object -First 1 }
-    return $candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    return $signedCandidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 }
 
 if ($Native) {
@@ -140,14 +147,26 @@ Assert-UploadCert $apk.FullName "APK"
 Assert-UploadCert $aab.FullName "AAB"
 
 New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
-$apkDest = Join-Path $DestDir ("{0}-{1}.apk" -f $BaseName, $Version)
-$aabDest = Join-Path $DestDir ("{0}-{1}.aab" -f $BaseName, $Version)
+$apkUnsigned = $apk.Name -match '(?i)unsigned'
+$aabUnsigned = $aab.Name -match '(?i)unsigned'
+$apkSuffix = if ($apkUnsigned) { "-unsigned" } else { "" }
+$aabSuffix = if ($aabUnsigned) { "-unsigned" } else { "" }
+$apkDest = Join-Path $DestDir ("{0}-{1}{2}.apk" -f $BaseName, $Version, $apkSuffix)
+$aabDest = Join-Path $DestDir ("{0}-{1}{2}.aab" -f $BaseName, $Version, $aabSuffix)
 
 Copy-Item -LiteralPath $apk.FullName -Destination $apkDest -Force
 Copy-Item -LiteralPath $aab.FullName -Destination $aabDest -Force
 
-Assert-UploadCert $apkDest "Staged APK"
-Assert-UploadCert $aabDest "Staged AAB"
+if ($apkUnsigned) {
+    Write-Host "WARNING: Staged APK is unsigned and is not Play-ready: $apkDest" -ForegroundColor Yellow
+} else {
+    Assert-UploadCert $apkDest "Staged APK"
+}
+if ($aabUnsigned) {
+    Write-Host "WARNING: Staged AAB is unsigned and is not Play-ready: $aabDest" -ForegroundColor Yellow
+} else {
+    Assert-UploadCert $aabDest "Staged AAB"
+}
 
 $apkSha256 = (Get-FileHash -LiteralPath $apkDest -Algorithm SHA256).Hash
 $aabSha256 = (Get-FileHash -LiteralPath $aabDest -Algorithm SHA256).Hash
@@ -157,8 +176,14 @@ $aabSize = (Get-Item -LiteralPath $aabDest).Length
 Write-Output "APK|$apkDest|$($apk.Name)"
 Write-Output "AAB|$aabDest|$($aab.Name)"
 Write-Host ""
-Write-Host "Play upload (use this AAB only):" -ForegroundColor Green
-Write-Host "  $aabDest"
+if ($aabUnsigned) {
+    Write-Host "Unsigned AAB staged for local review only:" -ForegroundColor Yellow
+    Write-Host "  $aabDest"
+    Write-Host "  Add release signing before Play upload."
+} else {
+    Write-Host "Play upload (use this AAB only):" -ForegroundColor Green
+    Write-Host "  $aabDest"
+}
 Write-Host "  Size:   $aabSize bytes"
 Write-Host "  SHA256: $aabSha256"
 if ($RequiredUploadSha1) {

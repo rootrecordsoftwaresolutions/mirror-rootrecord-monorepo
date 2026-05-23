@@ -13,7 +13,7 @@ export function PlotDetailScreen({
   onBack: () => void;
   variant?: "web" | "mobile";
 }) {
-  const { save, purchaseRowSlot, purchaseBusy, balanceReady } = useGame();
+  const { save, purchaseRowSlot, purchaseBusy, balanceReady, handleInsufficientFunds } = useGame();
   const plot = save.plots.find((p) => p.id === plotId);
   const cat = getPlotCatalog(plotId);
 
@@ -44,7 +44,7 @@ export function PlotDetailScreen({
 
   const onBuyRow = async () => {
     const r = await purchaseRowSlot(plotId);
-    if (r === "insufficient") window.alert("Not enough Root Units.");
+    if (r === "insufficient") await handleInsufficientFunds();
     else if (r === "offline") window.alert("Could not reach the server. Deploy farms API and run D1 migration.");
   };
 

@@ -104,6 +104,22 @@ export default function About() {
             </p>
           </div>
         </div>
+
+        <div className="card p-4">
+          <div className="label mb-2">Legal</div>
+          <div className="text-sm text-ink-secondary space-y-2">
+            <p>
+              <a className="text-phos font-semibold" href="https://rootrecord.info/terms" target="_blank" rel="noopener noreferrer">
+                Terms of Service
+              </a>
+            </p>
+            <p>
+              <a className="text-phos font-semibold" href="https://rootrecord.info/privacy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </a>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

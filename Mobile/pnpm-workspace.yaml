@@ -1,5 +1,6 @@
 packages:
   - "weather-manager-mobile"
+  - "root-farms-app"
   - "business-manager-app"
   - "account-hub-app"
   - "token-manager-app"

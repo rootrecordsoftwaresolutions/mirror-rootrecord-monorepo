@@ -52,6 +52,7 @@ public class MainActivity extends BridgeActivity {
     ensureAdView();
     loadRewardedAd();
     mainHandler.post(this::attachWebAdsBridge);
+    mainHandler.post(this::syncAdVisibilityFromWeb);
 
     View decor = getWindow() != null ? getWindow().getDecorView() : null;
     if (decor != null) {
@@ -66,6 +67,7 @@ public class MainActivity extends BridgeActivity {
 
     mainHandler.postDelayed(this::pushSafeAreaInsetsFromDecor, 400L);
     mainHandler.postDelayed(this::syncAdVisibilityFromWeb, 500L);
+    mainHandler.postDelayed(this::syncAdVisibilityFromWeb, 1500L);
   }
 
   @Override
@@ -202,6 +204,7 @@ public class MainActivity extends BridgeActivity {
       return;
     }
     webView.addJavascriptInterface(new WebAdsBridge(), "RootRecordAds");
+    syncWebBannerInset();
   }
 
   private void loadRewardedAd() {

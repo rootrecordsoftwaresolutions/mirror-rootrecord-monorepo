@@ -1,9 +1,10 @@
-# Deploy rootrecord-solana-tx + upload secrets from credentials.env.txt / Web/credentials.env (same account as primary).
+# Deploy rootrecord-solana-tx + upload secrets from repo credentials.env / credentials.env.txt / Web/credentials.env.
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here
 
 $repoRoot = (Resolve-Path (Join-Path $here "..\..\..\")).Path
+$credRoot = Join-Path $repoRoot "credentials.env"
 $credTxt = Join-Path $repoRoot "credentials.env.txt"
 $credEnv = Join-Path $repoRoot "Web\credentials.env"
 
@@ -20,6 +21,7 @@ function Import-DotEnvFile([string]$path) {
   }
 }
 
+Import-DotEnvFile $credRoot
 Import-DotEnvFile $credTxt
 Import-DotEnvFile $credEnv
 
@@ -42,7 +44,7 @@ function Put-SecretIf([string]$name, [string]$val) {
 }
 
 Put-SecretIf "RR_PUSH_ADMIN_SECRET" $env:RR_PUSH_ADMIN_SECRET
-Put-SecretIf "RRTT_TREASURY_SECRET_KEY_B58" $env:RRTT_TREASURY_SECRET_KEY_B58
+Put-SecretIf "ROOT_RECORD_GLOBAL_UPDATER_SECRET_KEY_B58" $env:ROOT_RECORD_GLOBAL_UPDATER_SECRET_KEY_B58
 Put-SecretIf "SOLANA_RPC_URL" $env:SOLANA_RPC_URL
 Put-SecretIf "DISCORD_WEBHOOK_SOLANA_TOOLS" $env:DISCORD_WEBHOOK_SOLANA_TOOLS
 Put-SecretIf "TREASURY_MAINTENANCE_SOURCE_SECRET_KEY_B58" $env:TREASURY_MAINTENANCE_SOURCE_SECRET_KEY_B58

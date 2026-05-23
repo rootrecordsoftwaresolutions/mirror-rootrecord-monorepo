@@ -9,6 +9,8 @@
     "d1:bm:clear-user": "node scripts/clear-bm-user-business.mjs",
     "d1:bm:scan-all": "node scripts/clear-bm-all-users.mjs",
     "d1:bm:clear-all": "node scripts/clear-bm-all-users.mjs --execute",
+    "d1:purge:test-accounts": "node scripts/purge-non-production-accounts.mjs",
+    "d1:purge:test-accounts:execute": "node scripts/purge-non-production-accounts.mjs --execute",
     "custodial:live-balances": "node scripts/live-custodial-balances.mjs"
   },
   "dependencies": {

@@ -6,13 +6,7 @@ export function ScreenHeader({ title, subtitle, back = true, right = null }) {
   const nav = useNavigate();
   return (
     <header
-      className="screen-header px-4 pb-3 sticky top-0 z-30 glass-bottom"
-      style={{
-        borderTop: "none",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
-        /* Safe area + native banner inset live on `.business-web-main` (App.js); header only needs spacing. */
-        paddingTop: "1rem",
-      }}
+      className="screen-header px-4 pt-1 pb-2 sticky top-0 z-30 glass-bottom border-b border-white/5"
     >
       <div className="flex items-center gap-2">
         {back && (
@@ -37,7 +31,7 @@ export function ScreenHeader({ title, subtitle, back = true, right = null }) {
 
 export function PageContainer({ children, className = "" }) {
   return (
-    <div className={`page-shell px-4 pt-4 pb-28 lg:pb-10 ${className}`}>{children}</div>
+    <div className={`page-shell px-4 pt-2 pb-28 lg:pb-10 ${className}`}>{children}</div>
   );
 }
 

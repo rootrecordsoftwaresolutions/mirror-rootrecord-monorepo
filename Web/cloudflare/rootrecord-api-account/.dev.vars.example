@@ -16,3 +16,6 @@ INTERNAL_WALLET_ENC_KEY_B64=paste-44-char-base64-here
 #
 # App session start → Discord (POST /api/app-session/start from mobile/web apps):
 # DISCORD_APP_SESSION_WEBHOOK_URL=https://discord.com/api/webhooks/…
+#
+# Root Economy circulation pings (*/45 cron on rootrecord-api-account):
+# DISCORD_ROOT_ECONOMY_WEBHOOK_URL=https://discord.com/api/webhooks/…

@@ -38,7 +38,7 @@ export function WelcomeBackModal() {
         </h2>
         {pending > 0 ? (
           <>
-            <p className="contract-lead">You earned {formatRu(pending)} Root Units while away</p>
+            <p className="contract-lead">You earned {formatRu(pending)} while away</p>
             <p className="contract-amount">+{formatRu(pending)}</p>
             <p className="contract-hint">Harvest to add this to your account balance.</p>
             {canDouble ? (

@@ -1,5 +1,5 @@
 /**
- * Root Units headline balance from `/api/earn/summary`.
+ * Roots headline balance from `/api/earn/summary`.
  * Matches Discord `/bal` (full `rr_earn_balance`) — not `custodial_pending_units` alone.
  */
 (function (global) {

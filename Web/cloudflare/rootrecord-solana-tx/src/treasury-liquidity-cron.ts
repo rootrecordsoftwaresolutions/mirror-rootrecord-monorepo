@@ -19,6 +19,7 @@ import { json } from "./cors";
 import { notifySolanaToolsDiscord } from "./discord-solana-notify";
 import { verifyWorkerOpsAdmin } from "./ops-auth";
 import type { SolanaTxEnv } from "./env";
+import { loadRootRecordGlobalUpdaterSigner } from "./root-record-global-updater";
 import { confirmSignedTxWithPoll } from "./solana-confirm";
 import { raydiumClusterFromRpcUrl, withdrawTreasuryCpmmLpForDeficits } from "./treasury-raydium-cpmm";
 
@@ -172,24 +173,13 @@ export type TreasuryLiquidityCheckResult = {
  * Every hour at :30 UTC: ensure treasury holds at least the configured RRTT / RRESERVE minimums.
  * 1) If `TREASURY_CP_MM_POOL_ID` is set, treasury **burns LP** from that Raydium CPMM pool (must hold LP) to receive both legs.
  * 2) If still short and `TREASURY_MAINTENANCE_SOURCE_SECRET_KEY_B58` is set (pubkey ≠ treasury), SPL top-up from that wallet.
- * 3) Discord on remaining shortfall / errors. Uses `RRTT_TREASURY_SECRET_KEY_B58` as the treasury signer.
+ * 3) Discord on remaining shortfall / errors. Uses the Root Record Global Updater as the treasury signer.
  */
 export async function runTreasuryLiquidityReserveCheck(env: SolanaTxEnv): Promise<TreasuryLiquidityCheckResult> {
   const alerts: string[] = [];
-  const treasurySk = String(env.RRTT_TREASURY_SECRET_KEY_B58 || "").trim();
   const rrttMintStr = String(env.RRTT_MINT_BASE58 || "").trim();
   const rreserveMintStr = String(env.RRESERVE_MINT_BASE58 || "").trim();
 
-  if (!treasurySk) {
-    const r: TreasuryLiquidityCheckResult = {
-      ok: true,
-      skipped: true,
-      skip_reason: "no RRTT_TREASURY_SECRET_KEY_B58",
-      alerts: [],
-    };
-    console.log("treasury_liquidity_check", JSON.stringify(r));
-    return r;
-  }
   if (!rrttMintStr) {
     const r: TreasuryLiquidityCheckResult = {
       ok: true,
@@ -201,21 +191,20 @@ export async function runTreasuryLiquidityReserveCheck(env: SolanaTxEnv): Promis
     return r;
   }
 
-  let treasury: Keypair;
-  try {
-    treasury = Keypair.fromSecretKey(bs58.decode(treasurySk));
-  } catch {
-    const msg = "Treasury liquidity check: invalid treasury secret (cannot decode).";
+  const signer = loadRootRecordGlobalUpdaterSigner(env);
+  if (!signer.ok) {
+    const msg = `Treasury liquidity check: ${signer.detail}`;
     const r: TreasuryLiquidityCheckResult = {
-      ok: false,
-      skipped: false,
-      skip_reason: "invalid RRTT_TREASURY_SECRET_KEY_B58",
-      alerts: [msg],
+      ok: true,
+      skipped: true,
+      skip_reason: signer.detail,
+      alerts: [],
     };
     console.error("treasury_liquidity_check", JSON.stringify(r));
-    await notifySolanaToolsDiscord(env.DISCORD_WEBHOOK_SOLANA_TOOLS, msg);
+    await notifySolanaToolsDiscord(env.DISCORD_WEBHOOK_SOLANA_TOOLS, msg).catch(() => {});
     return r;
   }
+  const treasury = signer.keypair;
 
   const picked = await pickWorkingConnection(String(env.SOLANA_RPC_URL || "").trim());
   if (!picked) {

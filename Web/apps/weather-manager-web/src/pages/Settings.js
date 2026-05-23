@@ -36,6 +36,8 @@ import {
 const CONTACT = {
   website: 'https://rootrecord.info/',
   contact: 'https://rootrecord.info/contact.html',
+  terms: 'https://rootrecord.info/terms',
+  privacy: 'https://rootrecord.info/privacy',
   discord: 'https://discord.gg/jBgRdgmsjB',
   telegram: 'https://t.me/rootrecordsupport',
   desktopWeb: 'https://weather.rootrecord.info/',
@@ -182,8 +184,7 @@ export default function Settings({ onSignedOut }) {
       data-testid="settings-page"
     >
       <header
-        className="flex items-center justify-between p-4 lg:px-0"
-        style={{ paddingTop: '1rem' }}
+        className="flex items-center justify-between px-4 pt-2 pb-2 lg:px-0"
       >
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
@@ -329,6 +330,20 @@ export default function Settings({ onSignedOut }) {
           hint="Message the team (contact form)"
           href={CONTACT.contact}
           testId="settings-contact-form"
+        />
+        <ExternalLinkRow
+          icon={ShieldCheck}
+          label="Terms of Service"
+          hint="RootRecord app terms"
+          href={CONTACT.terms}
+          testId="settings-terms"
+        />
+        <ExternalLinkRow
+          icon={ShieldCheck}
+          label="Privacy Policy"
+          hint="How RootRecord handles data"
+          href={CONTACT.privacy}
+          testId="settings-privacy"
         />
         <ExternalLinkRow
           icon={MessageCircle}

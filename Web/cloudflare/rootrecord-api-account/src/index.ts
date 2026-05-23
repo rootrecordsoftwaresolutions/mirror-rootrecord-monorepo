@@ -6,8 +6,9 @@ import { runInactiveAccountCleanupCron } from "./inactive-account-cron";
 import { runDiscordDeveloperMessageSync } from "./discord-developer-sync";
 import { reconcileStaleStripeSubscriptions } from "../../shared/stripe-reconcile";
 import { runFarmsVarmintCron } from "./farms-varmint";
+import { runRootEconomyDiscordCron } from "./discord-root-economy-cron";
 // NOAA alert cron lives only on rootrecord-api-weather (and api-kilauea if it ever needs alerts).
-// This Worker: `* * * * *` runs Discord → D1 stats + developer feed sync; `45 8` runs inactive-account cleanup + HTTP error prune.
+// This Worker: `* * * * *` Discord stats + Root Economy ping at :00/:45 UTC; `45 8` inactive-account cleanup.
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -74,6 +75,14 @@ export default {
       return;
     }
     if (c === "* * * * *" && shard === "account") {
+      const utcMin = new Date(event.scheduledTime || Date.now()).getUTCMinutes();
+      if (utcMin === 0 || utcMin === 45) {
+        const er = await runRootEconomyDiscordCron(env).catch((e) => ({
+          ok: false,
+          skipped: e instanceof Error ? e.message : String(e),
+        }));
+        console.log("root_economy_discord_cron", JSON.stringify(er));
+      }
       await runDiscordDeveloperMessageSync(env).catch((e) =>
         console.error("discord_developer_sync_err", e instanceof Error ? e.message : String(e)),
       );

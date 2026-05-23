@@ -1,10 +1,8 @@
-import bs58 from "bs58";
-import { Keypair } from "@solana/web3.js";
-
 import { json } from "./cors";
 import { notifySolanaToolsDiscord } from "./discord-solana-notify";
 import { verifyWorkerOpsAdmin } from "./ops-auth";
 import type { SolanaTxEnv } from "./env";
+import { loadRootRecordGlobalUpdaterSigner } from "./root-record-global-updater";
 import { pickWorkingConnection } from "./treasury-liquidity-cron";
 import { raydiumClusterFromRpcUrl, withdrawTreasuryCpmmLpForWsolDeficit } from "./treasury-raydium-cpmm";
 
@@ -34,22 +32,16 @@ export type TreasurySolLpCheckResult = {
 /**
  * Triggered on a schedule from rootrecord-primary (HTTP POST): ensure treasury native SOL ≥
  * `TREASURY_MIN_SOL_UI` (default 0.01) by burning LP from `TREASURY_SOL_CP_POOL_ID`
- * (RRESERVE / WSOL Raydium CPMM). Uses `RRTT_TREASURY_SECRET_KEY_B58` signer.
+ * (RRESERVE / WSOL Raydium CPMM). Uses the Root Record Global Updater signer.
  * LP mint ref (docs): `3eEuJcKyUoLWUiY9WGjjpYBuVAqUaHsJL73aagonB7h4` for pool `HCzXKUajPqSjs4k3PhApZqmEwbSXj6gbp2s3o4Ve44Zk`.
  * Pools whose LP mint is listed in `treasury-raydium-cpmm` protection set are never withdrawn here.
  */
 export async function runTreasurySolLpReserveCheck(env: SolanaTxEnv): Promise<TreasurySolLpCheckResult> {
   const alerts: string[] = [];
   const lpErrors: string[] = [];
-  const treasurySk = String(env.RRTT_TREASURY_SECRET_KEY_B58 || "").trim();
   const poolId = String(env.TREASURY_SOL_CP_POOL_ID || "").trim();
   const rreserveMintStr = String(env.RRESERVE_MINT_BASE58 || "").trim();
 
-  if (!treasurySk) {
-    const r: TreasurySolLpCheckResult = { ok: true, skipped: true, skip_reason: "no RRTT_TREASURY_SECRET_KEY_B58", alerts: [] };
-    console.log("treasury_sol_lp_check", JSON.stringify(r));
-    return r;
-  }
   if (!poolId) {
     const r: TreasurySolLpCheckResult = { ok: true, skipped: true, skip_reason: "no TREASURY_SOL_CP_POOL_ID", alerts: [] };
     console.log("treasury_sol_lp_check", JSON.stringify(r));
@@ -61,16 +53,15 @@ export async function runTreasurySolLpReserveCheck(env: SolanaTxEnv): Promise<Tr
     return r;
   }
 
-  let treasury: Keypair;
-  try {
-    treasury = Keypair.fromSecretKey(bs58.decode(treasurySk));
-  } catch {
-    const msg = "Treasury SOL check: invalid treasury secret (cannot decode).";
-    const r: TreasurySolLpCheckResult = { ok: false, skipped: false, alerts: [msg] };
+  const signer = loadRootRecordGlobalUpdaterSigner(env);
+  if (!signer.ok) {
+    const msg = `Treasury SOL check: ${signer.detail}`;
+    const r: TreasurySolLpCheckResult = { ok: true, skipped: true, skip_reason: signer.detail, alerts: [] };
     console.error("treasury_sol_lp_check", JSON.stringify(r));
-    await notifySolanaToolsDiscord(env.DISCORD_WEBHOOK_SOLANA_TOOLS, msg);
+    await notifySolanaToolsDiscord(env.DISCORD_WEBHOOK_SOLANA_TOOLS, msg).catch(() => {});
     return r;
   }
+  const treasury = signer.keypair;
 
   const picked = await pickWorkingConnection(String(env.SOLANA_RPC_URL || "").trim());
   if (!picked) {

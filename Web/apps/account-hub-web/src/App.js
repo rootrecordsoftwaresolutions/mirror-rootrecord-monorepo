@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { api, getToken, RR_APP_ID } from "./lib/api";
+import { startEarnUsageRewards } from "./lib/earnUsageRewards";
 import BottomNav from "./components/ui/BottomNav";
 import AuthScreen from "./components/modules/AuthScreen";
 import Home from "./components/modules/Home";
@@ -12,6 +14,20 @@ import Account from "./components/modules/Account";
 import { About, Help } from "./components/modules/Info";
 import Feedback from "./components/modules/Feedback";
 import DeveloperMessages from "./components/modules/DeveloperMessages";
+
+function EarnUsageHeartbeat() {
+  const { user } = useAuth();
+  const loc = useLocation();
+  useEffect(() => {
+    if (!user) return undefined;
+    return startEarnUsageRewards(api, {
+      appId: RR_APP_ID,
+      getToken,
+      getPage: () => loc.pathname,
+    });
+  }, [user, loc.pathname]);
+  return null;
+}
 
 function Gate({ children }) {
   const { user } = useAuth();
@@ -72,6 +88,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <EarnUsageHeartbeat />
       <div
         className="min-h-[100dvh] lg:pl-56"
         style={{

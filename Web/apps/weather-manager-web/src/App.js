@@ -15,7 +15,8 @@ import DeveloperMessages from './pages/DeveloperMessages';
 import AlertDetail from './pages/AlertDetail';
 import About from './pages/About';
 import { api, isBackendConfigured, RR_APP_ID, session, tryHydrateSessionFromCookie } from './lib/api';
-import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from '../../shared/accountNotifyApi';
+import { startEarnUsageRewards } from './lib/earnUsageRewards';
+import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from './lib/accountNotifyApi';
 import { safeSessionStorage } from './lib/storage';
 import useAccess from './lib/useAccess';
 import { refreshSessionAccess } from './lib/tierAccess';
@@ -69,8 +70,9 @@ export default function App() {
   const { decided, authed, guest, setAuthed, setGuest } = useGate();
   const { pro, life } = useAccess();
   const location = useLocation();
+  const isAuthRoute = location.pathname.startsWith('/auth');
   const hideTabs =
-    location.pathname.startsWith('/auth') ||
+    isAuthRoute ||
     location.pathname.startsWith('/locations/new') ||
     location.pathname.startsWith('/feedback') ||
     location.pathname.startsWith('/developer-messages') ||
@@ -82,6 +84,16 @@ export default function App() {
     if (!decided || !authed) return;
     refreshSessionAccess();
   }, [decided, authed]);
+
+  /** Root Units: periodic `/earn/heartbeat` while signed in (tester rewards). */
+  useEffect(() => {
+    if (!decided || !authed) return undefined;
+    return startEarnUsageRewards(api, {
+      appId: RR_APP_ID,
+      getToken: () => session.getToken(),
+      getPage: () => location.pathname,
+    });
+  }, [decided, authed, location.pathname]);
 
   /** Discord: signed-in session start (account Worker → `DISCORD_APP_SESSION_WEBHOOK_URL`). */
   useEffect(() => {
@@ -184,7 +196,7 @@ export default function App() {
 
   return (
     <div
-      className="weather-web-main min-h-screen bg-app text-white lg:pl-56 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 pt-[max(env(safe-area-inset-top,0px),var(--rr-native-ad-banner-height,0px))]"
+      className={`weather-web-main min-h-[100dvh] bg-app text-white pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 pt-[var(--rr-native-ad-banner-height,env(safe-area-inset-top,0px))] ${isAuthRoute ? '' : 'lg:pl-56'}`}
     >
       <GuestBanner />
       <Routes>

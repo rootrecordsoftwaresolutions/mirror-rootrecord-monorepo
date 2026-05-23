@@ -8,7 +8,7 @@
 #   .\scripts\sweep-custodial-sol.ps1 -Destination "OtherPubkey..."
 #
 param(
-  [string] $Destination = "3QG6gVk3fdimzQaKX9zf7J6kCs5DRLKg1RNea3VBosDJ",
+  [string] $Destination = "G1DHctEcwkiLw8NZDfCbDCbuPktQBmWa6P2aobDuMKuZ",
   [switch] $Live
 )
 

@@ -1,10 +1,10 @@
 {
   "name": "rootrecord-root-farms-android",
-  "version": "1.0.4",
+  "version": "1.0.9",
   "private": true,
-  "description": "Android (Capacitor) wrapper for Root Farms. Web source lives at Web/apps/root-farms-web.",
+  "description": "Android (Capacitor) wrapper for Root Farms. Web source lives at Web/apps/root-farms-mobile-web.",
   "scripts": {
-    "build:web": "pnpm -C ../../Web/apps/root-farms-web run build",
+    "build:web": "pnpm -C ../../Web/apps/root-farms-mobile-web run build",
     "cap:sync": "pnpm run build:web && pnpm exec cap sync",
     "cap:init:android": "pnpm exec cap add android",
     "android:open": "pnpm exec cap open android",

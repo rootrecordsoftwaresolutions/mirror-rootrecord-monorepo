@@ -62,6 +62,16 @@
   border-color: rgba(248, 113, 113, 0.45);
 }
 
+.varmint-card--advisory {
+  border-color: #3d5a80;
+}
+
+.varmint-card-hint {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--muted, #9eb0c8);
+}
+
 .varmint-card--block {
   border-color: rgba(52, 211, 153, 0.45);
 }

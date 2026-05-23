@@ -53,7 +53,7 @@ export function simulatePlotTicks(
   incomeMultiplier = 1,
 ): { save: GameSave; earned: number } {
   if (dtSec <= 0) return { save, earned: 0 };
-  const mult = Math.max(0, Math.min(1, Number(incomeMultiplier) || 0));
+  const mult = Math.max(0, Number(incomeMultiplier) || 0);
   let earned = 0;
   const plots = save.plots.map((p) => {
     if (!p.unlocked || p.rowsActive <= 0) return p;
@@ -137,10 +137,22 @@ export function activePlotStats(save: GameSave): { activePlots: number; activeRo
 
 }
 
+/** Unlocked plots and total purchased row slots (sum of rowCount). */
+export function farmsProgressStats(save: GameSave): { plotsUnlocked: number; rowsAccumulated: number } {
+  let plotsUnlocked = 0;
+  let rowsAccumulated = 0;
+  for (const p of save.plots) {
+    if (!p.unlocked) continue;
+    plotsUnlocked += 1;
+    rowsAccumulated += Math.max(0, Math.floor(p.rowCount) || 0);
+  }
+  return { plotsUnlocked, rowsAccumulated };
+}
+
 
 
 export function totalRuPerSec(save: GameSave, incomeMultiplier = 1): number {
-  const mult = Math.max(0, Math.min(1, Number(incomeMultiplier) || 0));
+  const mult = Math.max(0, Number(incomeMultiplier) || 0);
   let sum = 0;
   for (const p of save.plots) {
     if (!p.unlocked || p.rowsActive <= 0) continue;

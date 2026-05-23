@@ -171,6 +171,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-
   }
 }
 
+.business-web-main {
+  padding-top: max(var(--rr-native-ad-banner-height, 0px), env(safe-area-inset-top, 0px));
+  scroll-padding-top: max(var(--rr-native-ad-banner-height, 0px), env(safe-area-inset-top, 0px));
+}
+
 /*
  * Recharts default tooltip sets each row's color to the series/slice color (entry.color).
  * Dark category colors on a dark tooltip are unreadable — force high-contrast copy.

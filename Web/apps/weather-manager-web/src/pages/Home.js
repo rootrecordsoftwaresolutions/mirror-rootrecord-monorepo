@@ -89,11 +89,12 @@ function writeWeatherSnapshot(locationId, bundle) {
 
 function Bento({ icon: Icon, label, value, sub }) {
   return (
-    <div className="bg-container border border-subtle p-3 flex flex-col gap-1" data-testid={`bento-${label.toLowerCase()}`}>
-      <div className="flex items-center justify-between text-accent/80">
-        <Icon strokeWidth={1.5} className="w-4 h-4 text-accent" />
-        <span className="text-[10px] uppercase tracking-widest font-mono">{label}</span>
-      </div>
+    <div
+      className="bg-container border border-subtle p-3 flex flex-col items-center text-center gap-1 min-h-[5.5rem] justify-center"
+      data-testid={`bento-${label.toLowerCase()}`}
+    >
+      <Icon strokeWidth={1.5} className="w-4 h-4 text-accent shrink-0" aria-hidden />
+      <span className="text-[10px] uppercase tracking-widest font-mono text-accent/80">{label}</span>
       <div className="font-mono text-2xl tracking-tight text-white">{value ?? '—'}</div>
       {sub && <div className="text-xs text-accent/70 font-mono">{sub}</div>}
     </div>
@@ -387,7 +388,7 @@ export default function Home() {
 
   return (
     <div className="animate-fadein lg:mx-auto lg:max-w-[min(1400px,calc(100%-2rem))]" data-testid="home-page">
-      <header className="flex items-center justify-between px-4 pb-4 pt-2 lg:px-10 lg:pt-4">
+      <header className="flex items-center justify-between px-4 pt-1 pb-2 lg:px-10 lg:pt-2">
         <LocationPicker locations={locations} activeId={activeId} onPick={setActive} />
         <button
           aria-label="Refresh"
@@ -421,7 +422,7 @@ export default function Home() {
         ) : (
           <>
             {/* Hero */}
-            <div className="bg-container border border-subtle p-5 mb-4" data-testid="home-current-hero">
+            <div className="bg-container border border-subtle p-5 mb-3" data-testid="home-current-hero">
               <div className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-2">Now</div>
               <div className="flex items-end justify-between">
                 <div>
@@ -445,7 +446,7 @@ export default function Home() {
             </div>
 
             {/* Bento metrics */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-2 gap-2 mb-2">
               <Bento icon={Wind} label="Wind" value={fmtSpeedKmH(wind)} sub={windDirSub} />
               <Bento
                 icon={Droplets}
@@ -468,7 +469,7 @@ export default function Home() {
               <Bento icon={Sun} label="Visibility" value={obs?.visibility?.value != null ? fmtKmOrMi(obs.visibility.value / 1000, 1) : '—'} />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-2 gap-2 mb-4">
               <Bento icon={Thermometer} label="Feels like" value={feelsLikeC != null ? fmtTemp(feelsLikeC, 'C') : '—'} />
               <Bento icon={Thermometer} label="Dew point" value={dewPointC != null ? fmtTemp(dewPointC, 'C') : '—'} />
               <Bento icon={Thermometer} label="Wet bulb" value={wetBulbC != null ? fmtTemp(wetBulbC, 'C') : '—'} />

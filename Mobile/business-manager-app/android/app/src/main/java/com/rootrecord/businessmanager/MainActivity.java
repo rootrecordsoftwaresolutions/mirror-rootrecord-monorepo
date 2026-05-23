@@ -44,6 +44,8 @@ public class MainActivity extends BridgeActivity {
     ensureAdView();
 
     mainHandler.post(this::attachWebAdsBridge);
+    mainHandler.post(this::syncAdVisibilityFromWeb);
+    mainHandler.postDelayed(this::syncAdVisibilityFromWeb, 500L);
     mainHandler.postDelayed(this::syncAdVisibilityFromWeb, 1500L);
   }
 
@@ -110,25 +112,21 @@ public class MainActivity extends BridgeActivity {
     ViewCompat.requestApplyInsets(adView);
   }
 
+  /**
+   * Top padding for web content below the overlay banner. Use status bar + measured banner
+   * height — window geometry (ad bottom − WebView top) can over-count and leave a large gap.
+   */
   private int webTopInsetBelowAdPx(WebView webView) {
     if (adView == null || webView == null || adView.getVisibility() != View.VISIBLE) {
       return 0;
     }
-    int[] adWin = new int[2];
-    int[] wvWin = new int[2];
-    adView.getLocationInWindow(adWin);
-    webView.getLocationInWindow(wvWin);
     int bannerPx = adView.getHeight();
     if (bannerPx <= 0) {
       bannerPx =
           (int) (FALLBACK_BANNER_HEIGHT_DP * getResources().getDisplayMetrics().density + 0.5f);
     }
-    int adBottomInWindow = adWin[1] + bannerPx;
-    int inset = adBottomInWindow - wvWin[1];
-    if (inset < 0) {
-      inset = 0;
-    }
-    return inset + (int) (BANNER_TOP_GAP_DP * getResources().getDisplayMetrics().density + 0.5f);
+    int gapPx = (int) (BANNER_TOP_GAP_DP * getResources().getDisplayMetrics().density + 0.5f);
+    return statusBarInsetPx() + bannerPx + gapPx;
   }
 
   private int statusBarInsetPx() {
@@ -156,6 +154,7 @@ public class MainActivity extends BridgeActivity {
       return;
     }
     webView.addJavascriptInterface(new WebAdsBridge(), "RootRecordAds");
+    syncWebBannerInset();
   }
 
   @Override

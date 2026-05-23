@@ -6,6 +6,9 @@
 /charts /charts/ 308
 /charts/discord-activity /charts/discord-activity/ 308
 /charts/kilauea-eruption-summary /charts/kilauea-eruption-summary/ 308
+/charts/root-economy /charts/root-economy/ 308
+/chart /charts/root-economy/ 308
+/products/rootunits /products/rootunits/ 308
 
 # Legacy Discord activity URLs → charts subtree.
 /discord-activity /charts/discord-activity/ 308

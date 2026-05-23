@@ -67,7 +67,7 @@ STRIPE_PUBLISHABLE_KEY = "pk_live_51T3sezIaRpbMiAov6SUJgKLGR1igmRGOYg1rY1hKJPAWx
 # RRTT SPL (Solana mainnet): custodial balance cache + treasury→custodial cron.
 # Treasury **private key is never in this file** — set on the Worker only:
 #   wrangler secret put RRTT_TREASURY_SECRET_KEY_B58
-# Automated treasury Raydium LP + Discord developer feed: Worker `rootrecord-solana-tx` (plain var, no trailing slash):
+# ROOTS minting + automated treasury Raydium LP + Discord developer feed: Worker `rootrecord-solana-tx` (plain var, no trailing slash):
 ROOTRECORD_SOLANA_TX_URL = "https://rootrecord-solana-tx.rootrecord.workers.dev"
 RRTT_MINT_BASE58 = "6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEVsX6RQMT"
 RRTT_DECIMALS = "9"
@@ -122,6 +122,7 @@ DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1500286864119038103"
 # Run treasury SOL top-up + RRTT payout cron immediately (same as 07:00 UTC schedule):
 #   POST https://api.rootrecord.info/api/internal/run-rrtt-custodial-cron  (header X-RR-Push-Admin-Key: …)
 # Treasury checks (proxied to `ROOTRECORD_SOLANA_TX_URL`; schedules: SOL :00 UTC, RRTT/RRESERVE :10 UTC, both from `*/5`):
+#   POST https://api.rootrecord.info/api/internal/mint-roots
 #   POST https://api.rootrecord.info/api/internal/run-treasury-liquidity-check
 #   POST https://api.rootrecord.info/api/internal/run-treasury-sol-lp-check
 #   Header: X-RR-Push-Admin-Key (same as push-broadcast). Or call the solana-tx Worker `/api/internal/...` directly.

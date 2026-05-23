@@ -15,6 +15,9 @@
 /account.js
   Cache-Control: public, max-age=3600, must-revalidate
 
+/root-economy-widget.js
+  Cache-Control: public, max-age=0, must-revalidate
+
 /favicon.ico
   Cache-Control: public, max-age=86400
 

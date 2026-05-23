@@ -82,7 +82,7 @@ popd
 echo.
 echo Workers done.
 echo Finished %DATE% %TIME% >> "%LOGFILE%"
-pause
+if not "%RR_DEPLOY_NO_PAUSE%"=="1" pause
 endlocal
 exit /b 0
 
@@ -152,6 +152,6 @@ echo Exit code:  %ERR%
 echo CWD:        %CD%
 echo ============================================================
 echo FAILED at step "%STEP%" exit %ERR% >> "%LOGFILE%"
-if not "%NOPAUSE%"=="1" pause
+if not "%NOPAUSE%"=="1" if not "%RR_DEPLOY_NO_PAUSE%"=="1" pause
 endlocal
 exit /b %ERR%

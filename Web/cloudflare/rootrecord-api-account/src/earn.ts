@@ -3,6 +3,27 @@ import { json } from "./cors";
 import { resolveUserId } from "./auth";
 import { extendProRedeemedUntil } from "./accounts";
 import { getSignupBonusRow, SIGNUP_BONUS_UNITS } from "./earn-signup-bonus";
+import {
+  DAILY_CHECKIN_UNITS,
+  DAILY_MAX_UNITS,
+  MAX_CHUNK_SEC,
+  MAX_GAP_SEC,
+  MAX_SECONDS_PER_PAGE,
+  PRO_REDEMPTION_DAYS,
+  PRO_REDEMPTION_UNIT_COST,
+  UNITS_PER_SECOND,
+} from "../../shared/earn-program-constants";
+import {
+  FIRST_APP_OPEN_UNITS,
+  getFirstAppOpenRow,
+  grantFirstAppOpenBonus,
+} from "../../shared/earn-app-first-open";
+import {
+  ROOTS_ATOMIC_PER_WHOLE,
+  formatRootsAtomic,
+  formatRootsAtomicLocale,
+  rootsAtomicToWhole,
+} from "../../shared/roots-units";
 import type { CustodialCacheRpcEnv } from "./custodial-onchain-cache";
 import { refreshCustodialOnchainCacheFromRpc } from "./custodial-onchain-cache";
 import { readCustodialTokenSlots } from "./custodial-wallet-token-slots";
@@ -20,16 +41,7 @@ export interface EarnEnv {
 /** Bound Solana wait for `/earn/summary` custodial refresh (same order of magnitude as login cache). */
 const EARN_SUMMARY_CUSTODIAL_RPC_MS = 10_000;
 
-/** Per second of credited time on a route; 15 min = 900s → 900×20 = 18,000 units per page visit max. */
-const UNITS_PER_SECOND = 20;
-const MAX_SECONDS_PER_PAGE = 15 * 60; // 900
-const DAILY_CHECKIN_UNITS = 10_000;
-/** Per app, per UTC day (separate app A + B + C can each hit this). */
-const DAILY_MAX_UNITS = 100_000;
-/** Ignore gaps longer than this (app backgrounded / device sleep) — no retroactive credit. */
-const MAX_GAP_SEC = 90;
-/** Per request, cap wall-clock chunk so a burst of heartbeats cannot mint huge amounts. */
-const MAX_CHUNK_SEC = 10;
+export { PRO_REDEMPTION_UNIT_COST, PRO_REDEMPTION_DAYS } from "../../shared/earn-program-constants";
 
 const APP_RE = /^[a-z0-9][a-z0-9_-]{0,79}$/i;
 const PAGE_RE = /^[a-z0-9/_-]{0,200}$/i;
@@ -58,10 +70,6 @@ function normalizePage(raw: string | undefined): string {
   if (s && PAGE_RE.test(s) && s.startsWith("/")) return s;
   return "/";
 }
-
-/** Rewards-for-Pro redemption: 100,000 testing-rewards points → 1 month of Pro membership. */
-export const PRO_REDEMPTION_UNIT_COST = 100_000;
-export const PRO_REDEMPTION_DAYS = 30;
 
 export async function handleEarnRoutes(
   request: Request,
@@ -106,7 +114,7 @@ async function earnRedeemProMonth(request: Request, env: EarnEnv): Promise<Respo
   if (balance < PRO_REDEMPTION_UNIT_COST) {
     return json(
       {
-        detail: `You need ${PRO_REDEMPTION_UNIT_COST.toLocaleString()} Root Units to redeem one month of Pro. Current balance: ${balance.toLocaleString()}.`,
+        detail: `You need ${formatRootsAtomicLocale(PRO_REDEMPTION_UNIT_COST)} Roots to redeem one month of Pro. Current balance: ${formatRootsAtomicLocale(balance)}.`,
         balance,
         cost: PRO_REDEMPTION_UNIT_COST,
         short_by: PRO_REDEMPTION_UNIT_COST - balance,
@@ -290,6 +298,7 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
   const claimable = appDay.checkin_claimed === 0 && checkinLeft > 0;
   const wouldGrant = Math.min(DAILY_CHECKIN_UNITS, checkinLeft);
   const signupRow = await getSignupBonusRow(env.DB, userId);
+  const firstOpenRow = await getFirstAppOpenRow(env.DB, userId, appId);
 
   let custodial_tokens:
     | {
@@ -390,8 +399,12 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
 
   return json(
     {
+      roots_atomic_per_whole: ROOTS_ATOMIC_PER_WHOLE,
+      roots_smallest_unit_whole: 0.00000001,
       balance,
+      balance_whole: rootsAtomicToWhole(balance),
       balance_display,
+      balance_display_whole: rootsAtomicToWhole(balance_display),
       /** Mobile `rewardsFormat.js` only renders pending/wallet when this is true. */
       custodial_summary_attached: true,
       custodial_pending_units,
@@ -415,6 +428,13 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
         received: Boolean(signupRow),
         received_units: signupRow ? signupRow.units : 0,
         granted_at: signupRow?.granted_at ?? null,
+      },
+      first_open_bonus: {
+        per_app: true,
+        program_units: FIRST_APP_OPEN_UNITS,
+        received: Boolean(firstOpenRow),
+        received_units: firstOpenRow ? firstOpenRow.units : 0,
+        granted_at: firstOpenRow?.granted_at ?? null,
       },
       ymd,
       app_id: appId,
@@ -511,6 +531,7 @@ async function earnHeartbeat(request: Request, env: EarnEnv): Promise<Response> 
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   await ensureBalance(env.DB, userId, nowIso);
+  await grantFirstAppOpenBonus(env.DB, userId, appId, nowIso);
   const appDay0 = await getAppDay(env.DB, userId, appId, ymd);
   const dailyLeft = DAILY_MAX_UNITS - appDay0.units_earned;
   if (dailyLeft <= 0) {
@@ -630,6 +651,8 @@ async function earnHeartbeat(request: Request, env: EarnEnv): Promise<Response> 
     .run();
   if (granted > 0) {
     await incAppTotals(env.DB, userId, appId, ymd, granted, nowIso);
+    const { maybeTouchRootEconomyAfterEarn } = await import("../../shared/root-economy-snapshot");
+    await maybeTouchRootEconomyAfterEarn(env.DB, granted, "heartbeat");
   }
   await env.DB
     .prepare(
@@ -711,6 +734,8 @@ async function earnCheckin(request: Request, env: EarnEnv): Promise<Response> {
     .bind(newBalance, nowIso, userId)
     .run();
   await incAppTotals(env.DB, userId, appId, ymd, grant, nowIso);
+  const { maybeTouchRootEconomyAfterEarn } = await import("../../shared/root-economy-snapshot");
+  await maybeTouchRootEconomyAfterEarn(env.DB, grant, "checkin");
   await env.DB
     .prepare(
       "UPDATE rr_earn_app_day SET checkin_claimed = 1, updated_at = ? WHERE user_id = ? AND app_id = ? AND ymd = ?"

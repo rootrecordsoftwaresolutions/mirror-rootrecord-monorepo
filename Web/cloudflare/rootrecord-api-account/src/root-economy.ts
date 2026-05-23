@@ -1,5 +1,14 @@
 import type { D1Database } from "@cloudflare/workers-types";
+
+import { summarizeFarmsPlotsJson } from "./farms-catalog";
+import {
+  loadEconomyDailySeries,
+  readCirculationTotals,
+  touchRootEconomy,
+  type CirculationTotals,
+} from "../../shared/root-economy-snapshot";
 import { json } from "./cors";
+import { formatRootsAtomic, formatRootsAtomicLocale } from "../../shared/roots-units";
 
 export interface RootEconomyEnv {
   DB: D1Database;
@@ -73,6 +82,7 @@ type LeaderRow = {
   public_display_name: string | null;
   discord_username: string | null;
   discord_global_name: string | null;
+  plots_json: string | null;
 };
 
 export type EconomyLeaderEntry = {
@@ -82,6 +92,8 @@ export type EconomyLeaderEntry = {
   public_display_name: string | null;
   discord_username: string | null;
   discord_global_name: string | null;
+  farms_plots_unlocked: number;
+  farms_rows_accumulated: number;
 };
 
 export type EconomyLeaderboardData = {
@@ -94,27 +106,23 @@ const LEADERBOARD_SQL = `SELECT b.balance AS balance,
               iw.pubkey AS wallet_pubkey,
               la.public_display_name AS public_display_name,
               dal.discord_username AS discord_username,
-              dal.discord_global_name AS discord_global_name
+              dal.discord_global_name AS discord_global_name,
+              fp.plots_json AS plots_json
        FROM rr_earn_balance b
        INNER JOIN license_accounts la ON b.user_id = ('user:' || lower(la.email))
        INNER JOIN internal_solana_wallets iw ON iw.account_id = la.id
        LEFT JOIN discord_account_links dal ON dal.account_id = la.id
+       LEFT JOIN rr_farms_progress fp ON fp.user_id = b.user_id
        WHERE b.balance > 0
        ORDER BY b.balance DESC, iw.pubkey ASC
        LIMIT 100`;
 
-const CIRCULATION_SQL = `SELECT COALESCE(SUM(b.balance), 0) AS total_circulation
-       FROM rr_earn_balance b
-       INNER JOIN license_accounts la ON b.user_id = ('user:' || lower(la.email))
-       WHERE b.balance > 0`;
-
 export function formatEconomyUnits(n: number): string {
-  const v = Math.max(0, Math.floor(n));
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
-  if (v >= 10_000) return `${(v / 1_000).toFixed(1)}K`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(2)}K`;
-  return v.toLocaleString();
+  return formatRootsAtomic(n);
+}
+
+export function formatEconomyUnitsLocale(n: number): string {
+  return formatRootsAtomicLocale(n);
 }
 
 export function leaderboardEntryLabel(e: EconomyLeaderEntry): string {
@@ -128,9 +136,9 @@ export function leaderboardEntryLabel(e: EconomyLeaderEntry): string {
 }
 
 export async function loadEconomyLeaderboardData(db: D1Database): Promise<EconomyLeaderboardData> {
-  const [rows, totalRow] = await Promise.all([
+  const [rows, totals] = await Promise.all([
     db.prepare(LEADERBOARD_SQL).all<LeaderRow>(),
-    db.prepare(CIRCULATION_SQL).first<{ total_circulation: number }>(),
+    readCirculationTotals(db),
   ]);
 
   const entries = (rows.results || []).map((r, i) => {
@@ -139,6 +147,7 @@ export async function loadEconomyLeaderboardData(db: D1Database): Promise<Econom
     const public_display_name = r.public_display_name?.trim() || null;
     const discord_username = r.discord_username?.trim() || null;
     const discord_global_name = r.discord_global_name?.trim() || null;
+    const farms = summarizeFarmsPlotsJson(r.plots_json);
     return {
       rank: i + 1,
       balance,
@@ -146,28 +155,94 @@ export async function loadEconomyLeaderboardData(db: D1Database): Promise<Econom
       public_display_name,
       discord_username,
       discord_global_name,
+      farms_plots_unlocked: farms.plots_unlocked,
+      farms_rows_accumulated: farms.rows_accumulated,
     };
   });
 
   return {
     updated_at: new Date().toISOString(),
-    total_circulation: Math.max(0, Math.floor(Number(totalRow?.total_circulation) || 0)),
+    total_circulation: totals.total_circulation,
     entries,
   };
+}
+
+function parseDaysParam(url: URL): number {
+  const raw = parseInt(url.searchParams.get("days") || "90", 10);
+  if (!Number.isFinite(raw)) return 90;
+  return Math.min(365, Math.max(7, raw));
+}
+
+function mergeSeriesWithLive(
+  series: Awaited<ReturnType<typeof loadEconomyDailySeries>>,
+  live: CirculationTotals,
+  today: string,
+): { day: string; total_circulation: number; account_count: number }[] {
+  const out = [...series];
+  const last = out[out.length - 1];
+  if (last?.day === today) {
+    last.total_circulation = live.total_circulation;
+    last.account_count = live.account_count;
+  } else {
+    out.push({
+      day: today,
+      total_circulation: live.total_circulation,
+      account_count: live.account_count,
+    });
+  }
+  return out;
+}
+
+/** GET `/v1/economy/daily` — public circulation history (UTC days). */
+export async function handleEconomyDaily(request: Request, env: RootEconomyEnv): Promise<Response> {
+  const url = new URL(request.url);
+  const days = parseDaysParam(url);
+  const today = new Date().toISOString().slice(0, 10);
+
+  let live: CirculationTotals;
+  try {
+    live = await touchRootEconomy(env.DB, "public_read");
+  } catch {
+    live = await readCirculationTotals(env.DB);
+  }
+
+  let series = await loadEconomyDailySeries(env.DB, days);
+  if (!series.length) {
+    series = [{ day: today, total_circulation: live.total_circulation, account_count: live.account_count }];
+  } else {
+    series = mergeSeriesWithLive(series, live, today);
+  }
+
+  return json(
+    {
+      ok: true,
+      updated_at: new Date().toISOString(),
+      days,
+      total_circulation: live.total_circulation,
+      account_count: live.account_count,
+      series,
+    },
+    200,
+    { "Cache-Control": "public, max-age=15" },
+  );
 }
 
 export function buildEconomyDiscordMessage(data: EconomyLeaderboardData): string {
   const total = data.total_circulation;
   const lines: string[] = [
     "**Root Economy** — top Root Units balances",
-    `**Internal circulation:** **${total.toLocaleString()}** RU (${formatEconomyUnits(total)} total in linked accounts)`,
+    `**Internal circulation:** **${formatEconomyUnitsLocale(total)} Roots** (${formatEconomyUnits(total)} total in linked accounts)`,
     "",
   ];
   if (data.entries.length === 0) {
     lines.push("No balances yet.");
   } else {
     for (const e of data.entries.slice(0, 15)) {
-      lines.push(`**${e.rank}.** ${leaderboardEntryLabel(e)} — **${formatEconomyUnits(e.balance)}**`);
+      const farm =
+        e.farms_plots_unlocked > 0
+          ? ` · ${e.farms_plots_unlocked} plot${e.farms_plots_unlocked === 1 ? "" : "s"}, ${e.farms_rows_accumulated} rows`
+          : "";
+      lines.push(`**${e.rank}.** ${leaderboardEntryLabel(e)} — **${formatEconomyUnits(e.balance)}**${farm}`);
     }
     if (data.entries.length > 15) {
       lines.push(`_Showing 15 of ${data.entries.length} on the board._`);
@@ -181,6 +256,11 @@ export function buildEconomyDiscordMessage(data: EconomyLeaderboardData): string
 
 /** GET `/v1/economy/leaderboard` — public top-100 Root Units balances. */
 export async function handleEconomyLeaderboard(env: RootEconomyEnv): Promise<Response> {
+  try {
+    await touchRootEconomy(env.DB, "public_read");
+  } catch {
+    /* serve cached leaderboard */
+  }
   const data = await loadEconomyLeaderboardData(env.DB);
 
   return json(
@@ -204,6 +284,9 @@ export async function handleRootEconomyRoutes(
 ): Promise<Response | null> {
   if (sub === "/v1/economy/leaderboard" && method === "GET") {
     return handleEconomyLeaderboard(env);
+  }
+  if (sub === "/v1/economy/daily" && method === "GET") {
+    return handleEconomyDaily(request, env);
   }
   return null;
 }

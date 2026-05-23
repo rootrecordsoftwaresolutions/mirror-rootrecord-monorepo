@@ -22,7 +22,14 @@ export function AuthScreen({ onContinueAsBetaTester }: { onContinueAsBetaTester?
         mode === "signin"
           ? await auth.login(email.trim(), password)
           : await auth.register(email.trim(), password, name.trim());
-      if (!out.ok) setErr(out.detail);
+      if (!out.ok) {
+        if (mode === "signup" && /already registered|already exists|already in use/i.test(out.detail)) {
+          setMode("signin");
+          setErr("That email already has a RootRecord account. Use Sign in, or contact support if you need a password reset.");
+        } else {
+          setErr(out.detail);
+        }
+      }
     } catch {
       setErr("Could not reach the server. Check your connection and try again.");
     } finally {
@@ -111,6 +118,13 @@ export function AuthScreen({ onContinueAsBetaTester }: { onContinueAsBetaTester?
         <p className="auth-guest-note">
           Don&apos;t want to sign in? Play as a <strong>Beta Tester</strong> — progress stays on this device and is not
           saved to your RootRecord account.
+        </p>
+        <p className="auth-support-note">
+          Need an account reset? Contact{" "}
+          <a href="https://rootrecord.info/contact.html" target="_blank" rel="noopener noreferrer">
+            RootRecord support
+          </a>
+          .
         </p>
       </div>
     </div>

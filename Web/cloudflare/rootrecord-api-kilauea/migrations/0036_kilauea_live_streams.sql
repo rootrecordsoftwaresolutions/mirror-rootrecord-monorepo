@@ -16,21 +16,12 @@ CREATE INDEX IF NOT EXISTS idx_kilauea_live_streams_sort ON kilauea_live_streams
 INSERT INTO kilauea_live_streams (id, title, description, watch_url, youtube_video_id, sort_order, updated_at)
 VALUES
   (
-    'two_pineapples',
-    'Two Pineapples (YouTube)',
-    'Independent Hawaiʻi volcano coverage. Opens the active livestream when on air.',
-    'https://www.youtube.com/@TwoPineapples/live',
-    NULL,
-    0,
-    datetime('now')
-  ),
-  (
     'usgs_v1',
     '[V1cam] West Halemaʻumaʻu',
     'USGS summit thermal/visual feed (official YouTube stream).',
     'https://www.youtube.com/watch?v=HggWKlZv9yk',
     'HggWKlZv9yk',
-    1,
+    0,
     datetime('now')
   ),
   (
@@ -39,7 +30,7 @@ VALUES
     'USGS summit area monitoring (official YouTube stream).',
     'https://www.youtube.com/watch?v=Tz5tPqRRv1Y',
     'Tz5tPqRRv1Y',
-    2,
+    1,
     datetime('now')
   ),
   (
@@ -48,6 +39,6 @@ VALUES
     'USGS lava lake view when active (official YouTube stream).',
     'https://www.youtube.com/watch?v=gXKuUyKt8mc',
     'gXKuUyKt8mc',
-    3,
+    2,
     datetime('now')
   );

@@ -110,14 +110,6 @@ class LiveFeedsRepository @Inject constructor(
         /** Offline fallback — matches D1 seed in `0036_kilauea_live_streams.sql`. */
         fun defaultStreams(): List<LiveFeed> = listOf(
             LiveFeed(
-                id = "two_pineapples",
-                title = "Two Pineapples (YouTube)",
-                description = "Independent Hawaiʻi volcano coverage. Opens the active livestream when on air.",
-                youtubeVideoId = null,
-                watchUrl = "https://www.youtube.com/@TwoPineapples/live",
-                embedUrl = "https://www.youtube.com/@TwoPineapples/live",
-            ),
-            LiveFeed(
                 id = "usgs_v1",
                 title = "[V1cam] West Halemaʻumaʻu",
                 description = "USGS summit thermal/visual feed (official YouTube stream).",

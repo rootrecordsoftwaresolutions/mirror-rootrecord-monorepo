@@ -1,26 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatRu } from "../game/format";
 import {
   economyEntryLabel,
+  fetchEconomyDaily,
   fetchEconomyLeaderboard,
+  type EconomyDaily,
   type EconomyLeaderboard,
 } from "../lib/economyApi";
+import { EconomyCirculationChart } from "./EconomyCirculationChart";
 
 const REFRESH_MS = 30_000;
+type EconomySortKey = "balance" | "name" | "farmLevel";
 
 export function RootEconomyScreen({ variant = "web" }: { variant?: "web" | "mobile" }) {
   const [board, setBoard] = useState<EconomyLeaderboard | null>(null);
+  const [daily, setDaily] = useState<EconomyDaily | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<EconomySortKey>("balance");
 
   const load = useCallback(async () => {
-    const data = await fetchEconomyLeaderboard();
-    if (!data) {
+    const [boardData, dailyData] = await Promise.all([fetchEconomyLeaderboard(), fetchEconomyDaily(30)]);
+    if (!boardData) {
       setError("Could not load Root Economy — try again shortly.");
       setLoading(false);
       return;
     }
-    setBoard(data);
+    setBoard(boardData);
+    setDaily(dailyData);
     setError(null);
     setLoading(false);
   }, []);
@@ -41,6 +48,24 @@ export function RootEconomyScreen({ variant = "web" }: { variant?: "web" | "mobi
       }
     })();
 
+  const sortedEntries = useMemo(() => {
+    const entries = [...(board?.entries ?? [])];
+    if (sortKey === "name") {
+      entries.sort((a, b) => {
+        const byName = economyEntryLabel(a).localeCompare(economyEntryLabel(b), undefined, { sensitivity: "base" });
+        return byName || b.balance - a.balance;
+      });
+    } else if (sortKey === "farmLevel") {
+      entries.sort((a, b) => {
+        const level = (b.farms_plots_unlocked ?? 0) - (a.farms_plots_unlocked ?? 0);
+        return level || b.balance - a.balance || economyEntryLabel(a).localeCompare(economyEntryLabel(b));
+      });
+    } else {
+      entries.sort((a, b) => b.balance - a.balance || economyEntryLabel(a).localeCompare(economyEntryLabel(b)));
+    }
+    return entries;
+  }, [board?.entries, sortKey]);
+
   return (
     <div className={`screen economy-screen economy-screen--${variant}`}>
       <header className="economy-head">
@@ -50,28 +75,53 @@ export function RootEconomyScreen({ variant = "web" }: { variant?: "web" | "mobi
           <p className="economy-circulation" aria-label="Total Root Units in internal circulation">
             <span className="economy-circulation-label">Internal circulation</span>
             <span className="economy-circulation-value">{formatRu(board.total_circulation ?? 0)}</span>
-            <span className="economy-circulation-raw">{(board.total_circulation ?? 0).toLocaleString()} RU</span>
+            <span className="economy-circulation-raw">{(board.total_circulation ?? 0).toLocaleString()} atomic units</span>
           </p>
         ) : null}
         {updatedLabel ? <p className="economy-updated">Updated {updatedLabel}</p> : null}
       </header>
 
+      {daily?.series?.length ? (
+        <EconomyCirculationChart series={daily.series} />
+      ) : loading ? null : (
+        <p className="economy-chart-empty">Circulation chart unavailable right now.</p>
+      )}
+
       {loading && !board ? <p className="economy-status">Loading leaderboard…</p> : null}
       {error ? <p className="economy-status economy-status--err">{error}</p> : null}
 
       {board && board.entries.length > 0 ? (
+        <>
+        <div className="economy-sort" aria-label="Sort Root Economy leaderboard">
+          <span>Sort by</span>
+          <button type="button" className={sortKey === "balance" ? "is-active" : ""} onClick={() => setSortKey("balance")}>
+            Balance
+          </button>
+          <button type="button" className={sortKey === "farmLevel" ? "is-active" : ""} onClick={() => setSortKey("farmLevel")}>
+            Farm level
+          </button>
+          <button type="button" className={sortKey === "name" ? "is-active" : ""} onClick={() => setSortKey("name")}>
+            Name
+          </button>
+        </div>
         <ol className="economy-list" aria-label="Top accounts by Root Units balance">
-          {board.entries.map((e) => {
+          {sortedEntries.map((e, index) => {
             const label = economyEntryLabel(e);
             const showWallet = label !== e.wallet_short;
             return (
               <li key={`${e.rank}-${e.wallet_short}`} className="economy-row">
-                <span className="economy-rank">{e.rank}</span>
+                <span className="economy-rank">{sortKey === "balance" ? e.rank : index + 1}</span>
                 <span className="economy-holder">
                   <span className="economy-name">{label}</span>
                   {showWallet ? <span className="economy-wallet">{e.wallet_short}</span> : null}
                   {e.public_display_name && e.discord_username ? (
                     <span className="economy-discord">@{e.discord_username.replace(/^@/, "")}</span>
+                  ) : null}
+                  {(e.farms_plots_unlocked ?? 0) > 0 || (e.farms_rows_accumulated ?? 0) > 0 ? (
+                    <span className="economy-farms">
+                      {e.farms_plots_unlocked ?? 0} plot{(e.farms_plots_unlocked ?? 0) === 1 ? "" : "s"} ·{" "}
+                      {e.farms_rows_accumulated ?? 0} rows
+                    </span>
                   ) : null}
                 </span>
                 <span className="economy-balance">{formatRu(e.balance)}</span>
@@ -79,6 +129,7 @@ export function RootEconomyScreen({ variant = "web" }: { variant?: "web" | "mobi
             );
           })}
         </ol>
+        </>
       ) : null}
 
       {board && board.entries.length === 0 && !loading ? (

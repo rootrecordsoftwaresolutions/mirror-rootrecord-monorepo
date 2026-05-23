@@ -1,7 +1,9 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 /** One-time, account-wide, granted when the license account is created (all apps share balance). */
-export const SIGNUP_BONUS_UNITS = 50_000;
+import { SIGNUP_BONUS_UNITS } from "../../shared/earn-program-constants";
+
+export { SIGNUP_BONUS_UNITS };
 
 async function ensureBalanceRow(db: D1Database, userId: string, nowIso: string) {
   await db
@@ -35,6 +37,9 @@ export async function grantSignupBonusOnRegistration(
     .prepare("UPDATE rr_earn_balance SET balance = balance + ?, updated_at = ? WHERE user_id = ?")
     .bind(SIGNUP_BONUS_UNITS, nowIso, userId)
     .run();
+
+  const { touchRootEconomy } = await import("../../shared/root-economy-snapshot");
+  await touchRootEconomy(db, "signup").catch(() => {});
 }
 
 export async function getSignupBonusRow(

@@ -7,7 +7,8 @@ import { sessionFromRequest } from "./primary-auth";
 export type RootUnitsTransferEnv = AuthEnv & { DB: D1Database };
 
 /** Matches Discord `/send` cap (`discord-root-units.ts`). */
-const MAX_ROOT_UNITS_PER_TRANSFER = 10_000_000;
+import { MAX_ROOT_UNITS_PER_TRANSFER } from "../../shared/earn-program-constants";
+import { formatRootsAtomicLocale, rootsWholeToAtomic } from "../../shared/roots-units";
 
 async function ensureBalanceRow(db: D1Database, userId: string, nowIso: string): Promise<void> {
   await db
@@ -27,7 +28,7 @@ async function getEarnBalance(db: D1Database, userId: string): Promise<number> {
 
 /**
  * POST `/v1/me/root-units/transfer`
- * Body JSON: exactly one of `recipient_email` or `recipient_account_id`, plus integer `amount` (whole Root Units).
+ * Body JSON: exactly one of `recipient_email` or `recipient_account_id`, plus `amount` (whole Roots, ≥ 0.00000001).
  */
 export async function handleRootUnitsTransferV1(request: Request, env: RootUnitsTransferEnv): Promise<Response> {
   if (request.method !== "POST") {
@@ -60,13 +61,14 @@ export async function handleRootUnitsTransferV1(request: Request, env: RootUnits
     );
   }
 
-  const amount = Math.floor(Number(body.amount));
-  if (!Number.isFinite(amount) || amount < 1) {
-    return json({ ok: false, detail: "amount must be a whole number ≥ 1." }, 400);
+  const amountWhole = Number(body.amount);
+  const amount = rootsWholeToAtomic(amountWhole);
+  if (!Number.isFinite(amountWhole) || amount < rootsWholeToAtomic(0.00000001)) {
+    return json({ ok: false, detail: "amount must be at least 0.00000001 Roots." }, 400);
   }
   if (amount > MAX_ROOT_UNITS_PER_TRANSFER) {
     return json(
-      { ok: false, detail: `amount cannot exceed ${MAX_ROOT_UNITS_PER_TRANSFER.toLocaleString()} per transfer.` },
+      { ok: false, detail: `amount cannot exceed ${formatRootsAtomicLocale(MAX_ROOT_UNITS_PER_TRANSFER)} Roots per transfer.` },
       400,
     );
   }

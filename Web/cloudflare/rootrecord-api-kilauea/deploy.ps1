@@ -132,6 +132,12 @@ if ($stripeSecret -match '^sk_(live|test)_' -and $stripeSecret.Length -gt 30) {
   Write-Host "Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env)."
 }
 
+$treasurySk = [string]$env:RRTT_TREASURY_SECRET_KEY_B58
+if ($treasurySk.Length -ge 64) {
+  $treasurySk | npx wrangler secret put RRTT_TREASURY_SECRET_KEY_B58
+  Write-Host "Uploaded RRTT_TREASURY_SECRET_KEY_B58 (Roots treasury signer)."
+}
+
 # AccuWeather secret only goes to weather + kilauea shards. Token/business/account/primary do not
 # carry weather code anymore (see router.ts: "Weather/forecast/natural-disaster modules removed").
 $shardLeaf = Split-Path $PSScriptRoot -Leaf

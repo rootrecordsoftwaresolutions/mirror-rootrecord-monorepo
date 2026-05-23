@@ -1,6 +1,7 @@
 import { json } from "./cors";
 
 const TREASURY_PATHS = new Set([
+  "/internal/mint-roots",
   "/internal/run-treasury-liquidity-check",
   "/internal/run-treasury-sol-lp-check",
 ]);

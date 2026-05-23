@@ -185,6 +185,10 @@
   }
 
   let apiBase = "";
+  const API_FALLBACK_BASES = [
+    "https://api.rootrecord.info",
+    "https://rootrecord-api-account.rootrecord.workers.dev",
+  ];
 
   async function loadConfig() {
     const res = await fetch("/api/site-config", { cache: "no-store" });
@@ -203,15 +207,51 @@
         headers: { "Content-Type": "application/json; charset=utf-8" },
       });
     }
-    const headers = new Headers(opts?.headers);
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token && !headers.has("Authorization")) {
-      headers.set("Authorization", "Bearer " + token);
+    const bases = [apiBase].concat(API_FALLBACK_BASES.filter((base) => base !== apiBase));
+    let lastResponse = null;
+    let lastFetchError = null;
+    for (let i = 0; i < bases.length; i += 1) {
+      const base = bases[i].replace(/\/+$/, "");
+      const headers = new Headers(opts?.headers);
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token && !headers.has("Authorization")) {
+        headers.set("Authorization", "Bearer " + token);
+      }
+      if (!headers.has("Content-Type") && opts?.body) {
+        headers.set("Content-Type", "application/json");
+      }
+      const sameOrigin = base === window.location.origin.replace(/\/+$/, "");
+      let response;
+      try {
+        response = await fetch(base + path, {
+          ...opts,
+          headers,
+          credentials: sameOrigin ? "include" : "omit",
+          cache: "no-store",
+        });
+      } catch (e) {
+        lastFetchError = e;
+        if (i < bases.length - 1) continue;
+        break;
+      }
+      lastResponse = response;
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.toLowerCase().includes("text/html")) {
+        const text = await response.clone().text().catch(() => "");
+        if (looksLikeHtml(text) && i < bases.length - 1) continue;
+      }
+      return response;
     }
-    if (!headers.has("Content-Type") && opts?.body) {
-      headers.set("Content-Type", "application/json");
+    if (lastFetchError) {
+      return new Response(JSON.stringify({ detail: "Could not reach the sign-in service. Please check the connection and try again." }), {
+        status: 503,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      });
     }
-    return fetch(apiBase + path, { ...opts, headers, credentials: "include" });
+    return lastResponse || new Response(JSON.stringify({ detail: "Service unavailable." }), {
+      status: 503,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
   }
 
   async function parseJsonRes(res) {
@@ -225,17 +265,35 @@
     return { j, text };
   }
 
-  function friendlyFromApiError(j) {
+  function looksLikeHtml(s) {
+    return /^\s*(?:<!doctype\s+html|<html|<!--\[if\s+lt\s+IE|<head|<body)\b/i.test(String(s || ""));
+  }
+
+  function friendlyFromApiError(j, text) {
+    if (looksLikeHtml(text)) {
+      return "The sign-in service returned a webpage instead of an API response. Please refresh and try again.";
+    }
     if (!j || typeof j !== "object") return "";
     const detail = typeof j.detail === "string" ? j.detail.trim() : "";
     if (detail && detail.length < 400) return detail;
+    const error = typeof j.error === "string" ? j.error.trim() : "";
+    if (error && error.length < 400) return error;
     return "";
+  }
+
+  function genericApiError(text, fallback) {
+    if (looksLikeHtml(text)) {
+      return "The verification service returned a webpage instead of an API response. Please refresh and try again.";
+    }
+    const t = String(text || "").trim();
+    if (t && t.length < 240 && !/[<>]/.test(t)) return t;
+    return fallback;
   }
 
   async function startDiscordOAuth() {
     try {
       const res = await apiFetch("/v1/discord/oauth/start?json=1&flow=verify", { method: "GET" });
-      const { j } = await parseJsonRes(res);
+      const { j, text } = await parseJsonRes(res);
       if (res.status === 401) {
         setStatus("Please sign in first.", "warn");
         showVerifyPanel("panel-verify-forms");
@@ -245,7 +303,7 @@
         const detail =
           typeof j.detail === "string" && j.detail.trim()
             ? j.detail.trim()
-            : "Could not start Discord verification. Please try again.";
+            : genericApiError(text, "Could not start Discord verification. Please try again.");
         setStatus(detail, res.status === 503 ? "warn" : "err");
         return;
       }
@@ -290,6 +348,7 @@
     setStatus("");
 
     const res = await apiFetch("/v1/me", {});
+    const meParsed = await parseJsonRes(res);
     if (res.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       notifyPortalAuthChange();
@@ -305,11 +364,17 @@
     }
     if (!res.ok) {
       showVerifyPanel("panel-verify-forms");
-      setStatus("We could not check your verification status. Please try again.", "err");
+      setStatus(genericApiError(meParsed.text, "We could not check your verification status. Please try again."), "err");
       return;
     }
 
-    const data = await res.json();
+    if (!meParsed.j || typeof meParsed.j !== "object" || looksLikeHtml(meParsed.text)) {
+      showVerifyPanel("panel-verify-forms");
+      setStatus(genericApiError(meParsed.text, "We could not check your verification status. Please try again."), "err");
+      return;
+    }
+
+    const data = meParsed.j;
     notifyPortalAuthChange();
 
     if (renderSuccessPanel(data, discordQ)) {
@@ -344,7 +409,7 @@
       });
       const { j, text } = await parseJsonRes(res);
       if (!res.ok) {
-        setStatus(friendlyFromApiError(j) || text.slice(0, 200) || "Sign-in failed.", "err");
+        setStatus(friendlyFromApiError(j, text) || genericApiError(text, "Sign-in failed."), "err");
         return;
       }
       if (j.access_token) {

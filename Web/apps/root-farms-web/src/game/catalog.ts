@@ -7,7 +7,21 @@ export type { RootGroupId, RootSpeciesDef } from "./roots-catalog";
 export const ROWS_PER_PLOT = 10;
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000;
 export const FULL_FIELD_BONUS = 1.1;
-export const CATALOG_HASH = "root-farms-v6";
+export const FIRST_PLOT_ATOMIC_PER_SEC = 1;
+export const ROOTS_DAILY_PRODUCTION_CAP_ATOMIC = 100_000_000;
+export const CATALOG_HASH = "root-farms-v11";
+export const ROOT_CLUSTER_COUNT = 6;
+export const ROOT_CLUSTER_SIZE = 10;
+export const ROOT_CLUSTER_BONUS = 0.05;
+export const ROOT_CLUSTER_COSTS_ATOMIC = [1_000_000, 5_000_000, 10_000_000, 15_000_000, 20_000_000, 25_000_000] as const;
+export const ROOT_CLUSTER_NAMES = [
+  "Root Cluster Tree I",
+  "Root Cluster Tree II",
+  "Root Cluster Tree III",
+  "Root Cluster Tree IV",
+  "Root Cluster Tree V",
+  "Root Cluster Tree VI",
+] as const;
 
 const GROUP_ACCENT: Record<number, PlotAccent> = {
   1: "green",
@@ -31,8 +45,8 @@ function growTimeSecForLevel(id: number): number {
 }
 
 function baseRuPerRowForLevel(id: number, growTimeSec: number): number {
-  const ruPerSec = 0.45 * Math.pow(1.018, id - 1);
-  return Math.max(1, Math.round(ruPerSec * growTimeSec * 10) / 10);
+  const ruPerSec = FIRST_PLOT_ATOMIC_PER_SEC * Math.pow(1.018, id - 1);
+  return Math.max(1, Math.floor(ruPerSec * growTimeSec));
 }
 
 function buildPlot(id: number): PlotCatalogEntry {
@@ -78,13 +92,27 @@ export function rowSlotCost(plotId: number, currentRows: number): number {
 export function plotRuPerCycle(cat: PlotCatalogEntry, rowsActive: number, rowCount: number): number {
   if (rowsActive <= 0) return 0;
   const base = rowsActive * cat.baseRuPerRow;
-  const full = rowsActive >= rowCount && rowCount > 0;
+  const full = rowCount > 1 && rowsActive >= rowCount;
   const bonus = full ? FULL_FIELD_BONUS : 1;
-  return Math.floor(base * bonus * 10) / 10;
+  return Math.floor(base * bonus);
 }
 
 export function plotRuPerSec(cat: PlotCatalogEntry, rowsActive: number, rowCount: number): number {
   const per = plotRuPerCycle(cat, rowsActive, rowCount);
   if (per <= 0 || cat.growTimeSec <= 0) return 0;
   return per / cat.growTimeSec;
+}
+
+export function rootClusterRange(clusterId: number): { start: number; end: number } {
+  const id = Math.min(ROOT_CLUSTER_COUNT, Math.max(1, Math.floor(clusterId) || 1));
+  const start = (id - 1) * ROOT_CLUSTER_SIZE + 1;
+  return { start, end: Math.min(PLOT_COUNT, start + ROOT_CLUSTER_SIZE - 1) };
+}
+
+export function rootClusterCost(clusterId: number): number {
+  return ROOT_CLUSTER_COSTS_ATOMIC[clusterId - 1] ?? ROOT_CLUSTER_COSTS_ATOMIC[ROOT_CLUSTER_COSTS_ATOMIC.length - 1];
+}
+
+export function rootClusterName(clusterId: number): string {
+  return ROOT_CLUSTER_NAMES[clusterId - 1] ?? `Root Cluster Tree ${clusterId}`;
 }

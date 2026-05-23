@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, setToken, getToken, getDeviceId, RR_APP_ID } from "../lib/api";
-import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from "../../../shared/accountNotifyApi";
+import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from "../lib/accountNotifyApi";
 import { loadProgramSettingsLocal, toProgramSettingsPatch } from "../lib/programSettings";
 
 /** Merge device `localStorage` program prefs into D1 via PATCH /settings (non-blocking). */

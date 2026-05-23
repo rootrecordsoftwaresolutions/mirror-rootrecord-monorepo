@@ -5,7 +5,13 @@ export interface SolanaTxEnv {
   DB: D1Database;
   RR_PUSH_ADMIN_SECRET?: string;
   SOLANA_RPC_URL?: string;
-  RRTT_TREASURY_SECRET_KEY_B58?: string;
+  /** Secret signer for Root Record Global Updater mint/treasury transaction creation. */
+  ROOT_RECORD_GLOBAL_UPDATER_SECRET_KEY_B58?: string;
+  /** Public wallet guard for the Root Record Global Updater signer. */
+  ROOT_RECORD_GLOBAL_UPDATER_PUBKEY?: string;
+  /** Official ROOTS SPL mint used by Discord `/mint` and Root Economy backing. */
+  ROOTS_MINT_BASE58?: string;
+  ROOTS_DECIMALS?: string;
   RRTT_MINT_BASE58?: string;
   RRTT_DECIMALS?: string;
   RRESERVE_MINT_BASE58?: string;

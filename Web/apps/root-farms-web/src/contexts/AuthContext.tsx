@@ -2,7 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { getStoredEmail, isAuthed, loginRequest, logoutRequest, signupRequest, tryHydrateSessionFromCookie } from "../lib/api";
 import { clearEntitlement } from "../lib/entitlement";
-import { notifyFarmsSessionStart } from "../lib/sessionNotify";
+import { notifyFarmsSessionStart, FARMS_APP_ID } from "../lib/sessionNotify";
+import { startEarnUsageRewards } from "../lib/earnUsageRewards";
+import { apiFetch, getStoredToken } from "../lib/api";
 
 type AuthCtx = {
   decided: boolean;
@@ -62,6 +64,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     notifyFarmsSessionStart(!authed);
     setSessionNotified(true);
   }, [canPlay, sessionNotified, authed]);
+
+  useEffect(() => {
+    if (!authed) return undefined;
+    const client = {
+      post: async (path: string, body: Record<string, unknown>) => {
+        const res = await apiFetch(`/api${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("earn request failed");
+        return { data: await res.json() };
+      },
+    };
+    return startEarnUsageRewards(client, {
+      appId: FARMS_APP_ID,
+      getToken: () => getStoredToken() || "",
+    });
+  }, [authed]);
 
   const login = useCallback(
     async (email: string, password: string) => {

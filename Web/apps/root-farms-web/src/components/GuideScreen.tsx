@@ -74,6 +74,29 @@ export function GuideScreen() {
       </article>
 
       <article className="guide-section">
+        <h2>Storms (Ginger and beyond)</h2>
+        <p>
+          From <strong>Ginger</strong> with at least two rows, <strong>wind</strong> can wipe a whole crop plot and <strong>lightning</strong> can strike one shared row number across all farms that day. Buy a <strong>lightning rod</strong> once, hire a <strong>lightning meteorologist</strong> (−1% income), or plant <strong>cypress windbreaks</strong> (−5% income, strong wind block).
+        </p>
+        <p>
+          Classic gopher, mice, and rabbit attacks apply only on <strong>Carrot through Garlic</strong> plots.
+        </p>
+      </article>
+
+      <article className="guide-section">
+        <h2>Orchards and vegetable plots</h2>
+        <p>
+          The <strong>Orchards</strong> tab contains three automatic app-bonus trees: Volcano, Business, and Weather. Each active tree adds +10% to total farm earnings for 24 hours after one signed-in session in its matching Root Record app.
+        </p>
+        <p>
+          Purchased <strong>Root Cluster Trees</strong> also live in Orchards after you cluster a completed 10-plot root section. Each cluster tree adds +5% total income.
+        </p>
+        <p>
+          At <strong>root level 20</strong> (your highest unlocked root plot), <strong>Vegetable plots</strong> open as a separate tier with its own unlock and row costs. Vegetables are protected when you own the lightning rod and have at least one farmhand active.
+        </p>
+      </article>
+
+      <article className="guide-section">
         <h2>Varmints and notifications</h2>
         <p>
           Gophers, field mice, and rabbits can attack farms across the game world on a schedule you do not control. When something happens to your farm, you may get a popup alert and an entry under Farmhands notifications.

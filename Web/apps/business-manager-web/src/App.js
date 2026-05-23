@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { api, getToken, RR_APP_ID } from "./lib/api";
+import { startEarnUsageRewards } from "./lib/earnUsageRewards";
 import BottomNav from "./components/ui/BottomNav";
 import AuthScreen from "./components/modules/AuthScreen";
 import Dashboard from "./components/modules/Dashboard";
@@ -18,6 +20,20 @@ import ProPaywall from "./components/ProPaywall";
 import UpsellModal from "./components/UpsellModal";
 
 const IS_NATIVE = typeof window !== "undefined" && Boolean(window?.Capacitor?.isNativePlatform?.());
+
+function EarnUsageHeartbeat() {
+  const { user, guest } = useAuth();
+  const loc = useLocation();
+  useEffect(() => {
+    if (!user || guest) return undefined;
+    return startEarnUsageRewards(api, {
+      appId: RR_APP_ID,
+      getToken,
+      getPage: () => loc.pathname,
+    });
+  }, [user, guest, loc.pathname]);
+  return null;
+}
 
 function Gate({ children }) {
   const { user, guest } = useAuth();
@@ -83,6 +99,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <EarnUsageHeartbeat />
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>

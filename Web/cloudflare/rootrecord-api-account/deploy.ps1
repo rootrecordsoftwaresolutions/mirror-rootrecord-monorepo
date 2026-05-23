@@ -154,6 +154,12 @@ if ($stripeSecret -match '^sk_(live|test)_' -and $stripeSecret.Length -gt 30) {
   Write-Host "Uploaded STRIPE_SECRET_KEY to Worker (from credentials.env)."
 }
 
+$treasurySk = [string]$env:RRTT_TREASURY_SECRET_KEY_B58
+if ($treasurySk.Length -ge 64) {
+  $treasurySk | npx wrangler secret put RRTT_TREASURY_SECRET_KEY_B58
+  Write-Host "Uploaded RRTT_TREASURY_SECRET_KEY_B58 (Roots treasury signer)."
+}
+
 # AccuWeather secret only goes to weather + kilauea shards. Token/business/account/primary do not
 # carry weather code anymore (see router.ts: "Weather/forecast/natural-disaster modules removed").
 $shardLeaf = Split-Path $PSScriptRoot -Leaf
@@ -181,6 +187,33 @@ $appSessionWebhook = [string]$env:DISCORD_APP_SESSION_WEBHOOK_URL
 if ($appSessionWebhook -match '^https://discord(app)?\.com/api/webhooks/' -and $appSessionWebhook.Length -gt 60) {
   $appSessionWebhook | npx wrangler secret put DISCORD_APP_SESSION_WEBHOOK_URL
   Write-Host "Uploaded DISCORD_APP_SESSION_WEBHOOK_URL (app session starts → Discord)."
+}
+
+$rootEconomyWebhook = [string]$env:DISCORD_ROOT_ECONOMY_WEBHOOK_URL
+if ($shardLeaf -eq 'rootrecord-api-account' -and $rootEconomyWebhook -match '^https://discord(?:app)?\.com/api/webhooks/' -and $rootEconomyWebhook.Length -gt 60) {
+  $rootEconomyWebhook | npx wrangler secret put DISCORD_ROOT_ECONOMY_WEBHOOK_URL
+  Write-Host "Uploaded DISCORD_ROOT_ECONOMY_WEBHOOK_URL (Root Economy */45 cron → Discord)."
+}
+
+$grokWebhook = [string]$env:DISCORD_GROK_WEBHOOK_URL
+if ($shardLeaf -eq 'rootrecord-api-account' -and $grokWebhook -match '^https://discord(?:app)?\.com/api/webhooks/' -and $grokWebhook.Length -gt 60) {
+  $grokWebhook | npx wrangler secret put DISCORD_GROK_WEBHOOK_URL
+  Write-Host "Uploaded DISCORD_GROK_WEBHOOK_URL (/screenshot archive webhook)."
+}
+
+foreach ($grokSecretName in @(
+  "GROK_X_BEARER_TOKEN",
+  "GROK_X_V1_CONSUMER_KEY",
+  "GROK_X_V1_CONSUMER_KEY_SECRET",
+  "GROK_X_V2_CLIENT_ID",
+  "GROK_X_V2_CLIENT_SECRET",
+  "GROK_API_BEARER_TOKEN"
+)) {
+  $grokSecretValue = [string](Get-Item -Path "Env:$grokSecretName" -ErrorAction SilentlyContinue).Value
+  if ($shardLeaf -eq 'rootrecord-api-account' -and $grokSecretValue.Trim().Length -ge 12) {
+    $grokSecretValue.Trim() | npx wrangler secret put $grokSecretName
+    Write-Host "Uploaded $grokSecretName."
+  }
 }
 
 # Discord announcements → D1 `developer_messages` (cron on this Worker only). Bot token: Portal → Bot → Reset Token.

@@ -6,9 +6,11 @@ import { ProPaywall } from "./components/ProPaywall";
 import { UpsellModal, UPSELL_EVENT } from "./components/UpsellModal";
 import { useAuth } from "./contexts/AuthContext";
 import { BIG_ISLAND_LOCATIONS, type BigIslandLocation } from "./locations";
-import { apiFetch, isPro, isLifeMember } from "./lib/api";
+import { apiFetch, getStoredToken, isPro, isLifeMember, RR_APP_ID } from "./lib/api";
+import { startEarnUsageRewards } from "./lib/earnUsageRewards";
 
 const FREE_TIER_LOC_ID = "volcano";
+const ACCOUNT_SESSION_API = "https://rootrecord-api-account.rootrecord.workers.dev";
 
 const IS_NATIVE = typeof window !== "undefined" && Boolean((window as { Capacitor?: { isNativePlatform?: () => boolean } })?.Capacitor?.isNativePlatform?.());
 import {
@@ -127,6 +129,43 @@ export function App() {
     if (!auth.decided || !auth.authed) return;
     void load(false);
   }, [auth.decided, auth.authed, load]);
+
+  useEffect(() => {
+    if (!auth.decided || !auth.authed) return undefined;
+    try {
+      const key = `rr.app_session_notify.${RR_APP_ID}.acct`;
+      if (typeof sessionStorage === "undefined" || !sessionStorage.getItem(key)) {
+        if (typeof sessionStorage !== "undefined") sessionStorage.setItem(key, "1");
+        void fetch(`${ACCOUNT_SESSION_API}/api/app-session/start`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getStoredToken() || ""}`,
+          },
+          body: JSON.stringify({ app_id: RR_APP_ID, mode: "signed_in" }),
+          credentials: "include",
+        }).catch(() => {});
+      }
+    } catch {
+      /* session tracking should not block dashboard use */
+    }
+    const client = {
+      post: async (path: string, body: Record<string, unknown>) => {
+        const res = await apiFetch(`/api${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("earn request failed");
+        return { data: await res.json() };
+      },
+    };
+    return startEarnUsageRewards(client, {
+      appId: RR_APP_ID,
+      getToken: () => getStoredToken() || "",
+      getPage: () => (typeof window !== "undefined" ? window.location.pathname : "/"),
+    });
+  }, [auth.decided, auth.authed]);
 
   useEffect(() => {
     if (auth.decided && !auth.authed) {
@@ -566,42 +605,17 @@ export function App() {
               <a className="link-pill" href="https://rootrecord.info/" target="_blank" rel="noreferrer">
                 rootrecord.info
               </a>
+              <a className="link-pill" href="https://rootrecord.info/terms" target="_blank" rel="noreferrer">
+                Terms
+              </a>
+              <a className="link-pill" href="https://rootrecord.info/privacy" target="_blank" rel="noreferrer">
+                Privacy
+              </a>
               <a className="link-pill" href="https://www.usgs.gov/volcanoes/kilauea" target="_blank" rel="noreferrer">
                 USGS Kīlauea
               </a>
               <a className="link-pill" href="https://www.weather.gov/hfo/" target="_blank" rel="noreferrer">
                 NWS Honolulu
-              </a>
-            </div>
-          </section>
-
-          <section className="panel panel-links">
-            <div className="panel-head">
-              <span className="panel-icon" aria-hidden>
-                ▶
-              </span>
-              <h2>Featured channels</h2>
-            </div>
-            <p className="muted small" style={{ marginTop: 0 }}>
-              Independent Hawaiʻi volcano coverage from the community. The /live link opens the active
-              stream when on air, otherwise the channel page.
-            </p>
-            <div className="link-row">
-              <a
-                className="link-pill"
-                href="https://www.youtube.com/@TwoPineapples/live"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Two Pineapples — Live
-              </a>
-              <a
-                className="link-pill"
-                href="https://www.youtube.com/@TwoPineapples"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Two Pineapples — Channel
               </a>
             </div>
           </section>

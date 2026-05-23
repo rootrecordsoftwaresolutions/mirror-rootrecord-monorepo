@@ -1,16 +1,30 @@
+export const ROOTS_ATOMIC_PER_WHOLE = 100_000_000;
+export const ROOTS_SMALLEST_UNIT = 1 / ROOTS_ATOMIC_PER_WHOLE;
+
+export function rootsAtomicToWhole(n: number): number {
+  const v = Math.max(0, Math.floor(Number(n) || 0));
+  return v / ROOTS_ATOMIC_PER_WHOLE;
+}
+
+function trimFixed8(n: number): string {
+  return n.toFixed(8).replace(/\.?0+$/, "");
+}
+
 export function formatRu(n: number): string {
-  const v = Math.max(0, Math.floor(n));
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
-  if (v >= 10_000) return `${(v / 1_000).toFixed(1)}K`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(2)}K`;
-  return String(v);
+  const whole = rootsAtomicToWhole(n);
+  if (whole >= 1_000_000_000) return `${(whole / 1_000_000_000).toFixed(2)}B ROOTS`;
+  if (whole >= 1_000_000) return `${(whole / 1_000_000).toFixed(2)}M ROOTS`;
+  if (whole >= 10_000) return `${(whole / 1_000).toFixed(1)}K ROOTS`;
+  if (whole >= 1_000) return `${(whole / 1_000).toFixed(2)}K ROOTS`;
+  return `${trimFixed8(whole)} ROOTS`;
 }
 
 export function formatRuRate(n: number): string {
-  if (n >= 1000) return `${formatRu(n)}/s`;
-  if (n >= 10) return `${Math.round(n)}/s`;
-  return `${n.toFixed(1)}/s`;
+  const wholePerSec = Math.max(0, Number(n) || 0) / ROOTS_ATOMIC_PER_WHOLE;
+  if (wholePerSec >= 1_000) return `${(wholePerSec / 1_000).toFixed(2)}K ROOTS/s`;
+  if (wholePerSec >= 1) return `${wholePerSec.toLocaleString(undefined, { maximumFractionDigits: 4 })} ROOTS/s`;
+  if (wholePerSec > 0) return `${trimFixed8(Math.max(ROOTS_SMALLEST_UNIT, wholePerSec))} ROOTS/s`;
+  return "0 ROOTS/s";
 }
 
 export function formatGrowTime(sec: number): string {

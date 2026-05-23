@@ -199,7 +199,7 @@ export default function AirQuality() {
 
   return (
     <div className="animate-fadein lg:mx-auto lg:max-w-[min(1400px,calc(100%-2rem))]" data-testid="air-quality-page">
-      <header className="flex items-center justify-between p-4 pb-2" style={{ paddingTop: '1rem' }}>
+      <header className="flex items-center justify-between px-4 pt-2 pb-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Air quality</h1>
           <p className="text-xs text-accent/70 font-mono uppercase tracking-widest">

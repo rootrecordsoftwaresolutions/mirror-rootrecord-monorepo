@@ -1,6 +1,6 @@
-# Dedicated Worker: treasury Raydium LP maintenance (SOL + RRTT/RRESERVE) + Discord → D1 developer_messages.
+# Dedicated Worker: ROOTS minting + treasury Raydium LP maintenance (SOL + RRTT/RRESERVE) + Discord → D1 developer_messages.
 # No Cloudflare cron on this Worker; call `/api/internal/...` manually or from your own scheduler if needed.
-# Secrets: RRTT_TREASURY_SECRET_KEY_B58, RR_PUSH_ADMIN_SECRET, SOLANA_RPC_URL (recommended), DISCORD_BOT_TOKEN,
+# Secrets: ROOT_RECORD_GLOBAL_UPDATER_SECRET_KEY_B58, RR_PUSH_ADMIN_SECRET, SOLANA_RPC_URL (recommended), DISCORD_BOT_TOKEN,
 #   DISCORD_WEBHOOK_SOLANA_TOOLS, TREASURY_MAINTENANCE_SOURCE_SECRET_KEY_B58 (optional).
 # Deploy: .\deploy.ps1 (loads repo-root credentials.env.txt then Web/credentials.env).
 name = "rootrecord-solana-tx"
@@ -17,6 +17,9 @@ database_name = "root-record"
 database_id = "0b49c598-1f91-4a09-84a8-6ba8241c6df3"
 
 [vars]
+ROOT_RECORD_GLOBAL_UPDATER_PUBKEY = "G1DHctEcwkiLw8NZDfCbDCbuPktQBmWa6P2aobDuMKuZ"
+ROOTS_MINT_BASE58 = "8hwxLN1Q4Yr8xFErErULCqNvcF1cMwGjpRXPz6DAH7gM"
+ROOTS_DECIMALS = "8"
 RRTT_MINT_BASE58 = "6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEVsX6RQMT"
 RRTT_DECIMALS = "9"
 RRESERVE_MINT_BASE58 = "5FNiQb4cFcD8wBkivXpeoB5xYb3R6ohU8Y5nKmMRB362"

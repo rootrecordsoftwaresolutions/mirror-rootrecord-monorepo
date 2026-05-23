@@ -54,7 +54,7 @@ import bs58 from "bs58";
 
 const DEFAULT_MINT_B58 = "8hwxLN1Q4Yr8xFErErULCqNvcF1cMwGjpRXPz6DAH7gM";
 const DEFAULT_EXCLUDE_OWNERS = new Set([
-  "3QG6gVk3fdimzQaKX9zf7J6kCs5DRLKg1RNea3VBosDJ",
+  "G1DHctEcwkiLw8NZDfCbDCbuPktQBmWa6P2aobDuMKuZ",
 ]);
 /** SPL token account addresses for this mint that must never be frozen (e.g. Raydium vault). */
 const DEFAULT_EXCLUDE_TOKEN_ACCOUNTS = new Set([

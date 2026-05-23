@@ -506,6 +506,20 @@ export function About() {
             </p>
           </div>
         </Section>
+        <Section title="Legal">
+          <div className="p-4 text-sm text-ink-secondary space-y-2">
+            <p>
+              <a className="text-brand font-semibold" href="https://rootrecord.info/terms" target="_blank" rel="noreferrer">
+                Terms of Service <ExternalLink size={12} className="inline opacity-80" aria-hidden />
+              </a>
+            </p>
+            <p>
+              <a className="text-brand font-semibold" href="https://rootrecord.info/privacy" target="_blank" rel="noreferrer">
+                Privacy Policy <ExternalLink size={12} className="inline opacity-80" aria-hidden />
+              </a>
+            </p>
+          </div>
+        </Section>
       </PageContainer>
     </>
   );

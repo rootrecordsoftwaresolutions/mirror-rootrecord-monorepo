@@ -1813,3 +1813,89 @@ section { position: relative; }
     transition-duration: .001ms !important;
   }
 }
+
+/* Root Economy public widget (marketing + /charts/root-economy/) */
+.re-widget {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 1.25rem 1.35rem;
+}
+.re-widget--compact { padding: 1rem 1.1rem; }
+.re-widget-status { margin: 0; font-size: 0.9rem; color: var(--ink-muted); }
+.re-widget-total-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin-bottom: 0.35rem;
+}
+.re-widget-total-val {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: clamp(1.35rem, 3vw, 1.85rem);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.re-widget-total-meta { margin: 0.35rem 0 0; font-size: 0.82rem; color: var(--ink-muted); }
+.re-widget-chart-wrap {
+  margin: 1rem 0 0.75rem;
+  height: 140px;
+  border-radius: 10px;
+  background: #121212;
+  border: 1px solid #2a2a2a;
+  padding: 0.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.re-widget-chart-wrap canvas {
+  flex: 1;
+  min-height: 0;
+  width: 100% !important;
+}
+.re-widget-chart-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--ink-muted, #9aa0a6);
+  line-height: 1.35;
+}
+.re-widget:not(.re-widget--compact) .re-widget-chart-wrap { height: 220px; }
+.re-widget-table-wrap { overflow-x: auto; margin-top: 0.5rem; }
+.re-widget-sort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.85rem 0 0.4rem;
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+.re-widget-sort button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+.re-widget-sort button.is-active {
+  border-color: var(--moss);
+  color: var(--moss);
+}
+.re-widget-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.re-widget-table th,
+.re-widget-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.re-widget-table th { color: var(--ink-muted); font-weight: 600; font-size: 0.75rem; }
+.re-widget-foot { margin: 0.75rem 0 0; font-size: 0.82rem; color: var(--ink-muted); }
+.re-widget-foot a { color: var(--moss); }
+.home-economy-card { margin-top: 1.25rem; }

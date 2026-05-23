@@ -34,4 +34,14 @@ export type GameSave = {
   plots: PlotProgress[];
 };
 
-export type TabId = "plots" | "farmhands" | "guide" | "leaderboard" | "replant" | "settings";
+export type TabId =
+  | "plots"
+  | "roots"
+  | "orchards"
+  | "vegetables"
+  | "farmhands"
+  | "market"
+  | "guide"
+  | "leaderboard"
+  | "replant"
+  | "settings";

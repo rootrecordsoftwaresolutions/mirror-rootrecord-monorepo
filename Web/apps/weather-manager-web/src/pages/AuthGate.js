@@ -134,9 +134,8 @@ export default function AuthGate({ onSignedIn }) {
           </div>
         </div>
       ) : null}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm animate-slideup">
-          <div className="flex items-center gap-3 mb-8">
+      <div className="flex-1 flex flex-col px-6 pt-4 pb-10 max-w-sm mx-auto w-full animate-slideup">
+          <div className="flex flex-col items-center text-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-md bg-accent/10 border border-accent/30 flex items-center justify-center">
               <Cloud strokeWidth={1.5} className="w-6 h-6 text-accent" />
             </div>
@@ -181,12 +180,12 @@ export default function AuthGate({ onSignedIn }) {
             </div>
           ) : (
             <>
-              <div className="flex gap-2 mb-6 text-xs uppercase tracking-widest font-mono">
+              <div className="grid grid-cols-2 mb-6 text-xs uppercase tracking-widest font-mono border-b border-subtle">
                 <button
                   type="button"
                   data-testid="auth-tab-signin"
                   onClick={() => setView('signin')}
-                  className={`pb-2 border-b-2 ${view === 'signin' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
+                  className={`pb-2 border-b-2 -mb-px text-center ${view === 'signin' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
                 >
                   Sign in
                 </button>
@@ -194,7 +193,7 @@ export default function AuthGate({ onSignedIn }) {
                   type="button"
                   data-testid="auth-tab-signup"
                   onClick={() => setView('signup')}
-                  className={`pb-2 border-b-2 ${view === 'signup' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
+                  className={`pb-2 border-b-2 -mb-px text-center ${view === 'signup' ? 'text-white border-accent' : 'text-accent/60 border-transparent'}`}
                 >
                   Create account
                 </button>
@@ -257,7 +256,6 @@ export default function AuthGate({ onSignedIn }) {
               )}
             </>
           )}
-        </div>
       </div>
     </div>
   );

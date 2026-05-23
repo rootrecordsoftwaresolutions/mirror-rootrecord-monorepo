@@ -16,7 +16,8 @@ export const ECOSYSTEM_EARN_REWARD_SYMBOL =
 /** Metaplex listing name — keep in sync with on-chain metadata. */
 export const ECOSYSTEM_LISTING_NAME = 'Root Record Software Solutions';
 
-const DEFAULT_TREASURY_OPERATOR = '3QG6gVk3fdimzQaKX9zf7J6kCs5DRLKg1RNea3VBosDJ';
+/** Roots treasury wallet (mainnet). Override with NEXT_PUBLIC_ECOSYSTEM_SOLSCAN_TREASURY. */
+const DEFAULT_TREASURY_OPERATOR = 'G1DHctEcwkiLw8NZDfCbDCbuPktQBmWa6P2aobDuMKuZ';
 
 /** Treasury / operator wallet (Solscan). */
 export const ECOSYSTEM_SOLSCAN_TREASURY =

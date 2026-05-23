@@ -15,7 +15,7 @@
 | Authority | `BgwDWXBhCaXjDWpX6viCb1MwMSW8jbWHSxi5FyGwyppY` |
 | Creator | `BgwDWXBhCaXjDWpX6viCb1MwMSW8jbWHSxi5FyGwyppY` |
 | First mint (UTC) | 15:17:47 Jul 4, 2025 |
-| Treasury | `3QG6gVk3fdimzQaKX9zf7J6kCs5DRLKg1RNea3VBosDJ` — [Solscan](https://solscan.io/account/3QG6gVk3fdimzQaKX9zf7J6kCs5DRLKg1RNea3VBosDJ) |
+| Treasury | `G1DHctEcwkiLw8NZDfCbDCbuPktQBmWa6P2aobDuMKuZ` — [Solscan](https://solscan.io/account/G1DHctEcwkiLw8NZDfCbDCbuPktQBmWa6P2aobDuMKuZ) |
 | Locked (yearly release) | `oaQtjV8Aj2rxTLAvQzFZvMqf3byhUeCaEaFz7vGQk5v` — [Solscan](https://solscan.io/account/oaQtjV8Aj2rxTLAvQzFZvMqf3byhUeCaEaFz7vGQk5v) |
 | Jupiter Referral Program | `45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp` — [Solscan](https://solscan.io/account/45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp) |
 

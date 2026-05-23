@@ -27,7 +27,7 @@ export default function Finance() {
       <PageContainer>
         <div
           className="card p-1 flex overflow-x-auto no-scrollbar mb-4 sticky z-10"
-          style={{ top: "calc(68px + env(safe-area-inset-top, 0px))" }}
+          style={{ top: "3.25rem" }}
         >
           {TABS.map((t) => (
             <button

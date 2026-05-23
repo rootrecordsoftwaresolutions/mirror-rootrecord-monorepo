@@ -129,6 +129,7 @@ async function migrateUserScopedIds(db: D1Database, oldEmail: string, newEmail: 
     { sql: "UPDATE rr_earn_app_day SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE rr_earn_app_total SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE rr_earn_signup_bonus SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
+    { sql: "UPDATE rr_earn_app_first_open SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE bm_owned_row SET user_key = ? WHERE user_key = ?", binds: [newU, oldU] },
   ];
 

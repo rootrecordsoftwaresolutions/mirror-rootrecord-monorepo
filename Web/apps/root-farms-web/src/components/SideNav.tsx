@@ -2,7 +2,11 @@ import type { TabId } from "../game/types";
 
 const TABS: { id: TabId; label: string; soon?: boolean }[] = [
   { id: "plots", label: "Plots" },
+  { id: "roots", label: "Roots" },
+  { id: "orchards", label: "Orchards" },
+  { id: "vegetables", label: "Vegetables" },
   { id: "farmhands", label: "Farmhands" },
+  { id: "market", label: "The Well" },
   { id: "guide", label: "Guide" },
   { id: "leaderboard", label: "Root Economy" },
   { id: "replant", label: "Replant", soon: true },
@@ -46,8 +50,16 @@ function iconFor(id: TabId): string {
   switch (id) {
     case "plots":
       return "▦";
+    case "roots":
+      return "⌑";
+    case "orchards":
+      return "🌳";
+    case "vegetables":
+      return "🥬";
     case "farmhands":
       return "◉";
+    case "market":
+      return "◇";
     case "guide":
       return "ℹ";
     case "leaderboard":

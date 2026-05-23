@@ -30,7 +30,6 @@ export default function About() {
     <div className="min-h-screen bg-app pb-8" data-testid="about-page">
       <header
         className="flex items-center gap-3 p-4 border-b border-subtle"
-        style={{ paddingTop: '1rem' }}
       >
         <button
           type="button"
@@ -104,6 +103,21 @@ export default function About() {
                 rootrecord.info
               </a>{' '}
               for the latest.
+            </p>
+          </div>
+        </Section>
+
+        <Section title="Legal">
+          <div className="p-4 text-sm text-accent/90 space-y-2">
+            <p>
+              <a className="text-accent font-semibold" href="https://rootrecord.info/terms" target="_blank" rel="noreferrer">
+                Terms of Service
+              </a>
+            </p>
+            <p>
+              <a className="text-accent font-semibold" href="https://rootrecord.info/privacy" target="_blank" rel="noreferrer">
+                Privacy Policy
+              </a>
             </p>
           </div>
         </Section>

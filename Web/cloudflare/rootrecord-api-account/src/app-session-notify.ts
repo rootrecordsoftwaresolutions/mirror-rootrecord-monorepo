@@ -7,6 +7,7 @@ import {
   parseAppIdFromAuthRequest,
   type AppSessionDiscordEnv,
 } from "../../shared/discord-app-session-notify";
+import { grantFirstAppOpenBonus } from "../../shared/earn-app-first-open";
 
 export {
   APP_SESSION_LABELS,
@@ -42,26 +43,76 @@ export async function handleAppSessionStartRoute(
   const sess = await sessionFromRequest(env, request);
   const betaTester = modeRaw === "beta_tester" || (!sess && modeRaw !== "signed_in");
 
-  const webhook = String(env.DISCORD_APP_SESSION_WEBHOOK_URL || "").trim();
-  if (!webhook) {
-    return json({ ok: true, notified: false }, 200);
+  let firstOpenGranted = false;
+  let firstOpenUnits = 0;
+  if (sess) {
+    const email = String(sess.email || "")
+      .trim()
+      .toLowerCase();
+    if (email) {
+      const userId = "user:" + email;
+      const nowIso = new Date().toISOString();
+      try {
+        await env.DB
+          .prepare(
+            `INSERT INTO rr_app_session_last_open (user_id, app_id, last_open_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(user_id, app_id) DO UPDATE SET last_open_at = excluded.last_open_at`,
+          )
+          .bind(userId, appId, nowIso)
+          .run();
+      } catch (e) {
+        const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
+        console.error(JSON.stringify({ msg: "app_session_last_open_failed", err: msg.slice(0, 200) }));
+      }
+      try {
+        const fo = await grantFirstAppOpenBonus(env.DB, userId, appId, nowIso);
+        firstOpenGranted = fo.granted;
+        firstOpenUnits = fo.units;
+      } catch (e) {
+        const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
+        console.error(JSON.stringify({ msg: "app_session_first_open_bonus_failed", err: msg.slice(0, 200) }));
+      }
+    }
   }
 
   if (sess) {
-    await notifyDiscordAppSessionForAccount(env, {
-      accountId: sess.accountId,
-      email: sess.email,
-      appId,
-      mode: "signed_in",
-      guestId: guestId || undefined,
-    });
-  } else {
-    await notifyDiscordGuestAppSession(env, {
-      appId,
-      mode: betaTester ? "beta_tester" : "anonymous",
-      guestId: guestId || undefined,
-    });
+    try {
+      const { touchRootEconomy } = await import("../../shared/root-economy-snapshot");
+      await touchRootEconomy(env.DB, "session").catch(() => {});
+    } catch {
+      /* ignore */
+    }
   }
 
-  return json({ ok: true, notified: true }, 201);
+  const webhook = String(env.DISCORD_APP_SESSION_WEBHOOK_URL || "").trim();
+  let notified = false;
+  if (webhook) {
+    if (sess) {
+      await notifyDiscordAppSessionForAccount(env, {
+        accountId: sess.accountId,
+        email: sess.email,
+        appId,
+        mode: "signed_in",
+        guestId: guestId || undefined,
+      });
+    } else {
+      await notifyDiscordGuestAppSession(env, {
+        appId,
+        mode: betaTester ? "beta_tester" : "anonymous",
+        guestId: guestId || undefined,
+      });
+    }
+    notified = true;
+  }
+
+  return json(
+    {
+      ok: true,
+      notified,
+      first_open_granted: firstOpenGranted,
+      first_open_units: firstOpenUnits,
+    },
+    notified ? 201 : 200,
+  );
 }

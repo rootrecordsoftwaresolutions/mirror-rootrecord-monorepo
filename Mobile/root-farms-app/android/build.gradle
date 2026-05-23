@@ -6,7 +6,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.6.0'
+        // AGP 8.8+ understands Kotlin 2.2 metadata used by play-services-ads 25.x.
+        classpath 'com.android.tools.build:gradle:8.8.0'
     }
 }
 

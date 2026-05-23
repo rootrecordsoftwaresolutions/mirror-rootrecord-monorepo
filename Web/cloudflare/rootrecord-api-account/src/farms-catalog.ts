@@ -3,10 +3,16 @@ export const PLOT_COUNT = 65;
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000;
 export const FULL_FIELD_BONUS = 1.1;
 export const ROWS_PER_PLOT = 10;
-export const CATALOG_HASH = "root-farms-v6";
+export const FIRST_PLOT_ATOMIC_PER_SEC = 1;
+export const ROOTS_DAILY_PRODUCTION_CAP_ATOMIC = 100_000_000;
+export const CATALOG_HASH = "root-farms-v11";
 export const FARMS_APP_ID = "root_farms";
-/** Max Root Units credited via farms settle per UTC day; 0 = no daily cap. */
-export const FARMS_DAILY_CAP = 0;
+export const ROOT_CLUSTER_COUNT = 6;
+export const ROOT_CLUSTER_SIZE = 10;
+export const ROOT_CLUSTER_BONUS = 0.05;
+export const ROOT_CLUSTER_COSTS_ATOMIC = [1_000_000, 5_000_000, 10_000_000, 15_000_000, 20_000_000, 25_000_000] as const;
+/** Max Root Units credited via farms settle per UTC day: 1.0 ROOTS token at 8 decimals. */
+export const FARMS_DAILY_CAP = ROOTS_DAILY_PRODUCTION_CAP_ATOMIC;
 
 export type PlotProgress = {
   id: number;
@@ -36,8 +42,8 @@ function growTimeSecForLevel(id: number): number {
 }
 
 function baseRuPerRowForLevel(id: number, growTimeSec: number): number {
-  const ruPerSec = 0.45 * Math.pow(1.018, id - 1);
-  return Math.max(1, Math.round(ruPerSec * growTimeSec * 10) / 10);
+  const ruPerSec = FIRST_PLOT_ATOMIC_PER_SEC * Math.pow(1.018, id - 1);
+  return Math.max(1, Math.floor(ruPerSec * growTimeSec));
 }
 
 function buildPlot(id: number): PlotCatalogEntry {
@@ -61,6 +67,27 @@ export function plotUnlockCost(plotId: number): number {
   return Math.floor(800 * Math.pow(1.72, tier - 1));
 }
 
+export function rootClusterRange(clusterId: number): { start: number; end: number } {
+  const id = Math.min(ROOT_CLUSTER_COUNT, Math.max(1, Math.floor(clusterId) || 1));
+  const start = (id - 1) * ROOT_CLUSTER_SIZE + 1;
+  return { start, end: Math.min(PLOT_COUNT, start + ROOT_CLUSTER_SIZE - 1) };
+}
+
+export function rootClusterCost(clusterId: number): number | null {
+  if (clusterId < 1 || clusterId > ROOT_CLUSTER_COUNT) return null;
+  return ROOT_CLUSTER_COSTS_ATOMIC[clusterId - 1] ?? null;
+}
+
+export function rootClusterCompleted(plots: PlotProgress[], clusterId: number): boolean {
+  const range = rootClusterRange(clusterId);
+  for (let id = range.start; id <= range.end; id++) {
+    const plot = plots.find((p) => p.id === id);
+    const cat = getPlotCatalog(id);
+    if (!plot?.unlocked || plot.rowCount < cat.maxRows) return false;
+  }
+  return true;
+}
+
 export function rowSlotCost(plotId: number, currentRows: number): number {
   const tier = plotId - 1;
   return Math.floor(90 * Math.pow(1.58, currentRows) * Math.pow(1.28, tier));
@@ -69,9 +96,9 @@ export function rowSlotCost(plotId: number, currentRows: number): number {
 export function plotRuPerCycle(rowsActive: number, rowCount: number, cat: PlotCatalogEntry): number {
   if (rowsActive <= 0) return 0;
   const base = rowsActive * cat.baseRuPerRow;
-  const full = rowsActive >= rowCount && rowCount > 0;
+  const full = rowCount > 1 && rowsActive >= rowCount;
   const bonus = full ? FULL_FIELD_BONUS : 1;
-  return Math.floor(base * bonus * 10) / 10;
+  return Math.floor(base * bonus);
 }
 
 export function createInitialPlots(): PlotProgress[] {
@@ -84,6 +111,24 @@ export function createInitialPlots(): PlotProgress[] {
   });
 }
 
+function normalizePlotProgress(input: Partial<PlotProgress>, fallback: PlotProgress): PlotProgress {
+  const id = Math.min(PLOT_COUNT, Math.max(1, Math.floor(Number(input.id ?? fallback.id) || fallback.id)));
+  const cat = getPlotCatalog(id);
+  const unlocked = Boolean(input.unlocked) || id === 1;
+  if (!unlocked) return { id, unlocked: false, rowCount: 0, rowsActive: 0, cycleProgress: 0 };
+  const minRows = id === 1 ? 1 : 0;
+  const rowCount = Math.min(cat.maxRows, Math.max(minRows, Math.floor(Number(input.rowCount) || 0)));
+  let rowsActive = Math.min(rowCount, Math.max(0, Math.floor(Number(input.rowsActive) || 0)));
+  if (rowsActive <= 0 && rowCount > 0) rowsActive = rowCount;
+  return {
+    id,
+    unlocked,
+    rowCount,
+    rowsActive,
+    cycleProgress: Math.max(0, Math.min(Number(input.cycleProgress) || 0, 50)),
+  };
+}
+
 export function simulateHarvests(
   plots: PlotProgress[],
   fromMs: number,
@@ -94,7 +139,7 @@ export function simulateHarvests(
   const dtSec = Math.max(0, (endMs - fromMs) / 1000);
   if (dtSec <= 0) return { granted: 0, plots };
 
-  const mult = Math.max(0, Math.min(1, Number(incomeMultiplier) || 0));
+  const mult = Math.max(0, Number(incomeMultiplier) || 0);
   let granted = 0;
   const nextPlots = plots.map((p) => {
     if (!p.unlocked || p.rowsActive <= 0) return p;
@@ -207,13 +252,19 @@ export function parsePlotsJson(raw: string | null | undefined): PlotProgress[] {
       const o = item as Record<string, unknown>;
       const id = Math.floor(Number(o.id) || 0);
       if (id < 1 || id > PLOT_COUNT) continue;
-      byId.set(id, {
+      byId.set(
         id,
-        unlocked: Boolean(o.unlocked),
-        rowCount: Math.max(0, Math.floor(Number(o.rowCount ?? o.row_count) || 0)),
-        rowsActive: Math.max(0, Math.floor(Number(o.rowsActive ?? o.rows_active) || 0)),
-        cycleProgress: Math.max(0, Number(o.cycleProgress ?? o.cycle_progress) || 0),
-      });
+        normalizePlotProgress(
+          {
+            id,
+            unlocked: Boolean(o.unlocked),
+            rowCount: Math.floor(Number(o.rowCount ?? o.row_count) || 0),
+            rowsActive: Math.floor(Number(o.rowsActive ?? o.rows_active) || 0),
+            cycleProgress: Number(o.cycleProgress ?? o.cycle_progress) || 0,
+          },
+          base[id - 1] ?? base[0],
+        ),
+      );
     }
     return base.map((p) => byId.get(p.id) ?? p);
   } catch {
@@ -235,4 +286,26 @@ export function totalRuPerSec(plots: PlotProgress[]): number {
     sum += per / cat.growTimeSec;
   }
   return sum;
+}
+
+/** Unlocked plot count + total purchased row slots (sum of rowCount). */
+export function summarizeFarmsPlots(plots: PlotProgress[]): {
+  plots_unlocked: number;
+  rows_accumulated: number;
+  rows_active: number;
+} {
+  let plots_unlocked = 0;
+  let rows_accumulated = 0;
+  let rows_active = 0;
+  for (const p of plots) {
+    if (!p.unlocked) continue;
+    plots_unlocked += 1;
+    rows_accumulated += Math.max(0, Math.floor(p.rowCount) || 0);
+    rows_active += Math.max(0, Math.floor(p.rowsActive) || 0);
+  }
+  return { plots_unlocked, rows_accumulated, rows_active };
+}
+
+export function summarizeFarmsPlotsJson(raw: string | null | undefined): ReturnType<typeof summarizeFarmsPlots> {
+  return summarizeFarmsPlots(parsePlotsJson(raw));
 }

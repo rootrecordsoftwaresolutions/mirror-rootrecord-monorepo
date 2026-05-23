@@ -72,3 +72,8 @@ body {
       #060d14;
   }
 }
+
+.weather-web-main {
+  padding-top: max(var(--rr-native-ad-banner-height, 0px), env(safe-area-inset-top, 0px));
+  scroll-padding-top: max(var(--rr-native-ad-banner-height, 0px), env(safe-area-inset-top, 0px));
+}

@@ -47,8 +47,10 @@ public class MainActivity extends BridgeActivity {
     ensureAdView();
 
     mainHandler.post(this::attachWebAdsBridge);
+    mainHandler.post(this::syncAdVisibilityFromWeb);
 
     // Web session (localStorage) may not exist until after the Capacitor bundle loads.
+    mainHandler.postDelayed(this::syncAdVisibilityFromWeb, 500L);
     mainHandler.postDelayed(this::syncAdVisibilityFromWeb, 1500L);
 
     View decor = getWindow() != null ? getWindow().getDecorView() : null;
@@ -130,6 +132,7 @@ public class MainActivity extends BridgeActivity {
       return;
     }
     webView.addJavascriptInterface(new WebAdsBridge(), "RootRecordAds");
+    syncWebBannerInset();
   }
 
   @Override
@@ -192,30 +195,18 @@ public class MainActivity extends BridgeActivity {
     adView.post(MainActivity.this::syncWebBannerInset);
   }
 
-  /**
-   * Padding for the web layer = distance from WebView top to ad bottom (Capacitor may already
-   * inset the WebView below the status bar — do not add status-bar height again).
-   */
+  /** Status bar + banner height (window geometry can over-count and leave a large top gap). */
   private int webTopInsetBelowAdPx(WebView webView) {
     if (adView == null || webView == null || adView.getVisibility() != View.VISIBLE) {
       return 0;
     }
-    int[] adWin = new int[2];
-    int[] wvWin = new int[2];
-    adView.getLocationInWindow(adWin);
-    webView.getLocationInWindow(wvWin);
     int bannerPx = adView.getHeight();
     if (bannerPx <= 0) {
       bannerPx =
           (int) (FALLBACK_BANNER_HEIGHT_DP * getResources().getDisplayMetrics().density + 0.5f);
     }
-    int adBottomInWindow = adWin[1] + bannerPx;
-    int inset = adBottomInWindow - wvWin[1];
-    if (inset < 0) {
-      inset = 0;
-    }
     int gapPx = (int) (BANNER_TOP_GAP_DP * getResources().getDisplayMetrics().density + 0.5f);
-    return inset + gapPx;
+    return statusBarInsetPx() + bannerPx + gapPx;
   }
 
   /** Status bar height for ad-free layout (WebView safe-area env is often 0 on Android). */

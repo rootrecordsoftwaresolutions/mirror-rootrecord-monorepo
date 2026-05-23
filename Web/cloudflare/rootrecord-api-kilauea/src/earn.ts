@@ -2,6 +2,11 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { json } from "./cors";
 import { resolveUserId } from "./auth";
 import { getSignupBonusRow, SIGNUP_BONUS_UNITS } from "./earn-signup-bonus";
+import {
+  FIRST_APP_OPEN_UNITS,
+  getFirstAppOpenRow,
+  grantFirstAppOpenBonus,
+} from "../../shared/earn-app-first-open";
 import type { CustodialCacheRpcEnv } from "./custodial-onchain-cache";
 import { refreshCustodialOnchainCacheFromRpc } from "./custodial-onchain-cache";
 import { sessionFromRequest } from "./primary-auth";
@@ -155,6 +160,7 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
   const claimable = appDay.checkin_claimed === 0 && checkinLeft > 0;
   const wouldGrant = Math.min(DAILY_CHECKIN_UNITS, checkinLeft);
   const signupRow = await getSignupBonusRow(env.DB, userId);
+  const firstOpenRow = await getFirstAppOpenRow(env.DB, userId, appId);
 
   let custodial_pending_units = 0;
   let custodial_units_sent = 0;
@@ -254,6 +260,13 @@ async function earnSummary(request: Request, env: EarnEnv): Promise<Response> {
         received_units: signupRow ? signupRow.units : 0,
         granted_at: signupRow?.granted_at ?? null,
       },
+      first_open_bonus: {
+        per_app: true,
+        program_units: FIRST_APP_OPEN_UNITS,
+        received: Boolean(firstOpenRow),
+        received_units: firstOpenRow ? firstOpenRow.units : 0,
+        granted_at: firstOpenRow?.granted_at ?? null,
+      },
       ymd,
       app_id: appId,
       today_units_earned: appDay.units_earned,
@@ -349,6 +362,7 @@ async function earnHeartbeat(request: Request, env: EarnEnv): Promise<Response> 
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   await ensureBalance(env.DB, userId, nowIso);
+  await grantFirstAppOpenBonus(env.DB, userId, appId, nowIso);
   const appDay0 = await getAppDay(env.DB, userId, appId, ymd);
   const dailyLeft = DAILY_MAX_UNITS - appDay0.units_earned;
   if (dailyLeft <= 0) {
@@ -468,6 +482,8 @@ async function earnHeartbeat(request: Request, env: EarnEnv): Promise<Response> 
     .run();
   if (granted > 0) {
     await incAppTotals(env.DB, userId, appId, ymd, granted, nowIso);
+    const { maybeTouchRootEconomyAfterEarn } = await import("../../shared/root-economy-snapshot");
+    await maybeTouchRootEconomyAfterEarn(env.DB, granted, "heartbeat");
   }
   await env.DB
     .prepare(
@@ -549,6 +565,8 @@ async function earnCheckin(request: Request, env: EarnEnv): Promise<Response> {
     .bind(newBalance, nowIso, userId)
     .run();
   await incAppTotals(env.DB, userId, appId, ymd, grant, nowIso);
+  const { maybeTouchRootEconomyAfterEarn } = await import("../../shared/root-economy-snapshot");
+  await maybeTouchRootEconomyAfterEarn(env.DB, grant, "checkin");
   await env.DB
     .prepare(
       "UPDATE rr_earn_app_day SET checkin_claimed = 1, updated_at = ? WHERE user_id = ? AND app_id = ? AND ymd = ?"

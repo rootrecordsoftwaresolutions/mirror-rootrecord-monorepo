@@ -127,6 +127,7 @@ export async function deleteMergedDuplicateAccount(
     db.prepare("DELETE FROM rr_earn_app_day WHERE user_id = ?").bind(userId),
     db.prepare("DELETE FROM rr_earn_app_total WHERE user_id = ?").bind(userId),
     db.prepare("DELETE FROM rr_earn_signup_bonus WHERE user_id = ?").bind(userId),
+    db.prepare("DELETE FROM rr_earn_app_first_open WHERE user_id = ?").bind(userId),
     db.prepare("DELETE FROM bm_owned_row WHERE user_key = ?").bind(userId),
     db.prepare("DELETE FROM me_password_attempt WHERE account_id = ?").bind(aid),
     db.prepare("DELETE FROM user_accounts WHERE email = ?").bind(emailLower),

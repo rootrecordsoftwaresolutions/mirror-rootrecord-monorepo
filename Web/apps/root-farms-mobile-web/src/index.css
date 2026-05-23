@@ -41,7 +41,8 @@ input {
   font: inherit;
 }
 
-.app-shell--mobile {
+.app-shell--mobile,
+.app-shell--web {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -53,12 +54,70 @@ input {
   );
 }
 
+.side-nav {
+  display: none;
+}
+
+.app-main-column {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .app-main {
   flex: 1;
   overflow: auto;
   padding-bottom: calc(
     var(--nav-h) + max(env(safe-area-inset-bottom, 0px), var(--rr-safe-area-bottom, 0px))
   );
+}
+
+.app-main--web {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(
+    var(--nav-h) + max(env(safe-area-inset-bottom, 0px), var(--rr-safe-area-bottom, 0px))
+  );
+}
+
+.ad-shell {
+  width: min(100% - 2rem, 420px);
+  min-height: 90px;
+  margin: 0.75rem auto;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+.ad-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ad-unit {
+  display: block;
+  min-height: 90px;
+  background: transparent;
+}
+
+.ad-shell--loading .ad-unit {
+  visibility: hidden;
+}
+
+.ad-shell--hidden {
+  display: none;
+}
+
+.mobile-web-header {
+  display: none;
 }
 
 .boot {
@@ -167,6 +226,14 @@ input {
   margin-top: 0.5rem;
 }
 
+.hud-income-breakdown {
+  margin-top: 0.35rem;
+}
+
+.hud-income-breakdown .hud-meta {
+  margin-top: 0.2rem;
+}
+
 .btn-harvest-now {
   font-size: 0.78rem;
   padding: 0.35rem 0.85rem;
@@ -230,6 +297,341 @@ button.plot-card {
   color: inherit;
   position: relative;
   overflow: hidden;
+}
+
+.plot-card--cluster {
+  border-color: rgba(74, 222, 128, 0.28);
+  background:
+    radial-gradient(circle at top left, rgba(74, 222, 128, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(15, 35, 28, 0.94), rgba(13, 21, 36, 0.94));
+}
+
+.tier-plots-grid .plot-card {
+  min-height: 9.25rem;
+}
+
+.tier-section-head {
+  margin-top: 0.85rem;
+}
+
+.tier-plot-card-locked {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.tier-card-actions {
+  margin-top: auto;
+  padding-top: 0.65rem;
+  align-items: flex-start;
+}
+
+.tier-row-action {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.28);
+}
+
+.orchard-tree-grid .plot-card {
+  min-height: 7.75rem;
+}
+
+.orchard-tree-card--inactive {
+  opacity: 0.72;
+}
+
+.orchard-empty-card {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.market-screen {
+  max-width: 72rem;
+}
+
+.market-panel {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: rgba(17, 26, 43, 0.82);
+}
+
+.market-panel--dice {
+  border-color: rgba(34, 211, 238, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 34%),
+    rgba(17, 26, 43, 0.82);
+}
+
+.market-panel--mint {
+  border-color: rgba(251, 191, 36, 0.22);
+}
+
+.market-panel--donate {
+  border-color: rgba(74, 222, 128, 0.2);
+  background:
+    radial-gradient(circle at top right, rgba(74, 222, 128, 0.08), transparent 34%),
+    rgba(17, 26, 43, 0.82);
+}
+
+.market-panel--wheel {
+  border-color: rgba(192, 132, 252, 0.22);
+  background:
+    radial-gradient(circle at 28% 28%, rgba(192, 132, 252, 0.11), transparent 30%),
+    rgba(17, 26, 43, 0.82);
+}
+
+.market-panel--roulette {
+  border-color: rgba(248, 113, 113, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(248, 113, 113, 0.09), transparent 32%),
+    rgba(17, 26, 43, 0.82);
+}
+
+.market-panel--hilo {
+  border-color: rgba(34, 211, 238, 0.2);
+  background:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 32%),
+    rgba(17, 26, 43, 0.82);
+}
+
+.market-panel--locked {
+  opacity: 0.78;
+}
+
+.market-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.market-panel h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.market-panel p,
+.market-note {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.market-note--warn {
+  color: var(--amber);
+}
+
+.market-balance,
+.market-lock-badge {
+  flex-shrink: 0;
+  min-width: 8rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: rgba(15, 23, 42, 0.55);
+  text-align: right;
+}
+
+.market-balance span,
+.market-lock-badge {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.market-balance strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--green);
+  font-family: var(--mono);
+}
+
+.dice-create-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 1rem;
+}
+
+.dice-stake-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 12rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.dice-stake-field--small {
+  min-width: 7rem;
+}
+
+.dice-stake-field input,
+.dice-stake-field select {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text);
+  padding: 0.65rem 0.75rem;
+}
+
+.market-game-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.market-section {
+  margin-top: 1.25rem;
+}
+
+.market-dice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+.market-dice-card {
+  min-height: 10rem;
+}
+
+.market-dice-card--open {
+  border-color: rgba(74, 222, 128, 0.25);
+}
+
+.market-result {
+  margin: 0.75rem 0 0;
+  color: var(--green);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.market-result--done {
+  color: var(--cyan);
+}
+
+.market-join-btn {
+  margin-top: 0.75rem;
+}
+
+.market-empty-card {
+  border-style: dashed;
+}
+
+.wheel-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.market-wheel-wrap {
+  position: relative;
+  width: min(100%, 19rem);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  display: grid;
+  place-items: center;
+}
+
+.market-wheel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle, rgba(15, 23, 42, 0.98) 0 28%, transparent 29%),
+    conic-gradient(
+      from -90deg,
+      rgba(74, 222, 128, 0.36) 0 187.2deg,
+      rgba(34, 211, 238, 0.35) 187.2deg 252deg,
+      rgba(94, 234, 212, 0.36) 252deg 302.4deg,
+      rgba(251, 191, 36, 0.38) 302.4deg 338.4deg,
+      rgba(192, 132, 252, 0.42) 338.4deg 356.4deg,
+      rgba(248, 113, 113, 0.58) 356.4deg 360deg
+    );
+  box-shadow: 0 0 36px rgba(34, 211, 238, 0.12);
+  transition: transform 1.55s cubic-bezier(0.12, 0.78, 0.18, 1);
+}
+
+.market-wheel-pointer {
+  position: absolute;
+  top: -0.1rem;
+  z-index: 3;
+  width: 0;
+  height: 0;
+  border-left: 0.75rem solid transparent;
+  border-right: 0.75rem solid transparent;
+  border-top: 1.25rem solid var(--cyan);
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.7));
+}
+
+.market-wheel-center {
+  position: absolute;
+  z-index: 2;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #0d1524;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.wheel-segment {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2.4rem;
+  margin-left: -1.2rem;
+  transform-origin: 50% 0;
+  color: rgba(232, 238, 248, 0.68);
+  font-family: var(--mono);
+  font-size: 0.42rem;
+  text-align: center;
+}
+
+.wheel-segment--small,
+.wheel-segment--small-win,
+.wheel-segment--break-even {
+  color: rgba(34, 211, 238, 0.9);
+}
+
+.wheel-segment--small-win {
+  font-weight: 700;
+}
+
+.wheel-segment--rare {
+  color: rgba(251, 191, 36, 0.95);
+  font-weight: 700;
+}
+
+.wheel-segment--jackpot {
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.9);
+}
+
+.wheel-actions {
+  display: grid;
+  gap: 0.75rem;
+  align-content: center;
+}
+
+.wheel-prize {
+  margin: 0;
+  color: var(--green);
+  font-weight: 700;
+  font-family: var(--mono);
 }
 
 .plot-card-top {
@@ -384,6 +786,11 @@ button.plot-card {
   margin: 0.4rem 0 0;
   font-size: 0.72rem;
   color: var(--green);
+}
+
+.plot-bonus.is-muted,
+.field-bonus.is-muted {
+  color: var(--muted);
 }
 
 .plot-cycle {

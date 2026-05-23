@@ -1,6 +1,6 @@
 {
   "name": "rootrecord-weather-web",
-  "version": "1.0.43",
+  "version": "1.0.45",
   "private": true,
   "homepage": ".",
   "dependencies": {

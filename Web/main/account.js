@@ -441,9 +441,9 @@
     const program =
       ' <a href="/beta-tester-rewards.html" style="' +
       moss +
-      '">Root Units</a>';
+      '">Roots</a>';
     const note =
-      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and program details are on the Root Units page. In Discord, use /bal and /send after linking your account.</span>';
+      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and program details are on the Roots page. In Discord, use /bal and /send after linking your account.</span>';
     if (!earn) {
       return escapeHtml("—") + program + note;
     }
@@ -474,7 +474,7 @@
       ["Account created", escapeHtml(formatAccountCreatedAt(data))],
       ["Subscription", subscriptionAccountValueHtml(data)],
       ["Password on file", escapeHtml(data.has_password ? "Yes" : "No")],
-      ["Root Units", betaTesterRewardsValueHtml(earn)],
+      ["Roots", betaTesterRewardsValueHtml(earn)],
     ];
     box.innerHTML = rows
       .map(
@@ -562,7 +562,7 @@
       webAppUrl: "https://business.rootrecord.info/",
       playTestUrl:
         "https://play.google.com/apps/testing/com.rootrecord.businessmanager",
-      note: "Cloud business workspace or Root Units activity on this account.",
+      note: "Cloud business workspace or Roots activity on this account.",
     },
     rootrecord_weather_manager_windows: {
       title: "Root Record Weather Manager",
@@ -602,7 +602,7 @@
       note: "Account Hub app session or earn activity on this account.",
     },
     root_farms: {
-      title: "Root Units Idle Farmer",
+      title: "Roots Idle Farmer",
       platform: "Web",
       href: "https://farms.rootrecord.info/",
       external: true,

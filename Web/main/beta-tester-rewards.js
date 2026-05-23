@@ -45,9 +45,14 @@
     return typeof j.apiBase === "string" ? j.apiBase.replace(/\/+$/, "") : "";
   }
 
-  function formatBalance(n) {
-    const b = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-    return String(b.toLocaleString());
+  var ROOTS_ATOMIC_PER_WHOLE = 100000000;
+
+  function formatBalance(atomic) {
+    var a = Number.isFinite(atomic) ? Math.max(0, Math.floor(atomic)) : 0;
+    var whole = a / ROOTS_ATOMIC_PER_WHOLE;
+    if (whole >= 1) return whole.toLocaleString(undefined, { maximumFractionDigits: 8 });
+    if (a <= 0) return "0";
+    return whole.toLocaleString(undefined, { maximumFractionDigits: 8 });
   }
 
   function rootUnitsFromSummary(j) {
@@ -55,7 +60,7 @@
       return parseRootUnitsBalanceFromSummary(j);
     }
     if (!j || typeof j !== "object") return NaN;
-    const candidates = [j.root_units_balance, j.ledger_balance, j.balance, j.root_units, j.balance_display]
+    const candidates = [j.balance, j.ledger_balance, j.root_units_balance, j.root_units, j.balance_display]
       .map(Number)
       .filter(function (n) {
         return Number.isFinite(n) && n >= 0;
@@ -197,6 +202,24 @@
     renderSources(j);
     if (!Number.isFinite(n)) {
       setStatus("Balance could not be read. Please try again in a moment.", "warn");
+    }
+    if (token) {
+      try {
+        await fetch(apiBase + "/api/app-session/start", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            app_id: "rootrecord_root_units_portal_web",
+            mode: "signed_in",
+          }),
+        });
+      } catch {
+        /* ignore */
+      }
     }
   }
 

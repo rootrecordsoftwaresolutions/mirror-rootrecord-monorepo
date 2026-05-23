@@ -120,7 +120,7 @@
     const li = document.createElement("li");
     const a = document.createElement("a");
     a.href = "/beta-tester-rewards.html";
-    a.textContent = "Root Units";
+    a.textContent = "Roots";
     li.appendChild(a);
     ul.appendChild(li);
   }

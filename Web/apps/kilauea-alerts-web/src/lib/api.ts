@@ -13,6 +13,8 @@ const STORAGE = {
 
 const WORKERS_DEV = "https://rootrecord-api-kilauea.rootrecord.workers.dev";
 
+export const RR_APP_ID = "rootrecord_kilauea_alerts_android";
+
 function normalizeOrigin(raw: string): string {
   let base = raw.trim().replace(/\/+$/, "");
   if (base.toLowerCase().endsWith("/api")) base = base.slice(0, -4).replace(/\/+$/, "");

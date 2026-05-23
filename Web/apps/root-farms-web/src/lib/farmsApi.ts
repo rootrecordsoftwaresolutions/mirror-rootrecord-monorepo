@@ -1,69 +1,302 @@
-import { CATALOG_HASH } from "../game/catalog";
-import type { FarmsProtections, ProtectionKind, VarmintEvent } from "../game/storeCatalog";
+import { CATALOG_HASH, PLOT_COUNT, getPlotCatalog } from "../game/catalog";
+import type { TierPlotProgress } from "../game/tier-catalog";
+import {
+  parseFarmsStoreFromApi,
+  type FarmsStoreData,
+  type StoreToggleKind,
+  type VarmintEvent,
+} from "../game/storeCatalog";
 
 import type { GameSave } from "../game/types";
 
 import { apiFetch } from "./api";
 
-
-
-export type FarmsStateResponse = {
-
-  ok: boolean;
-
-  balance: number;
-
-  progress_version: number;
-
-  last_settled_ms: number;
-
-  lifetime_farms_earned: number;
-
-  plots?: GameSave["plots"];
-
-  daily_remaining?: number;
-
-  protections?: FarmsProtections;
-
-  ru_per_sec?: number;
-
-  protection_fee_per_minute?: number;
-
-  varmint_events?: VarmintEvent[];
-
-  /** Server-computed unsettled earnings (not yet in rr_earn_balance). */
-  pending_ru?: number;
-
+export type OrchardAppBonusTree = {
+  id: number;
+  key: "volcano" | "business" | "weather" | string;
+  name: string;
+  unlocked: boolean;
+  used_recently: boolean;
+  active: boolean;
+  bonus_pct: number;
+  last_open_at: string | null;
 };
 
+export type OrchardAppBonus = {
+  multiplier: number;
+  active_count: number;
+  trees: OrchardAppBonusTree[];
+};
 
+export type FarmhandCheckinStatus = {
+  active: boolean;
+  last_checkin_at: string | null;
+  expires_at: string | null;
+  window_hours: number;
+};
 
-export type FarmsPurchaseKind = "unlock_plot" | "row_slot";
+export type DiceMarketRequest = {
+  id: string;
+  stake: number;
+  status: "open" | "resolved" | "tie" | string;
+  creator_label: string;
+  joiner_label: string | null;
+  creator_roll: number | null;
+  joiner_roll: number | null;
+  winner_label: string | null;
+  is_mine: boolean;
+  can_join: boolean;
+  created_at: string;
+  joined_at: string | null;
+  resolved_at: string | null;
+};
 
-function parsePurchaseErrorBody(
-  data: Record<string, unknown>,
-  progressVersion: number,
-): {
+export type DiceMarketResponse = {
+  ok: true;
+  balance: number;
+  requests: DiceMarketRequest[];
+  detail?: string;
+};
+
+export type MarketWheelSpinResponse = {
+  ok: true;
+  cost: number;
+  prize: number;
+  label: string;
+  net: number;
+  visual_index: number;
+  balance: number;
+  detail?: string;
+};
+
+export type MarketRouletteSpinResponse = {
+  ok: true;
+  game: "roulette";
+  amount: number;
+  bet_kind: string;
+  bet_number: number | null;
+  outcome_number: number;
+  outcome_color: "red" | "black" | "green" | string;
+  multiplier: number;
+  won: boolean;
+  payout: number;
+  net: number;
+  balance: number;
+  detail?: string;
+};
+
+export type MarketHiLoResponse = {
+  ok: true;
+  game: "hi_lo";
+  amount: number;
+  guess: "high" | "low" | string;
+  first_card: number;
+  next_card: number;
+  first_label: string;
+  next_label: string;
+  tie: boolean;
+  won: boolean;
+  payout: number;
+  net: number;
+  balance: number;
+  detail?: string;
+};
+
+function parseRootPlots(raw: unknown): GameSave["plots"] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: GameSave["plots"] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const id = Math.floor(Number(o.id) || 0);
+    if (id < 1 || id > PLOT_COUNT) continue;
+    const cat = getPlotCatalog(id);
+    const unlocked = Boolean(o.unlocked) || id === 1;
+    const rowCount = unlocked
+      ? Math.min(cat.maxRows, Math.max(id === 1 ? 1 : 0, Math.floor(Number(o.rowCount ?? o.row_count) || 0)))
+      : 0;
+    let rowsActive = unlocked
+      ? Math.min(rowCount, Math.max(0, Math.floor(Number(o.rowsActive ?? o.rows_active) || 0)))
+      : 0;
+    if (rowsActive <= 0 && rowCount > 0) rowsActive = rowCount;
+    out.push({
+      id,
+      unlocked,
+      rowCount,
+      rowsActive,
+      cycleProgress: Math.max(0, Math.min(Number(o.cycleProgress ?? o.cycle_progress) || 0, 50)),
+    });
+  }
+  return out.length ? out : undefined;
+}
+
+export type FarmsStateResponse = {
+  ok: boolean;
+  balance: number;
+  progress_version: number;
+  last_settled_ms: number;
+  lifetime_farms_earned: number;
+  plots?: GameSave["plots"];
+  orchards?: TierPlotProgress[];
+  vegetables?: TierPlotProgress[];
+  store?: FarmsStoreData;
+  root_level?: number;
+  orchards_unlocked?: boolean;
+  vegetables_unlocked?: boolean;
+  vegetables_protected?: boolean;
+  farmhand_checkin?: FarmhandCheckinStatus;
+  lightning_row?: number | null;
+  daily_remaining?: number;
+  ru_per_sec?: number;
+  protection_fee_per_minute?: number;
+  varmint_events?: VarmintEvent[];
+  pending_ru?: number;
+  orchard_app_bonus?: OrchardAppBonus;
+};
+
+export type FarmsPurchaseKind =
+  | "unlock_plot"
+  | "row_slot"
+  | "root_cluster"
+  | "buy_lightning_rod"
+  | "orchard_unlock"
+  | "orchard_row"
+  | "vegetable_unlock"
+  | "vegetable_row";
+
+export type FarmsPurchaseOk = {
   balance: number;
   progress_version: number;
   last_settled_ms: number;
   lifetime_farms_earned: number;
   plots: GameSave["plots"];
+  orchards?: TierPlotProgress[];
+  vegetables?: TierPlotProgress[];
+  store?: FarmsStoreData;
   cost: number;
-  rejected: true;
+  rejected?: true;
   detail?: string;
-} | null {
-  if (!Array.isArray(data.plots) || data.progress_version == null) return null;
+  varmint_events?: VarmintEvent[];
+  orchard_app_bonus?: OrchardAppBonus;
+  farmhand_checkin?: FarmhandCheckinStatus;
+};
+
+function parseTierPlots(raw: unknown): TierPlotProgress[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.map((item) => {
+    const o = item as Record<string, unknown>;
+    const unlocked = Boolean(o.unlocked);
+    const rowCount = unlocked
+      ? Math.min(10, Math.max(1, Math.floor(Number(o.rowCount ?? o.row_count) || 0)))
+      : 0;
+    let rowsActive = unlocked
+      ? Math.min(rowCount, Math.max(0, Math.floor(Number(o.rowsActive ?? o.rows_active) || 0)))
+      : 0;
+    if (rowsActive <= 0 && rowCount > 0) rowsActive = rowCount;
+    return {
+      id: Math.floor(Number(o.id) || 0),
+      unlocked,
+      rowCount,
+      rowsActive,
+      cycleProgress: Math.max(0, Math.min(Number(o.cycleProgress ?? o.cycle_progress) || 0, 50)),
+    };
+  });
+}
+
+function parseOrchardAppBonus(raw: unknown): OrchardAppBonus | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const rawTrees = Array.isArray(o.trees) ? o.trees : [];
+  const trees = rawTrees
+    .map((item) => {
+      const t = item as Record<string, unknown>;
+      return {
+        id: Math.max(1, Math.floor(Number(t.id) || 0)),
+        key: String(t.key || ""),
+        name: String(t.name || ""),
+        unlocked: t.unlocked === true,
+        used_recently: t.used_recently === true,
+        active: t.active === true,
+        bonus_pct: Math.max(0, Math.floor(Number(t.bonus_pct) || 0)),
+        last_open_at: typeof t.last_open_at === "string" && t.last_open_at ? t.last_open_at : null,
+      } satisfies OrchardAppBonusTree;
+    })
+    .filter((t) => t.id > 0 && t.name);
+  return {
+    multiplier: Math.max(1, Number(o.multiplier) || 1),
+    active_count: Math.max(0, Math.floor(Number(o.active_count) || 0)),
+    trees,
+  };
+}
+
+function parseFarmhandCheckin(raw: unknown): FarmhandCheckinStatus | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  return {
+    active: o.active === true,
+    last_checkin_at: typeof o.last_checkin_at === "string" && o.last_checkin_at ? o.last_checkin_at : null,
+    expires_at: typeof o.expires_at === "string" && o.expires_at ? o.expires_at : null,
+    window_hours: Math.max(1, Math.floor(Number(o.window_hours) || 48)),
+  };
+}
+
+function parseDiceMarketResponse(data: Record<string, unknown>): DiceMarketResponse {
+  const rawRequests = Array.isArray(data.requests) ? data.requests : [];
+  const requests = rawRequests
+    .map((item) => {
+      const o = item as Record<string, unknown>;
+      return {
+        id: String(o.id || ""),
+        stake: Math.max(0, Math.floor(Number(o.stake) || 0)),
+        status: String(o.status || "open"),
+        creator_label: String(o.creator_label || "Farmer"),
+        joiner_label: typeof o.joiner_label === "string" && o.joiner_label ? o.joiner_label : null,
+        creator_roll: o.creator_roll != null ? Math.max(1, Math.floor(Number(o.creator_roll) || 0)) : null,
+        joiner_roll: o.joiner_roll != null ? Math.max(1, Math.floor(Number(o.joiner_roll) || 0)) : null,
+        winner_label: typeof o.winner_label === "string" && o.winner_label ? o.winner_label : null,
+        is_mine: o.is_mine === true,
+        can_join: o.can_join === true,
+        created_at: String(o.created_at || ""),
+        joined_at: typeof o.joined_at === "string" && o.joined_at ? o.joined_at : null,
+        resolved_at: typeof o.resolved_at === "string" && o.resolved_at ? o.resolved_at : null,
+      } satisfies DiceMarketRequest;
+    })
+    .filter((r) => r.id && r.stake > 0);
+  return {
+    ok: true,
+    balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
+    requests,
+    detail: typeof data.detail === "string" ? data.detail : undefined,
+  };
+}
+
+function parsePurchaseBody(data: Record<string, unknown>, progressVersion: number): FarmsPurchaseOk | null {
+  const plots = parseRootPlots(data.plots);
+  if (!plots || data.progress_version == null) return null;
   const detail = typeof data.detail === "string" ? data.detail : undefined;
+  const storeRaw = data.store as Record<string, unknown> | undefined;
+  const store = storeRaw
+    ? parseFarmsStoreFromApi(
+        storeRaw.protections as FarmsStoreData["protections"] | undefined,
+        storeRaw as Partial<FarmsStoreData>,
+      )
+    : undefined;
   return {
     balance: Math.floor(Number(data.balance) || 0),
     progress_version: Math.floor(Number(data.progress_version) || progressVersion),
     last_settled_ms: Math.floor(Number(data.last_settled_ms) || Date.now()),
     lifetime_farms_earned: Math.floor(Number(data.lifetime_farms_earned) || 0),
-    plots: data.plots as GameSave["plots"],
+    plots,
+    orchards: parseTierPlots(data.orchards),
+    vegetables: parseTierPlots(data.vegetables),
+    store,
     cost: Math.floor(Number(data.cost) || 0),
-    rejected: true as const,
     detail,
+    varmint_events: Array.isArray(data.varmint_events)
+      ? (data.varmint_events as VarmintEvent[])
+      : undefined,
+    orchard_app_bonus: parseOrchardAppBonus(data.orchard_app_bonus),
+    farmhand_checkin: parseFarmhandCheckin(data.farmhand_checkin),
   };
 }
 
@@ -73,18 +306,28 @@ function parseFarmsStateResponse(data: Record<string, unknown>): FarmsStateRespo
   const progress_version = Math.floor(Number(data.progress_version) || 1);
   const last_settled_ms = Math.floor(Number(data.last_settled_ms) || Date.now());
   const lifetime_farms_earned = Math.max(0, Math.floor(Number(data.lifetime_farms_earned) || 0));
-  const plots = Array.isArray(data.plots) ? (data.plots as GameSave["plots"]) : undefined;
-  const protectionsRaw = data.protections as Record<string, unknown> | undefined;
-  const protections: FarmsProtections | undefined = protectionsRaw
-    ? {
-        gopher: Boolean(protectionsRaw.gopher),
-        mice: Boolean(protectionsRaw.mice),
-        rabbit: Boolean(protectionsRaw.rabbit),
-      }
-    : undefined;
+  const plots = parseRootPlots(data.plots);
+  const storeRaw = data.store as Record<string, unknown> | undefined;
+  const protRaw = data.protections as Record<string, unknown> | undefined;
+  const store = parseFarmsStoreFromApi(
+    protRaw
+      ? {
+          gopher: Boolean(protRaw.gopher),
+          mice: Boolean(protRaw.mice),
+          rabbit: Boolean(protRaw.rabbit),
+        }
+      : undefined,
+    storeRaw as Partial<FarmsStoreData> | undefined,
+  );
   const varmint_events = Array.isArray(data.varmint_events)
     ? (data.varmint_events as VarmintEvent[])
     : undefined;
+  const lightning_row =
+    data.lightning_row === null || data.lightning_row === undefined
+      ? data.lightning_row === null
+        ? null
+        : undefined
+      : Math.floor(Number(data.lightning_row));
   return {
     ok: true,
     balance,
@@ -92,18 +335,27 @@ function parseFarmsStateResponse(data: Record<string, unknown>): FarmsStateRespo
     last_settled_ms,
     lifetime_farms_earned,
     plots,
+    orchards: parseTierPlots(data.orchards),
+    vegetables: parseTierPlots(data.vegetables),
+    store,
+    root_level: data.root_level != null ? Math.floor(Number(data.root_level)) : undefined,
+    orchards_unlocked: data.orchards_unlocked === true,
+    vegetables_unlocked: data.vegetables_unlocked === true,
+    vegetables_protected: data.vegetables_protected === true,
+    farmhand_checkin: parseFarmhandCheckin(data.farmhand_checkin),
+    lightning_row,
     daily_remaining: data.daily_remaining != null ? Math.floor(Number(data.daily_remaining)) : undefined,
-    protections,
     ru_per_sec: data.ru_per_sec != null ? Number(data.ru_per_sec) : undefined,
     protection_fee_per_minute:
       data.protection_fee_per_minute != null ? Math.floor(Number(data.protection_fee_per_minute)) : undefined,
     varmint_events,
     pending_ru: data.pending_ru != null ? Math.max(0, Math.floor(Number(data.pending_ru))) : undefined,
+    orchard_app_bonus: parseOrchardAppBonus(data.orchard_app_bonus),
   };
 }
 
-export async function postStoreProtectionToggle(
-  kind: ProtectionKind,
+export async function postStoreToggle(
+  kind: StoreToggleKind,
   enabled: boolean,
   progressVersion: number,
 ): Promise<FarmsStateResponse | null> {
@@ -126,6 +378,9 @@ export async function postStoreProtectionToggle(
   }
 }
 
+/** @deprecated use postStoreToggle */
+export const postStoreProtectionToggle = postStoreToggle;
+
 export async function postVarmintAck(eventIds: string[]): Promise<boolean> {
   try {
     const res = await apiFetch("/api/v1/farms/varmint/ack", {
@@ -139,30 +394,17 @@ export async function postVarmintAck(eventIds: string[]): Promise<boolean> {
   }
 }
 
-
-
 export async function fetchFarmsState(): Promise<FarmsStateResponse | null> {
-
   try {
-
     const res = await apiFetch("/api/v1/farms/state", { method: "GET" });
-
     if (res.status === 404 || res.status === 501) return null;
-
     if (!res.ok) return null;
-
     const data = (await res.json()) as Record<string, unknown>;
     return parseFarmsStateResponse(data);
-
   } catch {
-
     return null;
-
   }
-
 }
-
-
 
 export type FarmsSettleOk = {
   ok: true;
@@ -173,12 +415,15 @@ export type FarmsSettleOk = {
   progress_version: number;
   lifetime_farms_earned?: number;
   plots?: GameSave["plots"];
+  orchards?: TierPlotProgress[];
+  vegetables?: TierPlotProgress[];
   daily_remaining?: number;
   harvest_cooldown_sec?: number;
   pending_ru?: number;
   detail?: string;
   daily_cap_blocked?: boolean;
   ad_bonus_granted?: number;
+  orchard_app_bonus?: OrchardAppBonus;
 };
 
 export type FarmsSettleErr = {
@@ -196,6 +441,13 @@ export type FarmsSettleErr = {
 
 export type FarmsSettleResult = FarmsSettleOk | FarmsSettleErr | null;
 
+export type FarmsRewardedAdBonusOk = {
+  ok: true;
+  bonus_granted: number;
+  balance: number;
+  lifetime_farms_earned?: number;
+};
+
 function parseFarmsSettleBody(
   data: Record<string, unknown>,
   progressVersion: number,
@@ -209,7 +461,9 @@ function parseFarmsSettleBody(
     progress_version: Math.floor(Number(data.progress_version) || progressVersion),
     lifetime_farms_earned:
       data.lifetime_farms_earned != null ? Math.floor(Number(data.lifetime_farms_earned)) : undefined,
-    plots: Array.isArray(data.plots) ? (data.plots as GameSave["plots"]) : undefined,
+    plots: parseRootPlots(data.plots),
+    orchards: parseTierPlots(data.orchards),
+    vegetables: parseTierPlots(data.vegetables),
     daily_remaining: data.daily_remaining != null ? Math.floor(Number(data.daily_remaining)) : undefined,
     harvest_cooldown_sec:
       data.harvest_cooldown_sec != null ? Math.floor(Number(data.harvest_cooldown_sec) || 60) : undefined,
@@ -218,6 +472,7 @@ function parseFarmsSettleBody(
     daily_cap_blocked: data.daily_cap_blocked === true,
     ad_bonus_granted:
       data.ad_bonus_granted != null ? Math.max(0, Math.floor(Number(data.ad_bonus_granted))) : undefined,
+    orchard_app_bonus: parseOrchardAppBonus(data.orchard_app_bonus),
   };
 }
 
@@ -274,57 +529,200 @@ export async function postFarmsSettle(
   }
 }
 
+export async function postFarmsRewardedAdBonus(): Promise<FarmsRewardedAdBonusOk | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/rewarded-ad-bonus", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, unknown>;
+    return {
+      ok: true,
+      bonus_granted: Math.max(0, Math.floor(Number(data.bonus_granted) || 0)),
+      balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
+      lifetime_farms_earned:
+        data.lifetime_farms_earned != null ? Math.max(0, Math.floor(Number(data.lifetime_farms_earned) || 0)) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
+export async function fetchDiceMarket(): Promise<DiceMarketResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/dice", { method: "GET" });
+    if (!res.ok) return null;
+    return parseDiceMarketResponse((await res.json()) as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+export async function postDiceRequest(stake: number): Promise<DiceMarketResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/dice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH, stake: Math.max(0, Math.floor(Number(stake) || 0)) }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return parseDiceMarketResponse(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function postDiceJoin(id: string): Promise<DiceMarketResponse | null> {
+  try {
+    const res = await apiFetch(`/api/v1/farms/market/dice/${encodeURIComponent(id)}/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return parseDiceMarketResponse(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function postMarketDonation(amount: number): Promise<DiceMarketResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/donate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH, amount: Math.max(0, Math.floor(Number(amount) || 0)) }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return parseDiceMarketResponse(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function postMarketWheelSpin(): Promise<MarketWheelSpinResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/wheel/spin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) {
+      return {
+        ok: true,
+        cost: 0,
+        prize: 0,
+        label: "",
+        net: 0,
+        visual_index: 0,
+        balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
+        detail: typeof data.detail === "string" ? data.detail : undefined,
+      };
+    }
+    return {
+      ok: true,
+      cost: Math.max(0, Math.floor(Number(data.cost) || 0)),
+      prize: Math.max(0, Math.floor(Number(data.prize) || 0)),
+      label: String(data.label || ""),
+      net: Math.floor(Number(data.net) || 0),
+      visual_index: Math.max(0, Math.min(99, Math.floor(Number(data.visual_index) || 0))),
+      balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
+      detail: typeof data.detail === "string" ? data.detail : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function postMarketRouletteSpin(
+  amount: number,
+  betKind: string,
+  number?: number,
+): Promise<MarketRouletteSpinResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/roulette/spin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        catalog_hash: CATALOG_HASH,
+        amount: Math.max(0, Math.floor(Number(amount) || 0)),
+        bet_kind: betKind,
+        number,
+      }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return {
+      ok: true,
+      game: "roulette",
+      amount: Math.max(0, Math.floor(Number(data.amount) || 0)),
+      bet_kind: String(data.bet_kind || betKind),
+      bet_number: data.bet_number == null ? null : Math.floor(Number(data.bet_number) || 0),
+      outcome_number: Math.max(0, Math.floor(Number(data.outcome_number) || 0)),
+      outcome_color: String(data.outcome_color || ""),
+      multiplier: Math.max(0, Math.floor(Number(data.multiplier) || 0)),
+      won: Boolean(data.won),
+      payout: Math.max(0, Math.floor(Number(data.payout) || 0)),
+      net: Math.floor(Number(data.net) || 0),
+      balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
+      detail: typeof data.detail === "string" ? data.detail : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function postMarketHiLoPlay(amount: number, guess: "high" | "low"): Promise<MarketHiLoResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/hi-lo/play", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        catalog_hash: CATALOG_HASH,
+        amount: Math.max(0, Math.floor(Number(amount) || 0)),
+        guess,
+      }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return {
+      ok: true,
+      game: "hi_lo",
+      amount: Math.max(0, Math.floor(Number(data.amount) || 0)),
+      guess: String(data.guess || guess),
+      first_card: Math.max(0, Math.floor(Number(data.first_card) || 0)),
+      next_card: Math.max(0, Math.floor(Number(data.next_card) || 0)),
+      first_label: String(data.first_label || ""),
+      next_label: String(data.next_label || ""),
+      tie: Boolean(data.tie),
+      won: Boolean(data.won),
+      payout: Math.max(0, Math.floor(Number(data.payout) || 0)),
+      net: Math.floor(Number(data.net) || 0),
+      balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
+      detail: typeof data.detail === "string" ? data.detail : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function postFarmsPurchase(
-
   kind: FarmsPurchaseKind,
-
   plotId: number,
-
   progressVersion: number,
-
-): Promise<{
-
-  balance: number;
-
-  progress_version: number;
-
-  last_settled_ms: number;
-
-  lifetime_farms_earned: number;
-
-  plots: GameSave["plots"];
-
-  cost: number;
-
-  rejected?: true;
-  detail?: string;
-
-} | null> {
-
+): Promise<FarmsPurchaseOk | null> {
   try {
-
     const res = await apiFetch("/api/v1/farms/purchase", {
-
       method: "POST",
-
       headers: { "Content-Type": "application/json" },
-
       body: JSON.stringify({
-
         kind,
-
         plot_id: plotId,
-
         progress_version: progressVersion,
-
         catalog_hash: CATALOG_HASH,
-
         client_now_ms: Date.now(),
-
       }),
-
     });
 
     if (res.status === 404 || res.status === 501) return null;
@@ -332,35 +730,15 @@ export async function postFarmsPurchase(
     const data = (await res.json()) as Record<string, unknown>;
 
     if (!res.ok) {
-      const parsed = parsePurchaseErrorBody(data, progressVersion);
-      if (parsed) return parsed;
+      const parsed = parsePurchaseBody(data, progressVersion);
+      if (parsed) return { ...parsed, rejected: true as const };
       return null;
     }
 
-    if (!Array.isArray(data.plots)) return null;
-
-    return {
-
-      balance: Math.floor(Number(data.balance) || 0),
-
-      progress_version: Math.floor(Number(data.progress_version) || progressVersion),
-
-      last_settled_ms: Math.floor(Number(data.last_settled_ms) || Date.now()),
-
-      lifetime_farms_earned: Math.floor(Number(data.lifetime_farms_earned) || 0),
-
-      plots: data.plots as GameSave["plots"],
-
-      cost: Math.floor(Number(data.cost) || 0),
-
-    };
-
+    const parsed = parsePurchaseBody(data, progressVersion);
+    if (!parsed) return null;
+    return parsed;
   } catch {
-
     return null;
-
   }
-
 }
-
-

@@ -1,5 +1,6 @@
 import { cors, json } from "./cors";
 import type { SolanaTxEnv } from "./env";
+import { handleMintRootsRoute } from "./roots-mint";
 import { handleRunTreasuryLiquidityCheckRoute } from "./treasury-liquidity-cron";
 import { handleRunTreasurySolLpCheckRoute } from "./treasury-sol-lp-cron";
 
@@ -32,6 +33,8 @@ export default {
     if (sol) return sol;
     const liq = await handleRunTreasuryLiquidityCheckRoute(request, env, sub, method);
     if (liq) return liq;
+    const mint = await handleMintRootsRoute(request, env, sub, method);
+    if (mint) return mint;
 
     return json({ detail: "Not found" }, 404);
   },

@@ -17,6 +17,7 @@ import { handlePrefsRoutes } from "./prefs";
 import { handleEarnRoutes } from "./earn";
 import { handleFarmsRoutes } from "./farms";
 import { handleMeProfilePatch, handleRootEconomyRoutes } from "./root-economy";
+import { runRootEconomyDiscordCron, runRootEconomyDiscordFullBoard } from "./discord-root-economy-cron";
 import { handleBusinessRoutes, handleBusinessAuthEntitlement, bmWipeOwnedRows } from "./business-mobile";
 import { handleFeedbackRoute } from "./feedback-route";
 import { performAccountDeletion } from "./account-deletion";
@@ -39,6 +40,7 @@ import { handleSolanaAppActivityRoute } from "./solana-app-activity";
 import { handleAppSessionStartRoute, scheduleAuthLoginDiscordSessionNotify } from "./app-session-notify";
 import { handleSolanaLinkedWalletRoute } from "./solana-linked-wallet";
 import { handleCustodialRrttWithdrawV1 } from "./custodial-rrtt-withdraw";
+import { handleRootsMintBalanceV1 } from "./roots-mint-balance";
 import {
   handleWithdrawalIntentCreate,
   handleWithdrawalIntentLegs,
@@ -109,6 +111,9 @@ export interface Env {
   /** Discord webhook for POST /api/feedback (`wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL`). */
 
   DISCORD_FEEDBACK_WEBHOOK_URL?: string;
+
+  /** Root Economy circulation pings (cron every 45 min UTC); `wrangler secret put DISCORD_ROOT_ECONOMY_WEBHOOK_URL`. */
+  DISCORD_ROOT_ECONOMY_WEBHOOK_URL?: string;
 
   /** Discord bot token (read-only) for announcements channel → D1 `developer_messages` (cron on this Worker). */
   DISCORD_BOT_TOKEN?: string;
@@ -538,6 +543,12 @@ export async function handleRequest(
 
     }
 
+    if (pathname === "/v1/me/roots/mint-balance") {
+
+      return handleRootsMintBalanceV1(request, env, method);
+
+    }
+
     if (method === "GET" && pathname === "/v1/me/withdrawal-settlement/framework") {
       return handleWithdrawalSettlementFrameworkGet();
     }
@@ -704,7 +715,7 @@ export async function handleRequest(
       return handleDiscordInteractions(request, env, ctx);
     }
 
-    if (method === "GET" && pathname === "/v1/economy/leaderboard") {
+    if (method === "GET" && pathname.startsWith("/v1/economy")) {
       const economyRes = await handleRootEconomyRoutes(request, env, pathname, method);
       if (economyRes) return economyRes;
     }
@@ -759,6 +770,10 @@ export async function handleRequest(
 
   if (sub === "/v1/me/custodial-withdraw-rrtt") {
     return handleCustodialRrttWithdrawV1(request, env, method);
+  }
+
+  if (sub === "/v1/me/roots/mint-balance") {
+    return handleRootsMintBalanceV1(request, env, method);
   }
 
   if (sub === "/v1/me/custodial-sol-wallet" || sub.startsWith("/v1/me/custodial-sol-wallet/")) {
@@ -875,6 +890,18 @@ export async function handleRequest(
 
   if (method === "POST" && sub === "/internal/discord-activity-daily-rebuild") {
     return handleDiscordActivityDailyRebuildPost(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/root-economy-discord-ping") {
+    const adminOk = await verifyWorkerOpsAdmin(request, env);
+    if (!adminOk) {
+      return json({ detail: "Unauthorized" }, 401);
+    }
+    const full = (new URL(request.url).searchParams.get("full") || "").trim() === "1";
+    const result = full
+      ? await runRootEconomyDiscordFullBoard(env)
+      : await runRootEconomyDiscordCron(env);
+    return json(result, result.ok ? 200 : 503);
   }
 
   if (method === "POST" && sub === "/auth/login") {

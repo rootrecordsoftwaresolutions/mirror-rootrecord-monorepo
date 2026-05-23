@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AdSenseAd } from "./components/AdSenseAd";
 import { AuthScreen } from "./components/AuthScreen";
 import { BetaTesterBanner } from "./components/BetaTesterBanner";
 import { PlaceholderTab } from "./components/PlaceholderTab";
@@ -8,6 +9,18 @@ import { PlotsGridScreen } from "./components/PlotsGridScreen";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { FarmhandsScreen } from "./components/FarmhandsScreen";
 import { GuideScreen } from "./components/GuideScreen";
+import { MarketScreen } from "./components/MarketScreen";
+import { OrchardsScreen } from "./components/OrchardsScreen";
+import { TierPlotsScreen } from "./components/TierPlotsScreen";
+import {
+  vegetableGrowSec,
+  vegetableName,
+  vegetableScientificName,
+  vegetableRowCost,
+  vegetableUnlockCost,
+} from "./game/tier-catalog";
+import { useGame } from "./contexts/GameContext";
+import { vegetablesProtected } from "./game/storeCatalog";
 import { BottomNav } from "./components/BottomNav";
 import { MobileWebHeader } from "./components/MobileWebHeader";
 import { SideNav } from "./components/SideNav";
@@ -15,22 +28,83 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { VarmintAlertModal } from "./components/VarmintAlertModal";
 import { WelcomeBackModal } from "./components/WelcomeBackModal";
 import { GameProvider } from "./contexts/GameContext";
+import { vegetablePlotHarvestTotal } from "./game/tier-income";
 import type { TabId } from "./game/types";
+
+function TierTabBody({
+  tier,
+}: {
+  tier: "orchards" | "vegetables";
+}) {
+  const {
+    orchardAppBonus,
+    vegetables,
+    vegetablesUnlocked,
+    rootLevel,
+    purchaseTier,
+    purchaseBusy,
+    handleInsufficientFunds,
+    store,
+    farmhandCheckin,
+  } = useGame();
+  if (tier === "orchards") {
+    return <OrchardsScreen orchardAppBonus={orchardAppBonus} store={store} />;
+  }
+  return (
+    <TierPlotsScreen
+      title="Vegetable plots"
+      lead={`Separate tier unlocked at farm level 20 (you are level ${rootLevel}). Protection requires a lightning rod plus any active farmhand: ${
+        farmhandCheckin?.active && vegetablesProtected(store) ? "active" : "not active"
+      }.`}
+      plots={vegetables}
+      locked={!vegetablesUnlocked}
+      lockedMessage="Reach farm level 20 from combined plots and rows to unlock vegetable plots."
+      unlockKind="vegetable_unlock"
+      rowKind="vegetable_row"
+      nameFor={vegetableName}
+      descriptionFor={vegetableScientificName}
+      growSecFor={vegetableGrowSec}
+      harvestFor={vegetablePlotHarvestTotal}
+      unlockCostFor={vegetableUnlockCost}
+      rowCostFor={vegetableRowCost}
+      onPurchase={async (kind, id) => {
+        const r = await purchaseTier(kind, id);
+        if (r === "insufficient") await handleInsufficientFunds();
+        else if (r === "offline") window.alert("Could not reach the server. Try again after reconnecting.");
+        else if (r === "unavailable") window.alert("Purchase not available yet.");
+      }}
+      purchaseBusy={purchaseBusy}
+    />
+  );
+}
 
 function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
   const [tab, setTab] = useState<TabId>("plots");
   const [plotId, setPlotId] = useState<number | null>(null);
 
+  const onTab = (t: TabId) => {
+    setTab(t);
+    setPlotId(null);
+  };
+
   let body: React.ReactNode;
   if (tab === "plots") {
+    body = <PlotsGridScreen onOpenPlot={setPlotId} onOpenTier={onTab} showRootGrid={false} />;
+  } else if (tab === "roots") {
     body =
       plotId != null ? (
         <PlotDetailScreen plotId={plotId} onBack={() => setPlotId(null)} variant="web" />
       ) : (
-        <PlotsGridScreen onOpenPlot={setPlotId} />
+        <PlotsGridScreen onOpenPlot={setPlotId} onOpenTier={onTab} showSummary={false} />
       );
+  } else if (tab === "orchards") {
+    body = <TierTabBody tier="orchards" />;
+  } else if (tab === "vegetables") {
+    body = <TierTabBody tier="vegetables" />;
   } else if (tab === "farmhands") {
     body = <FarmhandsScreen />;
+  } else if (tab === "market") {
+    body = <MarketScreen />;
   } else if (tab === "guide") {
     body = <GuideScreen />;
   } else if (tab === "settings") {
@@ -41,11 +115,6 @@ function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
     body = <PlaceholderTab title="Replant" blurb="Reset for permanent multipliers — prestige for Root Farms." />;
   }
 
-  const onTab = (t: TabId) => {
-    setTab(t);
-    setPlotId(null);
-  };
-
   return (
     <div className="app-shell app-shell--web">
       <SideNav tab={tab} onTab={onTab} />
@@ -53,7 +122,9 @@ function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
         <MobileWebHeader />
         <main className="app-main app-main--web">
           <BetaTesterBanner onSignIn={onSignIn} />
+          <AdSenseAd placement="top" />
           {body}
+          <AdSenseAd placement="bottom" />
         </main>
       </div>
       <BottomNav tab={tab} onTab={onTab} />
@@ -72,11 +143,23 @@ function RootFarmsGate() {
   }
 
   if (showSignIn && !auth.authed) {
-    return <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />;
+    return (
+      <div className="auth-ad-shell">
+        <AdSenseAd placement="top" />
+        <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />
+        <AdSenseAd placement="bottom" />
+      </div>
+    );
   }
 
   if (!auth.canPlay) {
-    return <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />;
+    return (
+      <div className="auth-ad-shell">
+        <AdSenseAd placement="top" />
+        <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />
+        <AdSenseAd placement="bottom" />
+      </div>
+    );
   }
 
   return (

@@ -55,7 +55,7 @@ export default function AuthScreen() {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto px-5 pb-10 min-h-[100dvh] flex flex-col justify-center pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] lg:pt-8">
+    <div className="w-full max-w-md mx-auto px-5 pb-10 flex flex-col justify-start pt-4 lg:pt-8">
       <Dialog.Root open={Boolean(outdated)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-[2px]" />

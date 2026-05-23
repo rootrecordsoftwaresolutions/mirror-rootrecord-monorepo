@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, getToken, setToken, getDeviceId, RR_APP_ID } from "../lib/api";
-import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from "../../../shared/accountNotifyApi";
+import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from "../lib/accountNotifyApi";
 
 const AuthCtx = createContext(null);
 

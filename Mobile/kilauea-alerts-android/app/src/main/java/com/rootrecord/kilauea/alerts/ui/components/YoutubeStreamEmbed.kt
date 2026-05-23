@@ -11,9 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 
-/** Two Pineapples channel — used when D1 row has `@…/live` instead of a video id. */
-private const val TWO_PINEAPPLES_CHANNEL_ID = "UCfdhgGlsoekErhdTRSzUkBw"
-
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun YoutubeStreamEmbed(
@@ -98,12 +95,6 @@ private fun resolveYoutubeEmbedTarget(loadUrl: String): YoutubeEmbedTarget {
         val src =
             "https://www.youtube.com/embed/$id?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1"
         return YoutubeEmbedTarget.Iframe(src)
-    }
-    if (trimmed.contains("/live", ignoreCase = true) || trimmed.contains("/@", ignoreCase = true)) {
-        val channelLive =
-            "https://www.youtube.com/embed/live_stream?channel=$TWO_PINEAPPLES_CHANNEL_ID" +
-                "&autoplay=1&playsinline=1"
-        return YoutubeEmbedTarget.Iframe(channelLive)
     }
     if (trimmed.contains("/embed/", ignoreCase = true)) {
         return YoutubeEmbedTarget.Iframe(trimmed)

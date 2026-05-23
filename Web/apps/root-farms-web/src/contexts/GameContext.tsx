@@ -18,7 +18,7 @@ import {
 
 } from "react";
 
-import { getPlotCatalog, plotUnlockCost, rowSlotCost } from "../game/catalog";
+import { getPlotCatalog, plotUnlockCost, rootClusterCost, rootClusterRange, rowSlotCost } from "../game/catalog";
 import {
   clearSave,
   harvestCooldownSecRemaining,
@@ -56,21 +56,43 @@ import {
 import {
   fetchFarmsState,
   postFarmsPurchase,
+  postFarmsRewardedAdBonus,
   postFarmsSettle,
-  postStoreProtectionToggle,
+  postStoreToggle,
   postVarmintAck,
   type FarmsPurchaseKind,
+  type FarmsPurchaseOk,
   type FarmsSettleOk,
   type FarmsStateResponse,
+  type FarmhandCheckinStatus,
+  type OrchardAppBonus,
 } from "../lib/farmsApi";
 import {
+  defaultFarmsStore,
+  LIGHTNING_ROD_COST,
   protectionIncomeMultiplier,
-  type FarmsProtections,
-  type ProtectionKind,
+  rootClusterIncomeMultiplier,
+  type FarmsStoreData,
+  type StoreToggleKind,
   type VarmintEvent,
 } from "../game/storeCatalog";
+import { buildGuestAdvisories } from "../game/farmsAdvisoryGuest";
+import { vegetableIncomePerSec } from "../game/tier-income";
+import {
+  computeRootLevel,
+  createInitialTierPlots,
+  ORCHARD_COUNT,
+  vegetablesUnlocked as vegetablesTierUnlocked,
+  VEGETABLE_COUNT,
+  vegetableRowCost,
+  vegetableUnlockCost,
+  type TierPlotProgress,
+} from "../game/tier-catalog";
+import { hasAdFreeAccess } from "../lib/entitlement";
+import { isNativeAdsAvailable, showRewardedAd, syncNativeAds } from "../lib/nativeAds";
 
 export type PurchaseResult = "ok" | "insufficient" | "unavailable" | "need_sign_in" | "offline";
+const INSUFFICIENT_FUNDS_AD_BONUS = 100_000;
 
 
 
@@ -103,11 +125,23 @@ type GameCtx = {
   purchasePlotUnlock: (plotId: number) => Promise<PurchaseResult>;
 
   resetProgress: () => void;
-  protections: FarmsProtections;
+  store: FarmsStoreData;
+  farmhandCheckin: FarmhandCheckinStatus | null;
+  orchards: TierPlotProgress[];
+  orchardAppBonus: OrchardAppBonus | null;
+  vegetables: TierPlotProgress[];
+  orchardsUnlocked: boolean;
+  vegetablesUnlocked: boolean;
+  rootLevel: number;
+  lightningRow: number | null | undefined;
   ruPerSec: number;
   protectionFeePerMinute: number;
   storeBusy: boolean;
-  toggleProtection: (kind: ProtectionKind, enabled: boolean) => Promise<void>;
+  toggleStore: (kind: StoreToggleKind, enabled: boolean) => Promise<void>;
+  buyLightningRod: () => Promise<PurchaseResult>;
+  handleInsufficientFunds: () => Promise<void>;
+  purchaseRootCluster: (clusterId: number) => Promise<PurchaseResult>;
+  purchaseTier: (kind: FarmsPurchaseKind, tierId: number) => Promise<PurchaseResult>;
   varmintNotifications: VarmintEvent[];
   activeVarmintEvent: VarmintEvent | null;
   dismissActiveVarmint: () => Promise<void>;
@@ -165,11 +199,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [harvestBusy, setHarvestBusy] = useState(false);
   const [harvestCooldownSec, setHarvestCooldownSec] = useState(() => harvestCooldownSecRemaining(scope));
 
-  const [protections, setProtections] = useState<FarmsProtections>({
-    gopher: false,
-    mice: false,
-    rabbit: false,
-  });
+  const [store, setStore] = useState<FarmsStoreData>(defaultFarmsStore);
+  const [farmhandCheckin, setFarmhandCheckin] = useState<FarmhandCheckinStatus | null>(null);
+  const [orchards, setOrchards] = useState<TierPlotProgress[]>(() => createInitialTierPlots(ORCHARD_COUNT));
+  const [orchardAppBonus, setOrchardAppBonus] = useState<OrchardAppBonus | null>(null);
+  const [vegetables, setVegetables] = useState<TierPlotProgress[]>(() => createInitialTierPlots(VEGETABLE_COUNT));
+  const [orchardsUnlocked, setOrchardsUnlocked] = useState(true);
+  const [vegetablesUnlocked, setVegetablesUnlocked] = useState(false);
+  const [rootLevel, setRootLevel] = useState(1);
+  const [lightningRow, setLightningRow] = useState<number | null | undefined>(undefined);
   const [ruPerSec, setRuPerSec] = useState(0);
   const [protectionFeePerMinute, setProtectionFeePerMinute] = useState(0);
   const [storeBusy, setStoreBusy] = useState(false);
@@ -181,14 +219,32 @@ export function GameProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const welcomeBackRef = useRef(welcomeBack);
   const activeVarmintQueueRef = useRef<VarmintEvent[]>([]);
-  const protectionsRef = useRef(protections);
+  const storeRef = useRef(store);
+  const orchardsRef = useRef(orchards);
+  const orchardAppBonusRef = useRef<OrchardAppBonus | null>(orchardAppBonus);
+  const vegetablesRef = useRef(vegetables);
   const farmsApiLiveRef = useRef(false);
 
   saveRef.current = save;
-  protectionsRef.current = protections;
+  storeRef.current = store;
+  orchardsRef.current = orchards;
+  orchardAppBonusRef.current = orchardAppBonus;
+  vegetablesRef.current = vegetables;
 
   progressVersionRef.current = progressVersion;
   welcomeBackRef.current = welcomeBack;
+
+  const allFarmRuPerSec = useCallback(
+    (incomeMult: number) => {
+      const appMult = Math.max(1, Number(orchardAppBonusRef.current?.multiplier) || 1);
+      const totalMult = incomeMult * appMult * rootClusterIncomeMultiplier(storeRef.current);
+      return (
+        totalRuPerSec(saveRef.current, totalMult) +
+        vegetableIncomePerSec(vegetablesRef.current, totalMult)
+      );
+    },
+    [],
+  );
 
   const ingestVarmintEvents = useCallback((events: VarmintEvent[], awayMs: number, pendingHarvestRu: number) => {
     if (!events.length && pendingHarvestRu <= 0) return;
@@ -214,6 +270,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setActiveVarmintEvent(events[0] ?? null);
     }
   }, []);
+
+  const queueGuestAdvisories = useCallback(() => {
+    if (!guestMode) return;
+    const events = buildGuestAdvisories(scope, saveRef.current, storeRef.current);
+    if (events.length) ingestVarmintEvents(events, 0, 0);
+  }, [guestMode, scope, ingestVarmintEvents]);
 
   const persist = useCallback(
     (next: GameSave) => {
@@ -241,10 +303,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const applyRemoteFarmsState = useCallback(
     (remote: FarmsStateResponse, nowMs: number, opts?: { skipWelcome?: boolean; awayMs?: number }) => {
       farmsApiLiveRef.current = true;
-      if (remote.protections) {
-        setProtections(remote.protections);
-        protectionsRef.current = remote.protections;
+      if (remote.store) {
+        setStore(remote.store);
+        storeRef.current = remote.store;
       }
+      if (remote.farmhand_checkin) setFarmhandCheckin(remote.farmhand_checkin);
+      if (remote.orchards?.length) {
+        setOrchards(remote.orchards);
+        orchardsRef.current = remote.orchards;
+      }
+      if (remote.orchard_app_bonus) {
+        setOrchardAppBonus(remote.orchard_app_bonus);
+        orchardAppBonusRef.current = remote.orchard_app_bonus;
+      }
+      if (remote.vegetables?.length) {
+        setVegetables(remote.vegetables);
+        vegetablesRef.current = remote.vegetables;
+      }
+      if (remote.orchards_unlocked != null) setOrchardsUnlocked(true);
+      if (remote.vegetables_unlocked != null) setVegetablesUnlocked(remote.vegetables_unlocked);
+      if (remote.root_level != null) setRootLevel(remote.root_level);
+      if (remote.lightning_row !== undefined) setLightningRow(remote.lightning_row);
       if (remote.balance != null) applyBalanceFromServer(remote.balance);
       setProgressVersion(remote.progress_version);
       progressVersionRef.current = remote.progress_version;
@@ -257,9 +336,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
         });
         persist({ ...merged, lastTickMs: nowMs });
       }
-      const incomeMult = protectionIncomeMultiplier(remote.protections ?? protectionsRef.current);
-      const pending = peekUnsettledRu(saveRef.current, nowMs, incomeMult);
-      setRuPerSec(totalRuPerSec(saveRef.current, incomeMult));
+      const incomeMult = protectionIncomeMultiplier(remote.store ?? storeRef.current);
+      const totalIncomeMult =
+        incomeMult *
+        Math.max(1, Number(orchardAppBonusRef.current?.multiplier) || 1) *
+        rootClusterIncomeMultiplier(storeRef.current);
+      const pending = peekUnsettledRu(saveRef.current, nowMs, totalIncomeMult);
+      setRuPerSec(
+        remote.ru_per_sec != null ? Number(remote.ru_per_sec) : allFarmRuPerSec(incomeMult),
+      );
       if (remote.protection_fee_per_minute != null) {
         setProtectionFeePerMinute(Math.max(0, remote.protection_fee_per_minute));
       } else {
@@ -279,7 +364,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
       setSyncNote(null);
     },
-    [applyBalanceFromServer, ingestVarmintEvents, persist, scope],
+    [allFarmRuPerSec, applyBalanceFromServer, ingestVarmintEvents, persist, scope],
   );
 
   const applySettleSuccess = useCallback(
@@ -296,13 +381,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
       persist(nextSave);
       saveRef.current = nextSave;
       applyBalanceFromServer(settled.balance);
-      const incomeMult = protectionIncomeMultiplier(protectionsRef.current);
-      const pending = peekUnsettledRu(nextSave, nowMs, incomeMult);
+      if (settled.orchard_app_bonus) {
+        setOrchardAppBonus(settled.orchard_app_bonus);
+        orchardAppBonusRef.current = settled.orchard_app_bonus;
+      }
+      const incomeMult = protectionIncomeMultiplier(storeRef.current);
+      const totalIncomeMult =
+        incomeMult *
+        Math.max(1, Number(orchardAppBonusRef.current?.multiplier) || 1) *
+        rootClusterIncomeMultiplier(storeRef.current);
+      const pending = peekUnsettledRu(nextSave, nowMs, totalIncomeMult);
       setPendingHarvest(pending);
-      setRuPerSec(totalRuPerSec(nextSave, incomeMult));
+      setRuPerSec(allFarmRuPerSec(incomeMult));
       persistPendingRu(scope, pending);
       if (settled.granted > 0) {
-        setSyncNote(`Harvested +${formatRu(settled.granted)} Root Units`);
+        setSyncNote(`Harvested +${formatRu(settled.granted)}`);
       } else {
         setSyncNote(null);
       }
@@ -356,7 +449,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const pending = peekUnsettledRu(
       saveRef.current,
       Date.now(),
-      protectionIncomeMultiplier(protectionsRef.current),
+      protectionIncomeMultiplier(storeRef.current),
     );
     setPendingHarvest(pending);
     persistPendingRu(scope, pending);
@@ -373,7 +466,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       try {
         const nowMs = Date.now();
         if (guestMode) {
-          const incomeMult = protectionIncomeMultiplier(protectionsRef.current);
+          const incomeMult = protectionIncomeMultiplier(storeRef.current);
           const advanced = advancePlotsToNow(saveRef.current, nowMs);
           const pending = peekUnsettledRu(advanced, nowMs, incomeMult);
           if (pending <= 0) {
@@ -388,8 +481,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
           if (!opts?.skipCooldownCheck) setHarvestCooldownSec(60);
           setSyncNote(
             opts?.rewardedDouble
-              ? `Harvested +${formatRu(granted)} Root Units (2× guest bonus).`
-              : `Harvested +${formatRu(pending)} Root Units (guest session only).`,
+              ? `Harvested +${formatRu(granted)} (2× guest bonus).`
+              : `Harvested +${formatRu(pending)} (guest session only).`,
           );
           return true;
         }
@@ -406,7 +499,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           if (settled.granted > 0) {
             markHarvestCooldown(nowMs, settled.harvest_cooldown_sec ?? 60);
             if (opts?.rewardedDouble && (settled.ad_bonus_granted ?? 0) > 0) {
-              setSyncNote(`Harvested +${formatRu(settled.granted)} Root Units (2× away bonus).`);
+              setSyncNote(`Harvested +${formatRu(settled.granted)} (2× away bonus).`);
             }
           } else if (settled.daily_cap_blocked) {
             setSyncNote(settled.detail ?? "Daily farms earning cap reached for today.");
@@ -497,9 +590,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       applyBalanceFromServer(GUEST_STARTING_BALANCE);
       setBalanceReady(true);
       setPendingHarvest(0);
-      const incomeMult = protectionIncomeMultiplier(protectionsRef.current);
-      setRuPerSec(totalRuPerSec(loaded, incomeMult));
+      const incomeMult = protectionIncomeMultiplier(storeRef.current);
+      setRuPerSec(allFarmRuPerSec(incomeMult));
       setSyncNote("Guest mode — nothing is saved. Your farm resets when you open the app again.");
+      queueGuestAdvisories();
       return;
     }
     if (!(await loadAccountBalanceFirst())) return;
@@ -521,12 +615,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
     persistLastForegroundMs(scope, nowMs);
   }, [
+    allFarmRuPerSec,
     applyBalanceFromServer,
     applyRemoteFarmsState,
     computeAwayMs,
     guestMode,
     loadAccountBalanceFirst,
     persist,
+    queueGuestAdvisories,
     scope,
     syncFarmsAfterBalance,
   ]);
@@ -572,14 +668,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (dt > 0) {
-        const incomeMult = protectionIncomeMultiplier(protectionsRef.current);
+        const incomeMult = protectionIncomeMultiplier(storeRef.current);
         const { save: next } = simulatePlotTicks(saveRef.current, dt, incomeMult);
         saveRef.current = next;
         if (now - lastRender > 80) {
           lastRender = now;
           setSave(next);
           if (balanceReady) {
-            setRuPerSec(totalRuPerSec(next, incomeMult));
+            setRuPerSec(allFarmRuPerSec(incomeMult));
             const gross = totalRuPerSec(next, 1);
             setProtectionFeePerMinute(Math.floor(gross * 60 * (1 - incomeMult)));
             const pending = peekUnsettledRu(next, Date.now(), incomeMult);
@@ -638,24 +734,70 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [activeVarmintEvent]);
 
-  const toggleProtection = useCallback(
-    async (kind: ProtectionKind, enabled: boolean) => {
+  const applyPurchaseRemote = useCallback(
+    (remote: FarmsPurchaseOk) => {
+      applyBalanceFromServer(remote.balance);
+      setProgressVersion(remote.progress_version);
+      progressVersionRef.current = remote.progress_version;
+      persist(
+        applyServerPlots(saveRef.current, {
+          plots: remote.plots,
+          lifetimeEarned: remote.lifetime_farms_earned,
+          lastSettledMs: remote.last_settled_ms,
+        }),
+      );
+      if (remote.orchards?.length) {
+        setOrchards(remote.orchards);
+        orchardsRef.current = remote.orchards;
+      }
+      if (remote.orchard_app_bonus) {
+        setOrchardAppBonus(remote.orchard_app_bonus);
+        orchardAppBonusRef.current = remote.orchard_app_bonus;
+      }
+      if (remote.vegetables?.length) {
+        setVegetables(remote.vegetables);
+        vegetablesRef.current = remote.vegetables;
+      }
+      if (remote.varmint_events?.length) {
+        ingestVarmintEvents(remote.varmint_events, 0, 0);
+      }
+      if (remote.store) {
+        setStore(remote.store);
+        storeRef.current = remote.store;
+      }
+      if (remote.farmhand_checkin) setFarmhandCheckin(remote.farmhand_checkin);
+      setOrchardsUnlocked(true);
+      setVegetablesUnlocked(vegetablesTierUnlocked(saveRef.current.plots, vegetablesRef.current));
+      setRootLevel(computeRootLevel(saveRef.current.plots, vegetablesRef.current));
+    },
+    [allFarmRuPerSec, applyBalanceFromServer, ingestVarmintEvents, persist],
+  );
+
+  const toggleStore = useCallback(
+    async (kind: StoreToggleKind, enabled: boolean) => {
       if (storeBusy || !balanceReady) return;
       if (guestMode) {
-        const next = { ...protectionsRef.current, [kind]: enabled };
-        setProtections(next);
-        protectionsRef.current = next;
+        const next = { ...storeRef.current };
+        if (kind === "gopher" || kind === "mice" || kind === "rabbit") {
+          next.protections = { ...next.protections, [kind]: enabled };
+        } else if (kind === "lightning_meteorologist") {
+          next.lightning_meteorologist = enabled;
+        } else if (kind === "cypress_trees") {
+          next.cypress_trees = enabled;
+        }
+        setStore(next);
+        storeRef.current = next;
         const incomeMult = protectionIncomeMultiplier(next);
-        setRuPerSec(totalRuPerSec(saveRef.current, incomeMult));
+        setRuPerSec(allFarmRuPerSec(incomeMult));
         const gross = totalRuPerSec(saveRef.current, 1);
         setProtectionFeePerMinute(Math.floor(gross * 60 * (1 - incomeMult)));
         return;
       }
       setStoreBusy(true);
       try {
-        const remote = await postStoreProtectionToggle(kind, enabled, progressVersionRef.current);
+        const remote = await postStoreToggle(kind, enabled, progressVersionRef.current);
         if (!remote?.ok) {
-          setSyncNote("Could not update protection — refresh and try again.");
+          setSyncNote("Could not update store — refresh and try again.");
           return;
         }
         applyRemoteFarmsState(remote, Date.now());
@@ -684,8 +826,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const awayMs = computeAwayMs(nowMs);
     if (guestMode) {
       if (awayMs >= OFFLINE_CONTRACT_MIN_AWAY_MS) {
-        const incomeMult = protectionIncomeMultiplier(protectionsRef.current);
-        const pending = peekUnsettledRu(saveRef.current, nowMs, incomeMult);
+        const incomeMult = protectionIncomeMultiplier(storeRef.current);
+        const pending = peekUnsettledRu(
+          saveRef.current,
+          nowMs,
+          incomeMult * rootClusterIncomeMultiplier(storeRef.current),
+        );
         if (pending > 0) {
           setWelcomeBack({ harvestRu: pending, varmintEvents: [] });
           return;
@@ -759,6 +905,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         try {
           persist(_applyLocal(saveRef.current));
           applyBalanceFromServer(accountBalanceRef.current - localCost);
+          queueGuestAdvisories();
           return "ok";
         } finally {
           setPurchaseBusy(false);
@@ -768,25 +915,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setPurchaseBusy(true);
 
       try {
-        const applyPurchaseResponse = (
-          remote: NonNullable<Awaited<ReturnType<typeof postFarmsPurchase>>>,
-        ) => {
-          applyBalanceFromServer(remote.balance);
-          setProgressVersion(remote.progress_version);
-          progressVersionRef.current = remote.progress_version;
-          persist(
-            applyServerPlots(saveRef.current, {
-              plots: remote.plots,
-              lifetimeEarned: remote.lifetime_farms_earned,
-              lastSettledMs: remote.last_settled_ms,
-            }),
-          );
-        };
-
         const attempt = async (): Promise<PurchaseResult | "retry"> => {
           const remote = await postFarmsPurchase(kind, plotId, progressVersionRef.current);
           if (!remote) return "offline";
-          applyPurchaseResponse(remote);
+          applyPurchaseRemote(remote);
           if (remote.rejected) {
             if (accountBalanceRef.current < remote.cost) return "insufficient";
             const d = (remote.detail || "").toLowerCase();
@@ -827,7 +959,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     },
 
-    [applyBalanceFromServer, balanceReady, guestMode, persist, purchaseBusy],
+    [applyBalanceFromServer, applyPurchaseRemote, balanceReady, guestMode, persist, purchaseBusy, queueGuestAdvisories],
 
   );
 
@@ -901,13 +1033,139 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   );
 
+  const handleInsufficientFunds = useCallback(async () => {
+    if (hasAdFreeAccess() || !isNativeAdsAvailable()) {
+      window.alert("Not enough ROOTS.");
+      return;
+    }
+    const ok = window.confirm(`Not enough ROOTS. Watch a rewarded ad for +${formatRu(INSUFFICIENT_FUNDS_AD_BONUS)}?`);
+    if (!ok) return;
+    syncNativeAds();
+    const ad = await showRewardedAd();
+    if (ad !== "earned") return;
 
+    if (guestMode) {
+      applyBalanceFromServer(accountBalanceRef.current + INSUFFICIENT_FUNDS_AD_BONUS);
+      window.alert(`Added +${formatRu(INSUFFICIENT_FUNDS_AD_BONUS)}.`);
+      return;
+    }
+
+    const bonus = await postFarmsRewardedAdBonus();
+    if (!bonus) {
+      window.alert("Ad bonus could not be credited. Try again later.");
+      return;
+    }
+    applyBalanceFromServer(bonus.balance);
+    if (bonus.lifetime_farms_earned != null) {
+      saveRef.current = { ...saveRef.current, lifetimeEarned: Math.max(saveRef.current.lifetimeEarned, bonus.lifetime_farms_earned) };
+      setSave(saveRef.current);
+    }
+    window.alert(
+      bonus.bonus_granted > 0
+        ? `Added +${formatRu(bonus.bonus_granted)}.`
+        : "Daily ROOTS earning cap reached. No ad bonus was added.",
+    );
+  }, [applyBalanceFromServer, guestMode]);
+
+  const purchaseRootCluster = useCallback(
+    (clusterId: number) => {
+      const range = rootClusterRange(clusterId);
+      const completed = saveRef.current.plots
+        .filter((p) => p.id >= range.start && p.id <= range.end)
+        .every((p) => p.unlocked && p.rowCount >= getPlotCatalog(p.id).maxRows);
+      if (!completed || storeRef.current.root_clusters?.[clusterId - 1]) return Promise.resolve("unavailable" as const);
+      const cost = rootClusterCost(clusterId);
+      if (!balanceReady) return Promise.resolve("offline" as const);
+      if (accountBalanceRef.current < cost) return Promise.resolve("insufficient" as const);
+      if (guestMode) {
+        const nextClusters = [...(storeRef.current.root_clusters ?? [])];
+        nextClusters[clusterId - 1] = true;
+        const next = { ...storeRef.current, root_clusters: nextClusters };
+        setStore(next);
+        storeRef.current = next;
+        applyBalanceFromServer(accountBalanceRef.current - cost);
+        setRuPerSec(allFarmRuPerSec(protectionIncomeMultiplier(next)));
+        return Promise.resolve("ok" as const);
+      }
+      return runPurchase("root_cluster", clusterId, cost, (s) => s);
+    },
+    [allFarmRuPerSec, applyBalanceFromServer, balanceReady, guestMode, runPurchase],
+  );
+
+  const purchaseTier = useCallback(
+    async (kind: FarmsPurchaseKind, tierId: number): Promise<PurchaseResult> => {
+      let cost = 0;
+      if (kind === "buy_lightning_rod") {
+        if (storeRef.current.lightning_rod_owned) return "unavailable";
+        cost = LIGHTNING_ROD_COST;
+      } else if (kind === "orchard_unlock" || kind === "orchard_row") {
+        return "unavailable";
+      } else if (kind === "vegetable_unlock") {
+        cost = vegetableUnlockCost(tierId);
+      } else if (kind === "vegetable_row") {
+        const v = vegetablesRef.current.find((x) => x.id === tierId);
+        if (!v?.unlocked) return "unavailable";
+        cost = vegetableRowCost(tierId, v.rowCount);
+      } else {
+        return "unavailable";
+      }
+      if (!balanceReady) return "offline";
+      if (accountBalanceRef.current < cost) return "insufficient";
+
+      if (guestMode) {
+        setPurchaseBusy(true);
+        try {
+          if (kind === "buy_lightning_rod") {
+            const next = { ...storeRef.current, lightning_rod_owned: true };
+            setStore(next);
+            storeRef.current = next;
+          } else {
+            const next = vegetablesRef.current.map((p) => {
+              if (p.id !== tierId) return p;
+              if (kind === "vegetable_unlock") {
+                return { ...p, unlocked: true, rowCount: 1, rowsActive: 1, cycleProgress: 0 };
+              }
+              const rowCount = p.rowCount + 1;
+              return { ...p, rowCount, rowsActive: rowCount };
+            });
+            setVegetables(next);
+            vegetablesRef.current = next;
+          }
+          applyBalanceFromServer(accountBalanceRef.current - cost);
+          queueGuestAdvisories();
+          return "ok";
+        } finally {
+          setPurchaseBusy(false);
+        }
+      }
+
+      return runPurchase(kind, tierId, cost, (s) => s);
+    },
+    [applyBalanceFromServer, balanceReady, guestMode, queueGuestAdvisories, runPurchase],
+  );
+
+  const buyLightningRod = useCallback(
+    () => purchaseTier("buy_lightning_rod", 0),
+    [purchaseTier],
+  );
 
   const resetProgress = useCallback(() => {
     setWelcomeBack(null);
     if (guestMode) {
       const fresh = createInitialSave();
       persist(fresh);
+      setStore(defaultFarmsStore());
+      setFarmhandCheckin(null);
+      storeRef.current = defaultFarmsStore();
+      setOrchards(createInitialTierPlots(ORCHARD_COUNT));
+      setOrchardAppBonus(null);
+      setVegetables(createInitialTierPlots(VEGETABLE_COUNT));
+      orchardsRef.current = createInitialTierPlots(ORCHARD_COUNT);
+      orchardAppBonusRef.current = null;
+      vegetablesRef.current = createInitialTierPlots(VEGETABLE_COUNT);
+      setOrchardsUnlocked(true);
+      setVegetablesUnlocked(false);
+      setRootLevel(1);
       applyBalanceFromServer(GUEST_STARTING_BALANCE);
       setPendingHarvest(0);
       setHarvestCooldownSec(0);
@@ -954,11 +1212,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       resetProgress,
 
-      protections,
+      store,
+      farmhandCheckin,
+      orchards,
+      orchardAppBonus,
+      vegetables,
+      orchardsUnlocked,
+      vegetablesUnlocked,
+      rootLevel,
+      lightningRow,
       ruPerSec,
       protectionFeePerMinute,
       storeBusy,
-      toggleProtection,
+      toggleStore,
+      buyLightningRod,
+      handleInsufficientFunds,
+      purchaseRootCluster,
+      purchaseTier,
       varmintNotifications,
       activeVarmintEvent,
       dismissActiveVarmint,
@@ -996,11 +1266,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       resetProgress,
 
-      protections,
+      store,
+      farmhandCheckin,
+      orchards,
+      orchardAppBonus,
+      vegetables,
+      orchardsUnlocked,
+      vegetablesUnlocked,
+      rootLevel,
+      lightningRow,
       ruPerSec,
       protectionFeePerMinute,
       storeBusy,
-      toggleProtection,
+      toggleStore,
+      buyLightningRod,
+      handleInsufficientFunds,
+      purchaseRootCluster,
+      purchaseTier,
       varmintNotifications,
       activeVarmintEvent,
       dismissActiveVarmint,

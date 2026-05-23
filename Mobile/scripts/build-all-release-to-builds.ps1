@@ -9,12 +9,32 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
 
 New-Item -ItemType Directory -Force -Path $OutRoot | Out-Null
 # Do not set CI=true — react-scripts treats ESLint warnings as errors under CI.
 $env:GENERATE_SOURCEMAP = "false"
 if ([string]::IsNullOrWhiteSpace($env:NODE_OPTIONS) -or $env:NODE_OPTIONS -notmatch "max-old-space-size") {
     $env:NODE_OPTIONS = "--max-old-space-size=8192 --max-semi-space-size=128"
+}
+
+function Invoke-NoisyNative {
+    param(
+        [Parameter(Mandatory = $true)][string]$Command,
+        [Parameter(Mandatory = $true)][string]$FailureMessage
+    )
+    $oldEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & cmd.exe /d /s /c "$Command 2>&1"
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $oldEap
+    }
+    if ($code -ne 0) { throw "$FailureMessage (exit $code)" }
 }
 
 function Copy-BuildArtifacts {
@@ -51,10 +71,8 @@ function Invoke-OneApp {
     # 1) Build the web app
     Push-Location $web
     try {
-        pnpm install
-        if ($LASTEXITCODE -ne 0) { throw "pnpm install (web) failed in $web" }
-        pnpm run build
-        if ($LASTEXITCODE -ne 0) { throw "web build failed in $web" }
+        Invoke-NoisyNative "pnpm install" "pnpm install (web) failed in $web"
+        Invoke-NoisyNative "pnpm run build" "web build failed in $web"
     }
     finally {
         Pop-Location
@@ -63,17 +81,14 @@ function Invoke-OneApp {
     # 2) Cap sync from the Mobile app dir (capacitor.config.json webDir points at the web build)
     Push-Location $app
     try {
-        pnpm install
-        if ($LASTEXITCODE -ne 0) { throw "pnpm install (android) failed in $app" }
-        pnpm exec cap sync android
-        if ($LASTEXITCODE -ne 0) { throw "cap sync android failed in $app" }
+        Invoke-NoisyNative "pnpm install" "pnpm install (android) failed in $app"
+        Invoke-NoisyNative "pnpm exec cap sync android" "cap sync android failed in $app"
 
         # 3) Gradle release build
         $androidDir = Join-Path $app "android"
         Push-Location $androidDir
         try {
-            & .\gradlew.bat bundleRelease assembleRelease --no-daemon
-            if ($LASTEXITCODE -ne 0) { throw "gradle bundleRelease assembleRelease failed" }
+            Invoke-NoisyNative ".\gradlew.bat bundleRelease assembleRelease --no-daemon" "gradle bundleRelease assembleRelease failed"
         }
         finally {
             Pop-Location
@@ -86,12 +101,30 @@ function Invoke-OneApp {
     }
 }
 
+function Get-PackageVersion {
+    param([string]$PackageJsonPath)
+    if (-not (Test-Path -LiteralPath $PackageJsonPath)) { throw "Missing package.json: $PackageJsonPath" }
+    $pkg = Get-Content -LiteralPath $PackageJsonPath -Raw | ConvertFrom-Json
+    $version = [string]$pkg.version
+    if ([string]::IsNullOrWhiteSpace($version)) { throw "No version in $PackageJsonPath" }
+    return $version
+}
+
+function Get-GradleVersionName {
+    param([string]$GradlePath)
+    if (-not (Test-Path -LiteralPath $GradlePath)) { throw "Missing Gradle file: $GradlePath" }
+    $text = Get-Content -LiteralPath $GradlePath -Raw
+    $m = [regex]::Match($text, 'versionName\s*=?\s*"([^"]+)"')
+    if (-not $m.Success) { throw "No versionName in $GradlePath" }
+    return $m.Groups[1].Value
+}
+
 # Order: smaller apps first (faster feedback), Weather last (Firebase + signing heavier).
-Invoke-OneApp -Subfolder "root-farms"       -WebRel "Web\apps\root-farms-mobile-web" -AppRel "root-farms-app"         -BaseName "RootRecord-RootFarms"       -Version "0.1.0"
-Invoke-OneApp -Subfolder "token-manager"    -WebRel "Web\apps\token-manager-web"    -AppRel "token-manager-app"      -BaseName "RootRecord-TokenManager"    -Version "0.1.1"
-Invoke-OneApp -Subfolder "account-hub"      -WebRel "Web\apps\account-hub-web"      -AppRel "account-hub-app"        -BaseName "RootRecord-AccountHub"      -Version "0.1.2"
-Invoke-OneApp -Subfolder "business-manager" -WebRel "Web\apps\business-manager-web" -AppRel "business-manager-app"   -BaseName "RootRecord-BusinessManager" -Version "1.09"
-Invoke-OneApp -Subfolder "weather-manager"  -WebRel "Web\apps\weather-manager-web"  -AppRel "weather-manager-mobile" -BaseName "RootRecord-WeatherManager"  -Version "1.0.19"
+Invoke-OneApp -Subfolder "root-farms"       -WebRel "Web\apps\root-farms-mobile-web" -AppRel "root-farms-app"         -BaseName "RootRecord-RootFarms"       -Version (Get-PackageVersion (Join-Path $MobileRoot "root-farms-app\package.json"))
+Invoke-OneApp -Subfolder "token-manager"    -WebRel "Web\apps\token-manager-web"    -AppRel "token-manager-app"      -BaseName "RootRecord-TokenManager"    -Version (Get-PackageVersion (Join-Path $MobileRoot "token-manager-app\package.json"))
+Invoke-OneApp -Subfolder "account-hub"      -WebRel "Web\apps\account-hub-web"      -AppRel "account-hub-app"        -BaseName "RootRecord-AccountHub"      -Version (Get-PackageVersion (Join-Path $MobileRoot "account-hub-app\package.json"))
+Invoke-OneApp -Subfolder "business-manager" -WebRel "Web\apps\business-manager-web" -AppRel "business-manager-app"   -BaseName "RootRecord-BusinessManager" -Version (Get-PackageVersion (Join-Path $MobileRoot "business-manager-app\package.json"))
+Invoke-OneApp -Subfolder "weather-manager"  -WebRel "Web\apps\weather-manager-web"  -AppRel "weather-manager-mobile" -BaseName "RootRecord-WeatherManager"  -Version (Get-PackageVersion (Join-Path $MobileRoot "weather-manager-mobile\package.json"))
 
 function Invoke-KilaueaAlertsNative {
     param(
@@ -105,8 +138,7 @@ function Invoke-KilaueaAlertsNative {
     Write-Host "`n========== kilauea-alerts (native Kotlin / $Version) ==========" -ForegroundColor Cyan
     Push-Location $proj
     try {
-        & .\gradlew.bat bundleRelease assembleRelease --no-daemon
-        if ($LASTEXITCODE -ne 0) { throw "kilauea-alerts-android gradle bundleRelease assembleRelease failed" }
+        Invoke-NoisyNative ".\gradlew.bat bundleRelease assembleRelease --no-daemon" "kilauea-alerts-android gradle bundleRelease assembleRelease failed"
         $dest = Join-Path $OutRoot "kilauea-alerts"
         $stageScript = Join-Path $PSScriptRoot "stage-release-artifacts.ps1"
         $lines = & powershell -NoProfile -ExecutionPolicy Bypass -File $stageScript `
@@ -121,6 +153,6 @@ function Invoke-KilaueaAlertsNative {
     }
 }
 
-Invoke-KilaueaAlertsNative -Version "1.0.0"
+Invoke-KilaueaAlertsNative -Version (Get-GradleVersionName (Join-Path $MobileRoot "kilauea-alerts-android\app\build.gradle.kts"))
 
 Write-Host "`nAll builds finished. Output root: $OutRoot" -ForegroundColor Green
