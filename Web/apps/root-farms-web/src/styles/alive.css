@@ -1033,3 +1033,255 @@ button.plot-card:hover .plot-plant {
   z-index: 1;
   padding-right: 2rem;
 }
+
+/* ───────── Tier consistency: shared header strip + locked + empty cards ───────── */
+
+.screen-header { margin-bottom: 1rem; }
+.screen-header h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.6rem, 2.2vw, 2rem);
+  letter-spacing: -0.015em;
+  background: linear-gradient(180deg, #e8ffe1 0%, var(--leaf) 75%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.screen-header .screen-lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  max-width: 52rem;
+}
+
+/* the 3-pill total strip seen on Vegetables + Orchards (and reusable elsewhere) */
+.tier-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.7rem;
+  margin: 0.5rem 0 1.25rem;
+}
+.tier-stat-pill {
+  position: relative;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  overflow: hidden;
+  transition: transform 0.3s var(--ease-out-soft), border-color 0.3s var(--ease-out-soft);
+}
+.tier-stat-pill::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--leaf), transparent);
+  opacity: 0.5;
+}
+.tier-stat-pill:hover { transform: translateY(-2px); border-color: rgba(123, 214, 106, 0.30); }
+.tier-stat-pill--accent {
+  background:
+    radial-gradient(80% 80% at 0% 0%, rgba(123, 214, 106, 0.12), transparent 60%),
+    linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  border-color: rgba(123, 214, 106, 0.25);
+}
+.tier-stat-k {
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tier-stat-v {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--leaf);
+}
+.tier-stat-v small {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 0.15rem;
+}
+
+/* tier locked card (Vegetables before level 20) */
+.tier-locked-card {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 196, 107, 0.4);
+  background:
+    radial-gradient(70% 80% at 0% 0%, rgba(255, 196, 107, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  box-shadow: var(--shadow-card);
+}
+.tier-locked-emoji {
+  font-size: 2.5rem;
+  filter: grayscale(0.4) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45));
+  animation: balance-pulse 4s ease-in-out infinite;
+}
+.tier-locked-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--amber);
+}
+.tier-locked-sub {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+/* orchard empty hero */
+.orchard-empty-card {
+  display: flex !important;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem !important;
+  border-style: dashed !important;
+}
+.orchard-empty-emoji {
+  font-size: 2.6rem;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45));
+  animation: brand-breathe 6s ease-in-out infinite;
+}
+.orchard-empty-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--leaf);
+  font-size: 1.1rem;
+}
+.orchard-empty-card .plot-sub { margin-top: 0.25rem; }
+
+/* ───────── Tree sprite (Orchards cards) ───────── */
+
+.plot-tree {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.95rem;
+  width: 60px;
+  height: 76px;
+  pointer-events: none;
+  z-index: 1;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.4));
+  transform-origin: 50% 100%;
+  transition: transform 0.45s var(--ease-out-soft);
+}
+.plot-card:hover .plot-tree { transform: scale(1.05); }
+
+.plot-tree-soil {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 44px;
+  height: 10px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 100%, #6a4424 0%, #4a2d16 60%, transparent 75%);
+  border-radius: 50% / 80%;
+}
+.plot-tree-trunk {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 5px;
+  height: 26px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #6a4424, #3e2614);
+  border-radius: 3px 3px 1px 1px;
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.4);
+}
+.plot-tree-canopy {
+  position: absolute;
+  left: 50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--leaf) 0%, var(--green) 55%, var(--green-deep) 100%);
+  box-shadow: inset -4px -4px 8px rgba(0, 0, 0, 0.25),
+              inset 4px 4px 6px rgba(255, 255, 255, 0.06);
+}
+.plot-tree-canopy--a {
+  width: 36px; height: 36px;
+  bottom: 28px;
+  transform: translate(-50%, 0);
+}
+.plot-tree-canopy--b {
+  width: 24px; height: 24px;
+  bottom: 42px;
+  transform: translate(-90%, 0);
+}
+.plot-tree-canopy--c {
+  width: 22px; height: 22px;
+  bottom: 44px;
+  transform: translate(-10%, 0);
+}
+
+/* inactive tree → grey/wilted */
+.plot-tree:not(.plot-tree--active) {
+  filter: grayscale(0.85) brightness(0.78) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+}
+.plot-tree--active {
+  animation: tree-sway 6s ease-in-out infinite;
+}
+@keyframes tree-sway {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(1.5deg); }
+}
+.plot-tree--active .plot-tree-canopy {
+  animation: canopy-bob 5s ease-in-out infinite;
+}
+.plot-tree--active .plot-tree-canopy--b { animation-delay: 0.4s; }
+.plot-tree--active .plot-tree-canopy--c { animation-delay: 0.8s; }
+@keyframes canopy-bob {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.1); }
+}
+
+/* keep tree card text clear of the tree sprite */
+.orchard-tree-card .plot-card-top { padding-right: 4.5rem; }
+
+/* mobile sizes */
+@media (max-width: 768px) {
+  .plot-tree { width: 48px; height: 60px; right: 0.6rem; bottom: 0.8rem; }
+  .plot-tree-trunk { height: 20px; }
+  .plot-tree-canopy--a { width: 28px; height: 28px; bottom: 22px; }
+  .plot-tree-canopy--b { width: 18px; height: 18px; bottom: 32px; }
+  .plot-tree-canopy--c { width: 18px; height: 18px; bottom: 34px; }
+  .orchard-tree-card .plot-card-top { padding-right: 3.5rem; }
+}
+
+/* the tier locked card on narrow screens */
+@media (max-width: 540px) {
+  .tier-locked-card,
+  .orchard-empty-card { flex-direction: column; align-items: flex-start; text-align: left; }
+}
+
+/* tier locked-plot lock chip + visual */
+.plot-name-lock {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.4rem;
+  border-radius: 0.4rem;
+  background: rgba(255, 196, 107, 0.15);
+  border: 1px solid rgba(255, 196, 107, 0.35);
+  color: var(--gold);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.tier-plot-card-locked .plot-card-main,
+.tier-plot-card-locked .plot-yield { opacity: 0.7; }

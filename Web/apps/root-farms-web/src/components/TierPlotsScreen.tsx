@@ -1,6 +1,7 @@
 import { formatGrowTime, formatRu } from "../game/format";
 import type { FarmsPurchaseKind, OrchardAppBonusTree } from "../lib/farmsApi";
 import type { TierPlotProgress } from "../game/tier-catalog";
+import { AccountBalanceHud } from "./AccountBalanceHud";
 
 type Props = {
   title: string;
@@ -44,20 +45,51 @@ export function TierPlotsScreen({
   if (locked) {
     return (
       <div className="screen">
+        <AccountBalanceHud />
         <header className="screen-header">
           <h1>{title}</h1>
           <p className="screen-lead">{lockedMessage}</p>
         </header>
+        <div className="tier-locked-card">
+          <span className="tier-locked-emoji" aria-hidden>
+            🌱
+          </span>
+          <div>
+            <p className="tier-locked-title">Tier sealed</p>
+            <p className="tier-locked-sub">{lockedMessage}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
+  const unlockedCount = plots.filter((p) => p.unlocked).length;
+  const totalRows = plots.reduce((n, p) => n + (p.unlocked ? p.rowCount : 0), 0);
+  const totalActiveRows = plots.reduce((n, p) => n + (p.unlocked ? p.rowsActive : 0), 0);
+
   return (
     <div className="screen">
+      <AccountBalanceHud />
       <header className="screen-header">
         <h1>{title}</h1>
         <p className="screen-lead">{lead}</p>
       </header>
+      <div className="tier-stat-strip" aria-label="Tier totals">
+        <div className="tier-stat-pill">
+          <span className="tier-stat-k">Plots</span>
+          <span className="tier-stat-v">
+            {unlockedCount}<small>/{plots.length}</small>
+          </span>
+        </div>
+        <div className="tier-stat-pill">
+          <span className="tier-stat-k">Rows</span>
+          <span className="tier-stat-v">{totalRows}</span>
+        </div>
+        <div className="tier-stat-pill">
+          <span className="tier-stat-k">Growing</span>
+          <span className="tier-stat-v">{totalActiveRows}</span>
+        </div>
+      </div>
       <div className="section-head tier-section-head">
         <span>{title} ({plots.length})</span>
         <span>Tap for rows &amp; grow info</span>
@@ -69,15 +101,33 @@ export function TierPlotsScreen({
           const unlockCost = unlockCostFor(p.id);
           const rowCost = p.unlocked ? rowCostFor(p.id, p.rowCount) : 0;
           const appBonus = bonusById.get(p.id);
+          const cycle = Math.min(1, Math.max(0, p.cycleProgress));
           return (
             <article
               key={p.id}
               className={`plot-card plot-card--grid accent-green${p.unlocked ? "" : " tier-plot-card-locked"}`}
+              style={p.unlocked ? ({ ["--grow" as any]: cycle } as React.CSSProperties) : undefined}
             >
+              {p.unlocked ? (
+                <span
+                  className="plot-plant"
+                  aria-hidden
+                  data-stage={cycle >= 0.95 ? "ripe" : cycle >= 0.5 ? "mid" : "sprout"}
+                >
+                  <span className="plot-plant-leaf plot-plant-leaf--l" />
+                  <span className="plot-plant-leaf plot-plant-leaf--r" />
+                  <span className="plot-plant-leaf plot-plant-leaf--c" />
+                  <span className="plot-plant-stem" />
+                  <span className="plot-plant-soil" />
+                </span>
+              ) : null}
               <div className="plot-card-top">
                 <div className="plot-card-main">
                   <span className="plot-name">
-                    {p.unlocked ? nameFor(p.id) : `🔒 ${nameFor(p.id)}`}
+                    {p.unlocked ? null : (
+                      <span className="plot-name-lock" aria-hidden>🔒</span>
+                    )}
+                    {nameFor(p.id)}
                     {p.unlocked ? <span className="plot-dot" aria-label="active" /> : null}
                   </span>
                   {descriptionFor ? <span className="plot-sub plot-sub--sci">{descriptionFor(p.id)}</span> : null}

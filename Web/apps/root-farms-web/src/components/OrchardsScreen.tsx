@@ -1,6 +1,7 @@
 import { ROOT_CLUSTER_COUNT, rootClusterName, rootClusterRange } from "../game/catalog";
 import type { FarmsStoreData } from "../game/storeCatalog";
 import type { OrchardAppBonus } from "../lib/farmsApi";
+import { AccountBalanceHud } from "./AccountBalanceHud";
 
 type Props = {
   orchardAppBonus: OrchardAppBonus | null;
@@ -34,6 +35,18 @@ function formatExpires(lastOpenAt: string | null): string | null {
   });
 }
 
+function TreeSprite({ active }: { active: boolean }) {
+  return (
+    <span className={`plot-tree${active ? " plot-tree--active" : ""}`} aria-hidden>
+      <span className="plot-tree-canopy plot-tree-canopy--a" />
+      <span className="plot-tree-canopy plot-tree-canopy--b" />
+      <span className="plot-tree-canopy plot-tree-canopy--c" />
+      <span className="plot-tree-trunk" />
+      <span className="plot-tree-soil" />
+    </span>
+  );
+}
+
 export function OrchardsScreen({ orchardAppBonus, store }: Props) {
   const appTrees = orchardAppBonus?.trees ?? [];
   const clusterIds = Array.from({ length: ROOT_CLUSTER_COUNT }, (_, i) => i + 1).filter(
@@ -41,9 +54,12 @@ export function OrchardsScreen({ orchardAppBonus, store }: Props) {
   );
   const activeAppCount = orchardAppBonus?.active_count ?? 0;
   const clusterBonusPct = clusterIds.length * 5;
+  const appBonusPct = activeAppCount * 10;
+  const totalBonusPct = appBonusPct + clusterBonusPct;
 
   return (
     <div className="screen">
+      <AccountBalanceHud />
       <header className="screen-header">
         <h1>Orchards</h1>
         <p className="screen-lead">
@@ -51,6 +67,23 @@ export function OrchardsScreen({ orchardAppBonus, store }: Props) {
           Purchased Root Cluster Trees move here and add +5% total income each.
         </p>
       </header>
+
+      <div className="tier-stat-strip" aria-label="Orchard totals">
+        <div className="tier-stat-pill">
+          <span className="tier-stat-k">Active app</span>
+          <span className="tier-stat-v">
+            {activeAppCount}<small>/{appTrees.length || 3}</small>
+          </span>
+        </div>
+        <div className="tier-stat-pill">
+          <span className="tier-stat-k">Cluster trees</span>
+          <span className="tier-stat-v">{clusterIds.length}</span>
+        </div>
+        <div className="tier-stat-pill tier-stat-pill--accent">
+          <span className="tier-stat-k">Total bonus</span>
+          <span className="tier-stat-v">+{totalBonusPct}%</span>
+        </div>
+      </div>
 
       <div className="section-head tier-section-head">
         <span>App bonus trees ({appTrees.length})</span>
@@ -68,6 +101,7 @@ export function OrchardsScreen({ orchardAppBonus, store }: Props) {
               key={tree.key || tree.id}
               className={`plot-card plot-card--grid accent-green orchard-tree-card${tree.active ? "" : " orchard-tree-card--inactive"}`}
             >
+              <TreeSprite active={tree.active} />
               <div className="plot-card-top">
                 <div className="plot-card-main">
                   <span className="plot-name">
@@ -104,6 +138,7 @@ export function OrchardsScreen({ orchardAppBonus, store }: Props) {
             const range = rootClusterRange(clusterId);
             return (
               <article key={clusterId} className="plot-card plot-card--grid plot-card--cluster accent-green orchard-tree-card">
+                <TreeSprite active />
                 <div className="plot-card-top">
                   <div className="plot-card-main">
                     <span className="plot-name">
@@ -126,9 +161,13 @@ export function OrchardsScreen({ orchardAppBonus, store }: Props) {
         </div>
       ) : (
         <article className="plot-card orchard-empty-card">
-          <p className="plot-sub">
-            Complete a 10-plot root section from the Roots tab, then cluster it to move that Root Cluster Tree here.
-          </p>
+          <span className="orchard-empty-emoji" aria-hidden>🌳</span>
+          <div>
+            <p className="orchard-empty-title">Plant your first orchard</p>
+            <p className="plot-sub">
+              Complete a 10-plot root section from the Roots tab, then cluster it to move that Root Cluster Tree here.
+            </p>
+          </div>
         </article>
       )}
     </div>
