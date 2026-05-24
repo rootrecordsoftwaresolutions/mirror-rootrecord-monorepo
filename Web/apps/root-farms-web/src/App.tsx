@@ -38,6 +38,7 @@ function TierTabBody({
 }) {
   const {
     orchardAppBonus,
+    membershipBonus,
     vegetables,
     vegetablesUnlocked,
     rootLevel,
@@ -48,12 +49,12 @@ function TierTabBody({
     farmhandCheckin,
   } = useGame();
   if (tier === "orchards") {
-    return <OrchardsScreen orchardAppBonus={orchardAppBonus} store={store} />;
+    return <OrchardsScreen orchardAppBonus={orchardAppBonus} membershipBonus={membershipBonus} store={store} rootLevel={rootLevel} />;
   }
   return (
     <TierPlotsScreen
       title="Vegetable plots"
-      lead={`Separate tier unlocked at farm level 20 (you are level ${rootLevel}). Protection requires a lightning rod plus any active farmhand: ${
+      lead={`Separate tier unlocked at farm level 20 (you are level ${rootLevel}). Protection requires the lightning meteorologist's rod plus any active farmhand: ${
         farmhandCheckin?.active && vegetablesProtected(store) ? "active" : "not active"
       }.`}
       plots={vegetables}

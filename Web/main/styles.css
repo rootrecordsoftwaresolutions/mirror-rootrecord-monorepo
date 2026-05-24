@@ -1593,6 +1593,35 @@ section { position: relative; }
 
 .stack-form button { align-self: flex-start; }
 
+.member-perk-card {
+  margin: 1rem 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid rgba(63, 226, 141, 0.24);
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(420px 260px at 90% 0%, rgba(92, 225, 240, 0.1), transparent 60%),
+    rgba(63, 226, 141, 0.07);
+}
+
+.member-perk-card h3 {
+  margin: 0.1rem 0 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 450;
+}
+
+.member-perk-card p {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+}
+
+.member-perk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
 .billing-pricing-table-wrap {
   margin-top: 1.25rem;
   min-height: 2rem;
@@ -1601,6 +1630,57 @@ section { position: relative; }
 .billing-pricing-table-wrap stripe-pricing-table {
   display: block;
   width: 100%;
+}
+
+.member-perk-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(5, 15, 26, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.member-perk-popup[hidden] {
+  display: none;
+}
+
+.member-perk-popup-card {
+  position: relative;
+  width: min(100%, 30rem);
+  padding: 1.4rem;
+  border: 1px solid rgba(63, 226, 141, 0.34);
+  border-radius: var(--r-xl);
+  background:
+    radial-gradient(480px 300px at 90% -10%, rgba(63, 226, 141, 0.18), transparent 60%),
+    var(--surface);
+  box-shadow: var(--shadow-lg), var(--glow-green);
+}
+
+.member-perk-popup-card h2 {
+  margin: 0.2rem 0 0.7rem;
+  font-family: var(--font-display);
+  font-weight: 450;
+  line-height: 1.1;
+}
+
+.member-perk-popup-card p {
+  color: var(--ink-soft);
+}
+
+.member-perk-popup-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: rgba(167, 230, 178, 0.06);
+  color: var(--ink);
+  cursor: pointer;
 }
 
 .account-grid { margin: 0 0 1.5rem; }

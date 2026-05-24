@@ -79,7 +79,7 @@ export function buildGuestAdvisories(
   if (userHasStormHazards(save.plots)) {
     push(
       "advisory_milestone_storms",
-      "Wind and lightning are active on Ginger+ plots. Open Farmhands for storm gear.",
+      "Wind and lightning are now unlocked. They can strike anywhere in your unlocked field. Open Farmhands for storm gear.",
       "danger_storms",
     );
   }
@@ -111,12 +111,13 @@ export function buildGuestAdvisories(
     if (!store.protections.gopher) missing.push("gopher protection");
     if (!store.protections.mice) missing.push("field mice protection");
     if (!store.protections.rabbit) missing.push("rabbit protection");
+    if (!store.protections.birds) missing.push("Uncle for birds");
     if (missing.length && canNudge(nudge, "classic")) {
       out.push({
         id: `guest-adv-safety-classic-${Date.now()}`,
         kind: "advisory_safety_classic",
         plot_id: null,
-        message: `Turn on ${missing.join(", ")} under Farmhands.`,
+        message: `Buy the needed tool, then turn on ${missing.join(", ")} under Farmhands.`,
         created_at: now,
       });
       nudge.classic = now;
@@ -125,8 +126,8 @@ export function buildGuestAdvisories(
 
   if (userHasStormHazards(save.plots)) {
     const missing: string[] = [];
-    if (!store.lightning_rod_owned && !store.lightning_meteorologist) {
-      missing.push("lightning rod or meteorologist");
+    if (!store.lightning_meteorologist) {
+      missing.push("lightning meteorologist with a lightning rod");
     }
     if (!store.cypress_trees) missing.push("cypress windbreak");
     if (missing.length && canNudge(nudge, "storm")) {
@@ -134,7 +135,7 @@ export function buildGuestAdvisories(
         id: `guest-adv-safety-storm-${Date.now()}`,
         kind: "advisory_safety_storm",
         plot_id: null,
-        message: `Storms active — consider ${missing.join(" and ")} on Farmhands.`,
+        message: `Storms active — consider buying the needed tool and turning on ${missing.join(" and ")} on Farmhands.`,
         created_at: now,
       });
       nudge.storm = now;

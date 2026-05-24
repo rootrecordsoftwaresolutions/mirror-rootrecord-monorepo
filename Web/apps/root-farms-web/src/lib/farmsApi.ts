@@ -28,6 +28,23 @@ export type OrchardAppBonus = {
   trees: OrchardAppBonusTree[];
 };
 
+export type MembershipBonusTree = {
+  key: "monthly_member" | "lifetime_member" | string;
+  name: string;
+  active: boolean;
+  bonus_pct: number;
+  blurb: string;
+};
+
+export type MembershipBonus = {
+  multiplier: number;
+  bonus_pct: number;
+  monthly_active: boolean;
+  lifetime_active: boolean;
+  pro_redeemed_until: string | null;
+  trees: MembershipBonusTree[];
+};
+
 export type FarmhandCheckinStatus = {
   active: boolean;
   last_checkin_at: string | null;
@@ -52,11 +69,24 @@ export type DiceMarketRequest = {
   resolved_at: string | null;
 };
 
+export type MarketLimit = {
+  used: number;
+  limit: number;
+  remaining: number;
+  locked: boolean;
+  locked_until: string | null;
+};
+
 export type DiceMarketResponse = {
   ok: true;
   balance: number;
   requests: DiceMarketRequest[];
   detail?: string;
+  cost?: number;
+  pro_redeemed_until?: string | null;
+  pro_unlocked?: boolean;
+  membership_bonus?: MembershipBonus;
+  market_limit?: MarketLimit;
 };
 
 export type MarketWheelSpinResponse = {
@@ -68,6 +98,7 @@ export type MarketWheelSpinResponse = {
   visual_index: number;
   balance: number;
   detail?: string;
+  market_limit?: MarketLimit;
 };
 
 export type MarketRouletteSpinResponse = {
@@ -81,9 +112,11 @@ export type MarketRouletteSpinResponse = {
   multiplier: number;
   won: boolean;
   payout: number;
+  payout_capped?: boolean;
   net: number;
   balance: number;
   detail?: string;
+  market_limit?: MarketLimit;
 };
 
 export type MarketHiLoResponse = {
@@ -110,6 +143,7 @@ export type MarketHiLoResponse = {
   net?: number;
   balance: number;
   detail?: string;
+  market_limit?: MarketLimit;
 };
 
 function parseRootPlots(raw: unknown): GameSave["plots"] | undefined {
@@ -162,13 +196,19 @@ export type FarmsStateResponse = {
   varmint_events?: VarmintEvent[];
   pending_ru?: number;
   orchard_app_bonus?: OrchardAppBonus;
+  membership_bonus?: MembershipBonus;
 };
 
 export type FarmsPurchaseKind =
   | "unlock_plot"
   | "row_slot"
   | "root_cluster"
+  | "buy_gopher_tool"
+  | "buy_mice_tool"
+  | "buy_rabbit_tool"
+  | "buy_birds_tool"
   | "buy_lightning_rod"
+  | "buy_cypress_tool"
   | "orchard_unlock"
   | "orchard_row"
   | "vegetable_unlock"
@@ -188,6 +228,7 @@ export type FarmsPurchaseOk = {
   detail?: string;
   varmint_events?: VarmintEvent[];
   orchard_app_bonus?: OrchardAppBonus;
+  membership_bonus?: MembershipBonus;
   farmhand_checkin?: FarmhandCheckinStatus;
 };
 
@@ -239,6 +280,44 @@ function parseOrchardAppBonus(raw: unknown): OrchardAppBonus | undefined {
   };
 }
 
+function parseMembershipBonus(raw: unknown): MembershipBonus | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const rawTrees = Array.isArray(o.trees) ? o.trees : [];
+  const trees = rawTrees
+    .map((item) => {
+      const t = item as Record<string, unknown>;
+      return {
+        key: String(t.key || ""),
+        name: String(t.name || ""),
+        active: t.active === true,
+        bonus_pct: Math.max(0, Math.floor(Number(t.bonus_pct) || 0)),
+        blurb: String(t.blurb || ""),
+      } satisfies MembershipBonusTree;
+    })
+    .filter((t) => t.key && t.name);
+  return {
+    multiplier: Math.max(1, Number(o.multiplier) || 1),
+    bonus_pct: Math.max(0, Math.floor(Number(o.bonus_pct) || 0)),
+    monthly_active: o.monthly_active === true,
+    lifetime_active: o.lifetime_active === true,
+    pro_redeemed_until: typeof o.pro_redeemed_until === "string" && o.pro_redeemed_until ? o.pro_redeemed_until : null,
+    trees,
+  };
+}
+
+function parseMarketLimit(raw: unknown): MarketLimit | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  return {
+    used: Math.max(0, Math.floor(Number(o.used) || 0)),
+    limit: Math.max(0, Math.floor(Number(o.limit) || 0)),
+    remaining: Math.max(0, Math.floor(Number(o.remaining) || 0)),
+    locked: o.locked === true,
+    locked_until: typeof o.locked_until === "string" && o.locked_until ? o.locked_until : null,
+  };
+}
+
 function parseFarmhandCheckin(raw: unknown): FarmhandCheckinStatus | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const o = raw as Record<string, unknown>;
@@ -278,6 +357,11 @@ function parseDiceMarketResponse(data: Record<string, unknown>): DiceMarketRespo
     balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
     requests,
     detail: typeof data.detail === "string" ? data.detail : undefined,
+    cost: data.cost != null ? Math.max(0, Math.floor(Number(data.cost) || 0)) : undefined,
+    pro_redeemed_until: typeof data.pro_redeemed_until === "string" && data.pro_redeemed_until ? data.pro_redeemed_until : null,
+    pro_unlocked: data.pro_unlocked === true,
+    membership_bonus: parseMembershipBonus(data.membership_bonus),
+    market_limit: parseMarketLimit(data.market_limit),
   };
 }
 
@@ -307,6 +391,7 @@ function parsePurchaseBody(data: Record<string, unknown>, progressVersion: numbe
       ? (data.varmint_events as VarmintEvent[])
       : undefined,
     orchard_app_bonus: parseOrchardAppBonus(data.orchard_app_bonus),
+    membership_bonus: parseMembershipBonus(data.membership_bonus),
     farmhand_checkin: parseFarmhandCheckin(data.farmhand_checkin),
   };
 }
@@ -363,6 +448,7 @@ function parseFarmsStateResponse(data: Record<string, unknown>): FarmsStateRespo
     varmint_events,
     pending_ru: data.pending_ru != null ? Math.max(0, Math.floor(Number(data.pending_ru))) : undefined,
     orchard_app_bonus: parseOrchardAppBonus(data.orchard_app_bonus),
+    membership_bonus: parseMembershipBonus(data.membership_bonus),
   };
 }
 
@@ -436,6 +522,7 @@ export type FarmsSettleOk = {
   daily_cap_blocked?: boolean;
   ad_bonus_granted?: number;
   orchard_app_bonus?: OrchardAppBonus;
+  membership_bonus?: MembershipBonus;
 };
 
 export type FarmsSettleErr = {
@@ -485,6 +572,7 @@ function parseFarmsSettleBody(
     ad_bonus_granted:
       data.ad_bonus_granted != null ? Math.max(0, Math.floor(Number(data.ad_bonus_granted))) : undefined,
     orchard_app_bonus: parseOrchardAppBonus(data.orchard_app_bonus),
+    membership_bonus: parseMembershipBonus(data.membership_bonus),
   };
 }
 
@@ -628,6 +716,20 @@ export async function postMarketDonation(amount: number): Promise<DiceMarketResp
   }
 }
 
+export async function postMarketMonthlyPass(): Promise<DiceMarketResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/monthly-pass", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return parseDiceMarketResponse(data);
+  } catch {
+    return null;
+  }
+}
+
 export async function postMarketWheelSpin(): Promise<MarketWheelSpinResponse | null> {
   try {
     const res = await apiFetch("/api/v1/farms/market/wheel/spin", {
@@ -646,6 +748,7 @@ export async function postMarketWheelSpin(): Promise<MarketWheelSpinResponse | n
         visual_index: 0,
         balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
         detail: typeof data.detail === "string" ? data.detail : undefined,
+        market_limit: parseMarketLimit(data.market_limit),
       };
     }
     return {
@@ -657,6 +760,7 @@ export async function postMarketWheelSpin(): Promise<MarketWheelSpinResponse | n
       visual_index: Math.max(0, Math.min(99, Math.floor(Number(data.visual_index) || 0))),
       balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
       detail: typeof data.detail === "string" ? data.detail : undefined,
+      market_limit: parseMarketLimit(data.market_limit),
     };
   } catch {
     return null;
@@ -691,9 +795,11 @@ export async function postMarketRouletteSpin(
       multiplier: Math.max(0, Math.floor(Number(data.multiplier) || 0)),
       won: Boolean(data.won),
       payout: Math.max(0, Math.floor(Number(data.payout) || 0)),
+      payout_capped: data.payout_capped === true,
       net: Math.floor(Number(data.net) || 0),
       balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
       detail: typeof data.detail === "string" ? data.detail : undefined,
+      market_limit: parseMarketLimit(data.market_limit),
     };
   } catch {
     return null;
@@ -725,6 +831,7 @@ function parseMarketHiLoResponse(data: Record<string, unknown>): MarketHiLoRespo
     net: data.net == null ? undefined : Math.floor(Number(data.net) || 0),
     balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
     detail: typeof data.detail === "string" ? data.detail : undefined,
+    market_limit: parseMarketLimit(data.market_limit),
   };
 }
 

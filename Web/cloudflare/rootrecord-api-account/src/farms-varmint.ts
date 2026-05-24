@@ -223,7 +223,7 @@ function applyBirdClusterDamage(store: FarmsStoreData): FarmsStoreData {
   return clusterId == null ? store : applyRootClusterDamage(store, clusterId);
 }
 
-/** Global lightning row index (1–10): trim active rows on storm-range plots. */
+/** Global lightning row index (1-10): once unlocked, trim matching active rows across the field. */
 function applyLightningRowDamage(plots: PlotProgress[], rowIndex: number): PlotProgress[] {
   const targetRow = Math.min(10, Math.max(1, Math.floor(rowIndex)));
   return plots.map((p) => {
@@ -470,7 +470,7 @@ async function processStorms(
   }
 
   if (rollAttack(LIGHTNING_CHANCE)) {
-    const blocked = store.lightning_rod_owned || store.lightning_meteorologist;
+    const blocked = store.lightning_meteorologist;
     if (blocked) {
       await insertVarmintEvent(db, userId, "lightning_blocked", null, { lightning_row: lightningRow });
     } else {

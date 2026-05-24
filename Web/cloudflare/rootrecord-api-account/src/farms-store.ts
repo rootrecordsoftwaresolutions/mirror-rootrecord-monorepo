@@ -10,6 +10,8 @@ export const LIGHTNING_ROD_COST = 1_000_000;
 export const CYPRUS_WIND_BLOCK_CHANCE = 0.88;
 
 export type ProtectionKind = "gopher" | "mice" | "rabbit" | "birds";
+export type StoreToggleKind = ProtectionKind | "lightning_meteorologist" | "cypress_trees";
+export type FarmhandToolKind = StoreToggleKind;
 
 export type FarmsProtections = {
   gopher: boolean;
@@ -18,14 +20,26 @@ export type FarmsProtections = {
   birds: boolean;
 };
 
+export type FarmsFarmhandTools = Record<FarmhandToolKind, boolean>;
+
 export type FarmsStoreData = {
   protections: FarmsProtections;
+  farmhand_tools: FarmsFarmhandTools;
   lightning_rod_owned: boolean;
   lightning_meteorologist: boolean;
   cypress_trees: boolean;
   root_clusters: boolean[];
   milestones_seen?: string[];
   last_safety_nudge_at?: { classic?: string; storm?: string };
+};
+
+export const FARMHAND_TOOL_COST: Record<FarmhandToolKind, number> = {
+  gopher: 1_000_000,
+  mice: 1_000_000,
+  rabbit: 1_000_000,
+  birds: 1_000_000,
+  lightning_meteorologist: LIGHTNING_ROD_COST,
+  cypress_trees: 1_000_000,
 };
 
 const PROTECTION_FEE_RATE: Record<ProtectionKind, number> = {
@@ -38,6 +52,14 @@ const PROTECTION_FEE_RATE: Record<ProtectionKind, number> = {
 export function defaultFarmsStore(): FarmsStoreData {
   return {
     protections: { gopher: false, mice: false, rabbit: false, birds: false },
+    farmhand_tools: {
+      gopher: false,
+      mice: false,
+      rabbit: false,
+      birds: false,
+      lightning_meteorologist: false,
+      cypress_trees: false,
+    },
     lightning_rod_owned: false,
     lightning_meteorologist: false,
     cypress_trees: false,
@@ -51,16 +73,29 @@ export function parseFarmsStore(raw: string | null | undefined): FarmsStoreData 
   try {
     const o = JSON.parse(raw) as Record<string, unknown>;
     const p = (o.protections && typeof o.protections === "object" ? o.protections : o) as Record<string, unknown>;
+    const t = (o.farmhand_tools && typeof o.farmhand_tools === "object" ? o.farmhand_tools : {}) as Record<string, unknown>;
+    const protections = {
+      gopher: Boolean(p.gopher),
+      mice: Boolean(p.mice),
+      rabbit: Boolean(p.rabbit),
+      birds: Boolean(p.birds),
+    };
+    const lightningRodOwned = Boolean(o.lightning_rod_owned ?? o.lightning_rod);
+    const lightningMeteorologist = Boolean(o.lightning_meteorologist);
+    const cypressTrees = Boolean(o.cypress_trees);
     return {
-      protections: {
-        gopher: Boolean(p.gopher),
-        mice: Boolean(p.mice),
-        rabbit: Boolean(p.rabbit),
-        birds: Boolean(p.birds),
+      protections,
+      farmhand_tools: {
+        gopher: Boolean(t.gopher) || protections.gopher,
+        mice: Boolean(t.mice) || protections.mice,
+        rabbit: Boolean(t.rabbit) || protections.rabbit,
+        birds: Boolean(t.birds) || protections.birds,
+        lightning_meteorologist: Boolean(t.lightning_meteorologist) || lightningRodOwned || lightningMeteorologist,
+        cypress_trees: Boolean(t.cypress_trees) || cypressTrees,
       },
-      lightning_rod_owned: Boolean(o.lightning_rod_owned ?? o.lightning_rod),
-      lightning_meteorologist: Boolean(o.lightning_meteorologist),
-      cypress_trees: Boolean(o.cypress_trees),
+      lightning_rod_owned: lightningRodOwned,
+      lightning_meteorologist: lightningMeteorologist,
+      cypress_trees: cypressTrees,
       root_clusters: Array.isArray(o.root_clusters) ? (o.root_clusters as unknown[]).map(Boolean) : [],
       milestones_seen: Array.isArray(o.milestones_seen)
         ? (o.milestones_seen as unknown[]).map((x) => String(x)).filter(Boolean)
@@ -73,6 +108,23 @@ export function parseFarmsStore(raw: string | null | undefined): FarmsStoreData 
   } catch {
     return base;
   }
+}
+
+export function storeHasFarmhandTool(store: FarmsStoreData, kind: FarmhandToolKind): boolean {
+  const tools = store.farmhand_tools ?? defaultFarmsStore().farmhand_tools;
+  if (kind === "lightning_meteorologist") return Boolean(store.lightning_rod_owned || tools.lightning_meteorologist);
+  return Boolean(tools[kind]);
+}
+
+export function farmhandToolPurchaseKind(kind: string): FarmhandToolKind | null {
+  const clean = String(kind || "").trim();
+  if (clean === "buy_gopher_tool") return "gopher";
+  if (clean === "buy_mice_tool") return "mice";
+  if (clean === "buy_rabbit_tool") return "rabbit";
+  if (clean === "buy_birds_tool") return "birds";
+  if (clean === "buy_lightning_rod") return "lightning_meteorologist";
+  if (clean === "buy_cypress_tool") return "cypress_trees";
+  return null;
 }
 
 export function rootClusterIncomeMultiplier(store: FarmsStoreData): number {

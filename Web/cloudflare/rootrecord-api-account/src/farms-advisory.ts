@@ -48,8 +48,8 @@ function classicSafetiesOff(store: FarmsStoreData): string[] {
 
 function stormSafetiesOff(store: FarmsStoreData): string[] {
   const missing: string[] = [];
-  if (!store.lightning_rod_owned && !store.lightning_meteorologist) {
-    missing.push("a lightning rod or lightning meteorologist");
+  if (!store.lightning_meteorologist) {
+    missing.push("lightning meteorologist with a lightning rod");
   }
   if (!store.cypress_trees) missing.push("cypress windbreak");
   return missing;
@@ -129,7 +129,7 @@ export async function syncFarmAdvisories(
         db,
         userId,
         "advisory_safety_classic",
-        `Your unlocked field is exposed. Turn on ${missing.join(", ")} under Farmhands (−1–10% income each).`,
+        `Your unlocked field is exposed. Buy the needed tool, then turn on ${missing.join(", ")} under Farmhands (−1–10% income each).`,
       );
       nudge.classic = new Date().toISOString();
       nudgeChanged = true;
@@ -143,7 +143,7 @@ export async function syncFarmAdvisories(
         db,
         userId,
         "advisory_safety_storm",
-        `Storm hazards are active. Consider ${missing.join(" and ")} on the Farmhands tab.`,
+        `Storm hazards are active. Consider buying the needed tool and turning on ${missing.join(" and ")} on the Farmhands tab.`,
       );
       nudge.storm = new Date().toISOString();
       nudgeChanged = true;

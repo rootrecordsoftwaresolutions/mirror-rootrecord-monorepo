@@ -150,6 +150,51 @@ export async function loadKeypairForAccount(env: InternalWalletEnv, accountId: s
   return null;
 }
 
+/** Operator-only helper: import a known signer as an account's custodial wallet row. */
+export async function setCustodialWalletForAccountFromSecretKey(
+  env: InternalWalletEnv,
+  accountId: string,
+  secretKeyB58: string,
+  expectedPubkey?: string,
+): Promise<{ ok: true; pubkey: string } | { ok: false; detail: string }> {
+  const aid = String(accountId || "").trim();
+  if (!aid) return { ok: false, detail: "account_id is required." };
+  const aesKey = await importAesKeyFromEnv(env);
+  if (!aesKey) return { ok: false, detail: "INTERNAL_WALLET_ENC_KEY_B64 is missing or invalid." };
+
+  let kp: Keypair;
+  try {
+    kp = Keypair.fromSecretKey(bs58.decode(String(secretKeyB58 || "").trim()));
+  } catch {
+    return { ok: false, detail: "Treasury secret key is invalid." };
+  }
+
+  const pubkey = kp.publicKey.toBase58();
+  const expected = String(expectedPubkey || "").trim();
+  if (expected && pubkey !== expected) {
+    return { ok: false, detail: "Treasury secret key does not match the expected public address." };
+  }
+
+  const enc = await aesGcmEncrypt(aesKey, kp.secretKey);
+  try {
+    await env.DB.prepare(
+      `INSERT INTO internal_solana_wallets (account_id, pubkey, privkey_pkcs8_enc, privkey_iv)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(account_id) DO UPDATE SET
+         pubkey = excluded.pubkey,
+         privkey_pkcs8_enc = excluded.privkey_pkcs8_enc,
+         privkey_iv = excluded.privkey_iv`,
+    )
+      .bind(aid, pubkey, enc.ct, enc.iv)
+      .run();
+    await env.DB.prepare("INSERT OR IGNORE INTO rr_earn_custodial_state (account_id) VALUES (?)").bind(aid).run();
+  } catch (e) {
+    const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
+    return { ok: false, detail: msg || "Could not save custodial wallet." };
+  }
+  return { ok: true, pubkey };
+}
+
 export type ProvisionCustodialOptions = { suppressDiscord?: boolean };
 
 /** Create custodial keypair if missing; safe to call on signup (no-op if disabled or exists). */

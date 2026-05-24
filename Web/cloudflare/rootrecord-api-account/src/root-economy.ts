@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { summarizeFarmsPlotsJson } from "./farms-catalog";
+import { summarizeFarmsPlots, summarizeFarmsPlotsJson } from "./farms-catalog";
+import { parseTierPlotsJson, VEGETABLE_COUNT } from "./farms-orchards";
 import {
   loadEconomyDailySeries,
   readCirculationTotals,
@@ -83,6 +84,7 @@ type LeaderRow = {
   discord_username: string | null;
   discord_global_name: string | null;
   plots_json: string | null;
+  vegetables_json: string | null;
 };
 
 export type EconomyLeaderEntry = {
@@ -107,7 +109,8 @@ const LEADERBOARD_SQL = `SELECT b.balance AS balance,
               la.public_display_name AS public_display_name,
               dal.discord_username AS discord_username,
               dal.discord_global_name AS discord_global_name,
-              fp.plots_json AS plots_json
+              fp.plots_json AS plots_json,
+              fp.vegetables_json AS vegetables_json
        FROM rr_earn_balance b
        INNER JOIN license_accounts la ON b.user_id = ('user:' || lower(la.email))
        INNER JOIN internal_solana_wallets iw ON iw.account_id = la.id
@@ -135,6 +138,16 @@ export function leaderboardEntryLabel(e: EconomyLeaderEntry): string {
   return e.wallet_short;
 }
 
+function summarizeCombinedFarmsProgress(rootPlotsJson: string | null, vegetablesJson: string | null) {
+  const roots = summarizeFarmsPlotsJson(rootPlotsJson);
+  const vegetables = summarizeFarmsPlots(parseTierPlotsJson(vegetablesJson, VEGETABLE_COUNT));
+  return {
+    plots_unlocked: roots.plots_unlocked + vegetables.plots_unlocked,
+    rows_accumulated: roots.rows_accumulated + vegetables.rows_accumulated,
+    rows_active: roots.rows_active + vegetables.rows_active,
+  };
+}
+
 export async function loadEconomyLeaderboardData(db: D1Database): Promise<EconomyLeaderboardData> {
   const [rows, totals] = await Promise.all([
     db.prepare(LEADERBOARD_SQL).all<LeaderRow>(),
@@ -147,7 +160,7 @@ export async function loadEconomyLeaderboardData(db: D1Database): Promise<Econom
     const public_display_name = r.public_display_name?.trim() || null;
     const discord_username = r.discord_username?.trim() || null;
     const discord_global_name = r.discord_global_name?.trim() || null;
-    const farms = summarizeFarmsPlotsJson(r.plots_json);
+    const farms = summarizeCombinedFarmsProgress(r.plots_json, r.vegetables_json);
     return {
       rank: i + 1,
       balance,
@@ -240,7 +253,7 @@ export function buildEconomyDiscordMessage(data: EconomyLeaderboardData): string
     for (const e of data.entries.slice(0, 15)) {
       const farm =
         e.farms_plots_unlocked > 0
-          ? ` · ${e.farms_plots_unlocked} plot${e.farms_plots_unlocked === 1 ? "" : "s"}, ${e.farms_rows_accumulated} rows`
+          ? ` · ${e.farms_plots_unlocked} total plot${e.farms_plots_unlocked === 1 ? "" : "s"}, ${e.farms_rows_accumulated} total rows`
           : "";
       lines.push(`**${e.rank}.** ${leaderboardEntryLabel(e)} — **${formatEconomyUnits(e.balance)}**${farm}`);
     }

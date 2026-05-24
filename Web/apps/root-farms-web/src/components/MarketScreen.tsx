@@ -11,9 +11,11 @@ import {
   postMarketHiLoGuess,
   postMarketHiLoStart,
   postMarketDonation,
+  postMarketMonthlyPass,
   postMarketRouletteSpin,
   postMarketWheelSpin,
   type DiceMarketRequest,
+  type MarketLimit,
   type MarketHiLoResponse,
   type MarketRouletteSpinResponse,
 } from "../lib/farmsApi";
@@ -22,8 +24,9 @@ const ATOMIC_PER_ROOT = 100_000_000;
 const MIN_DICE_STAKE = 100_000;
 const MAX_DICE_STAKE = 100_000_000;
 const MARKET_GAME_MIN_STAKE = 100_000;
-const MARKET_GAME_MAX_STAKE = 100_000_000;
+const MARKET_GAME_MAX_STAKE = 10_000_000;
 const WHEEL_SPIN_COST = 100_000;
+const MONTHLY_PASS_COST = 150 * ATOMIC_PER_ROOT;
 const ROULETTE_NUMBERS = Array.from({ length: 37 }, (_, i) => i);
 const ROULETTE_RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const ROULETTE_TABLE_ROWS = [
@@ -87,6 +90,14 @@ function resultLabel(req: DiceMarketRequest): string {
   return req.winner_label ? `${req.winner_label} won` : "Resolved";
 }
 
+function marketLimitText(limit?: MarketLimit): string {
+  if (!limit) return "Wheel, roulette, and Hi-Lo: max bet 0.1 ROOTS, max payout 1 ROOT, rolling 24-hour wins/losses limit 1 ROOT.";
+  const base = `${formatRu(limit.used)} of ${formatRu(limit.limit)} rolling wins/losses used.`;
+  if (!limit.locked) return `${base} ${formatRu(limit.remaining)} left before a 24-hour Well lock.`;
+  const until = limit.locked_until ? ` until ${formatDate(limit.locked_until)}` : "";
+  return `${base} The Well is locked${until}.`;
+}
+
 export function MarketScreen() {
   const { rootLevel, balanceReady, spendableBalance, refreshServerBalance, handleInsufficientFunds } = useGame();
   const [stakeInput, setStakeInput] = useState("0.001");
@@ -97,12 +108,13 @@ export function MarketScreen() {
   const [rouletteNote, setRouletteNote] = useState("");
   const [rouletteResult, setRouletteResult] = useState<MarketRouletteSpinResponse | null>(null);
   const [hiLoStakeInput, setHiLoStakeInput] = useState("0.001");
-  const [hiLoGuess, setHiLoGuess] = useState<"high" | "low">("high");
   const [hiLoNote, setHiLoNote] = useState("");
   const [hiLoRound, setHiLoRound] = useState<MarketHiLoResponse | null>(null);
   const [hiLoLastDraw, setHiLoLastDraw] = useState<MarketHiLoResponse | null>(null);
   const [requests, setRequests] = useState<DiceMarketRequest[]>([]);
+  const [marketLimit, setMarketLimit] = useState<MarketLimit | undefined>();
   const [note, setNote] = useState("");
+  const [memberPassNote, setMemberPassNote] = useState("");
   const [wheelNote, setWheelNote] = useState("");
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wheelPrize, setWheelPrize] = useState("");
@@ -126,6 +138,7 @@ export function MarketScreen() {
     const hiLoState = await fetchMarketHiLoState();
     if (data) {
       setRequests(data.requests);
+      setMarketLimit(data.market_limit);
       setNote(data.detail || "");
     } else {
       setNote("Could not load The Well. Try again after reconnecting.");
@@ -134,6 +147,7 @@ export function MarketScreen() {
       setHiLoRound(hiLoState);
       setHiLoNote(hiLoState.detail || "Active Hi-Lo round restored.");
     }
+    if (hiLoState?.market_limit) setMarketLimit(hiLoState.market_limit);
     setLoading(false);
   };
 
@@ -147,6 +161,7 @@ export function MarketScreen() {
       return;
     }
     setRequests(data.requests);
+    setMarketLimit(data.market_limit);
     setNote(data.detail || "The Well updated.");
     await refreshServerBalance();
     if (data.detail?.toLowerCase().includes("insufficient")) {
@@ -198,6 +213,26 @@ export function MarketScreen() {
     }
   };
 
+  const buyMonthlyPass = async () => {
+    if (busy) return;
+    const ok = window.confirm(`Convert ${formatRu(MONTHLY_PASS_COST)} into a 30-day monthly membership pass?`);
+    if (!ok) return;
+    setBusy(true);
+    setMemberPassNote("");
+    try {
+      const result = await postMarketMonthlyPass();
+      if (!result) {
+        setMemberPassNote("Monthly pass conversion failed. Try again after reconnecting.");
+        return;
+      }
+      setMemberPassNote(result.detail || "Monthly membership pass active.");
+      await refreshServerBalance();
+      if (result.detail?.toLowerCase().includes("need ")) await handleInsufficientFunds();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const spinWheel = async () => {
     if (busy || wheelSpinning) return;
     setBusy(true);
@@ -211,10 +246,12 @@ export function MarketScreen() {
         return;
       }
       if (result.detail) {
+        setMarketLimit(result.market_limit);
         setWheelNote(result.detail);
         if (result.detail.toLowerCase().includes("insufficient")) await handleInsufficientFunds();
         return;
       }
+      setMarketLimit(result.market_limit);
       const targetRotation = 360 - (result.visual_index * 360) / WHEEL_SEGMENTS.length;
       setWheelRotation((current) => current + 1440 + targetRotation);
       setWheelPrize(result.label || formatRu(result.prize));
@@ -242,14 +279,18 @@ export function MarketScreen() {
         return;
       }
       if (result.detail) {
+        setMarketLimit(result.market_limit);
         setRouletteNote(result.detail);
         if (result.detail.toLowerCase().includes("insufficient")) await handleInsufficientFunds();
         return;
       }
       const outcome = `${result.outcome_number} ${result.outcome_color}`;
       setRouletteResult(result);
+      setMarketLimit(result.market_limit);
       setRouletteNote(
-        `${result.won ? "Won" : "Lost"} on ${outcome}. Payout ${formatRu(result.payout)} · net ${formatSignedRu(result.net)}`,
+        `${result.won ? "Won" : "Lost"} on ${outcome}. Payout ${formatRu(result.payout)}${
+          result.payout_capped ? " (1 ROOT cap)" : ""
+        } · net ${formatSignedRu(result.net)}`,
       );
       await refreshServerBalance();
     } finally {
@@ -272,6 +313,7 @@ export function MarketScreen() {
         setHiLoNote(result.detail);
         if (result.detail.toLowerCase().includes("insufficient")) await handleInsufficientFunds();
       }
+      setMarketLimit(result.market_limit);
       setHiLoRound(result.active ? result : null);
       await refreshServerBalance();
     } finally {
@@ -279,18 +321,19 @@ export function MarketScreen() {
     }
   };
 
-  const guessHiLo = async () => {
+  const guessHiLo = async (guess: "high" | "low") => {
     if (!hiLoRound?.active || busy) return;
     setBusy(true);
     setHiLoNote("");
     try {
-      const result = await postMarketHiLoGuess(hiLoGuess);
+      const result = await postMarketHiLoGuess(guess);
       if (!result) {
         setHiLoNote("Hi-Lo draw failed. Try again after reconnecting.");
         return;
       }
       setHiLoLastDraw(result);
       setHiLoRound(result.active ? result : null);
+      setMarketLimit(result.market_limit);
       const outcome = result.tie ? "Push" : result.won ? "Correct" : "Bust";
       const next = result.next_label || result.current_label || "?";
       const bank = result.bank != null ? formatRu(result.bank) : formatRu(0);
@@ -314,6 +357,7 @@ export function MarketScreen() {
       }
       setHiLoLastDraw(result);
       setHiLoRound(null);
+      setMarketLimit(result.market_limit);
       const payout = result.payout ?? result.bank ?? 0;
       setHiLoNote(`Cashed out ${formatRu(payout)}${result.net != null ? ` · net ${formatSignedRu(result.net)}` : ""}`);
       await refreshServerBalance();
@@ -330,13 +374,18 @@ export function MarketScreen() {
           Gather around The Well to post ROOTS dice requests, spin the wheel, play roulette, try Hi-Lo, or donate to
           other farmers.
         </p>
+        <p className="market-note market-note--warn">
+          Game disclaimer: dice is player-to-player and excluded from house-game limits. Wheel, roulette, and Hi-Lo
+          cap bets at 0.1 ROOTS, cap payouts at 1 ROOT, and lock for 24 hours after a rolling 1 ROOT in wins or losses.
+          {" "}{marketLimitText(marketLimit)}
+        </p>
       </header>
 
       <section className="market-panel market-panel--dice">
         <div className="market-panel-head">
           <div>
             <h2>Dice requests</h2>
-            <p>Minimum stake 0.001 ROOTS. Maximum stake 1 ROOTS.</p>
+            <p>Player-to-player dice. Minimum stake 0.001 ROOTS. Maximum stake 1 ROOTS.</p>
           </div>
           <div className="market-balance">
             <span>Available</span>
@@ -402,13 +451,13 @@ export function MarketScreen() {
         </div>
       </section>
 
-      <div className="market-game-grid">
-        <section className="market-panel market-panel--roulette">
+      <section className="market-panel market-panel--roulette">
           <div className="market-panel-head">
             <div>
               <h2>Roulette table</h2>
               <p>
-                Bet 0.001 to 1 ROOTS. Red/black, odd/even, and low/high pay 2x. Zero and straight numbers pay 36x.
+                Bet 0.001 to 0.1 ROOTS. Red/black, odd/even, and low/high pay 2x. Zero and straight numbers pay 36x
+                before the 1 ROOT payout cap.
               </p>
             </div>
             <span className="market-lock-badge">0-36</span>
@@ -485,17 +534,17 @@ export function MarketScreen() {
               {busy ? "Spinning..." : `Play roulette (${rouletteStakeValid ? formatRu(rouletteStakeAtomic) : "invalid"})`}
             </button>
           </div>
-          {!rouletteStakeValid ? <p className="market-note market-note--warn">Enter 0.001 to 1 ROOTS.</p> : null}
+          {!rouletteStakeValid ? <p className="market-note market-note--warn">Enter 0.001 to 0.1 ROOTS.</p> : null}
           {rouletteNote ? <p className="market-result">{rouletteNote}</p> : null}
-        </section>
+      </section>
 
-        <section className="market-panel market-panel--hilo">
+      <section className="market-panel market-panel--hilo">
           <div className="market-panel-head">
             <div>
               <h2>Hi-Lo</h2>
               <p>
                 Start with one real card face up. Each correct guess grows the round bank by 1.95x. Cash out anytime,
-                but a wrong guess loses the bank.
+                but a wrong guess loses the bank. Round bank maxes at 1 ROOT.
               </p>
             </div>
             <span className="market-lock-badge">A-K</span>
@@ -520,7 +569,7 @@ export function MarketScreen() {
               {hiLoRound?.rounds ? <small>{hiLoRound.rounds} correct</small> : <small>Draw first card to start</small>}
             </div>
           </div>
-          <div className="dice-create-row">
+          <div className={`dice-create-row${hiLoRound?.active ? " hilo-action-row" : ""}`}>
             {!hiLoRound?.active ? (
               <label className="dice-stake-field">
                 Stake
@@ -532,17 +581,13 @@ export function MarketScreen() {
                 />
               </label>
             ) : null}
-            <label className="dice-stake-field">
-              Next guess
-              <select value={hiLoGuess} onChange={(e) => setHiLoGuess(e.target.value === "low" ? "low" : "high")}>
-                <option value="high">Higher</option>
-                <option value="low">Lower</option>
-              </select>
-            </label>
             {hiLoRound?.active ? (
               <>
-                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void guessHiLo()}>
-                  {busy ? "Drawing..." : `Draw ${hiLoGuess === "high" ? "higher" : "lower"}`}
+                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void guessHiLo("high")}>
+                  {busy ? "Drawing..." : "Higher"}
+                </button>
+                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void guessHiLo("low")}>
+                  {busy ? "Drawing..." : "Lower"}
                 </button>
                 <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void cashOutHiLo()}>
                   Cash out {formatRu(hiLoRound.bank)}
@@ -554,10 +599,9 @@ export function MarketScreen() {
               </button>
             )}
           </div>
-          {!hiLoRound?.active && !hiLoStakeValid ? <p className="market-note market-note--warn">Enter 0.001 to 1 ROOTS.</p> : null}
+          {!hiLoRound?.active && !hiLoStakeValid ? <p className="market-note market-note--warn">Enter 0.001 to 0.1 ROOTS.</p> : null}
           {hiLoNote ? <p className="market-result">{hiLoNote}</p> : null}
-        </section>
-      </div>
+      </section>
 
       <section className="market-panel market-panel--donate">
         <div className="market-panel-head">
@@ -583,6 +627,28 @@ export function MarketScreen() {
             {busy ? "Donating..." : `Donate to everyone (${donationValid ? formatRu(donationAtomic) : "invalid"})`}
           </button>
         </div>
+      </section>
+
+      <section className="market-panel market-panel--membership">
+        <div className="market-panel-head">
+          <div>
+            <h2>Monthly membership pass</h2>
+            <p>
+              Convert {formatRu(MONTHLY_PASS_COST)} into a 30-day RootRecord monthly membership pass. This activates
+              the Monthly Member Tree so players can earn the member perk through gameplay too.
+            </p>
+          </div>
+          <span className="market-lock-badge">Member perk</span>
+        </div>
+        <div className="dice-create-row">
+          <a className="btn btn-ghost" href="https://rootrecord.info/billing.html">
+            Become a member
+          </a>
+          <button type="button" className="btn btn-primary" disabled={busy || !balanceReady} onClick={() => void buyMonthlyPass()}>
+            {busy ? "Converting..." : `Convert ${formatRu(MONTHLY_PASS_COST)}`}
+          </button>
+        </div>
+        {memberPassNote ? <p className="market-result">{memberPassNote}</p> : null}
       </section>
 
       <section className="market-section">

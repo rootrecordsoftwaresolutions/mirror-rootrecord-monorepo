@@ -4,6 +4,7 @@ export type RootsMintStatus = {
   ok: true;
   roots_mint: string;
   internal_balance_atomic: number;
+  custodial_roots_atomic: number;
   custodial_wallet: string;
   custodial_sol_lamports: number;
   minimum_sol_lamports: number;
@@ -44,6 +45,7 @@ export async function fetchRootsMintStatus(): Promise<RootsMintStatus | { ok: fa
       ok: true,
       roots_mint: String(data.roots_mint || ""),
       internal_balance_atomic: Math.max(0, Math.floor(Number(data.internal_balance_atomic) || 0)),
+      custodial_roots_atomic: Math.max(0, Math.floor(Number(data.custodial_roots_atomic) || 0)),
       custodial_wallet: String(data.custodial_wallet || ""),
       custodial_sol_lamports: Math.max(0, Math.floor(Number(data.custodial_sol_lamports) || 0)),
       minimum_sol_lamports: Math.max(0, Math.floor(Number(data.minimum_sol_lamports) || 0)),

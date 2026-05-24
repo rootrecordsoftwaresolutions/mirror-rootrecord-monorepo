@@ -9,7 +9,7 @@ export function GuideScreen() {
       </header>
 
       <p className="guide-disclaimer" role="note">
-        <strong>Please note:</strong> Game rules, income rates, costs, varmint behavior, and other details may change at any time without notice. What you read here describes how the game works today, not a permanent promise.
+        <strong>Please note:</strong> Game rules, income rates, costs, varmint behavior, Well limits, and other details may change at any time without notice. Dice is player-to-player and excluded from house-game limits. Wheel, roulette, and Hi-Lo currently cap bets at 0.1 ROOTS, cap payouts at 1 ROOT, and lock game play for 24 hours after 1 ROOT of rolling wins or losses in a 24-hour window.
       </p>
 
       <article className="guide-section">
@@ -61,7 +61,7 @@ export function GuideScreen() {
       <article className="guide-section">
         <h2>Farmhands (field protection)</h2>
         <p>
-          The <strong>Farmhands</strong> tab is where you hire protection for your fields. This is not a shop for seeds or gear — it is a set of optional plans you turn on or off:
+          The <strong>Farmhands</strong> tab is where you buy each helper&apos;s tool, then hire protection for your fields:
         </p>
         <ul className="guide-list">
           <li>
@@ -78,7 +78,7 @@ export function GuideScreen() {
           </li>
         </ul>
         <p>
-          While a plan is <strong>on</strong>, your farm&apos;s <strong>income rate</strong> is reduced by that plan&apos;s percentage. This is not taken from your spendable balance — you simply earn slightly slower. You can toggle plans anytime when signed in.
+          The tool is a one-time purchase from your spendable balance. While a helper is <strong>on</strong>, your farm&apos;s <strong>income rate</strong> is reduced by that helper&apos;s percentage. You can toggle hired helpers anytime when signed in.
         </p>
         <p>
           Farmhand protection only counts as active if you have checked into Root Farms recently. If you have not opened Root Farms within about 48 hours, farmhands stop protecting until you return.
@@ -86,9 +86,9 @@ export function GuideScreen() {
       </article>
 
       <article className="guide-section">
-        <h2>Storms (Ginger and beyond)</h2>
+        <h2>Storm Hazards</h2>
         <p>
-          From <strong>Ginger</strong> with at least two rows, <strong>wind</strong> can wipe a whole crop plot and <strong>lightning</strong> can strike one shared row number across all farms that day. Once storm hazards are active, they can affect the unlocked field, including roots, vegetables, orchards, and cluster trees. Buy a <strong>lightning rod</strong> once, hire a <strong>lightning meteorologist</strong> (−1% income), or plant <strong>cypress windbreaks</strong> (−5% income, strong wind block).
+          <strong>Ginger</strong> with at least two rows unlocks storm hazards. After that, <strong>wind</strong> and <strong>lightning</strong> are whole-field hazards: they can affect roots, vegetables, orchards, or cluster trees, not just Ginger+ plots. Buy the <strong>lightning rod</strong> to hire the <strong>lightning meteorologist</strong> (−1% income), or buy <strong>cypress saplings</strong> to enable the windbreak (−5% income, strong wind block).
         </p>
         <p>
           Varmints, birds, wind, and lightning can also affect orchard, vegetable, and cluster-tree progress as those systems grow. Read the Farmhands notifications after an alert so you know exactly what happened.
@@ -104,7 +104,10 @@ export function GuideScreen() {
           Purchased <strong>Root Cluster Trees</strong> also live in Orchards after you cluster a completed 10-plot root section. Each cluster tree adds +5% total income.
         </p>
         <p>
-          At <strong>farm level 20</strong>, <strong>Vegetable plots</strong> open as a separate tier with their own unlock and row costs. Farm level combines unlocked root and vegetable plots plus row progress. Vegetables are protected when you own the lightning rod and have at least one active farmhand.
+          Member-only trees live in Orchards too. Active monthly members grow a <strong>Monthly Member Tree</strong> for +10% income, while lifetime members grow a <strong>Lifetime Tree</strong> for +25% income.
+        </p>
+        <p>
+          At <strong>farm level 20</strong>, <strong>Vegetable plots</strong> open as a separate tier with their own unlock and row costs. Farm level combines unlocked root and vegetable plots plus row progress. Vegetables are protected when you own the lightning meteorologist&apos;s rod and have at least one active farmhand.
         </p>
       </article>
 
@@ -115,23 +118,26 @@ export function GuideScreen() {
         </p>
         <ul className="guide-list">
           <li>
-            <strong>Dice requests</strong> — post a ROOTS stake for another farmer to join. Higher D6 roll wins the escrowed stakes; ties refund both players.
+            <strong>Dice requests</strong> — post a ROOTS stake up to 1 ROOT for another farmer to join. Higher D6 roll wins the escrowed stakes; ties refund both players. Dice is player-to-player, so it does not count toward the house-game rolling lock.
           </li>
           <li>
             <strong>Spin the wheel</strong> — costs 0.001 ROOTS per spin, has 100 visual pegs, and includes small prizes plus a rare 1 ROOT jackpot.
           </li>
           <li>
-            <strong>Roulette</strong> — bet 0.001 to 1 ROOTS on red/black, odd/even, low/high, zero, or a straight number.
+            <strong>Roulette</strong> — bet 0.001 to 0.1 ROOTS on red/black, odd/even, low/high, zero, or a straight number. Payouts are capped at 1 ROOT.
           </li>
           <li>
-            <strong>Hi-Lo</strong> — start with one card face up, guess higher or lower, and keep going to grow the round bank by 1.95x per correct draw. Cash out anytime; a wrong guess loses the active bank.
+            <strong>Hi-Lo</strong> — start with one card face up, guess higher or lower, and keep going to grow the round bank by 1.95x per correct draw. Cash out anytime; a wrong guess loses the active bank, and the round bank maxes at 1 ROOT.
           </li>
           <li>
             <strong>Community donations</strong> — donate ROOTS to The Well and split the amount evenly across other signed-in farmers. Donations are recorded as internal ROOTS transactions and posted to the ROOTS economy webhook.
           </li>
+          <li>
+            <strong>Monthly membership pass</strong> — convert 150 ROOTS into a 30-day monthly membership pass so gameplay can activate the Monthly Member Tree.
+          </li>
         </ul>
         <p>
-          The Well is house-favored over time. Use it for fun, but do not spend ROOTS you need for farm upgrades.
+          The wheel, roulette, and Hi-Lo are house-favored over time. Use them for fun, but do not spend ROOTS you need for farm upgrades. Across those house games, total rolling wins or losses of 1 ROOT in 24 hours locks Well games for 24 hours.
         </p>
       </article>
 
@@ -187,7 +193,7 @@ export function GuideScreen() {
           <li>Balance row upgrades on your best plots with unlocking new crops.</li>
           <li>Cluster completed root sections to move them into Orchards and gain +5% total income per cluster tree.</li>
           <li>Open the Volcano, Business, and Weather apps once per day if you want the matching +10% app tree bonuses.</li>
-          <li>Turn on farmhand protection when you cannot check the game often — weigh the income-rate reduction against varmint risk.</li>
+          <li>Buy farmhand tools, then turn on protection when you cannot check the game often — weigh the income-rate reduction against hazard risk.</li>
           <li>Read Farmhands notifications after an alert so you know whether an attack was blocked.</li>
         </ul>
       </article>

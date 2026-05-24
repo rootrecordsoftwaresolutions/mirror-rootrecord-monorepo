@@ -9,8 +9,10 @@ import {
   provisionCustodialWalletIfMissing,
   type InternalWalletEnv,
 } from "./solana-internal-wallet";
+import { readCustodialTokenSlots, syncCustodialTokenSlotsFromRpc } from "./custodial-wallet-token-slots";
 
 const ROOTS_MINT_BASE58 = "8hwxLN1Q4Yr8xFErErULCqNvcF1cMwGjpRXPz6DAH7gM";
+const ROOTS_DECIMALS = 8;
 const MIN_CUSTODIAL_SOL_LAMPORTS = 10_000_000;
 const ACTIVE_STATUSES = ["pending", "reserved", "submitted"];
 
@@ -26,6 +28,7 @@ export type RootsMintBalanceEnv = AuthEnv &
     RR_PUSH_ADMIN_SECRET?: string;
     ROOTRECORD_SOLANA_TX_URL?: string;
     SOLANA_RPC_URL?: string;
+    CUSTODIAL_RPC_REFRESH_BUDGET_MS?: string;
   };
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -59,6 +62,20 @@ async function getEarnBalance(db: D1Database, userId: string): Promise<number> {
     .bind(userId)
     .first<{ balance: number }>();
   return Math.max(0, Math.floor(Number(row?.balance) || 0));
+}
+
+function safeAtomicNumber(rawValue: string, decimals: number, targetDecimals: number): number {
+  try {
+    const raw = BigInt(String(rawValue || "0").split(".")[0] || "0");
+    const sourceDecimals = Math.max(0, Math.floor(Number(decimals) || 0));
+    let normalized = raw;
+    if (sourceDecimals > targetDecimals) normalized = raw / 10n ** BigInt(sourceDecimals - targetDecimals);
+    if (sourceDecimals < targetDecimals) normalized = raw * 10n ** BigInt(targetDecimals - sourceDecimals);
+    const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+    return Number(normalized > maxSafe ? maxSafe : normalized);
+  } catch {
+    return 0;
+  }
 }
 
 async function markMintRequest(
@@ -117,26 +134,48 @@ function solUi(lamports: number): string {
   });
 }
 
-async function readMintStatus(env: RootsMintBalanceEnv, accountId: string, email: string) {
+async function readCustodialTreasuryBalances(
+  env: RootsMintBalanceEnv,
+  accountId: string,
+): Promise<{ rootsAtomic: number; solLamports: number; rpcRefreshed: boolean }> {
+  const budgetMs = Math.max(800, Math.min(8_000, Math.floor(Number(env.CUSTODIAL_RPC_REFRESH_BUDGET_MS) || 3_500)));
+  const refresh = await syncCustodialTokenSlotsFromRpc(env, accountId, budgetMs).catch(() => ({ ok: false, slots_written: 0 }));
+  const slots = await readCustodialTokenSlots(env.DB, accountId, 200).catch(() => []);
+  const rootsSlot = slots.find((s) => String(s.mint_base58 || "").trim() === ROOTS_MINT_BASE58);
+  const solSlot = slots.find((s) => String(s.mint_base58 || "").trim().toLowerCase() === "native");
+  return {
+    rootsAtomic: rootsSlot ? safeAtomicNumber(rootsSlot.amount_raw, rootsSlot.decimals, ROOTS_DECIMALS) : 0,
+    solLamports: solSlot ? safeAtomicNumber(solSlot.amount_raw, solSlot.decimals, 9) : 0,
+    rpcRefreshed: refresh.ok === true,
+  };
+}
+
+async function readMintWalletBase(env: RootsMintBalanceEnv, accountId: string, email: string) {
   await provisionCustodialWalletIfMissing(env, accountId, { suppressDiscord: true });
   const custodial = await loadKeypairForAccount(env, accountId);
   if (!custodial) {
     return { ok: false as const, response: json({ ok: false, detail: "No custodial wallet on file or cannot decrypt key." }, 403) };
   }
+  const userId = `user:${email.trim().toLowerCase()}`;
+  const balance = await getEarnBalance(env.DB, userId);
+  return { ok: true as const, custodial, userId, balance };
+}
+
+async function readMintStatus(env: RootsMintBalanceEnv, accountId: string, email: string) {
+  const base = await readMintWalletBase(env, accountId, email);
+  if (!base.ok) return base;
   const picked = await pickConnection(env);
   if (!picked) {
     return { ok: false as const, response: json({ ok: false, detail: "Could not reach Solana RPC. Try again later." }, 503) };
   }
-  const lamports = await picked.connection.getBalance(custodial.publicKey, "confirmed");
-  const userId = `user:${email.trim().toLowerCase()}`;
-  const balance = await getEarnBalance(env.DB, userId);
+  const lamports = await picked.connection.getBalance(base.custodial.publicKey, "confirmed");
   return {
     ok: true as const,
     connection: picked.connection,
     rpcUrl: picked.rpcUrl,
-    custodial,
-    userId,
-    balance,
+    custodial: base.custodial,
+    userId: base.userId,
+    balance: base.balance,
     lamports,
   };
 }
@@ -149,23 +188,28 @@ export async function handleRootsMintBalanceV1(
   const sess = await sessionFromRequest(env, request);
   if (!sess) return json({ ok: false, detail: "Sign in required." }, 401);
 
-  const status = await readMintStatus(env, sess.accountId, sess.email);
-  if (!status.ok) return status.response;
-
   if (method === "GET") {
+    const status = await readMintWalletBase(env, sess.accountId, sess.email);
+    if (!status.ok) return status.response;
+    const balances = await readCustodialTreasuryBalances(env, sess.accountId);
     return json({
       ok: true,
       roots_mint: ROOTS_MINT_BASE58,
       internal_balance_atomic: status.balance,
+      custodial_roots_atomic: balances.rootsAtomic,
       custodial_wallet: status.custodial.publicKey.toBase58(),
-      custodial_sol_lamports: status.lamports,
+      custodial_sol_lamports: balances.solLamports,
       minimum_sol_lamports: MIN_CUSTODIAL_SOL_LAMPORTS,
-      can_mint: status.balance > 0 && status.lamports >= MIN_CUSTODIAL_SOL_LAMPORTS,
-      rpc_url_used: status.rpcUrl.slice(0, 96),
+      can_mint: status.balance > 0 && balances.solLamports >= MIN_CUSTODIAL_SOL_LAMPORTS,
+      rpc_refreshed: balances.rpcRefreshed,
     });
   }
 
   if (method !== "POST") return json({ ok: false, detail: "Method not allowed" }, 405);
+
+  const status = await readMintStatus(env, sess.accountId, sess.email);
+  if (!status.ok) return status.response;
+
   if (status.balance <= 0) return json({ ok: false, detail: "No internal ROOTS balance available to mint." }, 400);
   if (status.lamports < MIN_CUSTODIAL_SOL_LAMPORTS) {
     return json(

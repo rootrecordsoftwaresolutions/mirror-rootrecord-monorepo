@@ -59,6 +59,7 @@ import { discordLinkCallback, discordLinkStart, discordUnlink } from "./discord-
 import { handleDiscordInteractions } from "./discord-root-units";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
+import { handleTreasuryAccountProvisionRoute } from "./treasury-account";
 
 // Weather/forecast/natural-disaster modules removed from this shard.
 // Live only on rootrecord-api-weather + rootrecord-api-kilauea (see ./weather.ts there).
@@ -172,6 +173,9 @@ export interface Env {
   CUSTODIAL_RPC_REFRESH_BUDGET_MS?: string;
   /** Treasury keypair secret key base58 (same encoding as Phantom export). */
   RRTT_TREASURY_SECRET_KEY_B58?: string;
+
+  /** Optional one-time bootstrap password for the internal treasury account. Prefer request body for provisioning. */
+  TREASURY_ACCOUNT_PASSWORD?: string;
 
   /**
    * Dev-only privileged wallet admin API switch.
@@ -1221,6 +1225,10 @@ export async function handleRequest(
   const custodialBackfillRes = await handleCustodialInternalBackfillRoute(request, env, sub, method);
 
   if (custodialBackfillRes) return custodialBackfillRes;
+
+  const treasuryAccountProvisionRes = await handleTreasuryAccountProvisionRoute(request, env, sub, method);
+
+  if (treasuryAccountProvisionRes) return treasuryAccountProvisionRes;
 
   const rrttCronRes = await handleRunRrttCustodialCronRoute(request, env, sub, method);
 

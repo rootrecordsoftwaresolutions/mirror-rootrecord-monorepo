@@ -38,24 +38,29 @@ import {
 } from "./farms-orchards";
 import { syncFarmAdvisories } from "./farms-advisory";
 import { getLightningRowForClient } from "./farms-varmint";
+import { extendProRedeemedUntil, readUserAccountAccessFlags } from "./accounts";
 import {
-  LIGHTNING_ROD_COST,
+  FARMHAND_TOOL_COST,
   computeRootLevel,
+  farmhandToolPurchaseKind,
   parseFarmsStore,
   farmsStoreToJson,
   protectionIncomeMultiplier,
   protectionIncomeReductionPerMinute,
   rootClusterIncomeMultiplier,
+  storeHasFarmhandTool,
   vegetablesProtected,
   vegetablesUnlocked,
+  type FarmhandToolKind,
   type ProtectionKind,
 } from "./farms-store";
 import {
   ackVarmintEvents,
   listPendingVarmintEvents,
 } from "./farms-varmint";
-import { formatRootsAtomicLocale } from "../../shared/roots-units";
+import { ROOTS_ATOMIC_PER_WHOLE, formatRootsAtomicLocale } from "../../shared/roots-units";
 import { isDiscordWebhookUrl, notifySolanaToolsDiscord } from "./discord-solana-notify";
+import { creditTreasuryBalance } from "./treasury-account";
 
 export interface FarmsEnv {
   DB: D1Database;
@@ -69,12 +74,20 @@ const ORCHARD_APP_BONUS_PCT = 10;
 const FARMHAND_CHECKIN_WINDOW_MS = 48 * 60 * 60 * 1000;
 const FARMHAND_CHECKIN_APP_IDS = [FARMS_APP_ID, "root_farms_android"];
 const INSUFFICIENT_FUNDS_REWARDED_AD_BONUS = 100_000; // 0.001 ROOTS
+const DICE_MAX_STAKE = 100_000_000; // 1 ROOT, player-to-player
 const MARKET_MIN_STAKE = 100_000; // 0.001 ROOTS
-const MARKET_MAX_STAKE = 100_000_000; // 1 ROOT
+const MARKET_MAX_STAKE = 10_000_000; // 0.1 ROOTS
+const MARKET_MAX_PAYOUT = 100_000_000; // 1 ROOT
+const MARKET_ACTIVITY_LIMIT = 100_000_000; // 1 ROOT net wins/losses in 24h
+const MARKET_ACTIVITY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MARKET_WHEEL_SPIN_COST = 100_000; // 0.001 ROOTS
+const MARKET_MONTHLY_PASS_COST = 150 * ROOTS_ATOMIC_PER_WHOLE; // 150 ROOTS
+const MARKET_MONTHLY_PASS_DAYS = 30;
+const MEMBER_TREE_MONTHLY_BONUS_PCT = 10;
+const MEMBER_TREE_LIFETIME_BONUS_PCT = 25;
 const HILO_PAYOUT_NUMERATOR = 195;
 const HILO_PAYOUT_DENOMINATOR = 100;
-const HILO_MAX_BANK = 10_000_000_000; // 100 ROOTS
+const HILO_MAX_BANK = MARKET_MAX_PAYOUT;
 
 const MARKET_WHEEL_PRIZES = [
   { label: "0.0001 ROOTS", prize: 10_000, weight: 52_000, visualCount: 52 },
@@ -130,6 +143,21 @@ type OrchardAppBonusStatus = {
     active: boolean;
     bonus_pct: number;
     last_open_at: string | null;
+  }>;
+};
+
+type MembershipBonusStatus = {
+  multiplier: number;
+  bonus_pct: number;
+  monthly_active: boolean;
+  lifetime_active: boolean;
+  pro_redeemed_until: string | null;
+  trees: Array<{
+    key: "monthly_member" | "lifetime_member";
+    name: string;
+    active: boolean;
+    bonus_pct: number;
+    blurb: string;
   }>;
 };
 
@@ -370,6 +398,15 @@ async function creditBalance(db: D1Database, userId: string, units: number, nowI
     .run();
 }
 
+async function creditTreasuryBestEffort(db: D1Database, units: number, nowIso: string, reason: string): Promise<void> {
+  try {
+    await creditTreasuryBalance(db, units, nowIso);
+  } catch (e) {
+    const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
+    console.error("treasury credit failed", reason, Math.max(0, Math.floor(Number(units) || 0)), msg.slice(0, 200));
+  }
+}
+
 function farmerLabel(userId: string | null | undefined): string {
   const clean = String(userId || "").replace(/[^a-z0-9]/gi, "");
   const suffix = clean.slice(-6).toUpperCase() || "ROOTS";
@@ -381,6 +418,37 @@ function emailFromUserId(userId: string): string | null {
   if (!raw.toLowerCase().startsWith("user:")) return null;
   const email = raw.slice(5).trim().toLowerCase();
   return email.includes("@") ? email : null;
+}
+
+async function loadMembershipBonusStatus(db: D1Database, userId: string): Promise<MembershipBonusStatus> {
+  const email = emailFromUserId(userId);
+  const access = email ? await readUserAccountAccessFlags(db, email).catch(() => null) : null;
+  const lifetimeActive = Boolean(access?.life_member);
+  const monthlyActive = !lifetimeActive && Boolean(access?.pro_unlocked);
+  const bonusPct = lifetimeActive ? MEMBER_TREE_LIFETIME_BONUS_PCT : monthlyActive ? MEMBER_TREE_MONTHLY_BONUS_PCT : 0;
+  return {
+    multiplier: 1 + bonusPct / 100,
+    bonus_pct: bonusPct,
+    monthly_active: monthlyActive,
+    lifetime_active: lifetimeActive,
+    pro_redeemed_until: access?.pro_redeemed_until ?? null,
+    trees: [
+      {
+        key: "monthly_member",
+        name: "Monthly Member Tree",
+        active: monthlyActive,
+        bonus_pct: MEMBER_TREE_MONTHLY_BONUS_PCT,
+        blurb: "Active monthly members grow a +10% income tree.",
+      },
+      {
+        key: "lifetime_member",
+        name: "Lifetime Tree",
+        active: lifetimeActive,
+        bonus_pct: MEMBER_TREE_LIFETIME_BONUS_PCT,
+        blurb: "Lifetime members grow a permanent +25% income tree.",
+      },
+    ],
+  };
 }
 
 async function accountIdForUserId(db: D1Database, userId: string): Promise<string | null> {
@@ -554,6 +622,82 @@ function normalizeMarketStake(raw: unknown): number {
   return Number.isFinite(amount) ? amount : 0;
 }
 
+function marketLimitSinceIso(nowMs = Date.now()): string {
+  return new Date(nowMs - MARKET_ACTIVITY_WINDOW_MS).toISOString();
+}
+
+async function marketLimitStatus(db: D1Database, userId: string, nowMs = Date.now()) {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT COALESCE(SUM(abs_units), 0) AS used, MIN(created_at) AS oldest
+         FROM rr_farms_market_activity
+         WHERE user_id = ? AND created_at >= ?`,
+      )
+      .bind(userId, marketLimitSinceIso(nowMs))
+      .first<{ used: number; oldest: string | null }>();
+    const used = Math.max(0, Math.floor(Number(row?.used) || 0));
+    const oldestMs = row?.oldest ? Date.parse(String(row.oldest)) : NaN;
+    const locked = used >= MARKET_ACTIVITY_LIMIT;
+    const lockedUntil =
+      locked && Number.isFinite(oldestMs)
+        ? new Date(oldestMs + MARKET_ACTIVITY_WINDOW_MS).toISOString()
+        : null;
+    return {
+      used,
+      limit: MARKET_ACTIVITY_LIMIT,
+      remaining: Math.max(0, MARKET_ACTIVITY_LIMIT - used),
+      locked,
+      locked_until: lockedUntil,
+    };
+  } catch {
+    return {
+      used: 0,
+      limit: MARKET_ACTIVITY_LIMIT,
+      remaining: MARKET_ACTIVITY_LIMIT,
+      locked: false,
+      locked_until: null,
+    };
+  }
+}
+
+async function marketLockedDetail(db: D1Database, userId: string): Promise<string | null> {
+  const status = await marketLimitStatus(db, userId);
+  if (!status.locked) return null;
+  const until = status.locked_until ? ` until ${new Date(status.locked_until).toLocaleString()}` : " for up to 24 hours";
+  return `The Well is locked${until}. You reached the 1 ROOT rolling 24-hour wins/losses limit.`;
+}
+
+async function recordMarketActivity(
+  db: D1Database,
+  userId: string,
+  game: string,
+  stake: number,
+  payout: number,
+  net: number,
+  nowIso: string,
+): Promise<void> {
+  const absUnits = Math.abs(Math.floor(Number(net) || 0));
+  if (absUnits <= 0) return;
+  await db
+    .prepare(
+      `INSERT INTO rr_farms_market_activity (id, user_id, game, stake, payout, net, abs_units, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      userId,
+      game,
+      Math.max(0, Math.floor(Number(stake) || 0)),
+      Math.max(0, Math.floor(Number(payout) || 0)),
+      Math.floor(Number(net) || 0),
+      absUnits,
+      nowIso,
+    )
+    .run()
+    .catch(() => {});
+}
+
 async function getAppDay(db: D1Database, userId: string, ymd: string): Promise<number> {
   const row = await db
     .prepare("SELECT units_earned FROM rr_earn_app_day WHERE user_id = ? AND app_id = ? AND ymd = ?")
@@ -645,9 +789,10 @@ async function statePayload(
   const vegetables = parseVegetablesProgress(progress.vegetables_json);
   const grossRuPerSec = grossFarmRuPerSec(plots, orchards, vegetables);
   const orchardAppBonus = await loadOrchardAppBonusStatus(db, userId, orchards);
+  const membershipBonus = await loadMembershipBonusStatus(db, userId);
   const farmhandCheckin = await loadFarmhandCheckinStatus(db, userId);
   const incomeMult = protectionIncomeMultiplier(store);
-  const totalIncomeMult = incomeMult * orchardAppBonus.multiplier * rootClusterIncomeMultiplier(store);
+  const totalIncomeMult = incomeMult * orchardAppBonus.multiplier * membershipBonus.multiplier * rootClusterIncomeMultiplier(store);
   const ruPerSec = grossRuPerSec * totalIncomeMult;
   const varmint_events = await listPendingVarmintEvents(db, userId);
   const nowMs = Date.now();
@@ -678,6 +823,7 @@ async function statePayload(
     protection_income_reduction_pct: Math.round((1 - incomeMult) * 1000) / 10,
     protection_fee_per_minute: protectionIncomeReductionPerMinute(grossRuPerSec, store),
     orchard_app_bonus: orchardAppBonus,
+    membership_bonus: membershipBonus,
     varmint_events,
     daily: {
       ymd: utcYmd(),
@@ -720,9 +866,16 @@ async function settleUser(
   const plots0 = mergePlotsForSettle(serverPlots, clientPlots, fromMs, clientNowMs);
   const store = parseFarmsStore(progress.store_json);
   const orchardAppBonus = await loadOrchardAppBonusStatus(db, userId, orchards0, clientNowMs);
-  const incomeMult = protectionIncomeMultiplier(store) * orchardAppBonus.multiplier * rootClusterIncomeMultiplier(store);
+  const membershipBonus = await loadMembershipBonusStatus(db, userId);
+  const protectionMult = protectionIncomeMultiplier(store);
+  const nonProtectionMult = orchardAppBonus.multiplier * membershipBonus.multiplier * rootClusterIncomeMultiplier(store);
+  const incomeMult = protectionMult * nonProtectionMult;
   const settled = settleAllHarvests(plots0, orchards0, vegetables0, fromMs, clientNowMs, incomeMult);
   const rawGranted = settled.granted;
+  const rawProtectionFee =
+    protectionMult < 1
+      ? Math.max(0, settleAllHarvests(plots0, orchards0, vegetables0, fromMs, clientNowMs, nonProtectionMult).granted - rawGranted)
+      : 0;
   const plots1 = settled.plots;
   const orchards1 = settled.orchards;
   const vegetables1 = settled.vegetables;
@@ -746,6 +899,7 @@ async function settleUser(
         orchards: orchards0,
         vegetables: vegetables0,
         orchard_app_bonus: orchardAppBonus,
+        membership_bonus: membershipBonus,
         pending_ru,
         daily_remaining: FARMS_DAILY_CAP > 0 ? dailyLeft : null,
         detail: "No new earnings since your last harvest.",
@@ -754,6 +908,8 @@ async function settleUser(
   }
 
   const granted = FARMS_DAILY_CAP > 0 ? Math.min(rawGranted, dailyLeft) : rawGranted;
+  const protectionFeeCharged =
+    rawProtectionFee > 0 && rawGranted > 0 && granted > 0 ? Math.floor(rawProtectionFee * (granted / rawGranted)) : 0;
 
   if (granted <= 0 && rawGranted > 0) {
     const pending_ru = pendingAllRu(plots0, orchards0, vegetables0, progress.last_settled_ms, clientNowMs, incomeMult);
@@ -772,6 +928,7 @@ async function settleUser(
         orchards: orchards0,
         vegetables: vegetables0,
         orchard_app_bonus: orchardAppBonus,
+        membership_bonus: membershipBonus,
         pending_ru,
         daily_remaining: 0,
         detail: `Daily farms earning cap reached (${formatRootsAtomicLocale(FARMS_DAILY_CAP)} ROOTS per day).`,
@@ -805,6 +962,9 @@ async function settleUser(
   ];
   await db.batch(stmts);
   if (granted > 0) await incAppTotals(db, userId, ymd, granted, nowIso);
+  if (protectionFeeCharged > 0) {
+    await creditTreasuryBestEffort(db, protectionFeeCharged, nowIso, "farmhand_income_charge");
+  }
 
   const today1 = today0 + granted;
 
@@ -822,6 +982,7 @@ async function settleUser(
       orchards: orchards1,
       vegetables: vegetables1,
       orchard_app_bonus: orchardAppBonus,
+      membership_bonus: membershipBonus,
       daily_remaining: FARMS_DAILY_CAP > 0 ? Math.max(0, FARMS_DAILY_CAP - today1) : null,
       pending_ru: 0,
     },
@@ -922,8 +1083,9 @@ function purchaseCost(
   vegetables: TierPlotProgress[],
   store: ReturnType<typeof parseFarmsStore>,
 ): number | null {
-  if (kind === "buy_lightning_rod") {
-    return store.lightning_rod_owned ? null : LIGHTNING_ROD_COST;
+  const toolKind = farmhandToolPurchaseKind(kind);
+  if (toolKind) {
+    return storeHasFarmhandTool(store, toolKind) ? null : FARMHAND_TOOL_COST[toolKind];
   }
   if (kind === "root_cluster") {
     if (store.root_clusters?.[plotId - 1]) return null;
@@ -966,9 +1128,20 @@ function applyPurchase(
   vegetables: TierPlotProgress[],
   store: ReturnType<typeof parseFarmsStore>,
 ): PurchaseApplyResult {
-  if (kind === "buy_lightning_rod") {
-    if (store.lightning_rod_owned) return null;
-    return { plots, orchards, vegetables, store: { ...store, lightning_rod_owned: true } };
+  const toolKind = farmhandToolPurchaseKind(kind);
+  if (toolKind) {
+    if (storeHasFarmhandTool(store, toolKind)) return null;
+    const farmhand_tools = { ...store.farmhand_tools, [toolKind]: true };
+    return {
+      plots,
+      orchards,
+      vegetables,
+      store: {
+        ...store,
+        farmhand_tools,
+        ...(toolKind === "lightning_meteorologist" ? { lightning_rod_owned: true } : {}),
+      },
+    };
   }
   if (kind === "root_cluster") {
     if (store.root_clusters?.[plotId - 1] || !rootClusterCompleted(plots, plotId)) return null;
@@ -1067,7 +1240,8 @@ async function farmsSettle(request: Request, env: FarmsEnv): Promise<Response> {
     const vegetables = parseVegetablesProgress(progress0.vegetables_json);
     const store = parseFarmsStore(progress0.store_json);
     const orchardAppBonus = await loadOrchardAppBonusStatus(env.DB, userId, orchards, clientNowMs);
-    const incomeMult = protectionIncomeMultiplier(store) * orchardAppBonus.multiplier * rootClusterIncomeMultiplier(store);
+    const membershipBonus = await loadMembershipBonusStatus(env.DB, userId);
+    const incomeMult = protectionIncomeMultiplier(store) * orchardAppBonus.multiplier * membershipBonus.multiplier * rootClusterIncomeMultiplier(store);
     const pending_ru = pendingAllRu(plots, orchards, vegetables, progress0.last_settled_ms, clientNowMs, incomeMult);
     return json(
       {
@@ -1077,6 +1251,7 @@ async function farmsSettle(request: Request, env: FarmsEnv): Promise<Response> {
         balance,
         pending_ru,
         orchard_app_bonus: orchardAppBonus,
+        membership_bonus: membershipBonus,
         progress_version: progress0.progress_version,
         last_settled_ms: progress0.last_settled_ms,
       },
@@ -1116,6 +1291,7 @@ async function farmsSettle(request: Request, env: FarmsEnv): Promise<Response> {
           clientNowMs,
           protectionIncomeMultiplier(parseFarmsStore(progress0.store_json)) *
             Math.max(1, Number((result.body.orchard_app_bonus as OrchardAppBonusStatus | undefined)?.multiplier) || 1) *
+            Math.max(1, Number((result.body.membership_bonus as MembershipBonusStatus | undefined)?.multiplier) || 1) *
             rootClusterIncomeMultiplier(parseFarmsStore(progress0.store_json)),
         );
   let responseBody: Record<string, unknown> = { ...result.body, pending_ru, harvest_cooldown_sec: cooldownSec };
@@ -1159,9 +1335,10 @@ async function farmsRewardedAdBonus(request: Request, env: FarmsEnv): Promise<Re
 }
 
 function dicePayload(row: DiceRequestRow, userId: string) {
+  const stake = Math.max(0, Math.floor(Number(row.stake) || 0));
   return {
     id: row.id,
-    stake: Math.max(0, Math.floor(Number(row.stake) || 0)),
+    stake,
     status: row.status,
     creator_label: farmerLabel(row.creator_user_id),
     joiner_label: row.joiner_user_id ? farmerLabel(row.joiner_user_id) : null,
@@ -1192,6 +1369,7 @@ async function diceMarketPayload(db: D1Database, userId: string) {
     ok: true,
     balance,
     requests: (rows.results ?? []).map((row) => dicePayload(row, userId)),
+    market_limit: await marketLimitStatus(db, userId),
   };
 }
 
@@ -1212,7 +1390,7 @@ async function farmsDiceMarket(request: Request, env: FarmsEnv): Promise<Respons
   }
   const stake = Math.floor(Number(body.stake) || 0);
   if (stake < 100_000) return json({ detail: "Minimum dice request stake is 0.001 ROOTS." }, 400);
-  if (stake > 100_000_000) return json({ detail: "Maximum dice request stake is 1 ROOTS." }, 400);
+  if (stake > DICE_MAX_STAKE) return json({ detail: "Maximum dice request stake is 1 ROOTS." }, 400);
 
   const nowIso = new Date().toISOString();
   await ensureBalance(env.DB, userId, nowIso);
@@ -1470,6 +1648,73 @@ async function farmsMarketDonate(request: Request, env: FarmsEnv): Promise<Respo
   });
 }
 
+async function farmsMarketMonthlyPass(request: Request, env: FarmsEnv): Promise<Response> {
+  const u = await requireUser(request, env);
+  if (u instanceof Response) return u;
+  const userId = u;
+
+  let body: { catalog_hash?: string } = {};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  if (String(body.catalog_hash || "") !== CATALOG_HASH) {
+    return json({ detail: "App catalog outdated. Update Root Farms and try again." }, 400);
+  }
+
+  const email = emailFromUserId(userId);
+  if (!email) {
+    return json({ ...(await diceMarketPayload(env.DB, userId)), detail: "Sign in with a RootRecord account to buy a monthly pass." }, 401);
+  }
+  const access = await readUserAccountAccessFlags(env.DB, email).catch(() => null);
+  if (access?.life_member) {
+    return json({
+      ...(await diceMarketPayload(env.DB, userId)),
+      membership_bonus: await loadMembershipBonusStatus(env.DB, userId),
+      detail: "Lifetime members already have the Lifetime Tree perk.",
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+  await ensureBalance(env.DB, userId, nowIso);
+  const debit = await env.DB
+    .prepare("UPDATE rr_earn_balance SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?")
+    .bind(MARKET_MONTHLY_PASS_COST, nowIso, userId, MARKET_MONTHLY_PASS_COST)
+    .run();
+  if ((debit.meta?.changes ?? 0) !== 1) {
+    return json(
+      {
+        ...(await diceMarketPayload(env.DB, userId)),
+        detail: `Need ${formatRootsAtomicLocale(MARKET_MONTHLY_PASS_COST)} ROOTS to buy a monthly membership pass.`,
+        cost: MARKET_MONTHLY_PASS_COST,
+      },
+      409,
+    );
+  }
+
+  let proRedeemedUntil: string | null = null;
+  try {
+    proRedeemedUntil = await extendProRedeemedUntil(env.DB, email, MARKET_MONTHLY_PASS_DAYS);
+  } catch {
+    proRedeemedUntil = null;
+  }
+  if (!proRedeemedUntil) {
+    await creditBalance(env.DB, userId, MARKET_MONTHLY_PASS_COST, new Date().toISOString()).catch(() => {});
+    return json({ ...(await diceMarketPayload(env.DB, userId)), detail: "Could not apply the monthly pass. Your ROOTS were refunded." }, 500);
+  }
+  await creditTreasuryBestEffort(env.DB, MARKET_MONTHLY_PASS_COST, nowIso, "monthly_membership_pass");
+
+  return json({
+    ...(await diceMarketPayload(env.DB, userId)),
+    cost: MARKET_MONTHLY_PASS_COST,
+    pro_redeemed_until: proRedeemedUntil,
+    pro_unlocked: true,
+    membership_bonus: await loadMembershipBonusStatus(env.DB, userId),
+    detail: `Monthly membership pass active until ${proRedeemedUntil}. Your Monthly Member Tree is now active.`,
+  });
+}
+
 async function farmsMarketWheelSpin(request: Request, env: FarmsEnv): Promise<Response> {
   const u = await requireUser(request, env);
   if (u instanceof Response) return u;
@@ -1486,6 +1731,10 @@ async function farmsMarketWheelSpin(request: Request, env: FarmsEnv): Promise<Re
   }
 
   const nowIso = new Date().toISOString();
+  const lockedDetail = await marketLockedDetail(env.DB, userId);
+  if (lockedDetail) {
+    return json({ ...(await diceMarketPayload(env.DB, userId)), detail: lockedDetail }, 423);
+  }
   await ensureBalance(env.DB, userId, nowIso);
   const debit = await env.DB
     .prepare("UPDATE rr_earn_balance SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?")
@@ -1496,16 +1745,20 @@ async function farmsMarketWheelSpin(request: Request, env: FarmsEnv): Promise<Re
   }
 
   const prize = pickWheelPrize();
-  await creditBalance(env.DB, userId, prize.prize, nowIso);
+  const payout = Math.min(MARKET_MAX_PAYOUT, prize.prize);
+  await creditBalance(env.DB, userId, payout, nowIso);
+  await creditTreasuryBestEffort(env.DB, MARKET_WHEEL_SPIN_COST, nowIso, "wheel_spin_cost");
+  await recordMarketActivity(env.DB, userId, "wheel", MARKET_WHEEL_SPIN_COST, payout, payout - MARKET_WHEEL_SPIN_COST, nowIso);
   const balance = await getBalance(env.DB, userId);
   return json({
     ok: true,
     cost: MARKET_WHEEL_SPIN_COST,
-    prize: prize.prize,
+    prize: payout,
     label: prize.label,
-    net: prize.prize - MARKET_WHEEL_SPIN_COST,
-    visual_index: wheelVisualIndexForPrize(prize.prize),
+    net: payout - MARKET_WHEEL_SPIN_COST,
+    visual_index: wheelVisualIndexForPrize(payout),
     balance,
+    market_limit: await marketLimitStatus(env.DB, userId),
   });
 }
 
@@ -1526,7 +1779,7 @@ async function farmsMarketRouletteSpin(request: Request, env: FarmsEnv): Promise
 
   const amount = normalizeMarketStake(body.amount);
   if (amount < MARKET_MIN_STAKE || amount > MARKET_MAX_STAKE) {
-    return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Roulette stake must be 0.001 to 1 ROOTS." }, 400);
+    return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Roulette stake must be 0.001 to 0.1 ROOTS." }, 400);
   }
 
   const betKind = String(body.bet_kind || "").trim().toLowerCase();
@@ -1542,6 +1795,10 @@ async function farmsMarketRouletteSpin(request: Request, env: FarmsEnv): Promise
   }
 
   const nowIso = new Date().toISOString();
+  const lockedDetail = await marketLockedDetail(env.DB, userId);
+  if (lockedDetail) {
+    return json({ ok: true, balance: await getBalance(env.DB, userId), market_limit: await marketLimitStatus(env.DB, userId), detail: lockedDetail }, 423);
+  }
   const debited = await debitMarketStake(env.DB, userId, amount, nowIso);
   if (!debited) {
     return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Insufficient ROOTS for roulette." }, 409);
@@ -1550,8 +1807,11 @@ async function farmsMarketRouletteSpin(request: Request, env: FarmsEnv): Promise
   const number = randomInt(37);
   const color = rouletteColor(number);
   const multiplier = roulettePayoutMultiplier(betKind, number, straightNumber);
-  const payout = amount * multiplier;
+  const rawPayout = amount * multiplier;
+  const payout = Math.min(MARKET_MAX_PAYOUT, rawPayout);
   if (payout > 0) await creditBalance(env.DB, userId, payout, nowIso);
+  await creditTreasuryBestEffort(env.DB, amount, nowIso, "roulette_stake");
+  await recordMarketActivity(env.DB, userId, "roulette", amount, payout, payout - amount, nowIso);
   const balance = await getBalance(env.DB, userId);
 
   return json({
@@ -1565,8 +1825,10 @@ async function farmsMarketRouletteSpin(request: Request, env: FarmsEnv): Promise
     multiplier,
     won: payout > 0,
     payout,
+    payout_capped: rawPayout > payout,
     net: payout - amount,
     balance,
+    market_limit: await marketLimitStatus(env.DB, userId),
   });
 }
 
@@ -1588,7 +1850,7 @@ async function farmsMarketHiLoState(request: Request, env: FarmsEnv): Promise<Re
   const u = await requireUser(request, env);
   if (u instanceof Response) return u;
   const active = await getActiveHiLoSession(env.DB, u);
-  return json({ ...hiLoSessionPayload(active), balance: await getBalance(env.DB, u) });
+  return json({ ...hiLoSessionPayload(active), balance: await getBalance(env.DB, u), market_limit: await marketLimitStatus(env.DB, u) });
 }
 
 async function farmsMarketHiLoStart(request: Request, env: FarmsEnv): Promise<Response> {
@@ -1608,7 +1870,7 @@ async function farmsMarketHiLoStart(request: Request, env: FarmsEnv): Promise<Re
 
   const amount = normalizeMarketStake(body.amount);
   if (amount < MARKET_MIN_STAKE || amount > MARKET_MAX_STAKE) {
-    return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Hi-Lo stake must be 0.001 to 1 ROOTS." }, 400);
+    return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Hi-Lo stake must be 0.001 to 0.1 ROOTS." }, 400);
   }
 
   const existing = await getActiveHiLoSession(env.DB, userId);
@@ -1620,6 +1882,10 @@ async function farmsMarketHiLoStart(request: Request, env: FarmsEnv): Promise<Re
   }
 
   const nowIso = new Date().toISOString();
+  const lockedDetail = await marketLockedDetail(env.DB, userId);
+  if (lockedDetail) {
+    return json({ ok: true, balance: await getBalance(env.DB, userId), market_limit: await marketLimitStatus(env.DB, userId), detail: lockedDetail }, 423);
+  }
   const debited = await debitMarketStake(env.DB, userId, amount, nowIso);
   if (!debited) {
     return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Insufficient ROOTS for Hi-Lo." }, 409);
@@ -1648,8 +1914,9 @@ async function farmsMarketHiLoStart(request: Request, env: FarmsEnv): Promise<Re
     )
     .bind(id, userId, amount, amount, firstCard, row.drawn_cards_json, nowIso, nowIso)
     .run();
+  await creditTreasuryBestEffort(env.DB, amount, nowIso, "hi_lo_stake");
   const balance = await getBalance(env.DB, userId);
-  return json({ ...hiLoSessionPayload(row, "First card drawn. Guess higher or lower."), balance });
+  return json({ ...hiLoSessionPayload(row, "First card drawn. Guess higher or lower."), balance, market_limit: await marketLimitStatus(env.DB, userId) });
 }
 
 async function farmsMarketHiLoGuess(request: Request, env: FarmsEnv): Promise<Response> {
@@ -1696,6 +1963,8 @@ async function farmsMarketHiLoGuess(request: Request, env: FarmsEnv): Promise<Re
       )
       .bind(nextCard, JSON.stringify(nextDrawn), nowIso, nowIso, row.id, userId)
       .run();
+    const stake = Math.max(0, Math.floor(Number(row.stake) || 0));
+    await recordMarketActivity(env.DB, userId, "hi_lo", stake, 0, -stake, nowIso);
     return json({
       ...hiLoSessionPayload({ ...row, current_card: nextCard, drawn_cards_json: JSON.stringify(nextDrawn), bank: 0, status: "lost", updated_at: nowIso, resolved_at: nowIso }, "Bust. You lost the Hi-Lo round bank."),
       guess,
@@ -1706,8 +1975,9 @@ async function farmsMarketHiLoGuess(request: Request, env: FarmsEnv): Promise<Re
       tie,
       won,
       payout: 0,
-      net: -Math.max(0, Math.floor(Number(row.stake) || 0)),
+      net: -stake,
       balance: await getBalance(env.DB, userId),
+      market_limit: await marketLimitStatus(env.DB, userId),
     });
   }
 
@@ -1766,7 +2036,8 @@ async function farmsMarketHiLoCashOut(request: Request, env: FarmsEnv): Promise<
   }
 
   const nowIso = new Date().toISOString();
-  const payout = Math.max(0, Math.floor(Number(row.bank) || 0));
+  const stake = Math.max(0, Math.floor(Number(row.stake) || 0));
+  const payout = Math.min(MARKET_MAX_PAYOUT, Math.max(0, Math.floor(Number(row.bank) || 0)));
   await env.DB
     .prepare(
       `UPDATE rr_farms_hilo_sessions
@@ -1776,12 +2047,14 @@ async function farmsMarketHiLoCashOut(request: Request, env: FarmsEnv): Promise<
     .bind(nowIso, nowIso, row.id, userId)
     .run();
   if (payout > 0) await creditBalance(env.DB, userId, payout, nowIso);
+  await recordMarketActivity(env.DB, userId, "hi_lo", stake, payout, payout - stake, nowIso);
   const balance = await getBalance(env.DB, userId);
   return json({
     ...hiLoSessionPayload({ ...row, status: "cashed_out", updated_at: nowIso, resolved_at: nowIso }, "Cashed out Hi-Lo winnings."),
     payout,
-    net: payout - Math.max(0, Math.floor(Number(row.stake) || 0)),
+    net: payout - stake,
     balance,
+    market_limit: await marketLimitStatus(env.DB, userId),
   });
 }
 
@@ -1819,15 +2092,21 @@ async function farmsPurchase(request: Request, env: FarmsEnv): Promise<Response>
     "unlock_plot",
     "row_slot",
     "root_cluster",
+    "buy_gopher_tool",
+    "buy_mice_tool",
+    "buy_rabbit_tool",
+    "buy_birds_tool",
     "buy_lightning_rod",
+    "buy_cypress_tool",
     "orchard_unlock",
     "orchard_row",
     "vegetable_unlock",
     "vegetable_row",
   ]);
   if (!kind || !tierKinds.has(kind)) return json({ detail: "Invalid purchase kind." }, 400);
-  if (kind === "buy_lightning_rod") {
-    if (plotId !== 0 && plotId !== 1) return json({ detail: "plot_id not used for lightning rod." }, 400);
+  const farmhandToolKind = farmhandToolPurchaseKind(kind);
+  if (farmhandToolKind) {
+    if (plotId !== 0 && plotId !== 1) return json({ detail: "plot_id not used for farmhand tools." }, 400);
   } else if (kind === "root_cluster") {
     if (plotId < 1 || plotId > ROOT_CLUSTER_COUNT) return json({ detail: "Invalid root cluster id." }, 400);
   } else if (kind.startsWith("orchard_")) {
@@ -1925,6 +2204,7 @@ async function farmsPurchase(request: Request, env: FarmsEnv): Promise<Response>
     });
     return json(body, 409);
   }
+  await creditTreasuryBestEffort(env.DB, cost, nowIso, `farm_purchase:${kind}`);
 
   const balance = await getBalance(env.DB, userId);
   const newVersion = versionForUpdate + 1;
@@ -1987,6 +2267,9 @@ async function farmsStoreToggle(request: Request, env: FarmsEnv): Promise<Respon
     return json({ detail: "Progress version mismatch. Refresh and try again." }, 409);
   }
   const store = parseFarmsStore(progress.store_json);
+  if (enabled && !storeHasFarmhandTool(store, kind as FarmhandToolKind)) {
+    return json({ detail: "Buy this farmhand tool before hiring the helper." }, 400);
+  }
   if (kind === "gopher" || kind === "mice" || kind === "rabbit" || kind === "birds") {
     store.protections[kind as ProtectionKind] = enabled;
   } else if (kind === "lightning_meteorologist") {
@@ -2047,6 +2330,7 @@ export async function handleFarmsRoutes(
   const diceCancelMatch = sub.match(/^\/v1\/farms\/market\/dice\/([^/]+)\/cancel$/);
   if (diceCancelMatch && method === "POST") return farmsDiceCancel(request, env, decodeURIComponent(diceCancelMatch[1]));
   if (sub === "/v1/farms/market/donate" && method === "POST") return farmsMarketDonate(request, env);
+  if (sub === "/v1/farms/market/monthly-pass" && method === "POST") return farmsMarketMonthlyPass(request, env);
   if (sub === "/v1/farms/market/wheel/spin" && method === "POST") return farmsMarketWheelSpin(request, env);
   if (sub === "/v1/farms/market/roulette/spin" && method === "POST") return farmsMarketRouletteSpin(request, env);
   if (sub === "/v1/farms/market/hi-lo/state" && method === "GET") return farmsMarketHiLoState(request, env);

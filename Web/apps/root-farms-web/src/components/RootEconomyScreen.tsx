@@ -119,8 +119,9 @@ export function RootEconomyScreen({ variant = "web" }: { variant?: "web" | "mobi
                   ) : null}
                   {(e.farms_plots_unlocked ?? 0) > 0 || (e.farms_rows_accumulated ?? 0) > 0 ? (
                     <span className="economy-farms">
-                      {e.farms_plots_unlocked ?? 0} plot{(e.farms_plots_unlocked ?? 0) === 1 ? "" : "s"} ·{" "}
-                      {e.farms_rows_accumulated ?? 0} rows
+                      {(e.farms_plots_unlocked ?? 0).toLocaleString()} total plot
+                      {(e.farms_plots_unlocked ?? 0) === 1 ? "" : "s"} ·{" "}
+                      {(e.farms_rows_accumulated ?? 0).toLocaleString()} total rows
                     </span>
                   ) : null}
                 </span>

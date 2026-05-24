@@ -65,13 +65,16 @@ import {
   type FarmsSettleOk,
   type FarmsStateResponse,
   type FarmhandCheckinStatus,
+  type MembershipBonus,
   type OrchardAppBonus,
 } from "../lib/farmsApi";
 import {
   defaultFarmsStore,
-  LIGHTNING_ROD_COST,
+  farmhandToolCost,
+  storeHasFarmhandTool,
   protectionIncomeMultiplier,
   rootClusterIncomeMultiplier,
+  type FarmhandToolKind,
   type FarmsStoreData,
   type StoreToggleKind,
   type VarmintEvent,
@@ -93,6 +96,18 @@ import { isNativeAdsAvailable, showRewardedAd, syncNativeAds } from "../lib/nati
 
 export type PurchaseResult = "ok" | "insufficient" | "unavailable" | "need_sign_in" | "offline";
 const INSUFFICIENT_FUNDS_AD_BONUS = 100_000;
+const ROOTS_CREDIT_PACK_URL = "https://buy.stripe.com/7sY6oH38FaRD3EUbEX5gc06";
+
+function rootsCreditPackUrl(email: string): string {
+  try {
+    const u = new URL(ROOTS_CREDIT_PACK_URL);
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.includes("@")) u.searchParams.set("prefilled_email", cleanEmail);
+    return u.toString();
+  } catch {
+    return ROOTS_CREDIT_PACK_URL;
+  }
+}
 
 
 
@@ -129,6 +144,7 @@ type GameCtx = {
   farmhandCheckin: FarmhandCheckinStatus | null;
   orchards: TierPlotProgress[];
   orchardAppBonus: OrchardAppBonus | null;
+  membershipBonus: MembershipBonus | null;
   vegetables: TierPlotProgress[];
   orchardsUnlocked: boolean;
   vegetablesUnlocked: boolean;
@@ -203,6 +219,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [farmhandCheckin, setFarmhandCheckin] = useState<FarmhandCheckinStatus | null>(null);
   const [orchards, setOrchards] = useState<TierPlotProgress[]>(() => createInitialTierPlots(ORCHARD_COUNT));
   const [orchardAppBonus, setOrchardAppBonus] = useState<OrchardAppBonus | null>(null);
+  const [membershipBonus, setMembershipBonus] = useState<MembershipBonus | null>(null);
   const [vegetables, setVegetables] = useState<TierPlotProgress[]>(() => createInitialTierPlots(VEGETABLE_COUNT));
   const [orchardsUnlocked, setOrchardsUnlocked] = useState(true);
   const [vegetablesUnlocked, setVegetablesUnlocked] = useState(false);
@@ -222,6 +239,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const storeRef = useRef(store);
   const orchardsRef = useRef(orchards);
   const orchardAppBonusRef = useRef<OrchardAppBonus | null>(orchardAppBonus);
+  const membershipBonusRef = useRef<MembershipBonus | null>(membershipBonus);
   const vegetablesRef = useRef(vegetables);
   const farmsApiLiveRef = useRef(false);
 
@@ -229,6 +247,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   storeRef.current = store;
   orchardsRef.current = orchards;
   orchardAppBonusRef.current = orchardAppBonus;
+  membershipBonusRef.current = membershipBonus;
   vegetablesRef.current = vegetables;
 
   progressVersionRef.current = progressVersion;
@@ -237,7 +256,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const allFarmRuPerSec = useCallback(
     (incomeMult: number) => {
       const appMult = Math.max(1, Number(orchardAppBonusRef.current?.multiplier) || 1);
-      const totalMult = incomeMult * appMult * rootClusterIncomeMultiplier(storeRef.current);
+      const memberMult = Math.max(1, Number(membershipBonusRef.current?.multiplier) || 1);
+      const totalMult = incomeMult * appMult * memberMult * rootClusterIncomeMultiplier(storeRef.current);
       return (
         totalRuPerSec(saveRef.current, totalMult) +
         vegetableIncomePerSec(vegetablesRef.current, totalMult)
@@ -316,6 +336,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setOrchardAppBonus(remote.orchard_app_bonus);
         orchardAppBonusRef.current = remote.orchard_app_bonus;
       }
+      if (remote.membership_bonus) {
+        setMembershipBonus(remote.membership_bonus);
+        membershipBonusRef.current = remote.membership_bonus;
+      }
       if (remote.vegetables?.length) {
         setVegetables(remote.vegetables);
         vegetablesRef.current = remote.vegetables;
@@ -340,6 +364,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const totalIncomeMult =
         incomeMult *
         Math.max(1, Number(orchardAppBonusRef.current?.multiplier) || 1) *
+        Math.max(1, Number(membershipBonusRef.current?.multiplier) || 1) *
         rootClusterIncomeMultiplier(storeRef.current);
       const pending = peekUnsettledRu(saveRef.current, nowMs, totalIncomeMult);
       setRuPerSec(
@@ -385,10 +410,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setOrchardAppBonus(settled.orchard_app_bonus);
         orchardAppBonusRef.current = settled.orchard_app_bonus;
       }
+      if (settled.membership_bonus) {
+        setMembershipBonus(settled.membership_bonus);
+        membershipBonusRef.current = settled.membership_bonus;
+      }
       const incomeMult = protectionIncomeMultiplier(storeRef.current);
       const totalIncomeMult =
         incomeMult *
         Math.max(1, Number(orchardAppBonusRef.current?.multiplier) || 1) *
+        Math.max(1, Number(membershipBonusRef.current?.multiplier) || 1) *
         rootClusterIncomeMultiplier(storeRef.current);
       const pending = peekUnsettledRu(nextSave, nowMs, totalIncomeMult);
       setPendingHarvest(pending);
@@ -778,7 +808,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (storeBusy || !balanceReady) return;
       if (guestMode) {
         const next = { ...storeRef.current };
-        if (kind === "gopher" || kind === "mice" || kind === "rabbit") {
+        if (enabled && !storeHasFarmhandTool(storeRef.current, kind as FarmhandToolKind)) return;
+        if (kind === "gopher" || kind === "mice" || kind === "rabbit" || kind === "birds") {
           next.protections = { ...next.protections, [kind]: enabled };
         } else if (kind === "lightning_meteorologist") {
           next.lightning_meteorologist = enabled;
@@ -1034,6 +1065,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 
   const handleInsufficientFunds = useCallback(async () => {
+    const buyPack = window.confirm("Not enough ROOTS. Buy 100 ROOTS for $3? The credit is applied after Stripe confirms the purchase.");
+    if (buyPack) {
+      window.open(rootsCreditPackUrl(auth.email), "_blank", "noopener,noreferrer");
+      return;
+    }
     if (hasAdFreeAccess() || !isNativeAdsAvailable()) {
       window.alert("Not enough ROOTS.");
       return;
@@ -1065,7 +1101,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         ? `Added +${formatRu(bonus.bonus_granted)}.`
         : "Daily ROOTS earning cap reached. No ad bonus was added.",
     );
-  }, [applyBalanceFromServer, guestMode]);
+  }, [applyBalanceFromServer, auth.email, guestMode]);
 
   const purchaseRootCluster = useCallback(
     (clusterId: number) => {
@@ -1095,9 +1131,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const purchaseTier = useCallback(
     async (kind: FarmsPurchaseKind, tierId: number): Promise<PurchaseResult> => {
       let cost = 0;
-      if (kind === "buy_lightning_rod") {
-        if (storeRef.current.lightning_rod_owned) return "unavailable";
-        cost = LIGHTNING_ROD_COST;
+      const farmhandToolByPurchaseKind: Partial<Record<FarmsPurchaseKind, FarmhandToolKind>> = {
+        buy_gopher_tool: "gopher",
+        buy_mice_tool: "mice",
+        buy_rabbit_tool: "rabbit",
+        buy_birds_tool: "birds",
+        buy_lightning_rod: "lightning_meteorologist",
+        buy_cypress_tool: "cypress_trees",
+      };
+      const toolKind = farmhandToolByPurchaseKind[kind];
+      if (toolKind) {
+        if (storeHasFarmhandTool(storeRef.current, toolKind)) return "unavailable";
+        cost = farmhandToolCost(toolKind);
       } else if (kind === "orchard_unlock" || kind === "orchard_row") {
         return "unavailable";
       } else if (kind === "vegetable_unlock") {
@@ -1115,8 +1160,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (guestMode) {
         setPurchaseBusy(true);
         try {
-          if (kind === "buy_lightning_rod") {
-            const next = { ...storeRef.current, lightning_rod_owned: true };
+          if (toolKind) {
+            const next = {
+              ...storeRef.current,
+              farmhand_tools: { ...storeRef.current.farmhand_tools, [toolKind]: true },
+              ...(toolKind === "lightning_meteorologist" ? { lightning_rod_owned: true } : {}),
+            };
             setStore(next);
             storeRef.current = next;
           } else {
@@ -1216,6 +1265,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       farmhandCheckin,
       orchards,
       orchardAppBonus,
+      membershipBonus,
       vegetables,
       orchardsUnlocked,
       vegetablesUnlocked,
@@ -1270,6 +1320,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       farmhandCheckin,
       orchards,
       orchardAppBonus,
+      membershipBonus,
       vegetables,
       orchardsUnlocked,
       vegetablesUnlocked,

@@ -1,12 +1,16 @@
 import type { BillingD1 } from "./billing-state";
 
 import { applyStripeBillingPatch } from "./apply-stripe-billing";
+import { ROOTS_ATOMIC_PER_WHOLE } from "./roots-units";
 
 export type StripeWebhookEnv = {
   DB: BillingD1;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
 };
+
+const ROOTS_CREDIT_PACK_AMOUNT_TOTAL = 300; // $3.00 USD in Stripe's smallest unit.
+const ROOTS_CREDIT_PACK_UNITS = 100 * ROOTS_ATOMIC_PER_WHOLE;
 
 function whJson(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -130,6 +134,33 @@ async function resolvePortalUser(
   return null;
 }
 
+async function ensureRootsBalance(db: BillingD1, userId: string, nowIso: string): Promise<void> {
+  await db
+    .prepare("INSERT OR IGNORE INTO rr_earn_balance (user_id, balance, updated_at) VALUES (?, 0, ?)")
+    .bind(userId, nowIso)
+    .run();
+}
+
+async function creditRootsPack(db: BillingD1, user: { email: string }): Promise<void> {
+  const email = user.email.trim().toLowerCase();
+  if (!email) return;
+  const userId = `user:${email}`;
+  const nowIso = new Date().toISOString();
+  await ensureRootsBalance(db, userId, nowIso);
+  await db
+    .prepare("UPDATE rr_earn_balance SET balance = balance + ?, updated_at = ? WHERE user_id = ?")
+    .bind(ROOTS_CREDIT_PACK_UNITS, nowIso, userId)
+    .run();
+}
+
+function isRootsCreditPackCheckout(session: Record<string, unknown>): boolean {
+  const mode = String(session.mode || "");
+  const currency = String(session.currency || "").toLowerCase();
+  const amountTotal = Math.floor(Number(session.amount_total) || 0);
+  const paymentStatus = String(session.payment_status || "").toLowerCase();
+  return mode === "payment" && currency === "usd" && amountTotal === ROOTS_CREDIT_PACK_AMOUNT_TOTAL && paymentStatus === "paid";
+}
+
 async function resolvePortalUserByCustomer(
   db: BillingD1,
   customerId: string
@@ -184,6 +215,10 @@ async function onCheckoutSessionCompleted(
   const subscription = typeof session.subscription === "string" ? session.subscription : null;
 
   if (mode === "payment") {
+    if (isRootsCreditPackCheckout(session)) {
+      await creditRootsPack(db, user);
+      return;
+    }
     await applyStripeBillingPatch(db, {
       email: user.email,
       account_id: user.accountId,

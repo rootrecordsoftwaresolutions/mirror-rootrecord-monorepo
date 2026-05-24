@@ -2,11 +2,12 @@ import { useMemo } from "react";
 import { useGame } from "../contexts/GameContext";
 import { formatRu, formatRuRate } from "../game/format";
 import {
-  LIGHTNING_ROD_COST,
   protectionIncomeMultiplier,
   STORE_PROTECTIONS,
+  storeHasFarmhandTool,
   vegetablesProtected,
   type ProtectionKind,
+  type StoreProtectionItem,
   type StoreToggleKind,
 } from "../game/storeCatalog";
 import { totalRuPerSec } from "../game/sim";
@@ -34,7 +35,7 @@ export function FarmhandsScreen() {
     storeBusy,
     purchaseBusy,
     toggleStore,
-    buyLightningRod,
+    purchaseTier,
     handleInsufficientFunds,
     lightningRow,
     varmintNotifications,
@@ -52,11 +53,11 @@ export function FarmhandsScreen() {
   const fieldItems = STORE_PROTECTIONS.filter((i) => FIELD_KINDS.has(i.kind as ProtectionKind));
   const stormItems = STORE_PROTECTIONS.filter((i) => !FIELD_KINDS.has(i.kind as ProtectionKind));
 
-  const onBuyLightningRod = async () => {
-    const r = await buyLightningRod();
+  const onBuyFarmhandTool = async (item: StoreProtectionItem) => {
+    const r = await purchaseTier(item.toolPurchaseKind, 0);
     if (r === "insufficient") await handleInsufficientFunds();
     else if (r === "offline") window.alert("Could not reach the server. Try again after reconnecting.");
-    else if (r === "unavailable") window.alert("Lightning rod is not available.");
+    else if (r === "unavailable") window.alert(`${item.toolName} is not available.`);
   };
 
   return (
@@ -65,8 +66,8 @@ export function FarmhandsScreen() {
         <div>
           <h1>Farmhands</h1>
           <p className="store-lead">
-            Hire protection and storm gear. Active plans lower your farm income rate — they do not charge your Root
-            Unit balance except the lightning rod purchase.
+            Buy each helper's tool once, then hire protection and storm gear. Active helpers lower your farm income
+            rate; tool purchases spend from your Root Unit balance.
           </p>
         </div>
         <div className="store-balance" aria-live="polite">
@@ -92,13 +93,13 @@ export function FarmhandsScreen() {
 
       {lightningRow != null ? (
         <p className="store-notice">
-          Shared lightning row today: <strong>row {lightningRow}</strong> (all Ginger+ farms).
+          Shared lightning row today: <strong>row {lightningRow}</strong>. Once lightning is unlocked, that row can be hit anywhere in the unlocked field.
         </p>
       ) : null}
 
       <p className="store-notice">
         Vegetable protection: <strong>{farmhandCheckin?.active && vegetablesProtected(store) ? "active" : "inactive"}</strong>{" "}
-        — requires the lightning rod plus at least one active farmhand.
+        — requires the lightning meteorologist's rod plus at least one active farmhand.
         {farmhandCheckin?.expires_at ? ` Farmhand check-in expires ${new Date(farmhandCheckin.expires_at).toLocaleString()}.` : " Log in to Root Farms every 48 hours to keep farmhands protecting the farm."}
       </p>
 
@@ -125,23 +126,31 @@ export function FarmhandsScreen() {
       <ul className="store-grid">
         {fieldItems.map((item) => {
           const on = storeToggleOn(store, item.kind);
+          const toolOwned = storeHasFarmhandTool(store, item.kind);
           return (
             <li key={item.kind}>
               <article className={`store-card${on ? " store-card--active" : ""}`}>
                 <div className="store-card-top">
                   <h2>{item.title}</h2>
-                  <span className={`store-card-badge${on ? " store-card-badge--on" : ""}`}>{on ? "On" : "Off"}</span>
+                  <span className={`store-card-badge${on || toolOwned ? " store-card-badge--on" : ""}`}>
+                    {on ? "On" : toolOwned ? "Ready" : "Tool needed"}
+                  </span>
                 </div>
                 <p className="store-card-blurb">{item.blurb}</p>
+                <p className="store-card-blurb">
+                  Requires {item.toolName.toLowerCase()} before this helper can be hired.
+                </p>
                 <div className="store-card-foot">
-                  <span className="store-card-cost">{item.feePctLabel}</span>
+                  <span className="store-card-cost">
+                    {toolOwned ? item.feePctLabel : `${formatRu(item.oneTimeCost)} tool`}
+                  </span>
                   <button
                     type="button"
                     className={`btn store-card-btn${on ? " btn-ghost" : " btn-primary"}`}
-                    disabled={!balanceReady || storeBusy}
-                    onClick={() => void toggleStore(item.kind, !on)}
+                    disabled={!balanceReady || storeBusy || purchaseBusy}
+                    onClick={() => void (toolOwned ? toggleStore(item.kind, !on) : onBuyFarmhandTool(item))}
                   >
-                    {storeBusy ? "…" : on ? "Turn off" : "Turn on"}
+                    {storeBusy || purchaseBusy ? "…" : toolOwned ? (on ? "Turn off" : "Hire helper") : item.toolAction}
                   </button>
                 </div>
               </article>
@@ -151,56 +160,38 @@ export function FarmhandsScreen() {
       </ul>
 
       <div className="section-head">
-        <span>Storms (Ginger+)</span>
+        <span>Storm hazards</span>
         <span>Income / cost</span>
       </div>
 
       <ul className="store-grid">
-        <li>
-          <article className={`store-card${store.lightning_rod_owned ? " store-card--active" : ""}`}>
-            <div className="store-card-top">
-              <h2>Lightning rod</h2>
-              <span className={`store-card-badge${store.lightning_rod_owned ? " store-card-badge--on" : ""}`}>
-                {store.lightning_rod_owned ? "Owned" : "—"}
-              </span>
-            </div>
-            <p className="store-card-blurb">
-              One-time purchase blocks shared lightning row strikes on your farm.
-            </p>
-            <div className="store-card-foot">
-              <span className="store-card-cost">{formatRu(LIGHTNING_ROD_COST)}</span>
-              <button
-                type="button"
-                className="btn store-card-btn btn-primary"
-                disabled={
-                  !balanceReady || storeBusy || purchaseBusy || store.lightning_rod_owned
-                }
-                onClick={() => void onBuyLightningRod()}
-              >
-                {store.lightning_rod_owned ? "Owned" : purchaseBusy ? "…" : "Buy rod"}
-              </button>
-            </div>
-          </article>
-        </li>
         {stormItems.map((item) => {
           const on = storeToggleOn(store, item.kind);
+          const toolOwned = storeHasFarmhandTool(store, item.kind);
           return (
             <li key={item.kind}>
               <article className={`store-card${on ? " store-card--active" : ""}`}>
                 <div className="store-card-top">
                   <h2>{item.title}</h2>
-                  <span className={`store-card-badge${on ? " store-card-badge--on" : ""}`}>{on ? "On" : "Off"}</span>
+                  <span className={`store-card-badge${on || toolOwned ? " store-card-badge--on" : ""}`}>
+                    {on ? "On" : toolOwned ? "Ready" : "Tool needed"}
+                  </span>
                 </div>
                 <p className="store-card-blurb">{item.blurb}</p>
+                <p className="store-card-blurb">
+                  Requires {item.toolName.toLowerCase()} before this helper can be hired.
+                </p>
                 <div className="store-card-foot">
-                  <span className="store-card-cost">{item.feePctLabel}</span>
+                  <span className="store-card-cost">
+                    {toolOwned ? item.feePctLabel : `${formatRu(item.oneTimeCost)} tool`}
+                  </span>
                   <button
                     type="button"
                     className={`btn store-card-btn${on ? " btn-ghost" : " btn-primary"}`}
-                    disabled={!balanceReady || storeBusy}
-                    onClick={() => void toggleStore(item.kind, !on)}
+                    disabled={!balanceReady || storeBusy || purchaseBusy}
+                    onClick={() => void (toolOwned ? toggleStore(item.kind, !on) : onBuyFarmhandTool(item))}
                   >
-                    {storeBusy ? "…" : on ? "Turn off" : "Turn on"}
+                    {storeBusy || purchaseBusy ? "…" : toolOwned ? (on ? "Turn off" : "Hire helper") : item.toolAction}
                   </button>
                 </div>
               </article>

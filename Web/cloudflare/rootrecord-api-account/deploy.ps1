@@ -160,6 +160,14 @@ if ($treasurySk.Length -ge 64) {
   Write-Host "Uploaded RRTT_TREASURY_SECRET_KEY_B58 (Roots treasury signer)."
 }
 
+foreach ($solanaRpcSecretName in @("SOLANA_RPC_URL", "HELIUS_RPC_URL", "HELIUS_API_KEY")) {
+  $solanaRpcSecretValue = [string](Get-Item -Path "Env:$solanaRpcSecretName" -ErrorAction SilentlyContinue).Value
+  if ($solanaRpcSecretValue.Trim().Length -ge 12) {
+    $solanaRpcSecretValue.Trim() | npx wrangler secret put $solanaRpcSecretName
+    Write-Host "Uploaded $solanaRpcSecretName for token/on-chain reports."
+  }
+}
+
 # AccuWeather secret only goes to weather + kilauea shards. Token/business/account/primary do not
 # carry weather code anymore (see router.ts: "Weather/forecast/natural-disaster modules removed").
 $shardLeaf = Split-Path $PSScriptRoot -Leaf

@@ -35,6 +35,11 @@ export type DiscordRootUnitsEnv = {
   RRTT_MINT_BASE58?: string;
   RRTT_DECIMALS?: string;
   CUSTODIAL_RPC_REFRESH_BUDGET_MS?: string;
+  HELIUS_API_KEY?: string;
+  HELIUS_RPC_URL?: string;
+  NEXT_PUBLIC_HELIUS_API_KEY?: string;
+  SOLANA_HELIUS_API_KEY?: string;
+  NEXT_PUBLIC_RPC_URL?: string;
   /** Custodial key decrypt (RRTT `/send user`). */
   INTERNAL_WALLET_ENC_KEY_B64?: string;
   /** Treasury pays ATA + tx fees for RRTT peer sends. */
@@ -1403,7 +1408,7 @@ async function handleMessageComponent(body: Record<string, unknown>, env: Discor
         data: {
           flags: 64,
           content:
-            "**Commands:** `/bal`, `/economy`, `/send` (**ROOTS** ledger, **RRTT**/**SOL** on-chain via `/send user`), `/wallet`, `/deposit`, `/menu`, `/faucet`, `/dice`. `/withdraw` & `/airdrop` soon.",
+            "**Commands:** `/bal`, `/economy`, `/send` (**ROOTS** ledger, **RRTT**/**SOL** on-chain via `/send user`), `/wallet`, `/deposit`, `/menu`, `/faucet`, `/dice`. Developer: `/screenshot`, `/snapshot`, `/activity`, `/token`, `/mint`. `/withdraw` & `/airdrop` soon.",
         },
       });
     }
@@ -1540,14 +1545,309 @@ async function fetchRootRecordTweets(env: DiscordRootUnitsEnv): Promise<Record<s
   }
 }
 
+async function fetchRootRecordReddit(): Promise<Record<string, unknown>> {
+  const url = "https://www.reddit.com/r/rootrecord/new.json?limit=10";
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "RootRecord/discord-ai-report/1.0 (community usage scan)" },
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const children = Array.isArray((data.data as Record<string, unknown> | undefined)?.children)
+      ? ((data.data as Record<string, unknown>).children as Array<Record<string, unknown>>)
+      : [];
+    const posts = children
+      .map((child) => {
+        const p = (child.data as Record<string, unknown> | undefined) || {};
+        return {
+          id: String(p.id || ""),
+          title: truncateText(p.title, 160),
+          author: String(p.author || ""),
+          score: n(p.score),
+          comments: n(p.num_comments),
+          created_utc: n(p.created_utc),
+          permalink: p.permalink ? `https://www.reddit.com${String(p.permalink)}` : "",
+          selftext: truncateText(p.selftext, 320),
+        };
+      })
+      .filter((p) => p.id && p.title);
+    return { configured: true, subreddit: "r/rootrecord", status: res.status, posts };
+  } catch (e) {
+    return { configured: true, subreddit: "r/rootrecord", error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+function pct(part: number, total: number): number {
+  if (!Number.isFinite(part) || !Number.isFinite(total) || total <= 0) return 0;
+  return Math.round((part / total) * 1000) / 10;
+}
+
+function enrichAppUsageRows(appDays: unknown, sessionRows: unknown, openRows: unknown): Array<Record<string, unknown>> {
+  const dayRows = Array.isArray(appDays) ? appDays : [];
+  const sessionList = Array.isArray(sessionRows) ? sessionRows : [];
+  const openList = Array.isArray(openRows) ? openRows : [];
+  const byApp = new Map<string, Record<string, unknown>>();
+
+  for (const raw of dayRows) {
+    const row = raw as Record<string, unknown>;
+    const appId = String(row.app_id || "").trim();
+    if (!appId || row.error) continue;
+    byApp.set(appId, {
+      app_id: appId,
+      units_earned: Math.max(0, Math.floor(n(row.units_earned))),
+      active_days: Math.max(0, Math.floor(n(row.active_days))),
+    });
+  }
+  for (const raw of sessionList) {
+    const row = raw as Record<string, unknown>;
+    const appId = String(row.app_id || "").trim();
+    if (!appId || row.error) continue;
+    const entry = byApp.get(appId) || { app_id: appId, units_earned: 0, active_days: 0 };
+    entry.sec_on_page = Math.max(0, Math.floor(n(row.sec_on_page)));
+    entry.active_users = Math.max(0, Math.floor(n(row.active_users)));
+    entry.latest_heartbeat_at = row.latest_heartbeat_at || null;
+    byApp.set(appId, entry);
+  }
+  for (const raw of openList) {
+    const row = raw as Record<string, unknown>;
+    const appId = String(row.app_id || "").trim();
+    if (!appId || row.error) continue;
+    const entry = byApp.get(appId) || { app_id: appId, units_earned: 0, active_days: 0 };
+    entry.recent_open_users = Math.max(0, Math.floor(n(row.recent_open_users)));
+    entry.latest_open_at = row.latest_open_at || null;
+    byApp.set(appId, entry);
+  }
+
+  const rows = [...byApp.values()];
+  const totalUnits = rows.reduce((sum, row) => sum + n(row.units_earned), 0);
+  const totalSeconds = rows.reduce((sum, row) => sum + n(row.sec_on_page), 0);
+  for (const row of rows) {
+    row.earned_share_pct = pct(n(row.units_earned), totalUnits);
+    row.time_share_pct = pct(n(row.sec_on_page), totalSeconds);
+  }
+  rows.sort((a, b) => n(b.time_share_pct) - n(a.time_share_pct) || n(b.units_earned) - n(a.units_earned));
+  return rows;
+}
+
+async function collectDiscordActivityReportData(env: DiscordRootUnitsEnv, requesterDiscordId: string): Promise<Record<string, unknown>> {
+  const nowIso = new Date().toISOString();
+  const [
+    totals,
+    daily,
+    channels,
+    topUsers,
+    linkedActive,
+    recentMessages,
+    discoveredChannels,
+    announcements,
+  ] = await Promise.all([
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS tracked_users,
+              COALESCE(SUM(message_count), 0) AS tracked_user_messages,
+              COALESCE(SUM(CASE WHEN last_message_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0) AS active_users_7d,
+              COALESCE(SUM(CASE WHEN last_message_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END), 0) AS active_users_30d,
+              MAX(last_message_at) AS latest_message_at
+       FROM discord_user_activity`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT day, message_count
+       FROM discord_activity_daily
+       ORDER BY day DESC
+       LIMIT 30`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT c.channel_id,
+              COALESCE(d.name, c.channel_id) AS channel_name,
+              d.type AS channel_type,
+              COALESCE(SUM(c.message_count), 0) AS message_count,
+              MAX(c.day) AS latest_day
+       FROM discord_activity_daily_by_channel c
+       LEFT JOIN discord_discovered_channels d ON d.channel_id = c.channel_id
+       WHERE c.day >= date('now', '-30 days')
+       GROUP BY c.channel_id
+       ORDER BY message_count DESC
+       LIMIT 25`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT discord_user_id,
+              username,
+              global_name,
+              last_message_at,
+              message_count
+       FROM discord_user_activity
+       WHERE last_message_at >= datetime('now', '-30 days')
+       ORDER BY message_count DESC, last_message_at DESC
+       LIMIT 25`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT l.account_id,
+              l.email,
+              a.discord_user_id,
+              a.username,
+              a.global_name,
+              a.last_message_at,
+              a.message_count
+       FROM discord_account_links l
+       INNER JOIN discord_user_activity a ON a.discord_user_id = l.discord_user_id
+       WHERE a.last_message_at >= datetime('now', '-30 days')
+       ORDER BY a.last_message_at DESC
+       LIMIT 25`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT s.discord_message_id,
+              s.channel_id,
+              COALESCE(d.name, s.channel_id) AS channel_name,
+              s.created_at
+       FROM discord_channel_message_stats s
+       LEFT JOIN discord_discovered_channels d ON d.channel_id = s.channel_id
+       ORDER BY s.created_at DESC
+       LIMIT 25`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT channel_id, guild_id, name, type, position, parent_id, updated_at
+       FROM discord_discovered_channels
+       ORDER BY position ASC, name ASC
+       LIMIT 75`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT app_scope, title, body, created_at
+       FROM developer_messages
+       ORDER BY created_at DESC
+       LIMIT 12`,
+    ),
+  ]);
+
+  const days = (Array.isArray(daily) ? daily : []) as Array<Record<string, unknown>>;
+  const totalMessages30d = days.reduce((sum, row) => sum + n((row as Record<string, unknown>).message_count), 0);
+  const mostRecentDay = days[0] as Record<string, unknown> | undefined;
+  const previousDay = days[1] as Record<string, unknown> | undefined;
+
+  return {
+    generated_at: nowIso,
+    requested_by_discord_id: requesterDiscordId,
+    purpose: "Developer-only Discord activity report for Root Record community operations",
+    source_tables: [
+      "discord_activity_daily",
+      "discord_activity_daily_by_channel",
+      "discord_channel_message_stats",
+      "discord_discovered_channels",
+      "discord_user_activity",
+      "discord_account_links",
+      "developer_messages",
+    ],
+    totals,
+    calculated: {
+      total_messages_30d: totalMessages30d,
+      latest_day: mostRecentDay?.day || null,
+      latest_day_messages: n(mostRecentDay?.message_count),
+      previous_day_messages: n(previousDay?.message_count),
+      latest_day_delta: n(mostRecentDay?.message_count) - n(previousDay?.message_count),
+    },
+    daily_30d: daily,
+    channel_activity_30d: channels,
+    top_users_30d: topUsers,
+    linked_active_users_30d: linkedActive,
+    recent_messages: recentMessages,
+    discovered_channels: discoveredChannels,
+    recent_announcements_feed: announcements,
+  };
+}
+
+async function loadRecentActivityAiReport(env: DiscordRootUnitsEnv, maxAgeMs: number): Promise<Record<string, unknown> | null> {
+  const row = await dbFirst<{ id: string; created_at: string; prompt_json: string; response_json: string }>(
+    env.DB,
+    `SELECT id, created_at, prompt_json, response_json
+     FROM discord_ai_reports
+     WHERE command_name = '/activity'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+  );
+  if (!row || (row as Record<string, unknown>).error) return null;
+  const createdMs = Date.parse(row.created_at);
+  if (!Number.isFinite(createdMs) || Date.now() - createdMs > maxAgeMs) return null;
+  const response = parseJsonObject(row.response_json);
+  const final = (response?.final as Record<string, unknown> | undefined) || response;
+  const prompt = parseJsonObject(row.prompt_json);
+  return {
+    id: row.id,
+    created_at: row.created_at,
+    generated_for_snapshot: false,
+    content: truncateText(String(final?.content || final?.fallback || ""), 1800),
+    status: final?.status || null,
+    summary_metrics: (prompt?.calculated as Record<string, unknown> | undefined) || null,
+  };
+}
+
+async function generateDiscordActivityAiReport(
+  env: DiscordRootUnitsEnv,
+  requesterDiscordId: string,
+  discord: { interactionId: string; channelId: string; guildId: string; userId: string },
+  opts: { generatedForSnapshot?: boolean } = {},
+): Promise<Record<string, unknown>> {
+  const reportData = await collectDiscordActivityReportData(env, requesterDiscordId);
+  const archiveId = crypto.randomUUID();
+  const final = await callGrokAnalysis(
+    env,
+    "Discord Activity Report",
+    "Analyze Discord-only activity for the Root Record community. Focus on channel utilization, message trends, active/linked member signals, announcement feed activity, and operational watch items. Avoid token price or ROOTS balance analysis unless the Discord activity directly references it. Return Discord-ready Markdown sections: Activity Pulse, Channels, Member Signals, Watch Items, Recommended Actions.",
+    reportData,
+  );
+  await postAiChannelMessage(env, {
+    content: `**/activity Discord report ${archiveId.slice(0, 8)}${opts.generatedForSnapshot ? " (snapshot refresh)" : ""}**\n${String(final.content || "No activity AI content returned.").slice(0, 1700)}`,
+  });
+  await archiveAiReport(
+    env,
+    "/activity",
+    {
+      id: archiveId,
+      created_at: new Date().toISOString(),
+      prompt: reportData,
+      response: { final },
+    },
+    discord,
+  );
+  return {
+    id: archiveId,
+    created_at: new Date().toISOString(),
+    generated_for_snapshot: Boolean(opts.generatedForSnapshot),
+    content: truncateText(String(final.content || final.fallback || "Discord activity report generated."), 1800),
+    status: final.status || null,
+    summary_metrics: reportData.calculated as Record<string, unknown>,
+  };
+}
+
 async function collectScreenshotReportData(env: DiscordRootUnitsEnv, requesterDiscordId: string): Promise<Record<string, unknown>> {
   const nowIso = new Date().toISOString();
-  const [leaderboard, circulation, daily, x, website, accounts, balances, appDays, photos, messages, errors, discordActivity] =
+  const [
+    leaderboard,
+    circulation,
+    daily,
+    x,
+    reddit,
+    website,
+    accounts,
+    balances,
+    appDays,
+    appSessionTime,
+    appRecentOpens,
+    photos,
+    messages,
+    errors,
+    discordActivity,
+  ] =
     await Promise.all([
       loadEconomyLeaderboardData(env.DB).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
       readCirculationTotals(env.DB).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
       loadEconomyDailySeries(env.DB, 14).catch((e) => [{ error: e instanceof Error ? e.message : String(e) }]),
       fetchRootRecordTweets(env),
+      fetchRootRecordReddit(),
       Promise.all(
         [
           "https://rootrecord.info/",
@@ -1566,6 +1866,23 @@ async function collectScreenshotReportData(env: DiscordRootUnitsEnv, requesterDi
          WHERE ymd >= date('now', '-14 days')
          GROUP BY app_id
          ORDER BY units_earned DESC
+         LIMIT 20`,
+      ),
+      dbAll(
+        env.DB,
+        `SELECT app_id, COUNT(*) AS active_users, COALESCE(SUM(sec_on_page), 0) AS sec_on_page, MAX(updated_at) AS latest_heartbeat_at
+         FROM rr_earn_state
+         GROUP BY app_id
+         ORDER BY sec_on_page DESC
+         LIMIT 20`,
+      ),
+      dbAll(
+        env.DB,
+        `SELECT app_id, COUNT(DISTINCT user_id) AS recent_open_users, MAX(last_open_at) AS latest_open_at
+         FROM rr_app_session_last_open
+         WHERE last_open_at >= datetime('now', '-14 days')
+         GROUP BY app_id
+         ORDER BY recent_open_users DESC
          LIMIT 20`,
       ),
       dbAll(
@@ -1604,10 +1921,12 @@ async function collectScreenshotReportData(env: DiscordRootUnitsEnv, requesterDi
     purpose: "Root Record ecosystem report for Discord /screenshot",
     root_economy: { circulation, daily, leaderboard },
     rootrecord_x: x,
+    reddit,
     website,
     accounts,
     balances,
-    app_usage_14d: appDays,
+    app_usage_14d: enrichAppUsageRows(appDays, appSessionTime, appRecentOpens),
+    app_usage_raw: { earned_14d: appDays, session_time: appSessionTime, recent_opens: appRecentOpens },
     volcano_photos: photos,
     developer_messages: messages,
     recent_worker_errors: errors,
@@ -1643,8 +1962,11 @@ async function callGrokReport(env: DiscordRootUnitsEnv, reportData: Record<strin
   const model = String(env.GROK_MODEL || "grok-3-latest").trim();
   const prompt =
     "Create a concise Discord-ready Root Record ecosystem report. Use only the provided data. " +
-    "Compare current data to previous_report when present. Use clean Markdown sections: Since Last Report, Current Snapshot, Watch Items, X Copy. " +
-    "X Copy must be a short copy-pasteable post with no hashtags. Call out new X posts, website/product changes, economy stats, app usage, photo review state, and operational risks. " +
+    "Move focus away from ROOTS balances and toward actual app usage, service utilization, user activity, product updates, and community signals. " +
+    "Compare current data to previous_report when present. Use clean Markdown sections: Since Last Report, App Usage & Services, Community Signals, Watch Items, X Copy. " +
+    "Use app_usage_14d earned_share_pct and time_share_pct to compare apps. Mention Reddit r/rootrecord when posts exist. " +
+    "Use discord_activity_ai_report as the Discord-specific subreport and fold its findings into Community Signals and Watch Items. " +
+    "X Copy must be a short copy-pasteable post with no hashtags. Keep token/internal balance details secondary unless they explain adoption. " +
     "Keep the full response under 1800 characters and do not mention secrets or internal tokens.";
   const body = {
     model,
@@ -1806,9 +2128,26 @@ function formatTopHolders(leaderboard: Record<string, unknown> | undefined): str
 function formatAppUsage(rows: unknown): string {
   if (!Array.isArray(rows) || !rows.length) return "No 14-day app usage rows returned.";
   return compactList(
-    rows.slice(0, 3).map((raw) => {
+    rows.slice(0, 5).map((raw) => {
       const row = raw as Record<string, unknown>;
-      return `${String(row.app_id || "unknown")}: ${formatRootsAtomicLocale(n(row.units_earned))} ROOTS`;
+      const time = n(row.time_share_pct) > 0 ? `, ${n(row.time_share_pct).toFixed(1)}% time` : "";
+      const users = n(row.recent_open_users || row.active_users);
+      return `${String(row.app_id || "unknown")}: ${n(row.earned_share_pct).toFixed(1)}% rewards${time}, ${users.toLocaleString()} users`;
+    }),
+    5,
+  );
+}
+
+function formatRedditSummary(reddit: Record<string, unknown> | undefined): string {
+  if (!reddit) return "Reddit r/rootrecord scan unavailable.";
+  if (reddit.error) return `Reddit r/rootrecord error: ${truncateText(reddit.error, 100)}`;
+  const posts = Array.isArray(reddit.posts) ? reddit.posts : [];
+  if (!posts.length) return "Reddit r/rootrecord: no recent posts returned.";
+  return compactList(
+    posts.slice(0, 3).map((raw) => {
+      const p = raw as Record<string, unknown>;
+      const comments = n(p.comments);
+      return `${truncateText(p.title, 70)} (${comments.toLocaleString()} comments)`;
     }),
     3,
   );
@@ -1853,6 +2192,14 @@ function formatOpsSummary(reportData: Record<string, unknown>): string {
         .join("; ")
     : "no recent worker errors returned";
   return `Discord messages tracked: ${discordMessages.toLocaleString()} recent. Worker signals: ${errText}.`;
+}
+
+function formatDiscordActivityAiSummary(reportData: Record<string, unknown>): string {
+  const activity = reportData.discord_activity_ai_report as Record<string, unknown> | undefined;
+  if (!activity) return "Discord activity AI report unavailable.";
+  const age = activity.generated_for_snapshot ? "fresh" : "recent";
+  const content = truncateText(activity.content || activity.fallback || "No activity report text.", 620);
+  return `${age} activity pass ${activity.id ? `(${String(activity.id).slice(0, 8)})` : ""}: ${content}`;
 }
 
 function reportMetrics(reportData: Record<string, unknown> | null | undefined): {
@@ -1944,12 +2291,13 @@ function buildXCopy(reportData: Record<string, unknown>): string {
   const xSignal = formatXSummary(reportData.rootrecord_x as Record<string, unknown> | undefined)
     .replace(/^@rootrecord latest(?: \([^)]*\))?:\s*/i, "Latest RootRecord update: ")
     .replace(/^@rootrecord:\s*/i, "RootRecord X: ");
+  const appUsage = formatAppUsage(reportData.app_usage_14d);
   return truncateText(
     [
       "Root Record ecosystem update:",
-      `${cur.accounts.toLocaleString()} accounts, ${formatRootsAtomicLocale(cur.circulation)} ROOTS in internal circulation across ${cur.holders.toLocaleString()} holders.`,
+      `${cur.accounts.toLocaleString()} accounts are using Root Record services.`,
       movement,
-      `Top holder: ${cur.topHolder}. App activity leader: ${cur.appLeader}.`,
+      `App usage: ${appUsage}.`,
       xSignal,
     ].join(" "),
     420,
@@ -1966,9 +2314,9 @@ function buildSocialUpdateFallback(reportData: Record<string, unknown>): string 
   const discordCopy = truncateText(
     [
       "Daily Root Record update:",
-      `${cur.accounts.toLocaleString()} accounts are tracked with ${formatRootsAtomicLocale(cur.circulation)} ROOTS in internal circulation.`,
+      `${cur.accounts.toLocaleString()} accounts are tracked across Root Record services.`,
       movement,
-      `Root Farms leads app activity today, with ${formatRootsAtomicLocale(cur.appLeaderUnits)} ROOTS earned over the 14-day view.`,
+      `App usage mix: ${formatAppUsage(reportData.app_usage_14d)}.`,
     ].join(" "),
     650,
   );
@@ -2002,6 +2350,33 @@ function fieldValue(raw: unknown, max = 980): string {
   return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}…` : s;
 }
 
+async function postAiChannelMessage(
+  env: DiscordRootUnitsEnv,
+  payload: { content?: string; embeds?: DiscordEmbed[]; username?: string },
+): Promise<void> {
+  const webhook = String(env.DISCORD_GROK_WEBHOOK_URL || "").trim();
+  if (!webhook) return;
+  const body: Record<string, unknown> = {
+    username: payload.username || "Root Record AI",
+  };
+  if (payload.content) body.content = truncateText(payload.content, 1900);
+  if (payload.embeds?.length) body.embeds = payload.embeds;
+  if (!body.content && !body.embeds) body.content = "Root Record AI report update.";
+  try {
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error("discord_ai_channel_post", res.status, text.slice(0, 300));
+    }
+  } catch (e) {
+    console.error("discord_ai_channel_post", e instanceof Error ? e.message : String(e));
+  }
+}
+
 function buildScreenshotReportEmbeds(reportData: Record<string, unknown>, archiveId: string): DiscordEmbed[] {
   const economy = reportData.root_economy as Record<string, unknown> | undefined;
   const circulation = economy?.circulation as Record<string, unknown> | undefined;
@@ -2015,7 +2390,7 @@ function buildScreenshotReportEmbeds(reportData: Record<string, unknown>, archiv
   return [
     {
       title: "Root Record Ecosystem Report",
-      description: `Generated ${reportTimestamp(generated)} from live Worker, website, Discord, and X data.`,
+      description: `Generated ${reportTimestamp(generated)} from live Worker, app usage, website, Discord, X, and Reddit data.`,
       color: 0x00a37a,
       timestamp: generated,
       fields: [
@@ -2024,11 +2399,11 @@ function buildScreenshotReportEmbeds(reportData: Record<string, unknown>, archiv
           value: fieldValue(formatComparison(reportData)),
         },
         {
-          name: "Economy Snapshot",
+          name: "Account Snapshot",
           value: fieldValue(
             [
               `Accounts: **${n(accounts?.total_accounts).toLocaleString()}**`,
-              `Circulation: **${formatRootsAtomicLocale(total)} ROOTS**`,
+              `Internal ROOTS: **${formatRootsAtomicLocale(total)}**`,
               `Holders: **${holders.toLocaleString()}**`,
             ].join("\n"),
           ),
@@ -2040,11 +2415,7 @@ function buildScreenshotReportEmbeds(reportData: Record<string, unknown>, archiv
           inline: true,
         },
         {
-          name: "Top Holders",
-          value: fieldValue(formatTopHolders(leaderboard)),
-        },
-        {
-          name: "App Activity",
+          name: "App Usage Mix",
           value: fieldValue(formatAppUsage(reportData.app_usage_14d)),
         },
         {
@@ -2052,9 +2423,15 @@ function buildScreenshotReportEmbeds(reportData: Record<string, unknown>, archiv
           value: fieldValue(
             [
               formatXSummary(reportData.rootrecord_x as Record<string, unknown> | undefined),
+              `Reddit: ${formatRedditSummary(reportData.reddit as Record<string, unknown> | undefined)}`,
+              `Discord: ${formatDiscordActivityAiSummary(reportData)}`,
               `Website: ${formatWebsiteSummary(reportData.website)}`,
             ].join("\n"),
           ),
+        },
+        {
+          name: "Top Holders (Secondary)",
+          value: fieldValue(formatTopHolders(leaderboard)),
         },
       ],
       footer: { text: `Raw JSON saved: ${archiveId.slice(0, 8)}` },
@@ -2073,24 +2450,26 @@ function buildFallbackScreenshotPost(reportData: Record<string, unknown>): strin
   const total = n(circulation?.total_circulation || balances?.total_balance);
   return [
     "**Root Record Ecosystem Report**",
-    `_Generated ${reportTimestamp(reportData.generated_at)} from live Worker, website, Discord, and X data._`,
+    `_Generated ${reportTimestamp(reportData.generated_at)} from live Worker, app usage, website, Discord, X, and Reddit data._`,
     "",
     "**Since Last Report**",
     formatComparison(reportData),
     "",
-    "**Economy**",
+    "**Usage & Services**",
     `• Total accounts: **${n(accounts?.total_accounts).toLocaleString()}**`,
-    `• ROOTS circulation: **${formatRootsAtomicLocale(total)} ROOTS** across **${holders.toLocaleString()}** holders`,
-    `• Top holders:\n${formatTopHolders(leaderboard)}`,
+    `• App usage mix: ${formatAppUsage(reportData.app_usage_14d)}`,
+    `• Internal ROOTS: **${formatRootsAtomicLocale(total)}** across **${holders.toLocaleString()}** holders`,
     "",
     "**Activity & Queues**",
-    `• App usage, 14 days: ${formatAppUsage(reportData.app_usage_14d)}`,
     `• Volcano photo queue: ${formatPhotoQueue(photos)}`,
     `• ${formatOpsSummary(reportData)}`,
     "",
     "**Content Signals**",
     `• ${formatXSummary(reportData.rootrecord_x as Record<string, unknown> | undefined)}`,
+    `• Reddit: ${formatRedditSummary(reportData.reddit as Record<string, unknown> | undefined)}`,
+    `• Discord: ${formatDiscordActivityAiSummary(reportData)}`,
     `• Website: ${formatWebsiteSummary(reportData.website)}`,
+    `• Top holders (secondary): ${formatTopHolders(leaderboard).replace(/\n/g, "; ")}`,
     "",
     "**X Copy**",
     "```text",
@@ -2146,6 +2525,367 @@ async function archiveScreenshotReport(
   }
 }
 
+function solanaRpcUrl(env: DiscordRootUnitsEnv): string {
+  const direct = String(env.HELIUS_RPC_URL || env.SOLANA_RPC_URL || env.NEXT_PUBLIC_RPC_URL || "").trim();
+  if (direct) return direct;
+  const key = String(env.HELIUS_API_KEY || env.NEXT_PUBLIC_HELIUS_API_KEY || env.SOLANA_HELIUS_API_KEY || "").trim();
+  if (key) return `https://mainnet.helius-rpc.com/?api-key=${encodeURIComponent(key)}`;
+  return "https://api.mainnet-beta.solana.com";
+}
+
+async function solanaRpc(env: DiscordRootUnitsEnv, method: string, params: unknown[]): Promise<Record<string, unknown>> {
+  try {
+    const res = await fetch(solanaRpcUrl(env), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": "RootRecord/discord-token-report" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ok: res.ok && !data.error, status: res.status, data };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+async function fetchJsonUrl(url: string): Promise<Record<string, unknown>> {
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "RootRecord/discord-token-report" } });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+async function collectRootsOnchainData(env: DiscordRootUnitsEnv): Promise<Record<string, unknown>> {
+  const [supply, largestAccounts, asset, heliusTokenAccounts] = await Promise.all([
+    solanaRpc(env, "getTokenSupply", [ROOTS_MINT_BASE58]),
+    solanaRpc(env, "getTokenLargestAccounts", [ROOTS_MINT_BASE58]),
+    solanaRpc(env, "getAsset", [{ id: ROOTS_MINT_BASE58 }]),
+    solanaRpc(env, "getTokenAccounts", [{ mint: ROOTS_MINT_BASE58, page: 1, limit: 20, displayOptions: { showZeroBalance: false } }]),
+  ]);
+  return {
+    mint: ROOTS_MINT_BASE58,
+    solscan_holders_url: `https://solscan.io/token/${ROOTS_MINT_BASE58}#holders`,
+    rpc_url_kind: solanaRpcUrl(env).includes("helius") ? "helius" : "configured_rpc",
+    supply,
+    largest_accounts: largestAccounts,
+    asset,
+    helius_token_accounts: heliusTokenAccounts,
+  };
+}
+
+async function collectRootsMarketData(): Promise<Record<string, unknown>> {
+  const [dex, jupiter] = await Promise.all([
+    fetchJsonUrl(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(ROOTS_MINT_BASE58)}`),
+    fetchJsonUrl(`https://lite-api.jup.ag/price/v3?ids=${encodeURIComponent(ROOTS_MINT_BASE58)}`),
+  ]);
+  const dexData = (dex.data as Record<string, unknown> | undefined) || {};
+  const pairs = Array.isArray(dexData.pairs) ? (dexData.pairs as unknown[]).slice(0, 8) : [];
+  return {
+    roots_mint: ROOTS_MINT_BASE58,
+    solscan_url: `https://solscan.io/token/${ROOTS_MINT_BASE58}`,
+    solscan_holders_url: `https://solscan.io/token/${ROOTS_MINT_BASE58}#holders`,
+    dexscreener: { ...dex, data: { pairs } },
+    jupiter,
+  };
+}
+
+async function collectTokenReportData(env: DiscordRootUnitsEnv, requesterDiscordId: string): Promise<Record<string, unknown>> {
+  const nowIso = new Date().toISOString();
+  const [circulation, leaderboard, internalBalances, mintRequests, cachedCustodialRoots, onchain, market, appUsage, reddit] =
+    await Promise.all([
+      readCirculationTotals(env.DB).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
+      loadEconomyLeaderboardData(env.DB).catch((e) => ({ error: e instanceof Error ? e.message : String(e) })),
+      dbFirst(
+        env.DB,
+        `SELECT COUNT(*) AS accounts_with_balance,
+                COALESCE(SUM(balance), 0) AS total_balance,
+                COALESCE(AVG(balance), 0) AS avg_balance,
+                COALESCE(MAX(balance), 0) AS max_balance
+         FROM rr_earn_balance
+         WHERE balance > 0`,
+      ),
+      dbAll(
+        env.DB,
+        `SELECT status, COUNT(*) AS count, COALESCE(SUM(amount_atomic), 0) AS amount_atomic
+         FROM rr_roots_mint_requests
+         GROUP BY status
+         ORDER BY status`,
+      ),
+      dbFirst(
+        env.DB,
+        `SELECT COUNT(DISTINCT account_id) AS custodial_accounts,
+                COALESCE(SUM(CAST(amount_raw AS INTEGER)), 0) AS amount_raw,
+                MAX(updated_at) AS updated_at
+         FROM custodial_wallet_token_slots
+         WHERE mint_base58 = ? AND CAST(amount_raw AS INTEGER) > 0`,
+        ROOTS_MINT_BASE58,
+      ),
+      collectRootsOnchainData(env),
+      collectRootsMarketData(),
+      dbAll(
+        env.DB,
+        `SELECT app_id, SUM(units_earned) AS units_earned, COUNT(*) AS active_days
+         FROM rr_earn_app_day
+         WHERE ymd >= date('now', '-14 days')
+         GROUP BY app_id
+         ORDER BY units_earned DESC
+         LIMIT 20`,
+      ),
+      fetchRootRecordReddit(),
+    ]);
+  return {
+    generated_at: nowIso,
+    requested_by_discord_id: requesterDiscordId,
+    purpose: "Developer-only Discord /token ROOTS token report",
+    internal_roots: { circulation, leaderboard, internal_balances: internalBalances, mint_requests: mintRequests, cached_custodial_roots: cachedCustodialRoots },
+    onchain_roots: onchain,
+    market,
+    usage_context: { app_usage_14d: appUsage, reddit },
+  };
+}
+
+async function callGrokAnalysis(
+  env: DiscordRootUnitsEnv,
+  title: string,
+  instruction: string,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const token = String(env.GROK_API_BEARER_TOKEN || "").trim();
+  const apiUrl = String(env.GROK_API_URL || "https://api.x.ai/v1/chat/completions").trim();
+  const model = String(env.GROK_MODEL || "grok-3-latest").trim();
+  const body = {
+    model,
+    messages: [
+      {
+        role: "system",
+        content:
+          `${instruction} Use only provided data. Be precise, mention unavailable/failed sources, and keep under 1200 characters. ` +
+          "Do not reveal secrets or raw credentials.",
+      },
+      { role: "user", content: jsonForArchive(data) },
+    ],
+    temperature: 0.25,
+  };
+  if (!token) {
+    return { ok: false, title, detail: "Grok API bearer token is not configured.", content: `${title}: AI unavailable; data archived.`, request: body };
+  }
+  try {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const response = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const content = String(
+      (((response.choices as Array<Record<string, unknown>> | undefined)?.[0]?.message as Record<string, unknown> | undefined)
+        ?.content as string | undefined) || "",
+    ).trim();
+    return { ok: res.ok && Boolean(content), title, status: res.status, content: content || `${title}: no AI text returned.`, request: body, response };
+  } catch (e) {
+    return { ok: false, title, detail: e instanceof Error ? e.message : String(e), content: `${title}: AI request failed.`, request: body };
+  }
+}
+
+async function archiveAiReport(
+  env: DiscordRootUnitsEnv,
+  commandName: string,
+  record: Record<string, unknown>,
+  discord: { interactionId: string; channelId: string; guildId: string; userId: string },
+): Promise<void> {
+  const id = String(record.id || crypto.randomUUID());
+  const nowIso = String(record.created_at || new Date().toISOString());
+  try {
+    await env.DB.prepare(
+      `INSERT INTO discord_ai_reports
+       (id, command_name, interaction_id, channel_id, guild_id, requested_by_discord_id, prompt_json, response_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        id,
+        commandName,
+        discord.interactionId,
+        discord.channelId,
+        discord.guildId,
+        discord.userId,
+        jsonForArchive(record.prompt),
+        jsonForArchive(record.response),
+        nowIso,
+      )
+      .run();
+  } catch (e) {
+    console.error("discord_ai_report_archive_d1", e instanceof Error ? e.message : String(e));
+  }
+
+  const webhook = String(env.DISCORD_GROK_WEBHOOK_URL || "").trim();
+  if (!webhook) return;
+  try {
+    const form = new FormData();
+    form.set(
+      "payload_json",
+      JSON.stringify({
+        content: `Root Record ${commandName} archive ${id}`,
+        username: "Root Record AI",
+      }),
+    );
+    form.set("files[0]", new Blob([jsonForArchive(record)], { type: "application/json" }), `rootrecord-${commandName.replace(/^\//, "")}-${id}.json`);
+    await fetch(webhook, { method: "POST", body: form });
+  } catch (e) {
+    console.error("discord_ai_report_archive_webhook", e instanceof Error ? e.message : String(e));
+  }
+}
+
+function tokenReportEmbed(finalReport: Record<string, unknown>, archiveId: string): DiscordEmbed[] {
+  return [
+    {
+      title: "ROOTS Token Report",
+      description: fieldValue(finalReport.content || "Token report generated.", 1800),
+      color: 0x7c3aed,
+      fields: [
+        { name: "Mint", value: `\`${ROOTS_MINT_BASE58}\`` },
+        { name: "Solscan", value: `[Token](https://solscan.io/token/${ROOTS_MINT_BASE58}) · [Holders](https://solscan.io/token/${ROOTS_MINT_BASE58}#holders)` },
+      ],
+      footer: { text: `AI record saved: ${archiveId.slice(0, 8)}` },
+      timestamp: new Date().toISOString(),
+    },
+  ];
+}
+
+function activityReportEmbed(activityReport: Record<string, unknown>): DiscordEmbed[] {
+  const metrics = (activityReport.summary_metrics as Record<string, unknown> | undefined) || {};
+  const generatedForSnapshot = Boolean(activityReport.generated_for_snapshot);
+  return [
+    {
+      title: "Discord Activity Report",
+      description: fieldValue(activityReport.content || "Discord activity report generated.", 1800),
+      color: 0x5865f2,
+      fields: [
+        {
+          name: "30d Messages",
+          value: n(metrics.total_messages_30d).toLocaleString(),
+          inline: true,
+        },
+        {
+          name: "Latest Day",
+          value: `${metrics.latest_day || "n/a"} · ${n(metrics.latest_day_messages).toLocaleString()}`,
+          inline: true,
+        },
+        {
+          name: "Source",
+          value: generatedForSnapshot ? "Generated for snapshot refresh" : "Developer /activity",
+          inline: true,
+        },
+      ],
+      footer: { text: `AI record saved: ${String(activityReport.id || "").slice(0, 8)}` },
+      timestamp: String(activityReport.created_at || new Date().toISOString()),
+    },
+  ];
+}
+
+async function handleActivityCommand(
+  body: Record<string, unknown>,
+  env: DiscordRootUnitsEnv,
+  member: Record<string, unknown> | undefined,
+  requesterDiscordId: string,
+): Promise<Response> {
+  if (!(await hasDeveloperRole(member, env))) {
+    return interactionResponse(4, { content: "Only @Developer can use `/activity`.", flags: 64 });
+  }
+  const activityReport = await generateDiscordActivityAiReport(env, requesterDiscordId, {
+    interactionId: String(body.id || ""),
+    channelId: String(body.channel_id || ""),
+    guildId: String(body.guild_id || ""),
+    userId: requesterDiscordId,
+  });
+  return jsonInteractionPayload({
+    type: 4,
+    data: {
+      embeds: activityReportEmbed(activityReport),
+      flags: 64,
+    },
+  });
+}
+
+async function handleTokenCommand(
+  body: Record<string, unknown>,
+  env: DiscordRootUnitsEnv,
+  member: Record<string, unknown> | undefined,
+  requesterDiscordId: string,
+): Promise<Response> {
+  if (!(await hasDeveloperRole(member, env))) {
+    return interactionResponse(4, { content: "Only @Developer can use `/token`.", flags: 64 });
+  }
+  const reportData = await collectTokenReportData(env, requesterDiscordId);
+  const archiveId = crypto.randomUUID();
+  const sectionSpecs = [
+    {
+      key: "internal",
+      title: "Internal ROOTS Ledger",
+      instruction: "Analyze internal ROOTS balances, circulation, mint request status, and custodial cached ROOTS. Focus on what this says about usage and distribution.",
+      data: reportData.internal_roots as Record<string, unknown>,
+    },
+    {
+      key: "onchain",
+      title: "On-chain ROOTS Token",
+      instruction: "Analyze on-chain ROOTS supply, largest token accounts, holder/account data from Helius/RPC, and Solscan holder context.",
+      data: reportData.onchain_roots as Record<string, unknown>,
+    },
+    {
+      key: "market",
+      title: "ROOTS LP Market",
+      instruction: "Analyze ROOTS market/LP data from DexScreener/Jupiter/Solscan links. Call out price, liquidity, pairs, volume, and missing data.",
+      data: reportData.market as Record<string, unknown>,
+    },
+    {
+      key: "usage",
+      title: "ROOTS Usage Context",
+      instruction: "Analyze how ROOTS usage connects to app activity and community signals. Prefer app/service utilization over raw token balance hype.",
+      data: reportData.usage_context as Record<string, unknown>,
+    },
+  ];
+  const subreports: Record<string, unknown>[] = [];
+  for (const spec of sectionSpecs) {
+    const ai = await callGrokAnalysis(env, spec.title, spec.instruction, spec.data);
+    subreports.push({ key: spec.key, ...ai });
+    await postAiChannelMessage(env, {
+      content: `**/token subreport: ${spec.title} (${archiveId.slice(0, 8)})**\n${String(ai.content || "No AI content returned.").slice(0, 1700)}`,
+    });
+  }
+  const final = await callGrokAnalysis(
+    env,
+    "Final ROOTS Token Report",
+    "Combine the provided subreports into one developer-ready ROOTS token report. Include internal ledger, on-chain holder/supply, LP market, app usage context, risks, and next actions. Keep it Discord-ready.",
+    { report_data: reportData, subreports },
+  );
+  await postAiChannelMessage(env, {
+    content: `**/token final report ${archiveId.slice(0, 8)}**\n${String(final.content || "No final AI content returned.").slice(0, 1700)}`,
+  });
+  await archiveAiReport(
+    env,
+    "/token",
+    {
+      id: archiveId,
+      created_at: new Date().toISOString(),
+      prompt: reportData,
+      response: { subreports, final },
+    },
+    {
+      interactionId: String(body.id || ""),
+      channelId: String(body.channel_id || ""),
+      guildId: String(body.guild_id || ""),
+      userId: requesterDiscordId,
+    },
+  );
+  return jsonInteractionPayload({
+    type: 4,
+    data: {
+      embeds: tokenReportEmbed(final, archiveId),
+      flags: 64,
+    },
+  });
+}
+
 async function handleScreenshotCommand(
   body: Record<string, unknown>,
   env: DiscordRootUnitsEnv,
@@ -2153,7 +2893,7 @@ async function handleScreenshotCommand(
   requesterDiscordId: string,
 ): Promise<Response> {
   if (!(await hasDeveloperRole(member, env))) {
-    return interactionResponse(4, { content: "Only @Developer can use `/screenshot`.", flags: 64 });
+    return interactionResponse(4, { content: "Only @Developer can use `/screenshot` or `/snapshot`.", flags: 64 });
   }
 
   const [reportData, previous] = await Promise.all([
@@ -2163,10 +2903,30 @@ async function handleScreenshotCommand(
   if (previous) {
     reportData.previous_report = previous;
   }
+  const recentActivityReport = await loadRecentActivityAiReport(env, 60 * 60 * 1000);
+  reportData.discord_activity_ai_report =
+    recentActivityReport ||
+    (await generateDiscordActivityAiReport(
+      env,
+      requesterDiscordId,
+      {
+        interactionId: String(body.id || ""),
+        channelId: String(body.channel_id || ""),
+        guildId: String(body.guild_id || ""),
+        userId: requesterDiscordId,
+      },
+      { generatedForSnapshot: true },
+    ));
   const grok = await callGrokReport(env, reportData);
   const archiveId = crypto.randomUUID();
   const reportEmbeds = buildScreenshotReportEmbeds(reportData, archiveId);
   const social = await callGrokSocialUpdate(env, reportData, reportEmbeds);
+  await postAiChannelMessage(env, {
+    content: `**/screenshot AI report ${archiveId.slice(0, 8)}**\n${String(grok.content || grok.fallback || "Report generated.").slice(0, 1700)}`,
+  });
+  await postAiChannelMessage(env, {
+    content: `**/screenshot social draft ${archiveId.slice(0, 8)}**\n${String(social.content || "Social draft generated.").slice(0, 1700)}`,
+  });
   await archiveScreenshotReport(
     env,
     {
@@ -2300,8 +3060,16 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
     return handleEconomy(env.DB);
   }
 
-  if (name === "screenshot") {
+  if (name === "screenshot" || name === "snapshot") {
     return handleScreenshotCommand(body, env, member, fromDiscordId);
+  }
+
+  if (name === "activity") {
+    return handleActivityCommand(body, env, member, fromDiscordId);
+  }
+
+  if (name === "token") {
+    return handleTokenCommand(body, env, member, fromDiscordId);
   }
 
   if (name === "mint") {

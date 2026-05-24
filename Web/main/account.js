@@ -844,6 +844,29 @@
     }
     syncBillingLifetimeUpsell(data);
     mountBillingPricingTable(data);
+    syncBillingMemberPerkPopup(data);
+  }
+
+  function syncBillingMemberPerkPopup(data) {
+    const popup = el("member-perk-popup");
+    if (!popup) return;
+    const close = el("member-perk-popup-close");
+    const cta = el("member-perk-popup-cta");
+    const isMember = Boolean(data && (data.life_member || data.lifeMember || data.pro_unlocked || data.proUnlocked));
+    const dismissed = sessionStorage.getItem("rootrecord_member_perk_popup_seen") === "1";
+    function hide() {
+      popup.hidden = true;
+      sessionStorage.setItem("rootrecord_member_perk_popup_seen", "1");
+    }
+    if (close && !close.dataset.bound) {
+      close.dataset.bound = "1";
+      close.addEventListener("click", hide);
+    }
+    if (cta && !cta.dataset.bound) {
+      cta.dataset.bound = "1";
+      cta.addEventListener("click", hide);
+    }
+    popup.hidden = isMember || dismissed;
   }
 
   function syncBillingLifetimeUpsell(data) {

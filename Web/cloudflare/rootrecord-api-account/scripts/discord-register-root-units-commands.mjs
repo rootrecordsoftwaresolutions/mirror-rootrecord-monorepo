@@ -169,6 +169,21 @@ const commands = [
     type: 1,
   },
   {
+    name: "snapshot",
+    description: "Developer-only Root Record ecosystem snapshot with usage and AI activity context",
+    type: 1,
+  },
+  {
+    name: "activity",
+    description: "Developer-only Discord activity AI report",
+    type: 1,
+  },
+  {
+    name: "token",
+    description: "Developer-only ROOTS token, LP market, holders, and usage AI report",
+    type: 1,
+  },
+  {
     name: "mint",
     description: "Developer-only mint/top-up for official ROOTS tokens",
     type: 1,

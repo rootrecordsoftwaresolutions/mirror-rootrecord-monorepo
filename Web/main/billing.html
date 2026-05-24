@@ -105,6 +105,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <section id="panel-billing-main" class="card-plain" hidden data-testid="billing-main-panel">
               <h2>Subscription &amp; billing</h2>
               <div id="billing-summary"></div>
+              <section class="member-perk-card" aria-labelledby="member-perk-title">
+                <p class="eyebrow">Root Farms member-only perk</p>
+                <h3 id="member-perk-title">Grow member trees in your Orchard</h3>
+                <p>
+                  Monthly members unlock the <strong>Monthly Member Tree</strong> for +10% Root Farms income.
+                  Lifetime members unlock the <strong>Lifetime Tree</strong> for +25% income.
+                </p>
+                <div class="member-perk-actions">
+                  <a class="btn btn-primary" href="#billing-pricing-table-wrap">Buy monthly membership</a>
+                  <a class="btn btn-secondary" href="#billing-pricing-table-wrap">Buy lifetime membership</a>
+                </div>
+              </section>
               <p id="billing-portal-wrap" class="billing-portal-actions" hidden style="margin-top:1rem">
                 <a class="btn btn-primary" id="billing-portal-link" href="#" target="_blank" rel="noopener noreferrer">Manage subscription &amp; payment</a>
               </p>
@@ -139,9 +151,20 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </footer>
   </div>
+  <div id="member-perk-popup" class="member-perk-popup" role="dialog" aria-modal="true" aria-labelledby="member-perk-popup-title" hidden>
+    <div class="member-perk-popup-card">
+      <button type="button" class="member-perk-popup-close" id="member-perk-popup-close" aria-label="Close">&times;</button>
+      <p class="eyebrow">Member-only Root Farms perk</p>
+      <h2 id="member-perk-popup-title">Become a member. Grow a better Orchard.</h2>
+      <p>
+        Monthly membership activates a +10% Monthly Member Tree. Lifetime membership activates a +25% Lifetime Tree.
+      </p>
+      <a class="btn btn-primary" href="#billing-pricing-table-wrap" id="member-perk-popup-cta">Become a member</a>
+    </div>
+  </div>
   <script>document.getElementById("yr").textContent=new Date().getFullYear();</script>
   <script async src="https://js.stripe.com/v3/pricing-table.js"></script>
   <script src="/site-nav.js?v=5" defer></script>
-  <script src="/account.js?v=26" defer></script>
+  <script src="/account.js?v=27" defer></script>
 </body>
 </html>
