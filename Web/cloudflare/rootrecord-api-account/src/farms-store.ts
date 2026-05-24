@@ -9,12 +9,13 @@ export const ROOT_LEVEL_VEGETABLES = 20;
 export const LIGHTNING_ROD_COST = 1_000_000;
 export const CYPRUS_WIND_BLOCK_CHANCE = 0.88;
 
-export type ProtectionKind = "gopher" | "mice" | "rabbit";
+export type ProtectionKind = "gopher" | "mice" | "rabbit" | "birds";
 
 export type FarmsProtections = {
   gopher: boolean;
   mice: boolean;
   rabbit: boolean;
+  birds: boolean;
 };
 
 export type FarmsStoreData = {
@@ -31,11 +32,12 @@ const PROTECTION_FEE_RATE: Record<ProtectionKind, number> = {
   gopher: 0.01,
   mice: 0.01,
   rabbit: 0.03,
+  birds: 0.10,
 };
 
 export function defaultFarmsStore(): FarmsStoreData {
   return {
-    protections: { gopher: false, mice: false, rabbit: false },
+    protections: { gopher: false, mice: false, rabbit: false, birds: false },
     lightning_rod_owned: false,
     lightning_meteorologist: false,
     cypress_trees: false,
@@ -54,6 +56,7 @@ export function parseFarmsStore(raw: string | null | undefined): FarmsStoreData 
         gopher: Boolean(p.gopher),
         mice: Boolean(p.mice),
         rabbit: Boolean(p.rabbit),
+        birds: Boolean(p.birds),
       },
       lightning_rod_owned: Boolean(o.lightning_rod_owned ?? o.lightning_rod),
       lightning_meteorologist: Boolean(o.lightning_meteorologist),
@@ -82,6 +85,7 @@ export function hasActiveFarmhand(store: FarmsStoreData): boolean {
     store.protections.gopher ||
       store.protections.mice ||
       store.protections.rabbit ||
+      store.protections.birds ||
       store.lightning_meteorologist ||
       store.cypress_trees,
   );
@@ -106,6 +110,7 @@ export function protectionIncomeMultiplier(store: FarmsStoreData): number {
   if (store.protections.gopher) reduction += PROTECTION_FEE_RATE.gopher;
   if (store.protections.mice) reduction += PROTECTION_FEE_RATE.mice;
   if (store.protections.rabbit) reduction += PROTECTION_FEE_RATE.rabbit;
+  if (store.protections.birds) reduction += PROTECTION_FEE_RATE.birds;
   if (store.lightning_meteorologist) reduction += 0.01;
   if (store.cypress_trees) reduction += 0.05;
   return Math.max(0, 1 - reduction);

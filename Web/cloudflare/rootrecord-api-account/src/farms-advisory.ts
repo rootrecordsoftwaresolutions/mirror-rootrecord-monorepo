@@ -5,7 +5,6 @@ import { insertVarmintEvent } from "./farms-varmint";
 import {
   horseradishComplete,
   parseFarmsStore,
-  plotInClassicVarmintRange,
   type FarmsStoreData,
   userHasStormHazards,
   vegetablesUnlocked,
@@ -35,7 +34,7 @@ function canNudgeCategory(nudge: SafetyNudgeAt, key: "classic" | "storm"): boole
 }
 
 function hasClassicExposure(plots: PlotProgress[]): boolean {
-  return plots.some((p) => p.unlocked && p.rowsActive > 0 && plotInClassicVarmintRange(p.id));
+  return plots.some((p) => p.unlocked && p.rowsActive > 0);
 }
 
 function classicSafetiesOff(store: FarmsStoreData): string[] {
@@ -43,6 +42,7 @@ function classicSafetiesOff(store: FarmsStoreData): string[] {
   if (!store.protections.gopher) missing.push("gopher protection");
   if (!store.protections.mice) missing.push("field mice protection");
   if (!store.protections.rabbit) missing.push("rabbit protection");
+  if (!store.protections.birds) missing.push("Uncle for birds");
   return missing;
 }
 
@@ -83,7 +83,7 @@ export async function syncFarmAdvisories(
       key: "danger_storms",
       kind: "advisory_milestone_storms",
       message:
-        "Wind and lightning are now active on Ginger+ plots (2+ rows on Ginger). Visit Farmhands for cypress windbreak, a lightning rod, or a meteorologist.",
+        "Wind and lightning are now active and can sweep across your unlocked field. Visit Farmhands for cypress windbreak, a lightning rod, or a meteorologist.",
     });
   }
   if (horseradishComplete(plots) && !seen.has("tier_orchards")) {
@@ -106,7 +106,7 @@ export async function syncFarmAdvisories(
     milestones.push({
       key: `root_unlock_${PLOT_GINGER}`,
       kind: "advisory_root_unlock",
-      message: "Ginger plot unlocked — you are entering crops that can face wind and lightning once you have 2+ rows.",
+      message: "Ginger plot unlocked — your field can face wind and lightning once you have 2+ rows.",
     });
   }
   const horseradish = plots.find((p) => p.id === PLOT_HORSERADISH);
@@ -129,7 +129,7 @@ export async function syncFarmAdvisories(
         db,
         userId,
         "advisory_safety_classic",
-        `Your Carrot–Garlic roots are exposed. Turn on ${missing.join(", ")} under Farmhands (−1–3% income each).`,
+        `Your unlocked field is exposed. Turn on ${missing.join(", ")} under Farmhands (−1–10% income each).`,
       );
       nudge.classic = new Date().toISOString();
       nudgeChanged = true;

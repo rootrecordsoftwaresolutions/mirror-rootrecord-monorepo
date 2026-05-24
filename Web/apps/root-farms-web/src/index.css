@@ -493,6 +493,11 @@ input {
   margin-top: 0.75rem;
 }
 
+.market-dice-actions {
+  display: grid;
+  gap: 0.25rem;
+}
+
 .market-empty-card {
   border-style: dashed;
 }
@@ -611,6 +616,225 @@ input {
   font-family: var(--mono);
 }
 
+.roulette-graphic {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.85rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.roulette-wheel-graphic {
+  position: relative;
+  width: 7rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 0.45rem solid rgba(120, 53, 15, 0.9);
+  background:
+    radial-gradient(circle, rgba(241, 245, 249, 0.95) 0 7%, transparent 8%),
+    radial-gradient(circle, rgba(15, 23, 42, 0.95) 0 24%, transparent 25%),
+    conic-gradient(
+      from -90deg,
+      #14532d 0 9.73deg,
+      #7f1d1d 9.73deg 19.46deg,
+      #020617 19.46deg 29.19deg,
+      #7f1d1d 29.19deg 38.92deg,
+      #020617 38.92deg 48.65deg,
+      #7f1d1d 48.65deg 58.38deg,
+      #020617 58.38deg 68.11deg,
+      #7f1d1d 68.11deg 77.84deg,
+      #020617 77.84deg 87.57deg,
+      #7f1d1d 87.57deg 97.3deg,
+      #020617 97.3deg 107.03deg,
+      #7f1d1d 107.03deg 116.76deg,
+      #020617 116.76deg 126.49deg,
+      #7f1d1d 126.49deg 136.22deg,
+      #020617 136.22deg 145.95deg,
+      #7f1d1d 145.95deg 155.68deg,
+      #020617 155.68deg 165.41deg,
+      #7f1d1d 165.41deg 175.14deg,
+      #020617 175.14deg 184.87deg,
+      #7f1d1d 184.87deg 194.6deg,
+      #020617 194.6deg 204.33deg,
+      #7f1d1d 204.33deg 214.06deg,
+      #020617 214.06deg 223.79deg,
+      #7f1d1d 223.79deg 233.52deg,
+      #020617 233.52deg 243.25deg,
+      #7f1d1d 243.25deg 252.98deg,
+      #020617 252.98deg 262.71deg,
+      #7f1d1d 262.71deg 272.44deg,
+      #020617 272.44deg 282.17deg,
+      #7f1d1d 282.17deg 291.9deg,
+      #020617 291.9deg 301.63deg,
+      #7f1d1d 301.63deg 311.36deg,
+      #020617 311.36deg 321.09deg,
+      #7f1d1d 321.09deg 330.82deg,
+      #020617 330.82deg 340.55deg,
+      #7f1d1d 340.55deg 350.28deg,
+      #020617 350.28deg 360deg
+    );
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.55), 0 0 22px rgba(248, 113, 113, 0.12);
+}
+
+.roulette-ball {
+  position: absolute;
+  left: 50%;
+  top: 0.35rem;
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(248, 250, 252, 0.7);
+}
+
+.roulette-ball--red {
+  color: #991b1b;
+}
+
+.roulette-ball--black {
+  color: #020617;
+}
+
+.roulette-ball--green {
+  color: #166534;
+}
+
+.roulette-felt {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 0.85rem;
+  background:
+    linear-gradient(135deg, rgba(20, 83, 45, 0.85), rgba(6, 78, 59, 0.62)),
+    rgba(15, 23, 42, 0.72);
+}
+
+.roulette-number-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(1.5rem, 1fr));
+  gap: 0.25rem;
+}
+
+.roulette-cell {
+  min-height: 1.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.35rem;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.roulette-cell--red {
+  background: #991b1b;
+}
+
+.roulette-cell--black {
+  background: #020617;
+}
+
+.roulette-cell--green {
+  background: #166534;
+}
+
+.roulette-cell--selected {
+  outline: 2px solid var(--amber);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.45);
+}
+
+.hilo-table {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.playing-card {
+  position: relative;
+  width: 5.4rem;
+  height: 7.4rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  background: linear-gradient(145deg, #fff, #dbeafe);
+  color: #0f172a;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+}
+
+.playing-card--hearts,
+.playing-card--diamonds {
+  color: #b91c1c;
+}
+
+.playing-card--back {
+  display: grid;
+  place-items: center;
+  background:
+    repeating-linear-gradient(45deg, rgba(34, 211, 238, 0.18) 0 0.4rem, transparent 0.4rem 0.8rem),
+    linear-gradient(145deg, #0f172a, #164e63);
+  color: rgba(232, 238, 248, 0.95);
+  font-family: var(--mono);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.playing-card-rank,
+.playing-card-suit {
+  position: absolute;
+  left: 0.65rem;
+  top: 0.45rem;
+  font-family: Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.playing-card-suit {
+  left: 50%;
+  top: 50%;
+  font-size: 2.5rem;
+  transform: translate(-50%, -50%);
+}
+
+.playing-card-rank--bottom {
+  left: auto;
+  right: 0.65rem;
+  top: auto;
+  bottom: 0.45rem;
+  transform: rotate(180deg);
+}
+
+.hilo-bank {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 9rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.hilo-bank span,
+.hilo-bank small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.hilo-bank strong {
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 1.05rem;
+}
+
 @media (max-width: 760px) {
   .wheel-layout {
     grid-template-columns: 1fr;
@@ -618,6 +842,18 @@ input {
 
   .market-wheel-wrap {
     max-width: 19rem;
+  }
+
+  .roulette-graphic {
+    grid-template-columns: 1fr;
+  }
+
+  .roulette-wheel-graphic {
+    margin-inline: auto;
+  }
+
+  .roulette-number-grid {
+    grid-template-columns: repeat(6, minmax(1.6rem, 1fr));
   }
 }
 

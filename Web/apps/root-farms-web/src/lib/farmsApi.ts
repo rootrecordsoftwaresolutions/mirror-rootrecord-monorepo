@@ -46,6 +46,7 @@ export type DiceMarketRequest = {
   winner_label: string | null;
   is_mine: boolean;
   can_join: boolean;
+  can_cancel: boolean;
   created_at: string;
   joined_at: string | null;
   resolved_at: string | null;
@@ -88,16 +89,25 @@ export type MarketRouletteSpinResponse = {
 export type MarketHiLoResponse = {
   ok: true;
   game: "hi_lo";
-  amount: number;
-  guess: "high" | "low" | string;
-  first_card: number;
-  next_card: number;
-  first_label: string;
-  next_label: string;
-  tie: boolean;
-  won: boolean;
-  payout: number;
-  net: number;
+  active: boolean;
+  session_id?: string;
+  stake: number;
+  bank: number;
+  current_card: number;
+  current_rank: number;
+  current_suit: string;
+  current_label: string;
+  rounds: number;
+  status: string;
+  guess?: "high" | "low" | string;
+  next_card?: number;
+  next_rank?: number;
+  next_suit?: string;
+  next_label?: string;
+  tie?: boolean;
+  won?: boolean;
+  payout?: number;
+  net?: number;
   balance: number;
   detail?: string;
 };
@@ -256,6 +266,7 @@ function parseDiceMarketResponse(data: Record<string, unknown>): DiceMarketRespo
         winner_label: typeof o.winner_label === "string" && o.winner_label ? o.winner_label : null,
         is_mine: o.is_mine === true,
         can_join: o.can_join === true,
+        can_cancel: o.can_cancel === true,
         created_at: String(o.created_at || ""),
         joined_at: typeof o.joined_at === "string" && o.joined_at ? o.joined_at : null,
         resolved_at: typeof o.resolved_at === "string" && o.resolved_at ? o.resolved_at : null,
@@ -315,6 +326,7 @@ function parseFarmsStateResponse(data: Record<string, unknown>): FarmsStateRespo
           gopher: Boolean(protRaw.gopher),
           mice: Boolean(protRaw.mice),
           rabbit: Boolean(protRaw.rabbit),
+          birds: Boolean(protRaw.birds),
         }
       : undefined,
     storeRaw as Partial<FarmsStoreData> | undefined,
@@ -588,6 +600,20 @@ export async function postDiceJoin(id: string): Promise<DiceMarketResponse | nul
   }
 }
 
+export async function postDiceCancel(id: string): Promise<DiceMarketResponse | null> {
+  try {
+    const res = await apiFetch(`/api/v1/farms/market/dice/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return parseDiceMarketResponse(data);
+  } catch {
+    return null;
+  }
+}
+
 export async function postMarketDonation(amount: number): Promise<DiceMarketResponse | null> {
   try {
     const res = await apiFetch("/api/v1/farms/market/donate", {
@@ -674,34 +700,84 @@ export async function postMarketRouletteSpin(
   }
 }
 
-export async function postMarketHiLoPlay(amount: number, guess: "high" | "low"): Promise<MarketHiLoResponse | null> {
+function parseMarketHiLoResponse(data: Record<string, unknown>): MarketHiLoResponse {
+  return {
+    ok: true,
+    game: "hi_lo",
+    active: data.active === true,
+    session_id: typeof data.session_id === "string" && data.session_id ? data.session_id : undefined,
+    stake: Math.max(0, Math.floor(Number(data.stake ?? data.amount) || 0)),
+    bank: Math.max(0, Math.floor(Number(data.bank ?? data.payout ?? data.amount) || 0)),
+    current_card: Math.max(0, Math.floor(Number(data.current_card ?? data.next_card ?? data.first_card) || 0)),
+    current_rank: Math.max(0, Math.floor(Number(data.current_rank) || 0)),
+    current_suit: String(data.current_suit || ""),
+    current_label: String(data.current_label || data.next_label || data.first_label || ""),
+    rounds: Math.max(0, Math.floor(Number(data.rounds) || 0)),
+    status: String(data.status || (data.active === true ? "active" : "")),
+    guess: data.guess == null ? undefined : String(data.guess),
+    next_card: data.next_card == null ? undefined : Math.max(0, Math.floor(Number(data.next_card) || 0)),
+    next_rank: data.next_rank == null ? undefined : Math.max(0, Math.floor(Number(data.next_rank) || 0)),
+    next_suit: data.next_suit == null ? undefined : String(data.next_suit || ""),
+    next_label: data.next_label == null ? undefined : String(data.next_label || ""),
+    tie: data.tie == null ? undefined : Boolean(data.tie),
+    won: data.won == null ? undefined : Boolean(data.won),
+    payout: data.payout == null ? undefined : Math.max(0, Math.floor(Number(data.payout) || 0)),
+    net: data.net == null ? undefined : Math.floor(Number(data.net) || 0),
+    balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
+    detail: typeof data.detail === "string" ? data.detail : undefined,
+  };
+}
+
+export async function fetchMarketHiLoState(): Promise<MarketHiLoResponse | null> {
   try {
-    const res = await apiFetch("/api/v1/farms/market/hi-lo/play", {
+    const res = await apiFetch("/api/v1/farms/market/hi-lo/state", { method: "GET" });
+    if (!res.ok) return null;
+    return parseMarketHiLoResponse((await res.json()) as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+export async function postMarketHiLoStart(amount: number): Promise<MarketHiLoResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/hi-lo/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         catalog_hash: CATALOG_HASH,
         amount: Math.max(0, Math.floor(Number(amount) || 0)),
-        guess,
       }),
     });
     const data = (await res.json()) as Record<string, unknown>;
-    return {
-      ok: true,
-      game: "hi_lo",
-      amount: Math.max(0, Math.floor(Number(data.amount) || 0)),
-      guess: String(data.guess || guess),
-      first_card: Math.max(0, Math.floor(Number(data.first_card) || 0)),
-      next_card: Math.max(0, Math.floor(Number(data.next_card) || 0)),
-      first_label: String(data.first_label || ""),
-      next_label: String(data.next_label || ""),
-      tie: Boolean(data.tie),
-      won: Boolean(data.won),
-      payout: Math.max(0, Math.floor(Number(data.payout) || 0)),
-      net: Math.floor(Number(data.net) || 0),
-      balance: Math.max(0, Math.floor(Number(data.balance) || 0)),
-      detail: typeof data.detail === "string" ? data.detail : undefined,
-    };
+    return parseMarketHiLoResponse(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function postMarketHiLoGuess(guess: "high" | "low"): Promise<MarketHiLoResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/hi-lo/guess", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH, guess }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return parseMarketHiLoResponse(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function postMarketHiLoCashOut(): Promise<MarketHiLoResponse | null> {
+  try {
+    const res = await apiFetch("/api/v1/farms/market/hi-lo/cash-out", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalog_hash: CATALOG_HASH }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    return parseMarketHiLoResponse(data);
   } catch {
     return null;
   }

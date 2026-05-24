@@ -61,7 +61,7 @@ export function GuideScreen() {
       <article className="guide-section">
         <h2>Farmhands (field protection)</h2>
         <p>
-          The <strong>Farmhands</strong> tab is where you hire protection for your fields. This is not a shop for seeds or gear — it is three optional plans you turn on or off:
+          The <strong>Farmhands</strong> tab is where you hire protection for your fields. This is not a shop for seeds or gear — it is a set of optional plans you turn on or off:
         </p>
         <ul className="guide-list">
           <li>
@@ -72,6 +72,9 @@ export function GuideScreen() {
           </li>
           <li>
             <strong>Rabbit protection</strong> — helps stop rabbits from clearing every row on a random plot. Rabbits attack less often than other varmints, but hurt more when they get through.
+          </li>
+          <li>
+            <strong>Hire Uncle</strong> — Uncle swats at birds with his cane to keep flocks away from the whole field. This costs −10% income rate while active.
           </li>
         </ul>
         <p>
@@ -85,10 +88,10 @@ export function GuideScreen() {
       <article className="guide-section">
         <h2>Storms (Ginger and beyond)</h2>
         <p>
-          From <strong>Ginger</strong> with at least two rows, <strong>wind</strong> can wipe a whole crop plot and <strong>lightning</strong> can strike one shared row number across all farms that day. Buy a <strong>lightning rod</strong> once, hire a <strong>lightning meteorologist</strong> (−1% income), or plant <strong>cypress windbreaks</strong> (−5% income, strong wind block).
+          From <strong>Ginger</strong> with at least two rows, <strong>wind</strong> can wipe a whole crop plot and <strong>lightning</strong> can strike one shared row number across all farms that day. Once storm hazards are active, they can affect the unlocked field, including roots, vegetables, orchards, and cluster trees. Buy a <strong>lightning rod</strong> once, hire a <strong>lightning meteorologist</strong> (−1% income), or plant <strong>cypress windbreaks</strong> (−5% income, strong wind block).
         </p>
         <p>
-          Varmints and lightning can also affect orchard and cluster-tree progress as those systems grow. Read the Farmhands notifications after an alert so you know exactly what happened.
+          Varmints, birds, wind, and lightning can also affect orchard, vegetable, and cluster-tree progress as those systems grow. Read the Farmhands notifications after an alert so you know exactly what happened.
         </p>
       </article>
 
@@ -121,7 +124,7 @@ export function GuideScreen() {
             <strong>Roulette</strong> — bet 0.001 to 1 ROOTS on red/black, odd/even, low/high, zero, or a straight number.
           </li>
           <li>
-            <strong>Hi-Lo</strong> — guess whether the next card is higher or lower. Wins pay 1.95x; ties push and refund the stake.
+            <strong>Hi-Lo</strong> — start with one card face up, guess higher or lower, and keep going to grow the round bank by 1.95x per correct draw. Cash out anytime; a wrong guess loses the active bank.
           </li>
           <li>
             <strong>Community donations</strong> — donate ROOTS to The Well and split the amount evenly across other signed-in farmers. Donations are recorded as internal ROOTS transactions and posted to the ROOTS economy webhook.
@@ -135,7 +138,7 @@ export function GuideScreen() {
       <article className="guide-section">
         <h2>Varmints and notifications</h2>
         <p>
-          Gophers, field mice, and rabbits can attack farms across the game world on a schedule you do not control. When something happens to your farm, you may get a popup alert and an entry under Farmhands notifications.
+          Gophers, field mice, rabbits, and birds can attack farms across the game world on a schedule you do not control. When something happens to your farm, you may get a popup alert and an entry under Farmhands notifications.
         </p>
         <p>
           If the matching protection was on, the attack is blocked and you will see that in the message. If protection was off, you may lose rows or progress until you repair or replant as the game allows.

@@ -11,13 +11,13 @@ import {
 } from "../game/storeCatalog";
 import { totalRuPerSec } from "../game/sim";
 
-const CLASSIC_KINDS = new Set<ProtectionKind>(["gopher", "mice", "rabbit"]);
+const FIELD_KINDS = new Set<ProtectionKind>(["gopher", "mice", "rabbit", "birds"]);
 
 function storeToggleOn(
   store: ReturnType<typeof useGame>["store"],
   kind: StoreToggleKind,
 ): boolean {
-  if (kind === "gopher" || kind === "mice" || kind === "rabbit") return store.protections[kind];
+  if (kind === "gopher" || kind === "mice" || kind === "rabbit" || kind === "birds") return store.protections[kind];
   if (kind === "lightning_meteorologist") return store.lightning_meteorologist;
   return store.cypress_trees;
 }
@@ -49,8 +49,8 @@ export function FarmhandsScreen() {
     return `${reductionPct}% lower income rate (−${formatRu(protectionFeePerMinute)}/min vs full rate)`;
   }, [balanceReady, reductionPct, protectionFeePerMinute]);
 
-  const classicItems = STORE_PROTECTIONS.filter((i) => CLASSIC_KINDS.has(i.kind as ProtectionKind));
-  const stormItems = STORE_PROTECTIONS.filter((i) => !CLASSIC_KINDS.has(i.kind as ProtectionKind));
+  const fieldItems = STORE_PROTECTIONS.filter((i) => FIELD_KINDS.has(i.kind as ProtectionKind));
+  const stormItems = STORE_PROTECTIONS.filter((i) => !FIELD_KINDS.has(i.kind as ProtectionKind));
 
   const onBuyLightningRod = async () => {
     const r = await buyLightningRod();
@@ -118,12 +118,12 @@ export function FarmhandsScreen() {
       ) : null}
 
       <div className="section-head">
-        <span>Carrot–Garlic varmints</span>
+        <span>Field hazards</span>
         <span>Income rate</span>
       </div>
 
       <ul className="store-grid">
-        {classicItems.map((item) => {
+        {fieldItems.map((item) => {
           const on = storeToggleOn(store, item.kind);
           return (
             <li key={item.kind}>

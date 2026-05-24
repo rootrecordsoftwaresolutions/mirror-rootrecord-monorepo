@@ -29,6 +29,7 @@ import { WelcomeBackModal } from "./components/WelcomeBackModal";
 import { GameProvider } from "./contexts/GameContext";
 import { vegetablePlotHarvestTotal } from "./game/tier-income";
 import type { TabId } from "./game/types";
+import { AdSenseAd } from "./components/AdSenseAd";
 
 function TierTabBody({
   tier,
@@ -121,7 +122,9 @@ function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
         <MobileWebHeader />
         <main className="app-main app-main--web">
           <BetaTesterBanner onSignIn={onSignIn} />
+          <AdSenseAd placement="top" />
           {body}
+          <AdSenseAd placement="bottom" />
         </main>
       </div>
       <BottomNav tab={tab} onTab={onTab} />
@@ -142,7 +145,9 @@ function RootFarmsGate() {
   if (showSignIn && !auth.authed) {
     return (
       <div className="auth-ad-shell">
+        <AdSenseAd placement="top" />
         <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />
+        <AdSenseAd placement="bottom" />
       </div>
     );
   }
@@ -150,7 +155,9 @@ function RootFarmsGate() {
   if (!auth.canPlay) {
     return (
       <div className="auth-ad-shell">
+        <AdSenseAd placement="top" />
         <AuthScreen onContinueAsBetaTester={() => setShowSignIn(false)} />
+        <AdSenseAd placement="bottom" />
       </div>
     );
   }

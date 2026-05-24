@@ -1,13 +1,11 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { FARMS_APP_ID, parsePlotsJson, plotsToJson, type PlotProgress } from "./farms-catalog";
-import { ORCHARD_COUNT, parseTierPlotsJson, tierPlotsToJson, type TierPlotProgress } from "./farms-orchards";
+import { ORCHARD_COUNT, VEGETABLE_COUNT, parseTierPlotsJson, tierPlotsToJson, type TierPlotProgress } from "./farms-orchards";
 import { getGlobalLightningRowIndex, maybeRollGlobalLightningRow } from "./farms-global-hazard";
 import {
   CYPRUS_WIND_BLOCK_CHANCE,
   farmsStoreToJson,
   parseFarmsStore,
-  plotInClassicVarmintRange,
-  plotInStormRange,
   protectionIncomeMultiplier,
   protectionIncomeReductionPerMinute,
   userHasStormHazards,
@@ -31,6 +29,7 @@ const ATTACK_CHANCE: Record<ProtectionKind, number> = {
   gopher: 1 / 250,
   mice: 1 / 320,
   rabbit: 1 / 1800,
+  birds: 1 / 520,
 };
 
 const WIND_CHANCE = 1 / 340;
@@ -46,6 +45,8 @@ export type VarmintEventKind =
   | "mice_blocked"
   | "rabbit_attack"
   | "rabbit_blocked"
+  | "birds_attack"
+  | "birds_blocked"
   | "wind_attack"
   | "wind_blocked"
   | "lightning_attack"
@@ -62,6 +63,10 @@ function hasActiveRows(plots: PlotProgress[]): boolean {
   return plots.some((p) => p.unlocked && p.rowsActive > 0);
 }
 
+function hasActiveTierRows(plots: TierPlotProgress[]): boolean {
+  return plots.some((p) => p.unlocked && p.rowsActive > 0);
+}
+
 function hasActiveTrees(orchards: TierPlotProgress[], store: FarmsStoreData): boolean {
   return orchards.some((p) => p.unlocked && p.rowCount > 0) || (store.root_clusters ?? []).some(Boolean);
 }
@@ -70,7 +75,7 @@ function farmhandsProtectedStore(store: FarmsStoreData, farmhandsActive: boolean
   if (farmhandsActive) return store;
   return {
     ...store,
-    protections: { gopher: false, mice: false, rabbit: false },
+    protections: { gopher: false, mice: false, rabbit: false, birds: false },
     lightning_meteorologist: false,
     cypress_trees: false,
   };
@@ -81,42 +86,67 @@ function randomInt(max: number): number {
   return Math.floor(Math.random() * max);
 }
 
-function pickClassicPlotWithRows(plots: PlotProgress[]): PlotProgress | null {
-  const eligible = plots.filter((p) => p.unlocked && p.rowsActive > 0 && plotInClassicVarmintRange(p.id));
-  if (!eligible.length) return null;
-  return eligible[randomInt(eligible.length)]!;
-}
-
-function pickClassicPlotWithRowSlots(plots: PlotProgress[]): PlotProgress | null {
-  const eligible = plots.filter((p) => p.unlocked && p.rowCount > 0 && plotInClassicVarmintRange(p.id));
-  if (!eligible.length) return null;
-  return eligible[randomInt(eligible.length)]!;
-}
-
-function pickStormPlot(plots: PlotProgress[]): PlotProgress | null {
-  const eligible = plots.filter((p) => p.unlocked && p.rowsActive > 0 && plotInStormRange(p.id));
-  if (!eligible.length) return null;
-  return eligible[randomInt(eligible.length)]!;
-}
-
-function pickOrchardWithRows(orchards: TierPlotProgress[]): TierPlotProgress | null {
-  const eligible = orchards.filter((p) => p.unlocked && p.rowsActive > 0);
-  if (!eligible.length) return null;
-  return eligible[randomInt(eligible.length)]!;
-}
-
-function pickOrchardWithRowSlots(orchards: TierPlotProgress[]): TierPlotProgress | null {
-  const eligible = orchards.filter((p) => p.unlocked && p.rowCount > 0);
-  if (!eligible.length) return null;
-  return eligible[randomInt(eligible.length)]!;
-}
-
 function pickRootCluster(store: FarmsStoreData): number | null {
   const eligible = (store.root_clusters ?? [])
     .map((on, i) => (on ? i + 1 : 0))
     .filter((id) => id > 0);
   if (!eligible.length) return null;
   return eligible[randomInt(eligible.length)]!;
+}
+
+type FieldTarget =
+  | { kind: "root"; id: number }
+  | { kind: "orchard"; id: number }
+  | { kind: "vegetable"; id: number }
+  | { kind: "cluster"; id: number };
+
+function pickFieldTargetWithRows(
+  plots: PlotProgress[],
+  orchards: TierPlotProgress[],
+  vegetables: TierPlotProgress[],
+  store?: FarmsStoreData,
+): FieldTarget | null {
+  const targets: FieldTarget[] = [];
+  for (const p of plots) if (p.unlocked && p.rowsActive > 0) targets.push({ kind: "root", id: p.id });
+  for (const p of orchards) if (p.unlocked && p.rowsActive > 0) targets.push({ kind: "orchard", id: p.id });
+  for (const p of vegetables) if (p.unlocked && p.rowsActive > 0) targets.push({ kind: "vegetable", id: p.id });
+  if (store) {
+    for (const id of (store.root_clusters ?? []).map((on, i) => (on ? i + 1 : 0)).filter((id) => id > 0)) {
+      targets.push({ kind: "cluster", id });
+    }
+  }
+  if (!targets.length) return null;
+  return targets[randomInt(targets.length)]!;
+}
+
+function pickFieldTargetWithRowSlots(
+  plots: PlotProgress[],
+  orchards: TierPlotProgress[],
+  vegetables: TierPlotProgress[],
+  store?: FarmsStoreData,
+): FieldTarget | null {
+  const targets: FieldTarget[] = [];
+  for (const p of plots) if (p.unlocked && p.rowCount > 0) targets.push({ kind: "root", id: p.id });
+  for (const p of orchards) if (p.unlocked && p.rowCount > 0) targets.push({ kind: "orchard", id: p.id });
+  for (const p of vegetables) if (p.unlocked && p.rowCount > 0) targets.push({ kind: "vegetable", id: p.id });
+  if (store) {
+    for (const id of (store.root_clusters ?? []).map((on, i) => (on ? i + 1 : 0)).filter((id) => id > 0)) {
+      targets.push({ kind: "cluster", id });
+    }
+  }
+  if (!targets.length) return null;
+  return targets[randomInt(targets.length)]!;
+}
+
+function targetPayload(target: FieldTarget | null): Record<string, unknown> {
+  if (!target) return {};
+  if (target.kind === "cluster" || target.kind === "orchard") return treePayload(target.kind, target.id);
+  if (target.kind === "vegetable") return { target_type: "vegetable", plot_id: target.id };
+  return { plot_id: target.id };
+}
+
+function targetPlotId(target: FieldTarget | null): number | null {
+  return target?.id ?? null;
 }
 
 function treePayload(kind: "orchard" | "cluster", id: number): Record<string, unknown> {
@@ -174,11 +204,30 @@ function applyRootClusterDamage(store: FarmsStoreData, clusterId: number): Farms
   return { ...store, root_clusters };
 }
 
+function applyBirdPlotDamage(plots: PlotProgress[]): PlotProgress[] {
+  return plots.map((p) => {
+    if (!p.unlocked || p.rowsActive <= 0) return p;
+    return { ...p, rowsActive: Math.max(0, p.rowsActive - 1), cycleProgress: 0 };
+  });
+}
+
+function applyBirdTierDamage(plots: TierPlotProgress[]): TierPlotProgress[] {
+  return plots.map((p) => {
+    if (!p.unlocked || p.rowsActive <= 0) return p;
+    return { ...p, rowsActive: Math.max(1, p.rowsActive - 1), cycleProgress: 0 };
+  });
+}
+
+function applyBirdClusterDamage(store: FarmsStoreData): FarmsStoreData {
+  const clusterId = pickRootCluster(store);
+  return clusterId == null ? store : applyRootClusterDamage(store, clusterId);
+}
+
 /** Global lightning row index (1–10): trim active rows on storm-range plots. */
 function applyLightningRowDamage(plots: PlotProgress[], rowIndex: number): PlotProgress[] {
   const targetRow = Math.min(10, Math.max(1, Math.floor(rowIndex)));
   return plots.map((p) => {
-    if (!p.unlocked || !plotInStormRange(p.id) || p.rowsActive < targetRow) return p;
+    if (!p.unlocked || p.rowsActive < targetRow) return p;
     return { ...p, rowsActive: targetRow - 1, cycleProgress: 0 };
   });
 }
@@ -194,6 +243,7 @@ function applyTreeLightningDamage(orchards: TierPlotProgress[], rowIndex: number
 function eventMessage(kind: VarmintEventKind, plotId: number, extra?: Record<string, unknown>): string {
   const targetType = String(extra?.target_type || "");
   const treeName = String(extra?.tree_name || "tree");
+  const plotLabel = targetType === "vegetable" ? `vegetable plot ${plotId}` : `plot ${plotId}`;
   if (targetType === "orchard" || targetType === "cluster") {
     switch (kind) {
       case "gopher_attack":
@@ -208,6 +258,10 @@ function eventMessage(kind: VarmintEventKind, plotId: number, extra?: Record<str
         return `A rabbit damaged ${treeName}.`;
       case "rabbit_blocked":
         return `Rabbit protection stopped an attack on ${treeName}.`;
+      case "birds_attack":
+        return `Birds pecked at ${treeName}.`;
+      case "birds_blocked":
+        return `Uncle swatted birds away from ${treeName}.`;
       case "wind_attack":
         return `Wind damaged ${treeName}.`;
       case "wind_blocked":
@@ -220,17 +274,21 @@ function eventMessage(kind: VarmintEventKind, plotId: number, extra?: Record<str
   }
   switch (kind) {
     case "gopher_attack":
-      return `A gopher gnawed a row on plot ${plotId} (Carrot–Garlic).`;
+      return `A gopher gnawed a row on ${plotLabel}.`;
     case "gopher_blocked":
-      return `Gopher protection stopped an attack on plot ${plotId}.`;
+      return `Gopher protection stopped an attack on ${plotLabel}.`;
     case "mice_attack":
-      return `Field mice destroyed a row on plot ${plotId} (Carrot–Garlic).`;
+      return `Field mice destroyed a row on ${plotLabel}.`;
     case "mice_blocked":
-      return `Field mice protection stopped an attack on plot ${plotId}.`;
+      return `Field mice protection stopped an attack on ${plotLabel}.`;
     case "rabbit_attack":
-      return `A rabbit wiped every row on plot ${plotId} (Carrot–Garlic).`;
+      return `A rabbit damaged ${plotLabel}.`;
     case "rabbit_blocked":
-      return `Rabbit protection stopped an attack on plot ${plotId}.`;
+      return `Rabbit protection stopped an attack on ${plotLabel}.`;
+    case "birds_attack":
+      return "A flock of birds pecked across the whole field.";
+    case "birds_blocked":
+      return "Uncle swatted at birds with his cane and kept the field safe.";
     case "wind_attack":
       return `Wind knocked out a crop on plot ${plotId}.`;
     case "wind_blocked":
@@ -238,8 +296,8 @@ function eventMessage(kind: VarmintEventKind, plotId: number, extra?: Record<str
     case "lightning_attack": {
       const row = Math.floor(Number(extra?.lightning_row) || 0);
       return row > 0
-        ? `Lightning struck row ${row} on your Ginger+ plots (shared storm row for all farms).`
-        : "Lightning struck a row on your Ginger+ plots.";
+        ? `Lightning struck row ${row} across your unlocked field (shared storm row for all farms).`
+        : "Lightning struck a row across your unlocked field.";
     }
     case "lightning_blocked": {
       const row = Math.floor(Number(extra?.lightning_row) || 0);
@@ -248,7 +306,7 @@ function eventMessage(kind: VarmintEventKind, plotId: number, extra?: Record<str
         : "Your lightning rod grounded a lightning strike.";
     }
     case "advisory_safety_classic":
-      return "Carrot–Garlic plots need protection — open Farmhands.";
+      return "Your field needs hazard protection — open Farmhands.";
     case "advisory_safety_storm":
       return "Storm gear recommended — open Farmhands.";
     case "advisory_milestone_storms":
@@ -369,40 +427,44 @@ async function processStorms(
   userId: string,
   plots: PlotProgress[],
   orchards: TierPlotProgress[],
+  vegetables: TierPlotProgress[],
   store: FarmsStoreData,
   lightningRow: number,
-): Promise<{ plots: PlotProgress[]; orchards: TierPlotProgress[]; store: FarmsStoreData; changed: boolean }> {
+): Promise<{ plots: PlotProgress[]; orchards: TierPlotProgress[]; vegetables: TierPlotProgress[]; store: FarmsStoreData; changed: boolean }> {
   let next = plots;
   let nextOrchards = orchards;
+  let nextVegetables = vegetables;
   let nextStore = store;
   let changed = false;
 
   if (rollAttack(WIND_CHANCE)) {
-    const clusterId = pickRootCluster(nextStore);
-    const tree = clusterId == null ? pickOrchardWithRows(nextOrchards) : null;
-    const target = !clusterId && !tree ? pickStormPlot(next) : null;
-    if (clusterId || tree || target) {
+    const target = pickFieldTargetWithRows(next, nextOrchards, nextVegetables, nextStore);
+    if (target) {
       const blocked = store.cypress_trees && Math.random() < CYPRUS_WIND_BLOCK_CHANCE;
       if (blocked) {
         await insertVarmintEvent(
           db,
           userId,
           "wind_blocked",
-          target?.id ?? tree?.id ?? clusterId,
-          clusterId ? treePayload("cluster", clusterId) : tree ? treePayload("orchard", tree.id) : { plot_id: target?.id },
+          targetPlotId(target),
+          targetPayload(target),
         );
-      } else if (clusterId) {
-        nextStore = applyRootClusterDamage(nextStore, clusterId);
+      } else if (target.kind === "cluster") {
+        nextStore = applyRootClusterDamage(nextStore, target.id);
         changed = true;
-        await insertVarmintEvent(db, userId, "wind_attack", clusterId, treePayload("cluster", clusterId));
-      } else if (tree) {
-        nextOrchards = applyTreeSlotDamage(nextOrchards, tree.id);
+        await insertVarmintEvent(db, userId, "wind_attack", target.id, targetPayload(target));
+      } else if (target.kind === "orchard") {
+        nextOrchards = applyTreeSlotDamage(nextOrchards, target.id);
         changed = true;
-        await insertVarmintEvent(db, userId, "wind_attack", tree.id, treePayload("orchard", tree.id));
+        await insertVarmintEvent(db, userId, "wind_attack", target.id, targetPayload(target));
+      } else if (target.kind === "vegetable") {
+        nextVegetables = applyTreeSlotDamage(nextVegetables, target.id);
+        changed = true;
+        await insertVarmintEvent(db, userId, "wind_attack", target.id, targetPayload(target));
       } else {
-        next = applyWindDamage(next, target!.id);
+        next = applyWindDamage(next, target.id);
         changed = true;
-        await insertVarmintEvent(db, userId, "wind_attack", target!.id, { plot_id: target!.id });
+        await insertVarmintEvent(db, userId, "wind_attack", target.id, targetPayload(target));
       }
     }
   }
@@ -414,6 +476,7 @@ async function processStorms(
     } else {
       next = applyLightningRowDamage(next, lightningRow);
       nextOrchards = applyTreeLightningDamage(nextOrchards, lightningRow);
+      nextVegetables = applyTreeLightningDamage(nextVegetables, lightningRow);
       const clusterId = pickRootCluster(nextStore);
       if (clusterId != null) nextStore = applyRootClusterDamage(nextStore, clusterId);
       changed = true;
@@ -425,7 +488,7 @@ async function processStorms(
     }
   }
 
-  return { plots: next, orchards: nextOrchards, store: nextStore, changed };
+  return { plots: next, orchards: nextOrchards, vegetables: nextVegetables, store: nextStore, changed };
 }
 
 async function processVarmintForUser(
@@ -433,128 +496,161 @@ async function processVarmintForUser(
   userId: string,
   plotsJson: string,
   orchardsJson: string | null,
+  vegetablesJson: string | null,
   storeJson: string,
   progressVersion: number,
   lightningRow: number,
 ): Promise<void> {
   let plots = parsePlotsJson(plotsJson);
   let orchards = parseTierPlotsJson(orchardsJson, ORCHARD_COUNT);
+  let vegetables = parseTierPlotsJson(vegetablesJson, VEGETABLE_COUNT);
   let store = parseFarmsStore(storeJson);
-  if (!hasActiveRows(plots) && !hasActiveTrees(orchards, store)) return;
+  if (!hasActiveRows(plots) && !hasActiveTierRows(vegetables) && !hasActiveTrees(orchards, store)) return;
 
   const farmhandsActive = await farmhandsRecentlyCheckedIn(db, userId);
   const effectiveStore = farmhandsProtectedStore(store, farmhandsActive);
   let plotsChanged = false;
   let orchardsChanged = false;
+  let vegetablesChanged = false;
   let storeChanged = false;
 
-  for (const kind of ["gopher", "mice", "rabbit"] as ProtectionKind[]) {
+  for (const kind of ["gopher", "mice", "rabbit", "birds"] as ProtectionKind[]) {
     if (!rollAttack(ATTACK_CHANCE[kind])) continue;
     const protectedOn = effectiveStore.protections[kind];
 
+    if (kind === "birds") {
+      if (protectedOn) {
+        await insertVarmintEvent(db, userId, "birds_blocked", null, { target_type: "field" });
+        continue;
+      }
+      plots = applyBirdPlotDamage(plots);
+      vegetables = applyBirdTierDamage(vegetables);
+      orchards = applyBirdTierDamage(orchards);
+      const nextStore = applyBirdClusterDamage(store);
+      plotsChanged = true;
+      vegetablesChanged = true;
+      orchardsChanged = true;
+      if (nextStore !== store) {
+        store = nextStore;
+        storeChanged = true;
+      }
+      await insertVarmintEvent(db, userId, "birds_attack", null, { target_type: "field" });
+      continue;
+    }
+
     if (kind === "rabbit") {
-      const clusterId = pickRootCluster(store);
-      const tree = clusterId == null ? pickOrchardWithRowSlots(orchards) : null;
-      const target = !clusterId && !tree ? pickClassicPlotWithRowSlots(plots) : null;
-      if (!clusterId && !tree && !target) continue;
+      const target = pickFieldTargetWithRowSlots(plots, orchards, vegetables, store);
+      if (!target) continue;
       if (protectedOn) {
         await insertVarmintEvent(
           db,
           userId,
           "rabbit_blocked",
-          target?.id ?? tree?.id ?? clusterId,
-          clusterId ? treePayload("cluster", clusterId) : tree ? treePayload("orchard", tree.id) : { plot_id: target?.id },
+          targetPlotId(target),
+          targetPayload(target),
         );
         continue;
       }
-      if (clusterId) {
-        store = applyRootClusterDamage(store, clusterId);
+      if (target.kind === "cluster") {
+        store = applyRootClusterDamage(store, target.id);
         storeChanged = true;
-        await insertVarmintEvent(db, userId, "rabbit_attack", clusterId, treePayload("cluster", clusterId));
-      } else if (tree) {
-        orchards = applyTreeSlotDamage(orchards, tree.id);
+        await insertVarmintEvent(db, userId, "rabbit_attack", target.id, targetPayload(target));
+      } else if (target.kind === "orchard") {
+        orchards = applyTreeSlotDamage(orchards, target.id);
         orchardsChanged = true;
-        await insertVarmintEvent(db, userId, "rabbit_attack", tree.id, treePayload("orchard", tree.id));
+        await insertVarmintEvent(db, userId, "rabbit_attack", target.id, targetPayload(target));
+      } else if (target.kind === "vegetable") {
+        vegetables = applyTreeSlotDamage(vegetables, target.id);
+        vegetablesChanged = true;
+        await insertVarmintEvent(db, userId, "rabbit_attack", target.id, targetPayload(target));
       } else {
-        plots = applyRabbitDamage(plots, target!.id);
+        plots = applyRabbitDamage(plots, target.id);
         plotsChanged = true;
-        await insertVarmintEvent(db, userId, "rabbit_attack", target!.id, { plot_id: target!.id });
+        await insertVarmintEvent(db, userId, "rabbit_attack", target.id, targetPayload(target));
       }
       continue;
     }
 
     if (kind === "mice") {
-      const tree = pickOrchardWithRowSlots(orchards);
-      const target = tree ? null : pickClassicPlotWithRowSlots(plots);
-      if (!tree && !target) continue;
+      const target = pickFieldTargetWithRowSlots(plots, orchards, vegetables);
+      if (!target) continue;
       if (protectedOn) {
         await insertVarmintEvent(
           db,
           userId,
           "mice_blocked",
-          target?.id ?? tree?.id ?? null,
-          tree ? treePayload("orchard", tree.id) : { plot_id: target?.id },
+          targetPlotId(target),
+          targetPayload(target),
         );
         continue;
       }
-      if (tree) {
-        orchards = applyTreeSlotDamage(orchards, tree.id);
+      if (target.kind === "orchard") {
+        orchards = applyTreeSlotDamage(orchards, target.id);
         orchardsChanged = true;
-        await insertVarmintEvent(db, userId, "mice_attack", tree.id, treePayload("orchard", tree.id));
+        await insertVarmintEvent(db, userId, "mice_attack", target.id, targetPayload(target));
+      } else if (target.kind === "vegetable") {
+        vegetables = applyTreeSlotDamage(vegetables, target.id);
+        vegetablesChanged = true;
+        await insertVarmintEvent(db, userId, "mice_attack", target.id, targetPayload(target));
       } else {
-        plots = applyMiceDamage(plots, target!.id);
+        plots = applyMiceDamage(plots, target.id);
         plotsChanged = true;
-        await insertVarmintEvent(db, userId, "mice_attack", target!.id, { plot_id: target!.id });
+        await insertVarmintEvent(db, userId, "mice_attack", target.id, targetPayload(target));
       }
       continue;
     }
 
-    const tree = pickOrchardWithRows(orchards);
-    const target = tree ? null : pickClassicPlotWithRows(plots);
-    if (!tree && !target) continue;
+    const target = pickFieldTargetWithRows(plots, orchards, vegetables);
+    if (!target) continue;
     if (protectedOn) {
       await insertVarmintEvent(
         db,
         userId,
         "gopher_blocked",
-        target?.id ?? tree?.id ?? null,
-        tree ? treePayload("orchard", tree.id) : { plot_id: target?.id },
+        targetPlotId(target),
+        targetPayload(target),
       );
       continue;
     }
-    if (tree) {
-      orchards = applyTreeRowDamage(orchards, tree.id);
+    if (target.kind === "orchard") {
+      orchards = applyTreeRowDamage(orchards, target.id);
       orchardsChanged = true;
-      await insertVarmintEvent(db, userId, "gopher_attack", tree.id, treePayload("orchard", tree.id));
+      await insertVarmintEvent(db, userId, "gopher_attack", target.id, targetPayload(target));
+    } else if (target.kind === "vegetable") {
+      vegetables = applyTreeRowDamage(vegetables, target.id);
+      vegetablesChanged = true;
+      await insertVarmintEvent(db, userId, "gopher_attack", target.id, targetPayload(target));
     } else {
-      plots = applyGopherDamage(plots, target!.id);
+      plots = applyGopherDamage(plots, target.id);
       plotsChanged = true;
-      await insertVarmintEvent(db, userId, "gopher_attack", target!.id, { plot_id: target!.id });
+      await insertVarmintEvent(db, userId, "gopher_attack", target.id, targetPayload(target));
     }
   }
 
   if (userHasStormHazards(plots) || hasActiveTrees(orchards, store)) {
-    const storm = await processStorms(db, userId, plots, orchards, effectiveStore, lightningRow);
+    const storm = await processStorms(db, userId, plots, orchards, vegetables, effectiveStore, lightningRow);
     plots = storm.plots;
     orchards = storm.orchards;
+    vegetables = storm.vegetables;
     if (storm.store.root_clusters !== effectiveStore.root_clusters) {
       store = { ...store, root_clusters: storm.store.root_clusters };
       storeChanged = true;
     }
     if (storm.changed) plotsChanged = true;
     if (storm.changed) orchardsChanged = true;
+    if (storm.changed) vegetablesChanged = true;
   }
 
-  if (!plotsChanged && !orchardsChanged && !storeChanged) return;
+  if (!plotsChanged && !orchardsChanged && !vegetablesChanged && !storeChanged) return;
 
   const nowIso = new Date().toISOString();
   await db
     .prepare(
       `UPDATE rr_farms_progress
-       SET plots_json = ?, orchards_json = ?, store_json = ?, progress_version = progress_version + 1, updated_at = ?
+       SET plots_json = ?, orchards_json = ?, vegetables_json = ?, store_json = ?, progress_version = progress_version + 1, updated_at = ?
        WHERE user_id = ? AND progress_version = ?`,
     )
-    .bind(plotsToJson(plots), tierPlotsToJson(orchards), farmsStoreToJson(store), nowIso, userId, progressVersion)
+    .bind(plotsToJson(plots), tierPlotsToJson(orchards), tierPlotsToJson(vegetables), farmsStoreToJson(store), nowIso, userId, progressVersion)
     .run();
 }
 
@@ -566,7 +662,7 @@ export async function runFarmsVarmintCron(db: D1Database): Promise<{
   const lightningRow = await maybeRollGlobalLightningRow(db);
   const rows = await db
     .prepare(
-      `SELECT user_id, plots_json, orchards_json, COALESCE(store_json, '{}') AS store_json, progress_version
+      `SELECT user_id, plots_json, orchards_json, vegetables_json, COALESCE(store_json, '{}') AS store_json, progress_version
        FROM rr_farms_progress
        ORDER BY RANDOM()
        LIMIT ?`,
@@ -576,6 +672,7 @@ export async function runFarmsVarmintCron(db: D1Database): Promise<{
       user_id: string;
       plots_json: string;
       orchards_json: string | null;
+      vegetables_json: string | null;
       store_json: string;
       progress_version: number;
     }>();
@@ -584,7 +681,16 @@ export async function runFarmsVarmintCron(db: D1Database): Promise<{
   let processed = 0;
   for (const r of list) {
     try {
-      await processVarmintForUser(db, r.user_id, r.plots_json, r.orchards_json, r.store_json, r.progress_version, lightningRow);
+      await processVarmintForUser(
+        db,
+        r.user_id,
+        r.plots_json,
+        r.orchards_json,
+        r.vegetables_json,
+        r.store_json,
+        r.progress_version,
+        lightningRow,
+      );
       processed += 1;
     } catch (e) {
       console.error("farms_varmint_user_err", r.user_id, e instanceof Error ? e.message : String(e));

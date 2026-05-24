@@ -49,8 +49,8 @@ export function AdSenseAd({ placement }: { placement: Placement }) {
 
     const timeout = window.setTimeout(() => {
       const status = unit.getAttribute("data-ad-status");
-      const hasFrame = unit.querySelector("iframe") != null;
-      if (status === "filled" || hasFrame) setState("filled");
+      if (status === "unfilled") setState("hidden");
+      else if (status === "filled") setState("filled");
       else setState("hidden");
     }, 4500);
 
@@ -68,6 +68,7 @@ export function AdSenseAd({ placement }: { placement: Placement }) {
       <ins
         ref={unitRef}
         className="adsbygoogle ad-unit"
+        style={{ display: "block" }}
         data-ad-client={client}
         data-ad-slot={slot}
         data-ad-format="auto"

@@ -3,13 +3,19 @@ import { useGame } from "../contexts/GameContext";
 import { formatRu } from "../game/format";
 import {
   fetchDiceMarket,
+  fetchMarketHiLoState,
+  postDiceCancel,
   postDiceJoin,
   postDiceRequest,
-  postMarketHiLoPlay,
+  postMarketHiLoCashOut,
+  postMarketHiLoGuess,
+  postMarketHiLoStart,
   postMarketDonation,
   postMarketRouletteSpin,
   postMarketWheelSpin,
   type DiceMarketRequest,
+  type MarketHiLoResponse,
+  type MarketRouletteSpinResponse,
 } from "../lib/farmsApi";
 
 const ATOMIC_PER_ROOT = 100_000_000;
@@ -19,6 +25,12 @@ const MARKET_GAME_MIN_STAKE = 100_000;
 const MARKET_GAME_MAX_STAKE = 100_000_000;
 const WHEEL_SPIN_COST = 100_000;
 const ROULETTE_NUMBERS = Array.from({ length: 37 }, (_, i) => i);
+const ROULETTE_RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const ROULETTE_TABLE_ROWS = [
+  [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
+  [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
+  [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34],
+];
 const WHEEL_SEGMENTS = [
   ...Array.from({ length: 52 }, () => ({ label: "0.0001", className: "wheel-segment--common" })),
   ...Array.from({ length: 18 }, () => ({ label: "0.0005", className: "wheel-segment--small" })),
@@ -52,8 +64,25 @@ function formatSignedRu(n: number): string {
   return `${sign}${formatRu(Math.abs(n))}`;
 }
 
+function cardSuitSymbol(suit: string): string {
+  if (suit === "hearts") return "♥";
+  if (suit === "diamonds") return "♦";
+  if (suit === "clubs") return "♣";
+  return "♠";
+}
+
+function cardRankOnly(label: string): string {
+  return label.replace(/[♥♦♣♠]/g, "") || "?";
+}
+
+function rouletteNumberColor(n: number): "red" | "black" | "green" {
+  if (n === 0) return "green";
+  return ROULETTE_RED_NUMBERS.has(n) ? "red" : "black";
+}
+
 function resultLabel(req: DiceMarketRequest): string {
   if (req.status === "open") return "Open";
+  if (req.status === "cancelled") return "Cancelled, stake refunded";
   if (req.status === "tie") return "Tie, both stakes refunded";
   return req.winner_label ? `${req.winner_label} won` : "Resolved";
 }
@@ -66,9 +95,12 @@ export function MarketScreen() {
   const [rouletteBet, setRouletteBet] = useState("red");
   const [rouletteNumber, setRouletteNumber] = useState("7");
   const [rouletteNote, setRouletteNote] = useState("");
+  const [rouletteResult, setRouletteResult] = useState<MarketRouletteSpinResponse | null>(null);
   const [hiLoStakeInput, setHiLoStakeInput] = useState("0.001");
   const [hiLoGuess, setHiLoGuess] = useState<"high" | "low">("high");
   const [hiLoNote, setHiLoNote] = useState("");
+  const [hiLoRound, setHiLoRound] = useState<MarketHiLoResponse | null>(null);
+  const [hiLoLastDraw, setHiLoLastDraw] = useState<MarketHiLoResponse | null>(null);
   const [requests, setRequests] = useState<DiceMarketRequest[]>([]);
   const [note, setNote] = useState("");
   const [wheelNote, setWheelNote] = useState("");
@@ -91,11 +123,16 @@ export function MarketScreen() {
   const load = async () => {
     setLoading(true);
     const data = await fetchDiceMarket();
+    const hiLoState = await fetchMarketHiLoState();
     if (data) {
       setRequests(data.requests);
       setNote(data.detail || "");
     } else {
       setNote("Could not load The Well. Try again after reconnecting.");
+    }
+    if (hiLoState?.active) {
+      setHiLoRound(hiLoState);
+      setHiLoNote(hiLoState.detail || "Active Hi-Lo round restored.");
     }
     setLoading(false);
   };
@@ -132,6 +169,18 @@ export function MarketScreen() {
     setBusy(true);
     try {
       await applyMarketResponse(await postDiceJoin(id));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelRequest = async (id: string, stake: number) => {
+    if (busy) return;
+    const ok = window.confirm(`Cancel this dice request and refund ${formatRu(stake)}?`);
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await applyMarketResponse(await postDiceCancel(id));
     } finally {
       setBusy(false);
     }
@@ -181,6 +230,7 @@ export function MarketScreen() {
     if (!rouletteStakeValid || busy) return;
     setBusy(true);
     setRouletteNote("");
+    setRouletteResult(null);
     try {
       const result = await postMarketRouletteSpin(
         rouletteStakeAtomic,
@@ -197,6 +247,7 @@ export function MarketScreen() {
         return;
       }
       const outcome = `${result.outcome_number} ${result.outcome_color}`;
+      setRouletteResult(result);
       setRouletteNote(
         `${result.won ? "Won" : "Lost"} on ${outcome}. Payout ${formatRu(result.payout)} · net ${formatSignedRu(result.net)}`,
       );
@@ -206,25 +257,65 @@ export function MarketScreen() {
     }
   };
 
-  const playHiLo = async () => {
+  const startHiLo = async () => {
     if (!hiLoStakeValid || busy) return;
     setBusy(true);
     setHiLoNote("");
+    setHiLoLastDraw(null);
     try {
-      const result = await postMarketHiLoPlay(hiLoStakeAtomic, hiLoGuess);
+      const result = await postMarketHiLoStart(hiLoStakeAtomic);
       if (!result) {
-        setHiLoNote("Hi-Lo failed. Try again after reconnecting.");
+        setHiLoNote("Hi-Lo start failed. Try again after reconnecting.");
         return;
       }
       if (result.detail) {
         setHiLoNote(result.detail);
         if (result.detail.toLowerCase().includes("insufficient")) await handleInsufficientFunds();
+      }
+      setHiLoRound(result.active ? result : null);
+      await refreshServerBalance();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const guessHiLo = async () => {
+    if (!hiLoRound?.active || busy) return;
+    setBusy(true);
+    setHiLoNote("");
+    try {
+      const result = await postMarketHiLoGuess(hiLoGuess);
+      if (!result) {
+        setHiLoNote("Hi-Lo draw failed. Try again after reconnecting.");
         return;
       }
-      const outcome = result.tie ? "Push" : result.won ? "Won" : "Lost";
-      setHiLoNote(
-        `${outcome}: ${result.first_label} → ${result.next_label}. Payout ${formatRu(result.payout)} · net ${formatSignedRu(result.net)}`,
-      );
+      setHiLoLastDraw(result);
+      setHiLoRound(result.active ? result : null);
+      const outcome = result.tie ? "Push" : result.won ? "Correct" : "Bust";
+      const next = result.next_label || result.current_label || "?";
+      const bank = result.bank != null ? formatRu(result.bank) : formatRu(0);
+      const net = result.net != null ? ` · net ${formatSignedRu(result.net)}` : "";
+      setHiLoNote(`${outcome}: drew ${next}. Bank ${bank}${net}`);
+      await refreshServerBalance();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cashOutHiLo = async () => {
+    if (!hiLoRound?.active || busy) return;
+    setBusy(true);
+    setHiLoNote("");
+    try {
+      const result = await postMarketHiLoCashOut();
+      if (!result) {
+        setHiLoNote("Hi-Lo cash out failed. Try again after reconnecting.");
+        return;
+      }
+      setHiLoLastDraw(result);
+      setHiLoRound(null);
+      const payout = result.payout ?? result.bank ?? 0;
+      setHiLoNote(`Cashed out ${formatRu(payout)}${result.net != null ? ` · net ${formatSignedRu(result.net)}` : ""}`);
       await refreshServerBalance();
     } finally {
       setBusy(false);
@@ -322,6 +413,39 @@ export function MarketScreen() {
             </div>
             <span className="market-lock-badge">0-36</span>
           </div>
+          <div className="roulette-graphic" aria-label="Roulette table graphic">
+            <div className="roulette-wheel-graphic">
+              <div className={`roulette-ball roulette-ball--${rouletteResult?.outcome_color || "idle"}`}>
+                {rouletteResult ? rouletteResult.outcome_number : "?"}
+              </div>
+            </div>
+            <div className="roulette-felt">
+              <button
+                type="button"
+                className={`roulette-cell roulette-cell--green${rouletteBet === "green" ? " roulette-cell--selected" : ""}`}
+                onClick={() => setRouletteBet("green")}
+              >
+                0
+              </button>
+              <div className="roulette-number-grid">
+                {ROULETTE_TABLE_ROWS.flat().map((n) => (
+                  <button
+                    type="button"
+                    key={n}
+                    className={`roulette-cell roulette-cell--${rouletteNumberColor(n)}${
+                      rouletteBet === "straight" && rouletteNumber === String(n) ? " roulette-cell--selected" : ""
+                    }`}
+                    onClick={() => {
+                      setRouletteBet("straight");
+                      setRouletteNumber(String(n));
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="dice-create-row">
             <label className="dice-stake-field">
               Stake
@@ -370,33 +494,67 @@ export function MarketScreen() {
             <div>
               <h2>Hi-Lo</h2>
               <p>
-                Guess if the next card is higher or lower. Wins pay 1.95x, ties push and refund the stake.
+                Start with one real card face up. Each correct guess grows the round bank by 1.95x. Cash out anytime,
+                but a wrong guess loses the bank.
               </p>
             </div>
             <span className="market-lock-badge">A-K</span>
           </div>
+          <div className="hilo-table">
+            <div className="playing-card playing-card--back" aria-label="Card deck">
+              <span>ROOT</span>
+            </div>
+            <div
+              className={`playing-card playing-card--${hiLoRound?.current_suit || hiLoLastDraw?.current_suit || "spades"}`}
+              aria-label={`Current card ${hiLoRound?.current_label || hiLoLastDraw?.current_label || "not drawn"}`}
+            >
+              <span className="playing-card-rank">{cardRankOnly(hiLoRound?.current_label || hiLoLastDraw?.current_label || "?")}</span>
+              <span className="playing-card-suit">{cardSuitSymbol(hiLoRound?.current_suit || hiLoLastDraw?.current_suit || "spades")}</span>
+              <span className="playing-card-rank playing-card-rank--bottom">
+                {cardRankOnly(hiLoRound?.current_label || hiLoLastDraw?.current_label || "?")}
+              </span>
+            </div>
+            <div className="hilo-bank">
+              <span>{hiLoRound?.active ? "Round bank" : "No active round"}</span>
+              <strong>{formatRu(hiLoRound?.bank ?? 0)}</strong>
+              {hiLoRound?.rounds ? <small>{hiLoRound.rounds} correct</small> : <small>Draw first card to start</small>}
+            </div>
+          </div>
           <div className="dice-create-row">
+            {!hiLoRound?.active ? (
+              <label className="dice-stake-field">
+                Stake
+                <input
+                  value={hiLoStakeInput}
+                  inputMode="decimal"
+                  placeholder="0.001"
+                  onChange={(e) => setHiLoStakeInput(e.target.value)}
+                />
+              </label>
+            ) : null}
             <label className="dice-stake-field">
-              Stake
-              <input
-                value={hiLoStakeInput}
-                inputMode="decimal"
-                placeholder="0.001"
-                onChange={(e) => setHiLoStakeInput(e.target.value)}
-              />
-            </label>
-            <label className="dice-stake-field">
-              Guess
+              Next guess
               <select value={hiLoGuess} onChange={(e) => setHiLoGuess(e.target.value === "low" ? "low" : "high")}>
                 <option value="high">Higher</option>
                 <option value="low">Lower</option>
               </select>
             </label>
-            <button type="button" className="btn btn-primary" disabled={busy || !hiLoStakeValid} onClick={() => void playHiLo()}>
-              {busy ? "Drawing..." : `Play Hi-Lo (${hiLoStakeValid ? formatRu(hiLoStakeAtomic) : "invalid"})`}
-            </button>
+            {hiLoRound?.active ? (
+              <>
+                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void guessHiLo()}>
+                  {busy ? "Drawing..." : `Draw ${hiLoGuess === "high" ? "higher" : "lower"}`}
+                </button>
+                <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void cashOutHiLo()}>
+                  Cash out {formatRu(hiLoRound.bank)}
+                </button>
+              </>
+            ) : (
+              <button type="button" className="btn btn-primary" disabled={busy || !hiLoStakeValid} onClick={() => void startHiLo()}>
+                {busy ? "Drawing..." : `Start Hi-Lo (${hiLoStakeValid ? formatRu(hiLoStakeAtomic) : "invalid"})`}
+              </button>
+            )}
           </div>
-          {!hiLoStakeValid ? <p className="market-note market-note--warn">Enter 0.001 to 1 ROOTS.</p> : null}
+          {!hiLoRound?.active && !hiLoStakeValid ? <p className="market-note market-note--warn">Enter 0.001 to 1 ROOTS.</p> : null}
           {hiLoNote ? <p className="market-result">{hiLoNote}</p> : null}
         </section>
       </div>
@@ -464,8 +622,15 @@ export function MarketScreen() {
                   <button type="button" className="btn btn-primary btn-sm market-join-btn" disabled={busy} onClick={() => void joinRequest(req.id)}>
                     Join for {formatRu(req.stake)}
                   </button>
+                ) : req.status === "open" && req.can_cancel ? (
+                  <div className="market-dice-actions">
+                    <p className="market-note">Waiting for another farmer to join.</p>
+                    <button type="button" className="btn btn-ghost btn-sm market-join-btn" disabled={busy} onClick={() => void cancelRequest(req.id, req.stake)}>
+                      Cancel and refund
+                    </button>
+                  </div>
                 ) : req.status === "open" && req.is_mine ? (
-                  <p className="market-note">Waiting for another farmer to join.</p>
+                  <p className="market-note">Waiting for result.</p>
                 ) : null}
               </article>
             ))}

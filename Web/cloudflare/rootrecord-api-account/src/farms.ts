@@ -72,6 +72,9 @@ const INSUFFICIENT_FUNDS_REWARDED_AD_BONUS = 100_000; // 0.001 ROOTS
 const MARKET_MIN_STAKE = 100_000; // 0.001 ROOTS
 const MARKET_MAX_STAKE = 100_000_000; // 1 ROOT
 const MARKET_WHEEL_SPIN_COST = 100_000; // 0.001 ROOTS
+const HILO_PAYOUT_NUMERATOR = 195;
+const HILO_PAYOUT_DENOMINATOR = 100;
+const HILO_MAX_BANK = 10_000_000_000; // 100 ROOTS
 
 const MARKET_WHEEL_PRIZES = [
   { label: "0.0001 ROOTS", prize: 10_000, weight: 52_000, visualCount: 52 },
@@ -159,6 +162,20 @@ type DiceRequestRow = {
   winner_user_id: string | null;
   created_at: string;
   joined_at: string | null;
+  resolved_at: string | null;
+};
+
+type HiLoSessionRow = {
+  id: string;
+  user_id: string;
+  stake: number;
+  bank: number;
+  current_card: number;
+  drawn_cards_json: string;
+  status: string;
+  rounds: number;
+  created_at: string;
+  updated_at: string;
   resolved_at: string | null;
 };
 
@@ -452,12 +469,75 @@ function roulettePayoutMultiplier(betKind: string, number: number, straightNumbe
   return 0;
 }
 
+function cardRank(card: number): number {
+  return ((Math.max(1, Math.floor(card)) - 1) % 13) + 1;
+}
+
+function cardSuit(card: number): "spades" | "hearts" | "diamonds" | "clubs" {
+  const suit = Math.floor((Math.max(1, Math.floor(card)) - 1) / 13);
+  if (suit === 1) return "hearts";
+  if (suit === 2) return "diamonds";
+  if (suit === 3) return "clubs";
+  return "spades";
+}
+
+function cardRankLabel(rank: number): string {
+  if (rank === 1) return "A";
+  if (rank === 11) return "J";
+  if (rank === 12) return "Q";
+  if (rank === 13) return "K";
+  return String(rank);
+}
+
+function cardSuitSymbol(suit: string): string {
+  if (suit === "hearts") return "♥";
+  if (suit === "diamonds") return "♦";
+  if (suit === "clubs") return "♣";
+  return "♠";
+}
+
 function cardLabel(card: number): string {
-  if (card === 1) return "A";
-  if (card === 11) return "J";
-  if (card === 12) return "Q";
-  if (card === 13) return "K";
-  return String(card);
+  const rank = cardRank(card);
+  const suit = cardSuit(card);
+  return `${cardRankLabel(rank)}${cardSuitSymbol(suit)}`;
+}
+
+function parseDrawnCards(raw: string | null | undefined): number[] {
+  if (!raw) return [];
+  try {
+    const list = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(list)) return [];
+    return list.map((x) => Math.floor(Number(x) || 0)).filter((x) => x >= 1 && x <= 52);
+  } catch {
+    return [];
+  }
+}
+
+function drawHiLoCard(excluding: number[]): number {
+  const used = new Set(excluding.filter((x) => x >= 1 && x <= 52));
+  const remaining = Array.from({ length: 52 }, (_, i) => i + 1).filter((card) => !used.has(card));
+  if (!remaining.length) return randomInt(52) + 1;
+  return remaining[randomInt(remaining.length)]!;
+}
+
+function hiLoSessionPayload(row: HiLoSessionRow | null, detail?: string) {
+  if (!row) return { ok: true as const, game: "hi_lo" as const, active: false, detail };
+  const currentCard = Math.floor(Number(row.current_card) || 1);
+  return {
+    ok: true as const,
+    game: "hi_lo" as const,
+    active: row.status === "active",
+    session_id: row.id,
+    stake: Math.max(0, Math.floor(Number(row.stake) || 0)),
+    bank: Math.max(0, Math.floor(Number(row.bank) || 0)),
+    current_card: currentCard,
+    current_rank: cardRank(currentCard),
+    current_suit: cardSuit(currentCard),
+    current_label: cardLabel(currentCard),
+    rounds: Math.max(0, Math.floor(Number(row.rounds) || 0)),
+    status: row.status,
+    detail,
+  };
 }
 
 async function debitMarketStake(db: D1Database, userId: string, amount: number, nowIso: string): Promise<boolean> {
@@ -1090,6 +1170,7 @@ function dicePayload(row: DiceRequestRow, userId: string) {
     winner_label: row.winner_user_id ? farmerLabel(row.winner_user_id) : null,
     is_mine: row.creator_user_id === userId || row.joiner_user_id === userId,
     can_join: row.status === "open" && row.creator_user_id !== userId,
+    can_cancel: row.status === "open" && row.creator_user_id === userId,
     created_at: row.created_at,
     joined_at: row.joined_at,
     resolved_at: row.resolved_at,
@@ -1222,6 +1303,58 @@ async function farmsDiceJoin(request: Request, env: FarmsEnv, diceId: string): P
   }
 
   return json(await diceMarketPayload(env.DB, userId));
+}
+
+async function farmsDiceCancel(request: Request, env: FarmsEnv, diceId: string): Promise<Response> {
+  const u = await requireUser(request, env);
+  if (u instanceof Response) return u;
+  const userId = u;
+  let body: { catalog_hash?: string } = {};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  if (String(body.catalog_hash || "") !== CATALOG_HASH) {
+    return json({ detail: "App catalog outdated. Update Root Farms and try again." }, 400);
+  }
+
+  const row = await env.DB
+    .prepare(
+      `SELECT id, creator_user_id, joiner_user_id, stake, status, creator_roll, joiner_roll, winner_user_id,
+              created_at, joined_at, resolved_at
+       FROM rr_farms_dice_requests
+       WHERE id = ?`,
+    )
+    .bind(diceId)
+    .first<DiceRequestRow>();
+  if (!row) return json({ ...(await diceMarketPayload(env.DB, userId)), detail: "Dice request not found." }, 404);
+  if (row.creator_user_id !== userId) {
+    return json({ ...(await diceMarketPayload(env.DB, userId)), detail: "Only the creator can cancel this dice request." }, 403);
+  }
+  if (row.status !== "open") {
+    return json({ ...(await diceMarketPayload(env.DB, userId)), detail: "Only open dice requests can be cancelled." }, 409);
+  }
+
+  const stake = Math.max(0, Math.floor(Number(row.stake) || 0));
+  const nowIso = new Date().toISOString();
+  const update = await env.DB
+    .prepare(
+      `UPDATE rr_farms_dice_requests
+       SET status = 'cancelled', resolved_at = ?
+       WHERE id = ? AND creator_user_id = ? AND status = 'open'`,
+    )
+    .bind(nowIso, diceId, userId)
+    .run();
+  if ((update.meta?.changes ?? 0) !== 1) {
+    return json({ ...(await diceMarketPayload(env.DB, userId)), detail: "Dice request is no longer open." }, 409);
+  }
+  if (stake > 0) await creditBalance(env.DB, userId, stake, nowIso);
+
+  return json({
+    ...(await diceMarketPayload(env.DB, userId)),
+    detail: `Cancelled dice request and refunded ${formatRootsAtomicLocale(stake)} ROOTS.`,
+  });
 }
 
 async function farmsMarketDonate(request: Request, env: FarmsEnv): Promise<Response> {
@@ -1437,12 +1570,33 @@ async function farmsMarketRouletteSpin(request: Request, env: FarmsEnv): Promise
   });
 }
 
-async function farmsMarketHiLoPlay(request: Request, env: FarmsEnv): Promise<Response> {
+async function getActiveHiLoSession(db: D1Database, userId: string): Promise<HiLoSessionRow | null> {
+  return db
+    .prepare(
+      `SELECT id, user_id, stake, bank, current_card, drawn_cards_json, status, rounds, created_at, updated_at, resolved_at
+       FROM rr_farms_hilo_sessions
+       WHERE user_id = ? AND status = 'active'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+    )
+    .bind(userId)
+    .first<HiLoSessionRow>()
+    .catch(() => null);
+}
+
+async function farmsMarketHiLoState(request: Request, env: FarmsEnv): Promise<Response> {
+  const u = await requireUser(request, env);
+  if (u instanceof Response) return u;
+  const active = await getActiveHiLoSession(env.DB, u);
+  return json({ ...hiLoSessionPayload(active), balance: await getBalance(env.DB, u) });
+}
+
+async function farmsMarketHiLoStart(request: Request, env: FarmsEnv): Promise<Response> {
   const u = await requireUser(request, env);
   if (u instanceof Response) return u;
   const userId = u;
 
-  let body: { catalog_hash?: string; amount?: number; guess?: string } = {};
+  let body: { catalog_hash?: string; amount?: number } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -1457,9 +1611,12 @@ async function farmsMarketHiLoPlay(request: Request, env: FarmsEnv): Promise<Res
     return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Hi-Lo stake must be 0.001 to 1 ROOTS." }, 400);
   }
 
-  const guess = String(body.guess || "").trim().toLowerCase();
-  if (guess !== "high" && guess !== "low") {
-    return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Choose high or low." }, 400);
+  const existing = await getActiveHiLoSession(env.DB, userId);
+  if (existing) {
+    return json({
+      ...hiLoSessionPayload(existing, "Cash out or finish your active Hi-Lo round before starting another."),
+      balance: await getBalance(env.DB, userId),
+    }, 409);
   }
 
   const nowIso = new Date().toISOString();
@@ -1468,29 +1625,170 @@ async function farmsMarketHiLoPlay(request: Request, env: FarmsEnv): Promise<Res
     return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Insufficient ROOTS for Hi-Lo." }, 409);
   }
 
-  const firstCard = randomInt(13) + 1;
-  const nextCard = randomInt(13) + 1;
-  const tie = firstCard === nextCard;
-  const won = !tie && (guess === "high" ? nextCard > firstCard : nextCard < firstCard);
-  const payout = tie ? amount : won ? Math.floor(amount * 1.95) : 0;
-  if (payout > 0) await creditBalance(env.DB, userId, payout, nowIso);
+  const firstCard = drawHiLoCard([]);
+  const id = crypto.randomUUID();
+  const row: HiLoSessionRow = {
+    id,
+    user_id: userId,
+    stake: amount,
+    bank: amount,
+    current_card: firstCard,
+    drawn_cards_json: JSON.stringify([firstCard]),
+    status: "active",
+    rounds: 0,
+    created_at: nowIso,
+    updated_at: nowIso,
+    resolved_at: null,
+  };
+  await env.DB
+    .prepare(
+      `INSERT INTO rr_farms_hilo_sessions (
+         id, user_id, stake, bank, current_card, drawn_cards_json, status, rounds, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, 'active', 0, ?, ?)`,
+    )
+    .bind(id, userId, amount, amount, firstCard, row.drawn_cards_json, nowIso, nowIso)
+    .run();
   const balance = await getBalance(env.DB, userId);
+  return json({ ...hiLoSessionPayload(row, "First card drawn. Guess higher or lower."), balance });
+}
 
+async function farmsMarketHiLoGuess(request: Request, env: FarmsEnv): Promise<Response> {
+  const u = await requireUser(request, env);
+  if (u instanceof Response) return u;
+  const userId = u;
+
+  let body: { catalog_hash?: string; guess?: string } = {};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  if (String(body.catalog_hash || "") !== CATALOG_HASH) {
+    return json({ detail: "App catalog outdated. Update Root Farms and try again." }, 400);
+  }
+
+  const guess = String(body.guess || "").trim().toLowerCase();
+  if (guess !== "high" && guess !== "low") {
+    return json({ ok: true, balance: await getBalance(env.DB, userId), detail: "Choose high or low." }, 400);
+  }
+
+  const row = await getActiveHiLoSession(env.DB, userId);
+  if (!row) {
+    return json({ ok: true, game: "hi_lo", active: false, balance: await getBalance(env.DB, userId), detail: "Start a Hi-Lo round first." }, 404);
+  }
+
+  const drawn = parseDrawnCards(row.drawn_cards_json);
+  const nextCard = drawHiLoCard(drawn);
+  const nextDrawn = [...drawn, nextCard];
+  const currentRank = cardRank(row.current_card);
+  const nextRank = cardRank(nextCard);
+  const tie = currentRank === nextRank;
+  const won = !tie && (guess === "high" ? nextRank > currentRank : nextRank < currentRank);
+  const nowIso = new Date().toISOString();
+  const currentBank = Math.max(0, Math.floor(Number(row.bank) || 0));
+
+  if (!tie && !won) {
+    await env.DB
+      .prepare(
+        `UPDATE rr_farms_hilo_sessions
+         SET current_card = ?, drawn_cards_json = ?, bank = 0, status = 'lost', updated_at = ?, resolved_at = ?
+         WHERE id = ? AND user_id = ? AND status = 'active'`,
+      )
+      .bind(nextCard, JSON.stringify(nextDrawn), nowIso, nowIso, row.id, userId)
+      .run();
+    return json({
+      ...hiLoSessionPayload({ ...row, current_card: nextCard, drawn_cards_json: JSON.stringify(nextDrawn), bank: 0, status: "lost", updated_at: nowIso, resolved_at: nowIso }, "Bust. You lost the Hi-Lo round bank."),
+      guess,
+      next_card: nextCard,
+      next_rank: nextRank,
+      next_suit: cardSuit(nextCard),
+      next_label: cardLabel(nextCard),
+      tie,
+      won,
+      payout: 0,
+      net: -Math.max(0, Math.floor(Number(row.stake) || 0)),
+      balance: await getBalance(env.DB, userId),
+    });
+  }
+
+  const nextBank = tie ? currentBank : Math.min(HILO_MAX_BANK, Math.floor((currentBank * HILO_PAYOUT_NUMERATOR) / HILO_PAYOUT_DENOMINATOR));
+  const rounds = Math.max(0, Math.floor(Number(row.rounds) || 0)) + (won ? 1 : 0);
+  await env.DB
+    .prepare(
+      `UPDATE rr_farms_hilo_sessions
+       SET current_card = ?, drawn_cards_json = ?, bank = ?, rounds = ?, updated_at = ?
+       WHERE id = ? AND user_id = ? AND status = 'active'`,
+    )
+    .bind(nextCard, JSON.stringify(nextDrawn), nextBank, rounds, nowIso, row.id, userId)
+    .run();
+
+  const nextRow: HiLoSessionRow = {
+    ...row,
+    bank: nextBank,
+    current_card: nextCard,
+    drawn_cards_json: JSON.stringify(nextDrawn),
+    rounds,
+    updated_at: nowIso,
+  };
   return json({
-    ok: true,
-    game: "hi_lo",
-    amount,
+    ...hiLoSessionPayload(nextRow, tie ? "Push. Same rank, your bank stays the same." : "Correct. Cash out or keep going."),
     guess,
-    first_card: firstCard,
     next_card: nextCard,
-    first_label: cardLabel(firstCard),
+    next_rank: nextRank,
+    next_suit: cardSuit(nextCard),
     next_label: cardLabel(nextCard),
     tie,
     won,
+    payout: nextBank,
+    net: nextBank - Math.max(0, Math.floor(Number(row.stake) || 0)),
+    balance: await getBalance(env.DB, userId),
+  });
+}
+
+async function farmsMarketHiLoCashOut(request: Request, env: FarmsEnv): Promise<Response> {
+  const u = await requireUser(request, env);
+  if (u instanceof Response) return u;
+  const userId = u;
+
+  let body: { catalog_hash?: string } = {};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  if (String(body.catalog_hash || "") !== CATALOG_HASH) {
+    return json({ detail: "App catalog outdated. Update Root Farms and try again." }, 400);
+  }
+
+  const row = await getActiveHiLoSession(env.DB, userId);
+  if (!row) {
+    return json({ ok: true, game: "hi_lo", active: false, balance: await getBalance(env.DB, userId), detail: "No active Hi-Lo round to cash out." }, 404);
+  }
+
+  const nowIso = new Date().toISOString();
+  const payout = Math.max(0, Math.floor(Number(row.bank) || 0));
+  await env.DB
+    .prepare(
+      `UPDATE rr_farms_hilo_sessions
+       SET status = 'cashed_out', updated_at = ?, resolved_at = ?
+       WHERE id = ? AND user_id = ? AND status = 'active'`,
+    )
+    .bind(nowIso, nowIso, row.id, userId)
+    .run();
+  if (payout > 0) await creditBalance(env.DB, userId, payout, nowIso);
+  const balance = await getBalance(env.DB, userId);
+  return json({
+    ...hiLoSessionPayload({ ...row, status: "cashed_out", updated_at: nowIso, resolved_at: nowIso }, "Cashed out Hi-Lo winnings."),
     payout,
-    net: payout - amount,
+    net: payout - Math.max(0, Math.floor(Number(row.stake) || 0)),
     balance,
   });
+}
+
+async function farmsMarketHiLoPlay(request: Request, env: FarmsEnv): Promise<Response> {
+  const start = await farmsMarketHiLoStart(request, env);
+  if (!start.ok) return start;
+  return start;
 }
 
 async function farmsPurchase(request: Request, env: FarmsEnv): Promise<Response> {
@@ -1676,7 +1974,7 @@ async function farmsStoreToggle(request: Request, env: FarmsEnv): Promise<Respon
     return json({ detail: "App catalog outdated. Update Root Farms and try again." }, 400);
   }
   const kind = String(body.kind || "").trim();
-  const allowed = new Set(["gopher", "mice", "rabbit", "lightning_meteorologist", "cypress_trees"]);
+  const allowed = new Set(["gopher", "mice", "rabbit", "birds", "lightning_meteorologist", "cypress_trees"]);
   if (!allowed.has(kind)) {
     return json({ detail: "Invalid store kind." }, 400);
   }
@@ -1689,7 +1987,7 @@ async function farmsStoreToggle(request: Request, env: FarmsEnv): Promise<Respon
     return json({ detail: "Progress version mismatch. Refresh and try again." }, 409);
   }
   const store = parseFarmsStore(progress.store_json);
-  if (kind === "gopher" || kind === "mice" || kind === "rabbit") {
+  if (kind === "gopher" || kind === "mice" || kind === "rabbit" || kind === "birds") {
     store.protections[kind as ProtectionKind] = enabled;
   } else if (kind === "lightning_meteorologist") {
     store.lightning_meteorologist = enabled;
@@ -1746,9 +2044,15 @@ export async function handleFarmsRoutes(
   if (sub === "/v1/farms/market/dice" && (method === "GET" || method === "POST")) return farmsDiceMarket(request, env);
   const diceJoinMatch = sub.match(/^\/v1\/farms\/market\/dice\/([^/]+)\/join$/);
   if (diceJoinMatch && method === "POST") return farmsDiceJoin(request, env, decodeURIComponent(diceJoinMatch[1]));
+  const diceCancelMatch = sub.match(/^\/v1\/farms\/market\/dice\/([^/]+)\/cancel$/);
+  if (diceCancelMatch && method === "POST") return farmsDiceCancel(request, env, decodeURIComponent(diceCancelMatch[1]));
   if (sub === "/v1/farms/market/donate" && method === "POST") return farmsMarketDonate(request, env);
   if (sub === "/v1/farms/market/wheel/spin" && method === "POST") return farmsMarketWheelSpin(request, env);
   if (sub === "/v1/farms/market/roulette/spin" && method === "POST") return farmsMarketRouletteSpin(request, env);
+  if (sub === "/v1/farms/market/hi-lo/state" && method === "GET") return farmsMarketHiLoState(request, env);
+  if (sub === "/v1/farms/market/hi-lo/start" && method === "POST") return farmsMarketHiLoStart(request, env);
+  if (sub === "/v1/farms/market/hi-lo/guess" && method === "POST") return farmsMarketHiLoGuess(request, env);
+  if (sub === "/v1/farms/market/hi-lo/cash-out" && method === "POST") return farmsMarketHiLoCashOut(request, env);
   if (sub === "/v1/farms/market/hi-lo/play" && method === "POST") return farmsMarketHiLoPlay(request, env);
   if (sub === "/v1/farms/purchase" && method === "POST") return farmsPurchase(request, env);
   if (sub === "/v1/farms/store/toggle" && method === "POST") return farmsStoreToggle(request, env);

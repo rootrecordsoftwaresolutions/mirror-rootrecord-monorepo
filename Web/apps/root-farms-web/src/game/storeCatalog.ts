@@ -1,4 +1,4 @@
-export type ProtectionKind = "gopher" | "mice" | "rabbit";
+export type ProtectionKind = "gopher" | "mice" | "rabbit" | "birds";
 
 export type StoreToggleKind = ProtectionKind | "lightning_meteorologist" | "cypress_trees";
 
@@ -17,35 +17,42 @@ export const STORE_PROTECTIONS: StoreProtectionItem[] = [
   {
     kind: "gopher",
     title: "Gopher protection",
-    blurb: "Stops gophers on Carrot–Garlic plots (one random active row). −1% income rate.",
+    blurb: "Stops gophers gnawing rows across the unlocked field. −1% income rate.",
     feePctLabel: "−1% income rate",
     feePct: 0.01,
   },
   {
     kind: "mice",
     title: "Field mice protection",
-    blurb: "Stops mice on Carrot–Garlic plots (destroys a row slot). −1% income rate.",
+    blurb: "Stops mice destroying row slots across the unlocked field. −1% income rate.",
     feePctLabel: "−1% income rate",
     feePct: 0.01,
   },
   {
     kind: "rabbit",
     title: "Rabbit protection",
-    blurb: "Stops rabbits wiping a Carrot–Garlic plot. −3% income rate.",
+    blurb: "Stops rabbits wiping rows across the unlocked field. −3% income rate.",
     feePctLabel: "−3% income rate",
     feePct: 0.03,
   },
   {
+    kind: "birds",
+    title: "Hire Uncle",
+    blurb: "Uncle swats at birds with his cane to keep flocks away from the whole field. −10% income rate.",
+    feePctLabel: "−10% income rate",
+    feePct: 0.10,
+  },
+  {
     kind: "lightning_meteorologist",
     title: "Lightning meteorologist",
-    blurb: "Grounds shared lightning row strikes (Ginger+ farms). −1% income rate.",
+    blurb: "Grounds shared lightning row strikes across the unlocked field. −1% income rate.",
     feePctLabel: "−1% income rate",
     feePct: 0.01,
   },
   {
     kind: "cypress_trees",
     title: "Cypress windbreak",
-    blurb: "Greatly reduces wind crop loss on Ginger+ plots. −5% income rate (shade).",
+    blurb: "Greatly reduces wind crop loss across the unlocked field. −5% income rate (shade).",
     feePctLabel: "−5% income rate",
     feePct: 0.05,
   },
@@ -63,11 +70,12 @@ export type FarmsProtections = {
   gopher: boolean;
   mice: boolean;
   rabbit: boolean;
+  birds: boolean;
 };
 
 export function defaultFarmsStore(): FarmsStoreData {
   return {
-    protections: { gopher: false, mice: false, rabbit: false },
+    protections: { gopher: false, mice: false, rabbit: false, birds: false },
     lightning_rod_owned: false,
     lightning_meteorologist: false,
     cypress_trees: false,
@@ -80,7 +88,7 @@ export function parseFarmsStoreFromApi(
   store?: Partial<FarmsStoreData>,
 ): FarmsStoreData {
   const base = defaultFarmsStore();
-  if (protections) base.protections = { ...protections };
+  if (protections) base.protections = { ...base.protections, ...protections };
   if (store) {
     if (store.lightning_rod_owned != null) base.lightning_rod_owned = Boolean(store.lightning_rod_owned);
     if (store.lightning_meteorologist != null) base.lightning_meteorologist = Boolean(store.lightning_meteorologist);
@@ -100,6 +108,7 @@ export function hasActiveFarmhand(store: FarmsStoreData): boolean {
     store.protections.gopher ||
       store.protections.mice ||
       store.protections.rabbit ||
+      store.protections.birds ||
       store.lightning_meteorologist ||
       store.cypress_trees,
   );
@@ -115,6 +124,7 @@ export function protectionIncomeMultiplier(store: FarmsStoreData): number {
   if (store.protections.gopher) reduction += 0.01;
   if (store.protections.mice) reduction += 0.01;
   if (store.protections.rabbit) reduction += 0.03;
+  if (store.protections.birds) reduction += 0.10;
   if (store.lightning_meteorologist) reduction += 0.01;
   if (store.cypress_trees) reduction += 0.05;
   return Math.max(0, 1 - reduction);
