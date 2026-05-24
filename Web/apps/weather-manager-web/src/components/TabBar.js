@@ -12,15 +12,20 @@ const tabs = [
 
 function navLinkClass(isActive) {
   return clsx(
-    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+    'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300',
     isActive
-      ? 'bg-subtle text-accent shadow-sm'
-      : 'text-white/70 hover:bg-container/80 hover:text-white'
+      ? 'bg-gradient-to-r from-accent/20 via-coral/15 to-violet/15 text-white shadow-glow border border-accent/30'
+      : 'text-white/70 hover:bg-white/5 hover:text-white border border-transparent'
   );
 }
 
 function NavIcon({ Icon, isActive }) {
-  return <Icon strokeWidth={isActive ? 2 : 1.5} className="h-5 w-5 shrink-0" />;
+  return (
+    <Icon
+      strokeWidth={isActive ? 2 : 1.5}
+      className={clsx('h-5 w-5 shrink-0 transition-colors', isActive && 'text-accent')}
+    />
+  );
 }
 
 /** Mobile: bottom tabs. Desktop (lg+): fixed left rail — web-first workflow layout. */
@@ -28,14 +33,14 @@ export default function TabBar() {
   return (
     <>
       <aside
-        className="fixed left-0 top-0 z-40 hidden h-full w-56 flex-col border-r border-subtle bg-app/95 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl lg:flex"
+        className="fixed left-0 top-0 z-40 hidden h-full w-56 flex-col border-r border-white/10 bg-app/40 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-2xl lg:flex"
         aria-label="Main navigation"
       >
-        <div className="px-4 pb-4">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent/90">RootRecord</div>
-          <div className="mt-0.5 text-sm font-semibold text-white">Weather</div>
+        <div className="px-4 pb-5">
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-accent">RootRecord</div>
+          <div className="mt-0.5 text-lg font-display font-semibold gradient-text">Weather</div>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 px-2 pb-4">
+        <nav className="flex flex-1 flex-col gap-1 px-2 pb-4">
           {tabs.map((t) => (
             <NavLink
               key={t.to}
@@ -56,7 +61,7 @@ export default function TabBar() {
       </aside>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-subtle bg-app/90 backdrop-blur-xl lg:hidden"
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-app/70 backdrop-blur-2xl lg:hidden"
         style={{
           height: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -72,13 +77,23 @@ export default function TabBar() {
                 data-testid={t.testId}
                 className={({ isActive }) =>
                   clsx(
-                    'flex w-full flex-col items-center justify-center gap-1 transition-colors active:scale-95',
-                    isActive ? 'text-accent' : 'text-accent/60 hover:text-accent'
+                    'relative flex w-full flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95',
+                    isActive ? 'text-accent' : 'text-white/55 hover:text-white'
                   )
                 }
               >
-                <t.icon strokeWidth={1.5} className="h-6 w-6" />
-                <span className="font-mono text-[10px] uppercase tracking-widest">{t.label}</span>
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span
+                        aria-hidden
+                        className="absolute top-1 h-1 w-8 rounded-full bg-gradient-to-r from-accent via-coral to-violet shadow-glow"
+                      />
+                    )}
+                    <t.icon strokeWidth={isActive ? 2 : 1.5} className="h-6 w-6" />
+                    <span className="font-mono text-[10px] uppercase tracking-widest">{t.label}</span>
+                  </>
+                )}
               </NavLink>
             </li>
           ))}

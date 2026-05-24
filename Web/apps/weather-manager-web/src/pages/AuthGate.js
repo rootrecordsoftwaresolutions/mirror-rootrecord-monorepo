@@ -136,12 +136,12 @@ export default function AuthGate({ onSignedIn }) {
       ) : null}
       <div className="flex-1 flex flex-col px-6 pt-4 pb-10 max-w-sm mx-auto w-full animate-slideup">
           <div className="flex flex-col items-center text-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-md bg-accent/10 border border-accent/30 flex items-center justify-center">
-              <Cloud strokeWidth={1.5} className="w-6 h-6 text-accent" />
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent/30 via-coral/25 to-violet/30 border border-white/15 flex items-center justify-center shadow-glow animate-float">
+              <Cloud strokeWidth={1.5} className="w-7 h-7 text-white drop-shadow-[0_2px_8px_rgba(255,184,107,0.6)]" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight" data-testid="auth-app-title">Weather Manager</h1>
-              <p className="text-xs text-accent/70 uppercase tracking-[.2em] font-mono">Forecasts &amp; alerts</p>
+              <h1 className="text-2xl font-display font-bold tracking-tight gradient-text" data-testid="auth-app-title">Weather Manager</h1>
+              <p className="text-[11px] text-white/70 uppercase tracking-[.25em] font-mono mt-1">Forecasts &amp; alerts</p>
             </div>
           </div>
 
@@ -161,7 +161,7 @@ export default function AuthGate({ onSignedIn }) {
               <a
                 href={BILLING_URL}
                 data-testid="auth-become-member"
-                className="bg-accent hover:bg-accentHover text-white py-3 rounded-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
+                className="bg-gradient-to-r from-accent via-coral to-violet hover:shadow-glow text-white py-3 rounded-full flex items-center justify-center gap-2 active:scale-95 transition-all duration-300 shadow-glass font-medium"
               >
                 Become a Member
                 <ArrowRight className="w-4 h-4" />
@@ -235,7 +235,7 @@ export default function AuthGate({ onSignedIn }) {
                   type="submit"
                   disabled={busy}
                   data-testid="auth-submit-button"
-                  className="bg-accent hover:bg-accentHover text-white py-3 rounded-sm flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+                  className="bg-gradient-to-r from-accent via-coral to-violet hover:shadow-glow text-white py-3 rounded-full flex items-center justify-center gap-2 active:scale-95 transition-all duration-300 shadow-glass font-medium disabled:opacity-60"
                 >
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                   {view === 'signin' ? 'Sign in' : 'Create account'}

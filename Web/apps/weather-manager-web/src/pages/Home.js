@@ -90,7 +90,7 @@ function writeWeatherSnapshot(locationId, bundle) {
 function Bento({ icon: Icon, label, value, sub }) {
   return (
     <div
-      className="bg-container border border-subtle p-3 flex flex-col items-center text-center gap-1 min-h-[5.5rem] justify-center"
+      className="bg-container border border-subtle p-3 flex flex-col items-center text-center gap-1 min-h-[5.5rem] justify-center shadow-glass hover:shadow-glow hover:border-accent/40 transition-all duration-300"
       data-testid={`bento-${label.toLowerCase()}`}
     >
       <Icon strokeWidth={1.5} className="w-4 h-4 text-accent shrink-0" aria-hidden />
@@ -333,9 +333,9 @@ export default function Home() {
         <button
           data-testid="home-add-location-cta"
           onClick={() => navigate('/locations/new')}
-          className="bg-accent hover:bg-accentHover text-white px-5 py-3 rounded-sm flex items-center gap-2 active:scale-95"
+          className="bg-gradient-to-r from-accent via-coral to-violet hover:shadow-glow text-white font-medium px-6 py-3 rounded-full flex items-center gap-2 active:scale-95 transition-all duration-300 shadow-glass"
         >
-          <Plus strokeWidth={1.5} className="w-4 h-4" /> Add location
+          <Plus strokeWidth={2} className="w-4 h-4" /> Add location
         </button>
         {err && (
           <div className="text-xs bg-sev-severe/10 border border-sev-severe/40 text-sev-severe p-2 mt-4 max-w-xs" data-testid="home-empty-error">
@@ -395,7 +395,7 @@ export default function Home() {
           data-testid="home-refresh-button"
           onClick={handleRefresh}
           className={clsx(
-            'p-2 rounded-sm border border-subtle text-neutral-300 hover:bg-containerHover active:scale-95',
+            'p-2 rounded-full bg-container border border-subtle text-accent hover:text-accentHover hover:border-accent/50 hover:shadow-glow active:scale-95 transition-all duration-300',
             refreshing && 'animate-spinSlow'
           )}
         >
@@ -422,24 +422,31 @@ export default function Home() {
         ) : (
           <>
             {/* Hero */}
-            <div className="bg-container border border-subtle p-5 mb-3" data-testid="home-current-hero">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-2">Now</div>
-              <div className="flex items-end justify-between">
-                <div>
-                  <div className="font-mono text-6xl leading-none tracking-tighter" data-testid="home-current-temp">
-                    {tempC === undefined || tempC === null
-                      ? (hourlyNow?.temperature !== undefined
-                          ? fmtHourlyGridTemp(hourlyNow, hourlyGridUnits)
-                          : '—')
-                      : fmtTemp(tempC, 'C')}
+            <div className="relative overflow-hidden bg-container border border-subtle p-5 mb-3 shadow-glass" data-testid="home-current-hero">
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-hero-gradient opacity-90" />
+              <div aria-hidden className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-coral/30 blur-3xl" />
+              <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-sky/25 blur-3xl" />
+              <div className="relative">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-accent mb-2">Now</div>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="font-mono text-6xl leading-none tracking-tighter gradient-text" data-testid="home-current-temp">
+                      {tempC === undefined || tempC === null
+                        ? (hourlyNow?.temperature !== undefined
+                            ? fmtHourlyGridTemp(hourlyNow, hourlyGridUnits)
+                            : '—')
+                        : fmtTemp(tempC, 'C')}
+                    </div>
+                    <div className="mt-2 text-white/85 font-medium">{condition}</div>
                   </div>
-                  <div className="mt-2 text-accent/80">{condition}</div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <AccuWeatherIcon code={nowIconCode} className="w-11 h-11 text-accent" title={safeText(condition, '')} />
-                  <div className="text-right text-xs text-accent/70 font-mono">
-                    {high !== undefined && <div>HIGH <span className="text-white">{fmtTemp(high, periodUnit)}</span></div>}
-                    {low !== undefined && <div>LOW <span className="text-white">{fmtTemp(low, periodUnit)}</span></div>}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="animate-float">
+                      <AccuWeatherIcon code={nowIconCode} className="w-14 h-14 text-accent drop-shadow-[0_4px_18px_rgba(255,184,107,0.45)]" title={safeText(condition, '')} />
+                    </div>
+                    <div className="text-right text-xs text-white/75 font-mono">
+                      {high !== undefined && <div>HIGH <span className="text-white font-semibold">{fmtTemp(high, periodUnit)}</span></div>}
+                      {low !== undefined && <div>LOW <span className="text-white font-semibold">{fmtTemp(low, periodUnit)}</span></div>}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -490,7 +497,7 @@ export default function Home() {
                   {bundle.forecast.hourly.filter((p) => p && typeof p === 'object').slice(0, 12).map((p, idx) => (
                     <div
                       key={p.number != null ? p.number : `h-${idx}`}
-                      className="flex min-w-[80px] max-w-[92px] shrink-0 flex-col bg-container border border-subtle px-2.5 py-3 text-center"
+                      className="flex min-w-[80px] max-w-[92px] shrink-0 flex-col bg-container border border-subtle px-2.5 py-3 text-center hover:border-accent/40 hover:shadow-glow transition-all duration-300"
                     >
                       <div className="text-[10px] font-mono text-accent/70 shrink-0">
                         {new Date(p.startTime).toLocaleTimeString([], { hour: 'numeric' })}
@@ -575,7 +582,7 @@ export default function Home() {
                       return (
                         <div
                           key={ref?.startTime || ref?.number || idx}
-                          className="flex min-w-[112px] max-w-[140px] shrink-0 flex-col bg-container border border-subtle px-2.5 py-3 text-center"
+                          className="flex min-w-[112px] max-w-[140px] shrink-0 flex-col bg-container border border-subtle px-2.5 py-3 text-center hover:border-coral/50 hover:shadow-glow-coral transition-all duration-300"
                           data-testid="home-daily-cell"
                         >
                           <div className="text-[10px] font-mono text-accent/70 shrink-0">{label}</div>
