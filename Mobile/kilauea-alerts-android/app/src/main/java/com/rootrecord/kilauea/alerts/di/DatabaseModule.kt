@@ -19,7 +19,7 @@ object DatabaseModule {
     @Singleton
     fun provideDb(@ApplicationContext ctx: Context): KilaueaDatabase =
         Room.databaseBuilder(ctx, KilaueaDatabase::class.java, "kilauea_alerts.db")
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
     @Provides

@@ -19,7 +19,7 @@ private val HAWAII_BBOX_URL =
 
 @Singleton
 class EarthquakeRepository @Inject constructor(
-    @Named("public") private val http: OkHttpClient,
+    @param:Named("public") private val http: OkHttpClient,
     private val dao: KilaueaDataDao,
 ) {
 

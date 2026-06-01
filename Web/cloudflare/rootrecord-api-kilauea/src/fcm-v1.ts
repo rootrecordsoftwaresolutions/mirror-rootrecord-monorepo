@@ -38,12 +38,46 @@ export async function getFcmAccessToken(creds: { clientEmail: string; privateKey
 
 export type FcmSendOneResult = { ok: true } | { ok: false; error: string };
 
+/** Data-only message — onMessageReceived runs even when the app is backgrounded (Android). */
+export async function sendFcmDataNotification(
+  projectId: string,
+  accessToken: string,
+  token: string,
+  data: Record<string, string>,
+): Promise<FcmSendOneResult> {
+  const url = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: {
+        token,
+        data,
+        android: { priority: "HIGH" },
+      },
+    }),
+  });
+  if (res.ok) return { ok: true };
+  let msg = `HTTP ${res.status}`;
+  try {
+    const j = (await res.json()) as { error?: { message?: string } };
+    if (j?.error?.message) msg = j.error.message;
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, error: msg };
+}
+
 export async function sendFcmNotification(
   projectId: string,
   accessToken: string,
   token: string,
   title: string,
-  body: string
+  body: string,
+  data?: Record<string, string>,
 ): Promise<FcmSendOneResult> {
   const url = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`;
   const res = await fetch(url, {
@@ -56,9 +90,10 @@ export async function sendFcmNotification(
       message: {
         token,
         notification: { title, body },
+        ...(data && Object.keys(data).length ? { data } : {}),
         android: {
           priority: "HIGH",
-          notification: { sound: "default" },
+          notification: { sound: "default", channel_id: "kilauea_volcano" },
         },
       },
     }),

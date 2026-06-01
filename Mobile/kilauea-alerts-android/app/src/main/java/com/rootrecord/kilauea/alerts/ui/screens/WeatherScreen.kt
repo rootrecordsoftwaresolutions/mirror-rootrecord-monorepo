@@ -79,7 +79,7 @@ fun WeatherScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text("My location weather", style = MaterialTheme.typography.titleSmall)
+                    Text("My Location Weather", style = MaterialTheme.typography.titleSmall)
                     Text(
                         if (proUnlocked) {
                             "When turned on, uses your location for this forecast. Kept only on this phone."

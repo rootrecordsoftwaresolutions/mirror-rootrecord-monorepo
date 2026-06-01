@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -80,7 +80,7 @@ fun PhotosScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Volcano photos") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -100,8 +100,8 @@ fun PhotosScreen(
             )
             // Three-state ladder for the submission control:
             //   not signed in   → sign-in nudge (gallery still browsable below)
-            //   signed in, free → Pro upgrade pitch (gating per product decision)
-            //   Pro / Lifetime  → real "Submit photo" button
+            //   signed in, standard access → membership pitch (gating per product decision)
+            //   member  → real "Submit photo" button
             // We deliberately don't render a disabled submit button for non-Pro users: it reads as
             // "broken" rather than "locked", which is exactly the confusion that prompted this gate.
             when {
@@ -110,7 +110,7 @@ fun PhotosScreen(
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Sign in required", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "To submit a photo, sign in on the More tab with your Root Record account.",
+                                "To submit a photo, sign in on the Menu tab with your Root Record account.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -120,9 +120,9 @@ fun PhotosScreen(
                 !proUnlocked -> {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Pro / Lifetime feature", style = MaterialTheme.typography.titleSmall)
+                            Text("Photo submissions require additional resources", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Photo submissions are part of Root Record Pro and Lifetime. The public gallery stays free to browse — upgrade to contribute your own shots of Kīlauea.",
+                                "The public gallery stays open to browse. Submitting photos uses storage and review resources, so submissions are limited to members only.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -133,7 +133,7 @@ fun PhotosScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Text("Become a member")
+                                Text("View membership options")
                             }
                         }
                     }

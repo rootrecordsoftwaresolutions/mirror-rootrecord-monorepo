@@ -21,8 +21,9 @@ compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-# `*/10` = USGS earthquakes (Big Island, M2.0+, ~150km of Kilauea) → Discord #kilauea-alerts.
-# Dedupes via `discord_posted_quakes` (migration 0033). Secret: DISCORD_KILAUEA_USGS_WEBHOOK_URL.
+# `*/10` = USGS earthquakes (Big Island, M2.0+, ~150km of Kilauea) → Discord #kilauea-alerts,
+# plus Kīlauea AI analysis reports for conservative triggers (migration 0054).
+# Secrets: DISCORD_KILAUEA_BOT_TOKEN (preferred), DISCORD_KILAUEA_USGS_WEBHOOK_URL (fallback), GROK_*.
 crons = ["*/10 * * * *"]
 
 [[d1_databases]]
@@ -41,9 +42,23 @@ name = "EMAIL"
 WORKER_SHARD = "kilauea"
 SITE_URL = "https://rootrecord.info"
 EMAIL_FROM = "RootRecord <root@rootrecord.info>"
+DISCORD_GUILD_ID = "1497039564345442406"
+DISCORD_KILAUEA_CLIENT_ID = "1510049729776713728"
+DISCORD_KILAUEA_PUBLIC_KEY = "e9da3437733cc84674fc40e5bc68b024e4386559a792f7965f1f84ae1ad20934"
+DISCORD_KILAUEA_ALERTS_CHANNEL_ID = "1502461868990791770"
+# Data intake submissions from /data — defaults to DISCORD_FEEDBACK_CHANNEL_ID if unset.
+# DISCORD_KILAUEA_DATA_CHANNEL_ID = ""
+DISCORD_DEVELOPER_ROLE_ID = "1497040541559558175"
+DISCORD_LIFETIME_MEMBER_ROLE_ID = "1504043473408360558"
+DISCORD_MONTHLY_MEMBER_ROLE_ID = "1497040710665244782"
 # AccuWeather: API key is a Worker **Secret** (`deploy.ps1` from repo-root `credentials.env` → `wrangler secret put ACCUWEATHER_API_KEY`), not [vars] (avoids Secret + var name clash in dashboard).
 # Optional language locale for responses (default in code: en-us)
 ACCUWEATHER_LANGUAGE = "en-us"
+GROK_MODEL = "grok-3-latest"
+GROK_API_URL = "https://api.x.ai/v1/chat/completions"
+DISCORD_KILAUEA_REPORT_CHANNEL_ID = "1502461868990791770"
+DISCORD_KILAUEA_AI_ARCHIVE_CHANNEL_ID = "1507597139465867364"
+DISCORD_FEEDBACK_CHANNEL_ID = "1499515809767096443"
 # Dashboard D1 cache: seconds before refetching upstream weather for same/nearby grid.
 WEATHER_DATA_TTL_SEC = "900"
 # Reuse cached weather across users when requested coordinates are within this radius.
@@ -78,9 +93,13 @@ PLAY_STORE_URL_TOKEN_MANAGER = "https://play.google.com/store/apps/details?id=co
 PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.rootrecord.accounthub"
 # Developer feed (Settings → messages in mobile apps): GET /api/mobile/developer-messages?app_id=…
 # Publish (ops): POST https://api.rootrecord.info/api/internal/developer-messages
-# Kīlauea live streams (Android Live Feeds pager): GET /api/mobile/kilauea-live-streams
+# Kīlauea live streams (Android Live Feeds): GET /api/mobile/kilauea-live-streams
 # Update one row (ops): POST …/api/internal/kilauea-live-streams  { id, watch_url, youtube_video_id?, title?, description?, sort_order? }
 #   Header: X-RR-Push-Admin-Key: <same as push-broadcast>
+# Kīlauea major-event page (Android home banner + hidden screen, D1 `kilauea_situation`):
+#   GET  …/api/mobile/kilauea-situation
+#   POST …/api/internal/kilauea-situation  { enabled, name?, body? }  — name required when enabled=true
+#   Disable: { "enabled": false }  — keeps last name/body for next event
 #   JSON: { "title": "…", "body": "…", "app_scope": "all" | "weather" | "bm" | "token_manager" | "account_hub" }
 #
 # Discord developer feed sync → Worker `rootrecord-solana-tx` (same D1 `developer_messages`).
@@ -91,8 +110,9 @@ PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.
 # Manual: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))" | wrangler secret put INTERNAL_WALLET_ENC_KEY_B64
 # Optional Discord channel for Solana tooling events (internal wallet provision, etc.):
 #   wrangler secret put DISCORD_WEBHOOK_SOLANA_TOOLS
-# In-app feedback (Business Manager, Account Hub, Weather mobile → POST /api/feedback):
-#   wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL
+# In-app feedback (Kīlauea Android → POST /api/feedback):
+#   Preferred: DISCORD_BOT_TOKEN posts to DISCORD_FEEDBACK_CHANNEL_ID.
+#   Optional fallback: wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL
 #   (paste full https://discord.com/api/webhooks/... URL — never commit it to git)
 # Next.js Solana Tools site POST /api/solana-site/log → Worker (must match site env SOLANA_SITE_LOG_SECRET):
 #   wrangler secret put SOLANA_SITE_LOG_SECRET

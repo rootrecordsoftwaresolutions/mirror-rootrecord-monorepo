@@ -17,7 +17,7 @@ private const val NWS_HI_ACTIVE =
 
 @Singleton
 class NwsAlertsRepository @Inject constructor(
-    @Named("public") private val http: OkHttpClient,
+    @param:Named("public") private val http: OkHttpClient,
     private val dao: KilaueaDataDao,
 ) {
 

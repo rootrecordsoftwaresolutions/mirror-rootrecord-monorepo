@@ -24,9 +24,12 @@ private const val BASE = "https://volcanoes.usgs.gov/hans-public/api/volcano"
  */
 @Singleton
 class UsgVolcanoRepository @Inject constructor(
-    @Named("public") private val http: OkHttpClient,
+    @param:Named("public") private val http: OkHttpClient,
     private val dao: KilaueaDataDao,
 ) {
+
+    /** Matches Home screen poll interval — hero banner must not sit on stale alert/color for 15+ min. */
+    private val localMaxAgeMs: Long = 2 * 60 * 1000L
 
     suspend fun cachedVolcanoJson(): String? = dao.getByKey(CacheKeys.VOLCANO_KILAUEA)?.payloadJson
 
@@ -75,13 +78,22 @@ class UsgVolcanoRepository @Inject constructor(
 
     suspend fun offlineFirst(forceRefresh: Boolean): Result<JsonObject> {
         if (!forceRefresh) {
-            cachedVolcanoJson()?.let { raw ->
-                runCatching { AppJson.parseToJsonElement(raw) as JsonObject }.getOrNull()?.let {
-                    return Result.success(it)
+            val row = dao.getByKey(CacheKeys.VOLCANO_KILAUEA)
+            val raw = row?.payloadJson
+            if (raw != null) {
+                val age = System.currentTimeMillis() - row.fetchedAtEpochMs
+                if (age >= 0 && age < localMaxAgeMs) {
+                    runCatching { AppJson.parseToJsonElement(raw) as JsonObject }.getOrNull()?.let {
+                        return Result.success(it)
+                    }
                 }
             }
         }
-        return refreshVolcanoStatus()
+        return refreshVolcanoStatus().recoverCatching { err ->
+            cachedVolcanoJson()?.let { raw ->
+                runCatching { AppJson.parseToJsonElement(raw) as JsonObject }.getOrNull()
+            } ?: throw err
+        }
     }
 
     private suspend fun httpGet(url: String): String = withContext(Dispatchers.IO) {

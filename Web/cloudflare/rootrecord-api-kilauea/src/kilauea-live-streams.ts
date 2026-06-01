@@ -34,7 +34,7 @@ export function embedUrlForStream(row: {
 }
 
 /**
- * GET /api/mobile/kilauea-live-streams — ordered list for the Kīlauea app Live Feeds pager.
+ * GET /api/mobile/kilauea-live-streams — ordered list for the Kīlauea app Live Feeds screen.
  */
 export async function handleKilaueaLiveStreamsGet(env: KilaueaLiveStreamsEnv): Promise<Response> {
   try {

@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 private const val BILLING_URL = "https://rootrecord.info/billing"
 
 /**
- * Pro upsell dialog. Renders at the root of `MainActivity` and listens to [UpsellEvents].
+ * Membership dialog. Renders at the root of `MainActivity` and listens to [UpsellEvents].
  * Visibility is driven by:
  *   - `MainActivity.onCreate` — bumps the open counter once per real launch, then fires the
  *     trigger when the count is even (>= 2) and the user is free.
@@ -35,18 +35,22 @@ fun UpsellOverlay() {
 
     AlertDialog(
         onDismissRequest = { UpsellEvents.dismiss() },
-        title = { Text("Unlock Kīlauea Alerts Pro") },
+        title = { Text("Some features require additional resources") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Free accounts are locked to Volcano.", style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "With Pro you unlock:",
+                    "Core access includes the Volcano view and Kīlauea volcano push alerts.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Some features are limited to members only:",
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 Text("• All Big Island locations", style = MaterialTheme.typography.bodySmall)
+                Text("• NWS, earthquake, and live-feed change alerts", style = MaterialTheme.typography.bodySmall)
                 Text("• The web dashboard at kilauea.rootrecord.info", style = MaterialTheme.typography.bodySmall)
-                Text("• Weather Manager + Business Manager web access too", style = MaterialTheme.typography.bodySmall)
+                Text("• Weather Manager and Business Manager member features too", style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
@@ -56,7 +60,7 @@ fun UpsellOverlay() {
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 runCatching { ctx.startActivity(i) }
             }) {
-                Text("Upgrade now")
+                Text("View membership options")
             }
         },
         dismissButton = {

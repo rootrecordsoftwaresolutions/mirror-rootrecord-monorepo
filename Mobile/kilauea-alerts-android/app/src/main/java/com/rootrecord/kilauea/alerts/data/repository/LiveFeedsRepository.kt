@@ -30,6 +30,8 @@ class LiveFeedsRepository @Inject constructor(
             ?: return null
         // Pre–D1 builds cached USGS portal links; ignore so we refetch YouTube embed URLs.
         if (isLegacyPortalCatalog(cat)) return null
+        if (cat.feeds.none { it.id == "lava_watchers" }) return null
+        if (cat.feeds.any { it.id == "lava_watchers" && it.youtubeVideoId.isNullOrBlank() }) return null
         return cat
     }
 
@@ -109,6 +111,14 @@ class LiveFeedsRepository @Inject constructor(
     companion object {
         /** Offline fallback — matches D1 seed in `0036_kilauea_live_streams.sql`. */
         fun defaultStreams(): List<LiveFeed> = listOf(
+            LiveFeed(
+                id = "lava_watchers",
+                title = "Lava Watchers",
+                description = "Featured content provider — independent Kīlauea livestream and commentary.",
+                youtubeVideoId = "yalZ2sXN_5k",
+                watchUrl = "https://www.youtube.com/@LavaWatchers/live",
+                embedUrl = "https://www.youtube.com/embed/yalZ2sXN_5k?autoplay=1&playsinline=1&rel=0&modestbranding=1",
+            ),
             LiveFeed(
                 id = "usgs_v1",
                 title = "[V1cam] West Halemaʻumaʻu",

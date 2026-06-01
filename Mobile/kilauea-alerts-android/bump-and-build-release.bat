@@ -46,6 +46,11 @@ if not defined VER (
 echo Building v%VER%
 
 echo.
+echo [preflight] Stop Gradle daemons and clear stale lint cache
+call "%GRADLEW%" --stop >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -LiteralPath '%APP%app\build\intermediates\lint-cache' -Recurse -Force -ErrorAction SilentlyContinue"
+
+echo.
 echo [1/2] gradlew bundleRelease assembleRelease
 call "%GRADLEW%" bundleRelease assembleRelease
 if errorlevel 1 goto FAIL

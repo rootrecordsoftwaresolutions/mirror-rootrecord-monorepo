@@ -75,7 +75,7 @@ class PhotosViewModel @Inject constructor(
             // around it (deep link, stale state) we still refuse client-side instead of wasting an
             // R2 upload + server moderation slot.
             if (!prefs.authProUnlocked.first()) {
-                _state.update { it.copy(toast = "Photo submissions are a Pro / Lifetime perk.") }
+                _state.update { it.copy(toast = "Photo submissions are limited to members only.") }
                 return@launch
             }
             _state.update { it.copy(uploading = true, error = null, toast = null) }

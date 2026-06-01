@@ -78,7 +78,7 @@ fun FeedbackScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Feedback") },
+                title = { Text("Submit Feedback") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -97,7 +97,7 @@ fun FeedbackScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Tell us what is working or what is not.",
+                "Tell us what is working, what is broken, or what would make Kīlauea Alerts more useful.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -105,7 +105,7 @@ fun FeedbackScreen(
             if (!signedIn) {
                 Card(Modifier.fillMaxWidth()) {
                     Text(
-                        "Sign in under More with your Root Record account to send feedback.",
+                        "Sign in under Menu with your Root Record account to submit feedback.",
                         modifier = Modifier.padding(16.dp),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -178,7 +178,7 @@ fun FeedbackScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !sending && signedIn && message.isNotBlank(),
             ) {
-                Text(if (sending) "Sending…" else "Send feedback")
+                Text(if (sending) "Sending…" else "Submit Feedback")
             }
         }
     }

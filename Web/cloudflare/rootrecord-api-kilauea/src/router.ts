@@ -59,6 +59,9 @@ import { readRecentHttpErrorEvents } from "./observability";
 import { handleMobileVersionPolicy } from "./mobile-client-version";
 import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./developer-messages";
 import { handleKilaueaLiveStreamsGet, handleKilaueaLiveStreamsPost } from "./kilauea-live-streams";
+import { handleKilaueaSituationGet, handleKilaueaSituationPost } from "./kilauea-situation";
+import { handleKilaueaAiAnalysesGet, handleKilaueaAiManualRun } from "./kilauea-ai-analysis";
+import { handleKilaueaDiscordInteractions } from "./discord-kilauea-bot";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
 import { handleAqsHawaiiCountyDaily } from "./aqs-epa";
@@ -113,6 +116,19 @@ export interface Env {
 
   FCM_PRIVATE_KEY?: string;
 
+  DISCORD_BOT_TOKEN?: string;
+  /** Kīlauea Alerts public bot (Application 1510049729776713728). */
+  DISCORD_KILAUEA_BOT_TOKEN?: string;
+  DISCORD_KILAUEA_CLIENT_ID?: string;
+  DISCORD_KILAUEA_PUBLIC_KEY?: string;
+  DISCORD_KILAUEA_ALERTS_CHANNEL_ID?: string;
+  DISCORD_KILAUEA_DATA_CHANNEL_ID?: string;
+  DISCORD_GUILD_ID?: string;
+  DISCORD_DEVELOPER_ROLE_ID?: string;
+  DISCORD_LIFETIME_MEMBER_ROLE_ID?: string;
+  DISCORD_MONTHLY_MEMBER_ROLE_ID?: string;
+  GROK_API_BEARER_TOKEN?: string;
+
   /** Seconds: reuse latest D1 `weather_data` row for same user + grid (default 600). */
 
   WEATHER_DATA_TTL_SEC?: string;
@@ -144,13 +160,25 @@ export interface Env {
 
   DISCORD_WEBHOOK_SOLANA_TOOLS?: string;
 
-  /** Discord webhook for POST /api/feedback (`wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL`). */
+  /** Discord channel for POST /api/feedback. Requires DISCORD_BOT_TOKEN; defaults in feedback-route if omitted. */
+
+  DISCORD_FEEDBACK_CHANNEL_ID?: string;
+
+  /** Fallback Discord webhook for POST /api/feedback (`wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL`). */
 
   DISCORD_FEEDBACK_WEBHOOK_URL?: string;
 
   /** Discord webhook for USGS Big Island earthquakes → #kilauea-alerts (set ONLY on api-kilauea). */
 
   DISCORD_KILAUEA_USGS_WEBHOOK_URL?: string;
+  /** Raw Kīlauea AI prompt/response archive channel. Requires DISCORD_BOT_TOKEN. */
+  DISCORD_KILAUEA_REPORT_CHANNEL_ID?: string;
+  DISCORD_KILAUEA_AI_ARCHIVE_CHANNEL_ID?: string;
+  /** X/Grok API credentials for Kīlauea AI analysis. */
+  GROK_API_BEARER_TOKEN?: string;
+  GROK_X_BEARER_TOKEN?: string;
+  GROK_API_URL?: string;
+  GROK_MODEL?: string;
 
   /** Bearer secret for POST /api/solana-site/log from the Next Solana Tools site (`wrangler secret put SOLANA_SITE_LOG_SECRET`). */
 
@@ -292,6 +320,17 @@ function webSsoSetCookie(request: Request, token: string | undefined | null): st
   return buildSessionCookieHeader(t, dom);
 }
 
+async function mergedAccessFromAccountMirror(
+  env: Env,
+  email: string,
+  data: Record<string, unknown>,
+): Promise<{ pro: boolean; life: boolean }> {
+  const flags = await readUserAccountAccessFlags(env.DB, email).catch(() => null);
+  const life = lifeMemberFromLicenseData(data) || Boolean(flags?.life_member);
+  const pro = life || Boolean(data.proUnlocked || data.pro_unlocked) || Boolean(flags?.pro_unlocked);
+  return { pro, life };
+}
+
 export async function handleRequest(
   request: Request,
   env: Env,
@@ -311,6 +350,19 @@ export async function handleRequest(
       h.set(k, v);
     }
     return new Response(null, { status: 204, headers: h });
+  }
+
+  if (method === "POST" && pathname === "/v1/discord/kilauea/interactions") {
+    return handleKilaueaDiscordInteractions(request, env, ctx);
+  }
+
+  if (method === "POST" && pathname === "/internal/kilauea-ai-run") {
+    const adminOk = await verifyWorkerOpsAdmin(request, env);
+    if (!adminOk) {
+      const has = Boolean(request.headers.get("X-RR-Push-Admin-Key"));
+      return json({ detail: has ? "Invalid admin key." : "Missing X-RR-Push-Admin-Key header." }, 401);
+    }
+    return handleKilaueaAiManualRun(request, env);
   }
 
 
@@ -394,17 +446,24 @@ export async function handleRequest(
 
       const data = (await res.json()) as Record<string, unknown>;
 
+      const v1LoginEmail = String(data.email || creds.email || "").trim();
+      const v1LoginAccess = await mergedAccessFromAccountMirror(env, v1LoginEmail, data);
+      data.pro_unlocked = v1LoginAccess.pro;
+      data.proUnlocked = v1LoginAccess.pro;
+      data.life_member = v1LoginAccess.life;
+      data.lifeMember = v1LoginAccess.life;
+
       try {
 
         await upsertUserAccountFromLicense(env.DB, {
 
-          email: String(data.email || creds.email || "").trim(),
+          email: v1LoginEmail,
 
           account_id: String(data.account_id || ""),
 
-          pro_unlocked: Boolean(data.proUnlocked || data.pro_unlocked),
+          pro_unlocked: v1LoginAccess.pro,
 
-          life_member: lifeMemberFromLicenseData(data),
+          life_member: v1LoginAccess.life,
 
           extra: { source: "login", path: "/v1/auth/login" },
 
@@ -458,17 +517,24 @@ export async function handleRequest(
 
       const data = (await res.json()) as Record<string, unknown>;
 
+      const v1SignupEmail = String(data.email || creds.email || "").trim();
+      const v1SignupAccess = await mergedAccessFromAccountMirror(env, v1SignupEmail, data);
+      data.pro_unlocked = v1SignupAccess.pro;
+      data.proUnlocked = v1SignupAccess.pro;
+      data.life_member = v1SignupAccess.life;
+      data.lifeMember = v1SignupAccess.life;
+
       try {
 
         await upsertUserAccountFromLicense(env.DB, {
 
-          email: String(data.email || creds.email || "").trim(),
+          email: v1SignupEmail,
 
           account_id: String(data.account_id || ""),
 
-          pro_unlocked: Boolean(data.proUnlocked || data.pro_unlocked),
+          pro_unlocked: v1SignupAccess.pro,
 
-          life_member: lifeMemberFromLicenseData(data),
+          life_member: v1SignupAccess.life,
 
           extra: { source: "signup", path: "/v1/auth/signup" },
 
@@ -739,6 +805,14 @@ export async function handleRequest(
     return handleKilaueaLiveStreamsGet(env);
   }
 
+  if (method === "GET" && sub === "/mobile/kilauea-situation") {
+    return handleKilaueaSituationGet(env);
+  }
+
+  if (method === "GET" && sub === "/mobile/kilauea-ai-analyses") {
+    return handleKilaueaAiAnalysesGet(request, env);
+  }
+
   if (method === "GET" && sub === "/aqs/hawaii-county-daily") {
     return handleAqsHawaiiCountyDaily(request, env);
   }
@@ -757,6 +831,19 @@ export async function handleRequest(
 
   if (method === "POST" && sub === "/internal/kilauea-live-streams") {
     return handleKilaueaLiveStreamsPost(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/kilauea-situation") {
+    return handleKilaueaSituationPost(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/kilauea-ai-run") {
+    const adminOk = await verifyWorkerOpsAdmin(request, env);
+    if (!adminOk) {
+      const has = Boolean(request.headers.get("X-RR-Push-Admin-Key"));
+      return json({ detail: has ? "Invalid admin key." : "Missing X-RR-Push-Admin-Key header." }, 401);
+    }
+    return handleKilaueaAiManualRun(request, env);
   }
 
   if (method === "POST" && sub === "/auth/login") {
@@ -793,7 +880,9 @@ export async function handleRequest(
 
     const emailOut = String(data.email || creds.email || "").trim();
 
-    const pro = Boolean(data.proUnlocked || data.pro_unlocked);
+    const access = await mergedAccessFromAccountMirror(env, emailOut, data);
+    const pro = access.pro;
+    const life = access.life;
 
     try {
 
@@ -805,7 +894,7 @@ export async function handleRequest(
 
         pro_unlocked: pro,
 
-        life_member: lifeMemberFromLicenseData(data),
+        life_member: life,
 
         extra: { source: "login" },
 
@@ -835,7 +924,7 @@ export async function handleRequest(
 
         pro_unlocked: pro,
 
-        life_member: lifeMemberFromLicenseData(data),
+        life_member: life,
 
       },
 
@@ -885,7 +974,9 @@ export async function handleRequest(
 
     const emailOut = String(data.email || creds.email || "").trim();
 
-    const pro = Boolean(data.proUnlocked || data.pro_unlocked);
+    const access = await mergedAccessFromAccountMirror(env, emailOut, data);
+    const pro = access.pro;
+    const life = access.life;
 
     try {
 
@@ -897,7 +988,7 @@ export async function handleRequest(
 
         pro_unlocked: pro,
 
-        life_member: lifeMemberFromLicenseData(data),
+        life_member: life,
 
         extra: { source: "signup" },
 
@@ -939,7 +1030,7 @@ export async function handleRequest(
 
         pro_unlocked: pro,
 
-        life_member: lifeMemberFromLicenseData(data),
+        life_member: life,
 
       },
 

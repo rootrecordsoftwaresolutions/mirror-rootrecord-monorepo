@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -25,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -46,9 +48,8 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.rootrecord.kilauea.alerts.ui.KilaueaNavRoutes
 import com.rootrecord.kilauea.alerts.ui.components.DisclaimerBanner
+import com.rootrecord.kilauea.alerts.data.repository.KilaueaSituation
 import com.rootrecord.kilauea.alerts.ui.home.HomeViewModel
-import com.rootrecord.kilauea.alerts.ui.theme.EmberRed
-import com.rootrecord.kilauea.alerts.ui.theme.LavaOrange
 import com.rootrecord.kilauea.alerts.ui.util.extractVolcanoAlertLevel
 import com.rootrecord.kilauea.alerts.ui.util.extractVolcanoHeroSubtitle
 import com.rootrecord.kilauea.alerts.ui.util.formatWeatherTimestampForDisplay
@@ -98,6 +99,13 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 DisclaimerBanner()
+                if (state.showSituationBanner()) {
+                    SituationPriorityBanner(
+                        situation = state.situation!!,
+                        onOpen = { navController.navigate(KilaueaNavRoutes.Situation) { launchSingleTop = true } },
+                        onDismiss = { vm.dismissSituationBanner() },
+                    )
+                }
                 if (state.loading && state.volcano == null && state.earthquakes == null) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
@@ -141,12 +149,55 @@ private fun navigateToMainTab(navController: NavController, route: String) {
 }
 
 @Composable
+private fun SituationPriorityBanner(
+    situation: KilaueaSituation,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFB45309),
+        ),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Major event — tap for details",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFFFFEDD5),
+                )
+                Text(
+                    situation.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Dismiss event banner until next update",
+                    tint = Color.White,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun HeroBanner(volcanoJson: JsonObject?) {
     val level = volcanoJson?.let { extractVolcanoAlertLevel(it) } ?: "Loading…"
     val subtitle = volcanoJson?.let { extractVolcanoHeroSubtitle(it) }
-    val elevated = level.contains("WATCH", true) ||
-        level.contains("WARNING", true) ||
-        level.contains("ADVISORY", true)
+    val palette = alertHeroPalette(level)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -159,34 +210,78 @@ private fun HeroBanner(volcanoJson: JsonObject?) {
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            if (elevated) EmberRed.copy(alpha = 0.35f) else LavaOrange.copy(alpha = 0.25f),
-                            Color(0xFF2A1810),
+                            palette.start,
+                            palette.end,
                         ),
                     ),
                 )
                 .padding(20.dp),
         ) {
-            Text("Kīlauea — USGS alert level", style = MaterialTheme.typography.labelMedium)
+            Text("Kīlauea — USGS Color / Alert Status", style = MaterialTheme.typography.labelMedium)
             Text(
                 level,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (elevated) Color.White else MaterialTheme.colorScheme.onSurface,
+                color = palette.primaryText,
             )
             Text(
                 "See Alerts tab for official USGS/HVO links.",
                 style = MaterialTheme.typography.bodySmall,
+                color = palette.secondaryText,
                 modifier = Modifier.padding(top = 8.dp),
             )
             subtitle?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = palette.secondaryText,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
         }
+    }
+}
+
+private data class AlertHeroPalette(
+    val start: Color,
+    val end: Color,
+    val primaryText: Color,
+    val secondaryText: Color,
+)
+
+private fun alertHeroPalette(level: String): AlertHeroPalette {
+    val normalized = level.uppercase(Locale.US)
+    return when {
+        normalized.contains("RED") || normalized.contains("WARNING") -> AlertHeroPalette(
+            start = Color(0xFFDC2626),
+            end = Color(0xFF450A0A),
+            primaryText = Color.White,
+            secondaryText = Color(0xFFFFE4E6),
+        )
+        normalized.contains("ORANGE") || normalized.contains("WATCH") -> AlertHeroPalette(
+            start = Color(0xFFEA580C),
+            end = Color(0xFF431407),
+            primaryText = Color.White,
+            secondaryText = Color(0xFFFFEDD5),
+        )
+        normalized.contains("YELLOW") || normalized.contains("ADVISORY") -> AlertHeroPalette(
+            start = Color(0xFFFACC15),
+            end = Color(0xFF713F12),
+            primaryText = Color(0xFF1C1917),
+            secondaryText = Color(0xFF292524),
+        )
+        normalized.contains("GREEN") || normalized.contains("NORMAL") -> AlertHeroPalette(
+            start = Color(0xFF16A34A),
+            end = Color(0xFF052E16),
+            primaryText = Color.White,
+            secondaryText = Color(0xFFDCFCE7),
+        )
+        else -> AlertHeroPalette(
+            start = Color(0xFF3A2A22),
+            end = Color(0xFF1E1511),
+            primaryText = Color.White,
+            secondaryText = Color(0xFFE7D8CC),
+        )
     }
 }
 
@@ -261,7 +356,7 @@ private fun WeatherSnapshotCard(wxJson: JsonObject?) {
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Summit weather", style = MaterialTheme.typography.titleMedium)
+            Text("Summit Weather", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Volcano Village — same forecast as the Weather tab.",
                 style = MaterialTheme.typography.bodySmall,
@@ -341,7 +436,7 @@ private fun RecentEarthquakesCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Recent earthquakes", style = MaterialTheme.typography.titleMedium)
+                Text("Recent Earthquakes", style = MaterialTheme.typography.titleMedium)
                 OutlinedButton(onClick = onOpenEarthquakesTab) {
                     Text("Open tab")
                 }

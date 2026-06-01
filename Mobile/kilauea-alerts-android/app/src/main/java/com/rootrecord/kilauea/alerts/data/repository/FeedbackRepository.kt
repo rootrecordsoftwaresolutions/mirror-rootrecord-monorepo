@@ -30,7 +30,7 @@ private data class FeedbackBody(
 
 @Singleton
 class FeedbackRepository @Inject constructor(
-    @Named("rootrecord") private val http: OkHttpClient,
+    @param:Named("rootrecord") private val http: OkHttpClient,
 ) {
 
     suspend fun send(

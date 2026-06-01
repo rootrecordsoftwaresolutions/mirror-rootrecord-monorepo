@@ -1,10 +1,15 @@
 package com.rootrecord.kilauea.alerts.ui.components
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -33,7 +38,7 @@ fun YoutubeStreamEmbed(
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.mediaPlaybackRequiresUserGesture = false
-                webChromeClient = WebChromeClient()
+                webChromeClient = FullscreenYoutubeChromeClient(c)
                 webViewClient = WebViewClient()
                 applyYoutubeEmbed(this, target, baseUrl)
             }
@@ -42,6 +47,54 @@ fun YoutubeStreamEmbed(
             applyYoutubeEmbed(view, target, baseUrl)
         },
     )
+}
+
+private class FullscreenYoutubeChromeClient(private val context: Context) : WebChromeClient() {
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private var originalSystemUiVisibility: Int? = null
+
+    override fun onShowCustomView(view: View?, callback: WebChromeClient.CustomViewCallback?) {
+        val activity = context.findActivity()
+        val decorView = activity?.window?.decorView as? ViewGroup
+        if (activity == null || decorView == null || view == null || customView != null) {
+            callback?.onCustomViewHidden()
+            return
+        }
+
+        customView = view
+        customViewCallback = callback
+        originalSystemUiVisibility = decorView.systemUiVisibility
+        decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        decorView.addView(
+            view,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+    }
+
+    override fun onHideCustomView() {
+        val decorView = context.findActivity()?.window?.decorView as? ViewGroup
+        customView?.let { decorView?.removeView(it) }
+        originalSystemUiVisibility?.let { decorView?.systemUiVisibility = it }
+        customViewCallback?.onCustomViewHidden()
+        customView = null
+        customViewCallback = null
+        originalSystemUiVisibility = null
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private sealed interface YoutubeEmbedTarget {

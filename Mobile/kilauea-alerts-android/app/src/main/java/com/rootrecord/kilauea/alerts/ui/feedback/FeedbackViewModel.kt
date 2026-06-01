@@ -34,7 +34,7 @@ class FeedbackViewModel @Inject constructor(
         viewModelScope.launch {
             _toast.value = null
             if (!signedIn.value) {
-                _toast.value = "Sign in from Settings to send feedback."
+                _toast.value = "Sign in from Menu to submit feedback."
                 return@launch
             }
             if (message.isBlank()) {

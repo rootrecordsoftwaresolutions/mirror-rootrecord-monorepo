@@ -33,10 +33,6 @@ USGS and NWS are called **directly** from the device. Weather dashboards use **`
 
 Signed-in users can send **feedback** from **More → Send feedback**; the app posts to **`POST https://api-kilauea.rootrecord.info/api/feedback`** (same route copied from the legacy primary; Worker forwards to Discord when configured).
 
-## Beta testing
-
-Discord announcement copy for testers: [`docs/DISCORD-BETA-1.0.3.md`](docs/DISCORD-BETA-1.0.3.md) (paste from below the horizontal rule).
-
 ## Branching
 
 Per workspace rules, weather-ecosystem work targets branch **`weather-work`**.

@@ -8,10 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -25,7 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -37,7 +37,6 @@ import com.rootrecord.kilauea.alerts.ui.components.DisclaimerBanner
 import com.rootrecord.kilauea.alerts.ui.components.LiveFeedEmbedUrl
 import com.rootrecord.kilauea.alerts.ui.components.YoutubeStreamEmbed
 import com.rootrecord.kilauea.alerts.ui.livefeeds.LiveFeedsViewModel
-import kotlinx.coroutines.launch
 
 @Composable
 fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
@@ -49,16 +48,15 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
         state.loading -> emptyList()
         else -> LiveFeedsRepository.defaultStreams()
     }
-    val pagerState = rememberPagerState(pageCount = { feeds.size })
-    val scope = rememberCoroutineScope()
+    var selectedFeedIndex by rememberSaveable { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         vm.visitedTab()
     }
 
     LaunchedEffect(feeds.size) {
-        if (pagerState.currentPage >= feeds.size && feeds.isNotEmpty()) {
-            pagerState.scrollToPage(0)
+        if (selectedFeedIndex >= feeds.size && feeds.isNotEmpty()) {
+            selectedFeedIndex = 0
         }
     }
 
@@ -78,7 +76,7 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
                 )
             }
             Text(
-                "Swipe between streams. Video plays on each page — links are updated from Root Record when USGS changes cameras.",
+                "Use the tabs to switch streams. Video controls stay inside the player — links are updated from Root Record when USGS changes cameras.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -98,8 +96,9 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
                     )
                 }
             } else {
+                val safeSelectedIndex = selectedFeedIndex.coerceIn(0, feeds.lastIndex)
                 ScrollableTabRow(
-                    selectedTabIndex = pagerState.currentPage.coerceIn(0, feeds.lastIndex),
+                    selectedTabIndex = safeSelectedIndex,
                     edgePadding = 0.dp,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -110,30 +109,23 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
                             .ifBlank { feed.title }
                             .take(22)
                         Tab(
-                            selected = pagerState.currentPage == index,
-                            onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                            selected = safeSelectedIndex == index,
+                            onClick = { selectedFeedIndex = index },
                             text = { Text(short, maxLines = 1) },
                         )
                     }
                 }
-                HorizontalPager(
-                    state = pagerState,
+                LiveFeedPage(
+                    feed = feeds[safeSelectedIndex],
+                    playVideo = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    beyondViewportPageCount = 0,
-                    key = { feeds[it].id },
-                ) { page ->
-                    val feed = feeds[page]
-                    LiveFeedPage(
-                        feed = feed,
-                        playVideo = page == pagerState.currentPage,
-                        onOpenExternal = {
-                            CustomTabsIntent.Builder().build()
-                                .launchUrl(ctx, Uri.parse(feed.watchUrl))
-                        },
-                    )
-                }
+                    onOpenExternal = {
+                        CustomTabsIntent.Builder().build()
+                            .launchUrl(ctx, Uri.parse(feeds[safeSelectedIndex].watchUrl))
+                    },
+                )
             }
             if (feeds.isNotEmpty()) {
                 TextButton(
@@ -143,7 +135,7 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.OpenInNew, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                     Text("All USGS Kīlauea webcams (directory)", modifier = Modifier.padding(start = 8.dp))
                 }
             }
@@ -163,10 +155,11 @@ fun LiveFeedsScreen(vm: LiveFeedsViewModel = hiltViewModel()) {
 private fun LiveFeedPage(
     feed: LiveFeed,
     playVideo: Boolean,
+    modifier: Modifier = Modifier,
     onOpenExternal: () -> Unit,
 ) {
     Column(
-        Modifier.fillMaxSize(),
+        modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(feed.title, style = MaterialTheme.typography.titleMedium)
@@ -190,7 +183,7 @@ private fun LiveFeedPage(
             }
         }
         TextButton(onClick = onOpenExternal, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.OpenInNew, contentDescription = null)
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
             Text("Open in YouTube", modifier = Modifier.padding(start = 8.dp))
         }
     }

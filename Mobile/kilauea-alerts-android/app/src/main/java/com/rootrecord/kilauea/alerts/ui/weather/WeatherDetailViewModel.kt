@@ -43,7 +43,7 @@ class WeatherDetailViewModel @Inject constructor(
                         _state.update {
                             it.copy(
                                 bundle = null,
-                                error = "Enable “My location weather” and allow location on the Weather tab so we can save your coordinates, then try again.",
+                                error = "Enable “My Location Weather” and allow location on the Weather tab so we can save your coordinates, then try again.",
                             )
                         }
                         return@launch

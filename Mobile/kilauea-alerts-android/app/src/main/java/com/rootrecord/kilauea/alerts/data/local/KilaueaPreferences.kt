@@ -27,6 +27,9 @@ class KilaueaPreferences @Inject constructor(
     val guestId: Flow<String> = ds.data.map { p -> p[GUEST_ID] ?: "" }
 
     val notificationVolcano: Flow<Boolean> = ds.data.map { it[NOTIFY_VOLCANO] != false }
+    val notificationVolcanoBypassDnd: Flow<Boolean> = ds.data.map { it[NOTIFY_VOLCANO_BYPASS_DND] == true }
+    val notificationVolcanoAlarmSound: Flow<Boolean> = ds.data.map { it[NOTIFY_VOLCANO_ALARM_SOUND] == true }
+    val notificationVolcanoElevatedOnly: Flow<Boolean> = ds.data.map { it[NOTIFY_VOLCANO_ELEVATED_ONLY] == true }
     val notificationNws: Flow<Boolean> = ds.data.map { it[NOTIFY_NWS] != false }
     val notificationEq: Flow<Boolean> = ds.data.map { it[NOTIFY_EQ] == true }
     val notificationLiveFeeds: Flow<Boolean> = ds.data.map { it[NOTIFY_LIVE] == true }
@@ -66,6 +69,14 @@ class KilaueaPreferences @Inject constructor(
      * Used to drive the every-other-open Pro upsell.
      */
     val appOpenCount: Flow<Int> = ds.data.map { it[APP_OPEN_COUNT] ?: 0 }
+
+    val themeMode: Flow<String> = ds.data.map { p ->
+        p[THEME_MODE]?.takeIf { it in THEME_MODES } ?: THEME_SYSTEM
+    }
+
+    val fontScale: Flow<Float> = ds.data.map { p ->
+        (p[FONT_SCALE] ?: DEFAULT_FONT_SCALE).coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE)
+    }
 
     suspend fun getAuthAccessToken(): String? =
         ds.data.first()[AUTH_ACCESS_TOKEN]?.takeIf { it.isNotBlank() }
@@ -111,6 +122,18 @@ class KilaueaPreferences @Inject constructor(
 
     suspend fun setNotifyVolcano(v: Boolean) {
         ds.edit { it[NOTIFY_VOLCANO] = v }
+    }
+
+    suspend fun setNotifyVolcanoBypassDnd(v: Boolean) {
+        ds.edit { it[NOTIFY_VOLCANO_BYPASS_DND] = v }
+    }
+
+    suspend fun setNotifyVolcanoAlarmSound(v: Boolean) {
+        ds.edit { it[NOTIFY_VOLCANO_ALARM_SOUND] = v }
+    }
+
+    suspend fun setNotifyVolcanoElevatedOnly(v: Boolean) {
+        ds.edit { it[NOTIFY_VOLCANO_ELEVATED_ONLY] = v }
     }
 
     suspend fun setNotifyNws(v: Boolean) {
@@ -171,8 +194,27 @@ class KilaueaPreferences @Inject constructor(
         return next
     }
 
+    suspend fun setThemeMode(mode: String) {
+        ds.edit { it[THEME_MODE] = mode.takeIf { candidate -> candidate in THEME_MODES } ?: THEME_SYSTEM }
+    }
+
+    suspend fun setFontScale(scale: Float) {
+        ds.edit { it[FONT_SCALE] = scale.coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE) }
+    }
+
     suspend fun getNotifiedVolcanoIds(): String =
         ds.data.first()[VOLCANO_NOTIFIED_IDS] ?: "[]"
+
+    suspend fun addNotifiedVolcanoId(noticeId: String) {
+        val id = noticeId.trim()
+        if (id.isEmpty()) return
+        val seen = com.rootrecord.kilauea.alerts.notifications.AlertDiffer
+            .parseStringSet(getNotifiedVolcanoIds())
+        if (id in seen) return
+        setNotifiedVolcanoIds(
+            com.rootrecord.kilauea.alerts.notifications.AlertDiffer.encodeStringSet(seen + id),
+        )
+    }
 
     suspend fun setNotifiedVolcanoIds(json: String) {
         ds.edit { it[VOLCANO_NOTIFIED_IDS] = json }
@@ -200,9 +242,20 @@ class KilaueaPreferences @Inject constructor(
         ds.edit { it[EQ_NOTIFIED_AT_THRESHOLD] = value }
     }
 
+    /** Server `updated_at` for the last dismissed home situation banner (re-shows when content changes). */
+    suspend fun getSituationBannerDismissedAt(): String? =
+        ds.data.first()[SITUATION_BANNER_DISMISSED_AT]?.takeIf { it.isNotBlank() }
+
+    suspend fun setSituationBannerDismissedAt(updatedAt: String) {
+        ds.edit { it[SITUATION_BANNER_DISMISSED_AT] = updatedAt.trim() }
+    }
+
     companion object {
         private val GUEST_ID = stringPreferencesKey("guest_id")
         private val NOTIFY_VOLCANO = booleanPreferencesKey("notify_volcano")
+        private val NOTIFY_VOLCANO_BYPASS_DND = booleanPreferencesKey("notify_volcano_bypass_dnd")
+        private val NOTIFY_VOLCANO_ALARM_SOUND = booleanPreferencesKey("notify_volcano_alarm_sound")
+        private val NOTIFY_VOLCANO_ELEVATED_ONLY = booleanPreferencesKey("notify_volcano_elevated_only")
         private val NOTIFY_NWS = booleanPreferencesKey("notify_nws")
         private val NOTIFY_EQ = booleanPreferencesKey("notify_eq")
         private val NOTIFY_LIVE = booleanPreferencesKey("notify_live_feeds")
@@ -213,6 +266,7 @@ class KilaueaPreferences @Inject constructor(
         private val NWS_NOTIFIED_IDS = stringPreferencesKey("nws_notified_ids")
         private val EQ_NOTIFIED_IDS = stringPreferencesKey("eq_notified_ids")
         private val EQ_NOTIFIED_AT_THRESHOLD = floatPreferencesKey("eq_notified_at_threshold")
+        private val SITUATION_BANNER_DISMISSED_AT = stringPreferencesKey("situation_banner_dismissed_at")
         private val WEATHER_USE_MY_LOCATION = booleanPreferencesKey("weather_use_my_location")
         private val WEATHER_LAST_GPS_LAT = floatPreferencesKey("weather_last_gps_lat")
         private val WEATHER_LAST_GPS_LON = floatPreferencesKey("weather_last_gps_lon")
@@ -223,7 +277,16 @@ class KilaueaPreferences @Inject constructor(
         private val AUTH_PRO_UNLOCKED = booleanPreferencesKey("auth_pro_unlocked")
         private val WELCOME_TUTORIAL_COMPLETE = booleanPreferencesKey("welcome_tutorial_complete")
         private val APP_OPEN_COUNT = intPreferencesKey("app_open_count")
+        private val THEME_MODE = stringPreferencesKey("theme_mode")
+        private val FONT_SCALE = floatPreferencesKey("font_scale")
 
         private const val DEFAULT_EQ_THRESHOLD = 4.0f
+        const val THEME_SYSTEM = "system"
+        const val THEME_LIGHT = "light"
+        const val THEME_DARK = "dark"
+        val THEME_MODES = setOf(THEME_SYSTEM, THEME_LIGHT, THEME_DARK)
+        private const val DEFAULT_FONT_SCALE = 1.0f
+        private const val MIN_FONT_SCALE = 1.0f
+        private const val MAX_FONT_SCALE = 1.3f
     }
 }

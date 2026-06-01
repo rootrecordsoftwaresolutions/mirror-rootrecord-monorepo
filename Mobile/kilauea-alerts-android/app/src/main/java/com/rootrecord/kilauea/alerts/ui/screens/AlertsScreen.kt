@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -29,6 +30,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import com.rootrecord.kilauea.alerts.ui.KilaueaNavRoutes
 import com.rootrecord.kilauea.alerts.ui.alerts.AlertsViewModel
 import com.rootrecord.kilauea.alerts.ui.components.DisclaimerBanner
 import com.rootrecord.kilauea.alerts.ui.util.formatUsgsNewestForAlerts
@@ -41,7 +44,10 @@ import kotlinx.serialization.json.jsonPrimitive
 private const val USGS_CARD_EXCERPT_CHARS = 900
 
 @Composable
-fun AlertsScreen(vm: AlertsViewModel = hiltViewModel()) {
+fun AlertsScreen(
+    navController: NavController,
+    vm: AlertsViewModel = hiltViewModel(),
+) {
     val state by vm.state.collectAsState()
     val ctx = LocalContext.current
     val usgsBody = formatUsgsNewestForAlerts(state.volcano?.get("newest"))
@@ -60,6 +66,11 @@ fun AlertsScreen(vm: AlertsViewModel = hiltViewModel()) {
                 )
             }
             item {
+                AiAnalysisEntryCard(
+                    onOpen = { navController.navigate(KilaueaNavRoutes.AiAnalysis) },
+                )
+            }
+            item {
                 VolcanoNoticeCard(
                     body = usgsBody,
                     onOpenUsgs = {
@@ -74,7 +85,7 @@ fun AlertsScreen(vm: AlertsViewModel = hiltViewModel()) {
             }
             item {
                 Text(
-                    "Hawaiʻi weather alerts (NWS)",
+                    "Hawaiʻi Weather Alerts (NWS)",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 4.dp, start = 4.dp),
                 )
@@ -117,6 +128,26 @@ fun AlertsScreen(vm: AlertsViewModel = hiltViewModel()) {
 }
 
 @Composable
+private fun AiAnalysisEntryCard(onOpen: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("AI Analysis", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Compare qualifying USGS, NWS, earthquake, and tsunami triggers with the previous AI report.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+                Text("See Latest AI Analysis")
+            }
+        }
+    }
+}
+
+@Composable
 private fun AlertsInfoCard(body: String, muted: Boolean = false) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -144,7 +175,7 @@ private fun VolcanoNoticeCard(body: String, onOpenUsgs: () -> Unit) {
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Latest volcano notice (USGS)", style = MaterialTheme.typography.titleMedium)
+            Text("Latest Volcano Notice (USGS)", style = MaterialTheme.typography.titleMedium)
             val excerpt =
                 if (body.length > USGS_CARD_EXCERPT_CHARS) {
                     body.take(USGS_CARD_EXCERPT_CHARS).trimEnd() + "…"

@@ -155,6 +155,51 @@ if ($shardLeaf -eq 'rootrecord-api-kilauea' -and $kilaueaUsgsWebhook -match '^ht
   Write-Host "Uploaded DISCORD_KILAUEA_USGS_WEBHOOK_URL to $shardLeaf (from credentials.env)."
 }
 
+foreach ($grokSecretName in @(
+  "GROK_X_BEARER_TOKEN",
+  "GROK_X_V1_CONSUMER_KEY",
+  "GROK_X_V1_CONSUMER_KEY_SECRET",
+  "GROK_X_V2_CLIENT_ID",
+  "GROK_X_V2_CLIENT_SECRET",
+  "GROK_API_BEARER_TOKEN"
+)) {
+  $grokSecretValue = [string](Get-Item -Path "Env:$grokSecretName" -ErrorAction SilentlyContinue).Value
+  if ($shardLeaf -eq 'rootrecord-api-kilauea' -and $grokSecretValue.Trim().Length -ge 12) {
+    $grokSecretValue.Trim() | npx wrangler secret put $grokSecretName
+    Write-Host "Uploaded $grokSecretName to $shardLeaf (same Grok values as account Worker)."
+  }
+}
+
+$grokChatAliases = @("XAI_API_KEY", "X_AI_API_KEY", "GROK_API_KEY")
+foreach ($aliasName in $grokChatAliases) {
+  $aliasValue = [string](Get-Item -Path "Env:$aliasName" -ErrorAction SilentlyContinue).Value
+  if ($shardLeaf -eq 'rootrecord-api-kilauea' -and $aliasValue.Trim().Length -ge 12) {
+    $aliasValue.Trim() | npx wrangler secret put GROK_API_BEARER_TOKEN
+    Write-Host "Uploaded GROK_API_BEARER_TOKEN to $shardLeaf from $aliasName."
+    break
+  }
+}
+
+$discordKilaueaBot = [string]$env:DISCORD_KILAUEA_BOT_TOKEN
+$discordKilaueaBot = $discordKilaueaBot.Trim()
+if ($discordKilaueaBot -match '^(?i)bot\s+') {
+  $discordKilaueaBot = ($discordKilaueaBot -replace '^(?i)bot\s+', '').Trim()
+}
+if ($shardLeaf -eq 'rootrecord-api-kilauea' -and $discordKilaueaBot.Length -ge 45 -and $discordKilaueaBot.Contains(".")) {
+  $discordKilaueaBot | npx wrangler secret put DISCORD_KILAUEA_BOT_TOKEN
+  Write-Host "Uploaded DISCORD_KILAUEA_BOT_TOKEN to $shardLeaf."
+}
+
+$discordBot = [string]$env:DISCORD_BOT_TOKEN
+$discordBot = $discordBot.Trim()
+if ($discordBot -match '^(?i)bot\s+') {
+  $discordBot = ($discordBot -replace '^(?i)bot\s+', '').Trim()
+}
+if ($shardLeaf -eq 'rootrecord-api-kilauea' -and $discordBot.Length -ge 45 -and $discordBot.Contains(".")) {
+  $discordBot | npx wrangler secret put DISCORD_BOT_TOKEN
+  Write-Host "Uploaded DISCORD_BOT_TOKEN to $shardLeaf (Kilauea AI raw archive channel)."
+}
+
 $discordFeedback = [string]$env:DISCORD_FEEDBACK_WEBHOOK_URL
 if ($discordFeedback -match '^https://discord(app)?\.com/api/webhooks/' -and $discordFeedback.Length -gt 60) {
   $discordFeedback | npx wrangler secret put DISCORD_FEEDBACK_WEBHOOK_URL

@@ -29,7 +29,8 @@ class AlertPollWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         notifications.ensureChannels()
         val pro = prefs.authProUnlocked.first()
-        val volcanoOn = pro && prefs.notificationVolcano.first()
+        val volcanoOn = prefs.notificationVolcano.first()
+        val volcanoElevatedOnly = prefs.notificationVolcanoElevatedOnly.first()
         val nwsOn = pro && prefs.notificationNws.first()
         val eqOn = pro && prefs.notificationEq.first()
         val threshold = prefs.eqMagnitudeThreshold.first()
@@ -68,18 +69,23 @@ class AlertPollWorker @AssistedInject constructor(
             if (curId != null && curId !in seen) {
                 val plain = VolcanoNoticeSignals.newestNoticePlainText(volJson)
                 val urgent = VolcanoNoticeSignals.shouldUseUrgentVolcanoNotification(volJson, plain)
-                if (urgent) {
+                if (volcanoElevatedOnly && !urgent) {
+                    prefs.setNotifiedVolcanoIds(AlertDiffer.encodeStringSet(seen + curId))
+                } else if (urgent) {
                     notifications.notifyVolcano(
                         "Kīlauea — eruptive activity or elevated unrest (USGS)",
                         "A new USGS notice describes eruption, lava, strong unrest, or elevated aviation color. Open Alerts for the official wording.",
+                        urgent = true,
                     )
+                    prefs.setNotifiedVolcanoIds(AlertDiffer.encodeStringSet(seen + curId))
                 } else {
                     notifications.notifyVolcano(
                         "Kīlauea update (USGS)",
                         "New volcano notice or status change. Open the app for official details.",
+                        urgent = false,
                     )
+                    prefs.setNotifiedVolcanoIds(AlertDiffer.encodeStringSet(seen + curId))
                 }
-                prefs.setNotifiedVolcanoIds(AlertDiffer.encodeStringSet(seen + curId))
             }
         }
 

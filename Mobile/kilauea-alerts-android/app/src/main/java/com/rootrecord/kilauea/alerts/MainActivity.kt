@@ -1,21 +1,28 @@
 package com.rootrecord.kilauea.alerts
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,8 +56,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.messaging.FirebaseMessaging
 import com.rootrecord.kilauea.alerts.ui.KilaueaNavRoutes
 import com.rootrecord.kilauea.alerts.ui.components.AdMobBanner
+import com.rootrecord.kilauea.alerts.ui.screens.AiAnalysisScreen
 import com.rootrecord.kilauea.alerts.ui.screens.AlertsScreen
 import com.rootrecord.kilauea.alerts.ui.screens.EarthquakesScreen
 import com.rootrecord.kilauea.alerts.ui.screens.FeedbackScreen
@@ -58,6 +67,7 @@ import com.rootrecord.kilauea.alerts.ui.screens.HomeScreen
 import com.rootrecord.kilauea.alerts.ui.screens.LiveFeedsScreen
 import com.rootrecord.kilauea.alerts.ui.screens.MoreScreen
 import com.rootrecord.kilauea.alerts.ui.screens.PhotosScreen
+import com.rootrecord.kilauea.alerts.ui.screens.SituationScreen
 import com.rootrecord.kilauea.alerts.ui.screens.WeatherDetailScreen
 import com.rootrecord.kilauea.alerts.ui.screens.WeatherScreen
 import com.rootrecord.kilauea.alerts.ui.theme.KilaueaTheme
@@ -80,8 +90,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         WorkEnqueue.schedulePeriodic(applicationContext)
+
+        if (savedInstanceState == null) {
+            WorkEnqueue.enqueueAlertPollOnLaunch(applicationContext)
+        }
 
         // Pro upsell counter — only bump on real launches, not config-change recreates.
         // First open is silent; #2, #4, #6, … trigger the overlay for free accounts. Feature
@@ -101,12 +118,29 @@ class MainActivity : ComponentActivity() {
                 authRepo.refreshAccountAccess()
             }
         }
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            lifecycleScope.launch {
+                authRepo.registerPushToken(token)
+            }
+        }
 
         setContent {
             val proUnlocked by prefs.authProUnlocked.collectAsStateWithLifecycle(initialValue = false)
-            KilaueaTheme {
+            val themeMode by prefs.themeMode.collectAsStateWithLifecycle(initialValue = KilaueaPreferences.THEME_SYSTEM)
+            val fontScale by prefs.fontScale.collectAsStateWithLifecycle(initialValue = 1f)
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (themeMode) {
+                KilaueaPreferences.THEME_LIGHT -> false
+                KilaueaPreferences.THEME_DARK -> true
+                else -> systemDark
+            }
+            KilaueaTheme(
+                darkTheme = darkTheme,
+                fontScale = fontScale,
+            ) {
                 KilaueaApp(
                     initialTab = intent?.getStringExtra(EXTRA_OPEN_TAB),
+                    openSituation = intent?.getBooleanExtra(EXTRA_OPEN_SITUATION, false) == true,
                     showBannerAds = !proUnlocked,
                 )
             }
@@ -116,18 +150,26 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_OPEN_TAB = "open_tab"
         const val TAB_ALERTS = "alerts"
+        const val EXTRA_OPEN_SITUATION = "open_situation"
     }
 }
 
 private data class TabSpec(val route: String, val labelRes: Int, val icon: ImageVector)
 
 @Composable
-private fun KilaueaApp(initialTab: String?, showBannerAds: Boolean) {
+private fun KilaueaApp(initialTab: String?, openSituation: Boolean, showBannerAds: Boolean) {
     val navController = rememberNavController()
     LaunchedEffect(initialTab) {
         if (initialTab == MainActivity.TAB_ALERTS) {
             navController.navigate(KilaueaNavRoutes.Alerts) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+            }
+        }
+    }
+    LaunchedEffect(openSituation) {
+        if (openSituation) {
+            navController.navigate(KilaueaNavRoutes.Situation) {
                 launchSingleTop = true
             }
         }
@@ -147,7 +189,7 @@ private fun KilaueaApp(initialTab: String?, showBannerAds: Boolean) {
 
     val tabs = listOf(
         TabSpec(KilaueaNavRoutes.Home, R.string.nav_home, Icons.Default.Home),
-        TabSpec(KilaueaNavRoutes.Earthquakes, R.string.nav_earthquakes, Icons.Default.Map),
+        TabSpec(KilaueaNavRoutes.Earthquakes, R.string.nav_earthquakes, Icons.Default.Terrain),
         TabSpec(KilaueaNavRoutes.Weather, R.string.nav_weather, Icons.Default.Cloud),
         TabSpec(KilaueaNavRoutes.LiveFeeds, R.string.nav_live_feeds, Icons.Default.LiveTv),
         TabSpec(KilaueaNavRoutes.Alerts, R.string.nav_alerts, Icons.Default.Warning),
@@ -159,6 +201,9 @@ private fun KilaueaApp(initialTab: String?, showBannerAds: Boolean) {
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
+            contentWindowInsets = WindowInsets.safeDrawing.only(
+                WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+            ),
             bottomBar = {
                 Column(Modifier.fillMaxWidth()) {
                     if (showBannerAds) {
@@ -226,9 +271,15 @@ private fun KilaueaApp(initialTab: String?, showBannerAds: Boolean) {
                     )
                 }
                 composable(KilaueaNavRoutes.LiveFeeds) { LiveFeedsScreen() }
-                composable(KilaueaNavRoutes.Alerts) { AlertsScreen() }
+                composable(KilaueaNavRoutes.Alerts) { AlertsScreen(navController = navController) }
+                composable(KilaueaNavRoutes.AiAnalysis) {
+                    AiAnalysisScreen(onBack = { navController.popBackStack() })
+                }
+                composable(KilaueaNavRoutes.Situation) {
+                    SituationScreen(onBack = { navController.popBackStack() })
+                }
                 composable(KilaueaNavRoutes.More) { MoreScreen(navController = navController) }
-                composable("photos") {
+                composable(KilaueaNavRoutes.Photos) {
                     PhotosScreen(onBack = { navController.popBackStack() })
                 }
                 composable(KilaueaNavRoutes.Feedback) {

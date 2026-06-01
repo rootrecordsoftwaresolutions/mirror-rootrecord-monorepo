@@ -7,6 +7,7 @@ import com.rootrecord.kilauea.alerts.data.local.KilaueaPreferences
 import com.rootrecord.kilauea.alerts.data.repository.DeveloperMessage
 import com.rootrecord.kilauea.alerts.data.repository.DeveloperMessagesRepository
 import com.rootrecord.kilauea.alerts.data.repository.RootRecordAuthRepository
+import com.rootrecord.kilauea.alerts.notifications.KilaueaNotificationManager
 import com.rootrecord.kilauea.alerts.work.WorkEnqueue
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -23,14 +24,20 @@ class MoreViewModel @Inject constructor(
     private val prefs: KilaueaPreferences,
     private val authRepo: RootRecordAuthRepository,
     private val devMessages: DeveloperMessagesRepository,
+    private val notifications: KilaueaNotificationManager,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     val notifyVolcano = prefs.notificationVolcano.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val notifyVolcanoBypassDnd = prefs.notificationVolcanoBypassDnd.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val notifyVolcanoAlarmSound = prefs.notificationVolcanoAlarmSound.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val notifyVolcanoElevatedOnly = prefs.notificationVolcanoElevatedOnly.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val notifyNws = prefs.notificationNws.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val notifyEq = prefs.notificationEq.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val notifyLive = prefs.notificationLiveFeeds.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val eqThreshold = prefs.eqMagnitudeThreshold.stateIn(viewModelScope, SharingStarted.Eagerly, 4f)
+    val themeMode = prefs.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, KilaueaPreferences.THEME_SYSTEM)
+    val fontScale = prefs.fontScale.stateIn(viewModelScope, SharingStarted.Eagerly, 1f)
 
     val authSignedIn = prefs.authSignedIn.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val authEmail = prefs.authEmail.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -54,9 +61,42 @@ class MoreViewModel @Inject constructor(
 
     fun setVolcano(v: Boolean) {
         viewModelScope.launch {
-            if (!prefs.authProUnlocked.first()) return@launch
             prefs.setNotifyVolcano(v)
+            if (v) WorkEnqueue.enqueueOneShotAlertPoll(appContext)
         }
+    }
+
+    fun setVolcanoBypassDnd(v: Boolean) {
+        viewModelScope.launch {
+            prefs.setNotifyVolcanoBypassDnd(v)
+            notifications.ensureChannels()
+            if (v) {
+                notifications.openDoNotDisturbAccessSettings()
+                notifications.openVolcanoUrgentChannelSettings()
+            }
+        }
+    }
+
+    fun setVolcanoAlarmSound(v: Boolean) {
+        viewModelScope.launch {
+            prefs.setNotifyVolcanoAlarmSound(v)
+            notifications.ensureChannels()
+            if (v) notifications.openVolcanoUrgentChannelSettings()
+        }
+    }
+
+    fun setVolcanoElevatedOnly(v: Boolean) {
+        viewModelScope.launch {
+            prefs.setNotifyVolcanoElevatedOnly(v)
+        }
+    }
+
+    fun openVolcanoNotificationSettings() {
+        notifications.openVolcanoUrgentChannelSettings()
+    }
+
+    fun openAppNotificationSettings() {
+        notifications.openAppNotificationSettings()
     }
 
     fun setNws(v: Boolean) {
@@ -88,6 +128,14 @@ class MoreViewModel @Inject constructor(
         }
     }
 
+    fun setThemeMode(mode: String) {
+        viewModelScope.launch { prefs.setThemeMode(mode) }
+    }
+
+    fun setFontScale(scale: Float) {
+        viewModelScope.launch { prefs.setFontScale(scale) }
+    }
+
     fun clearLoginError() {
         _loginError.value = null
     }
@@ -99,6 +147,16 @@ class MoreViewModel @Inject constructor(
             val r = authRepo.login(email, password)
             _loginBusy.value = false
             r.onFailure { _loginError.value = it.message ?: "Sign-in failed." }
+        }
+    }
+
+    fun createAccount(email: String, password: String) {
+        viewModelScope.launch {
+            _loginBusy.value = true
+            _loginError.value = null
+            val r = authRepo.createAccount(email, password)
+            _loginBusy.value = false
+            r.onFailure { _loginError.value = it.message ?: "Account creation failed." }
         }
     }
 

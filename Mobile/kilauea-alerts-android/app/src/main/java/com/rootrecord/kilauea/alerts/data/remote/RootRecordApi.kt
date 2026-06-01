@@ -60,7 +60,17 @@ interface RootRecordApi {
         @Query("app_id") appId: String = "rootrecord_kilauea_alerts_android",
     ): String
 
-    /** Ordered YouTube / live stream list for the Live Feeds pager (D1-backed). */
+    /** Ordered YouTube / live stream list for Live Feeds (D1-backed). */
     @GET("/api/mobile/kilauea-live-streams")
     suspend fun kilaueaLiveStreams(): String
+
+    /** Recent server-generated Kīlauea AI analyses. Backend redacts Pro continuation for free users. */
+    @GET("/api/mobile/kilauea-ai-analyses")
+    suspend fun kilaueaAiAnalyses(
+        @Query("limit") limit: Int = 10,
+    ): String
+
+    /** Remote major-event page (D1 singleton row; hidden in app until enabled). */
+    @GET("/api/mobile/kilauea-situation")
+    suspend fun kilaueaSituation(): String
 }

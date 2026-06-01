@@ -12,7 +12,7 @@ import com.google.android.gms.ads.AdView
 import com.rootrecord.kilauea.alerts.BuildConfig
 
 /**
- * Anchored adaptive banner. [BuildConfig.ADMOB_BANNER_AD_UNIT_ID] is the Google test unit in
+ * Anchored adaptive banner. [BuildConfig.ADMOB_BANNER_AD_UNIT_ID] is Google's sample unit in
  * `debug` and the production Kīlauea banner unit in `release`.
  */
 @Composable
@@ -20,7 +20,7 @@ fun AdMobBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val widthDp =
         (context.resources.displayMetrics.widthPixels / context.resources.displayMetrics.density).toInt()
-    val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, widthDp)
+    val adSize = AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, widthDp)
 
     AndroidView(
         modifier = modifier.fillMaxWidth().wrapContentHeight(),

@@ -54,13 +54,17 @@ object WorkEnqueue {
 
     fun enqueueOneShotAlertPoll(context: Context) {
         val wm = WorkManager.getInstance(context)
-        wm.enqueue(
-            androidx.work.OneTimeWorkRequestBuilder<AlertPollWorker>()
-                .setConstraints(
-                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
-                )
-                .build(),
-        )
+        val request = androidx.work.OneTimeWorkRequestBuilder<AlertPollWorker>()
+            .setConstraints(
+                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+            )
+            .build()
+        wm.enqueue(request)
+    }
+
+    /** Cold start / boot — always poll once (not subject to foreground throttle). */
+    fun enqueueAlertPollOnLaunch(context: Context) {
+        enqueueOneShotAlertPoll(context.applicationContext)
     }
 
     /** One-shot poll when app is active, throttled — complements 15-min periodic minimum. */

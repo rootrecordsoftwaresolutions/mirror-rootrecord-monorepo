@@ -1,31 +1,18 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import { kilaueaBotToken, postKilaueaEmbedsToChannel, type KilaueaDiscordEnv } from "./discord-kilauea-bot";
+import { listGuildAlertDestinations } from "./discord-kilauea-guild-config";
 
-// USGS earthquakes (Big Island, ~150km of Kilauea summit, M2.0+) → Discord #kilauea-alerts.
-// Runs from `rootrecord-api-kilauea` on the every-10-minutes cron (see wrangler.toml + index.ts).
-// (Block comment converted to // because the cron literal contains `*` `/` which closes /** */.)
-// Dedupes via `discord_posted_quakes` (migration 0033) so cron retries / overlapping windows
-// never double-post. Webhook URL comes from `env.DISCORD_KILAUEA_USGS_WEBHOOK_URL` (Worker secret).
+// USGS earthquakes (Big Island, ~150km of Kilauea summit, M2.0+) → Discord per-guild alert channels.
+// Dedupes via `kilauea_discord_guild_quake_post` per server.
 
-// Kilauea summit caldera. Matches the radius math used in weather.ts (HVO_BUNDLE_RADIUS_MILES).
 const KILAUEA_SUMMIT_LAT = 19.4205;
 const KILAUEA_SUMMIT_LON = -155.287;
-
-// Tight scope per ops decision: Big Island only.
 const MAX_RADIUS_KM = 150;
 const MIN_MAGNITUDE = 2.0;
-
-// USGS data has ~minute lag; cron is 10min. Pull a 2h lookback window for safety; dedupe handles overlap.
 const LOOKBACK_HOURS = 2;
-
-// How many embeds to put in a single Discord webhook POST (Discord caps at 10).
 const EMBEDS_PER_REQUEST = 10;
-
-// Prune rows older than this so the dedupe table stays small.
 const PRUNE_OLDER_THAN_DAYS = 30;
-
 const USGS_USER_AGENT = "RootRecord Kilauea Alerts (rootrecord.info)";
-const DISCORD_USERNAME = "RootRecord USGS";
-const DISCORD_AVATAR_URL = "https://rootrecord.info/favicon.png";
 
 type UsgsFeature = {
   id?: string;
@@ -52,19 +39,17 @@ type DiscordEmbed = {
 };
 
 function magnitudeColor(mag: number): number {
-  // Discord embed color = 24-bit RGB int. Bands match the Kilauea web dashboard convention.
-  if (mag >= 5.0) return 0xc81e1e; // deep red
-  if (mag >= 4.0) return 0xdf1739; // red
-  if (mag >= 3.0) return 0xf17a13; // orange
-  if (mag >= 2.5) return 0xe4b51d; // amber
-  return 0x8ac926;                  // green (M2.0–2.5)
+  if (mag >= 5.0) return 0xc81e1e;
+  if (mag >= 4.0) return 0xdf1739;
+  if (mag >= 3.0) return 0xf17a13;
+  if (mag >= 2.5) return 0xe4b51d;
+  return 0x8ac926;
 }
 
 function kmToMiles(km: number): number {
   return km * 0.621371;
 }
 
-/** Rewrite USGS "28 km E of …" → "17 mi E of …" so Discord readers see imperial like the web UI. */
 function imperialPlace(raw: string): string {
   if (!raw) return raw;
   return raw.replace(/(\d+(?:\.\d+)?)\s*km(\b)/i, (_m, num) => {
@@ -91,7 +76,6 @@ function buildEmbed(feat: UsgsFeature): DiscordEmbed | null {
     fields.push({ name: "Depth", value: `${depthMi.toFixed(depthMi >= 10 ? 0 : 1)} mi`, inline: true });
   }
   if (Number.isFinite(tMs) && tMs > 0) {
-    // Discord renders <t:1715450000:R> as "5 minutes ago" client-side, localized.
     fields.push({ name: "Time", value: `<t:${Math.floor(tMs / 1000)}:R>`, inline: true });
   }
   return {
@@ -115,123 +99,102 @@ async function fetchKilaueaQuakes(): Promise<UsgsFeature[]> {
   u.searchParams.set("starttime", startIso);
   u.searchParams.set("orderby", "time-asc");
   const r = await fetch(u.toString(), { headers: { "User-Agent": USGS_USER_AGENT, Accept: "application/geo+json" } });
-  if (!r.ok) {
-    console.warn(`usgs_kilauea_discord: USGS fetch failed ${r.status}`);
-    return [];
-  }
+  if (!r.ok) return [];
   const data = (await r.json()) as UsgsFeatureCollection;
   return Array.isArray(data?.features) ? data.features : [];
 }
 
-async function alreadyPosted(db: D1Database, eventIds: string[]): Promise<Set<string>> {
+async function alreadyPostedForGuild(db: D1Database, guildId: string, eventIds: string[]): Promise<Set<string>> {
   if (!eventIds.length) return new Set();
-  // D1 has a parameter cap; for the volumes here (≤ ~50 events/2h) one batched IN clause is fine.
   const placeholders = eventIds.map(() => "?").join(",");
   const { results } = await db
-    .prepare(`SELECT event_id FROM discord_posted_quakes WHERE event_id IN (${placeholders})`)
-    .bind(...eventIds)
+    .prepare(
+      `SELECT event_id FROM kilauea_discord_guild_quake_post WHERE guild_id = ? AND event_id IN (${placeholders})`,
+    )
+    .bind(guildId, ...eventIds)
     .all<{ event_id: string }>();
   return new Set((results || []).map((r) => String(r.event_id)));
 }
 
-async function markPosted(
+async function markPostedForGuild(
   db: D1Database,
-  records: Array<{ id: string; mag: number; place: string }>,
+  guildId: string,
+  eventIds: string[],
   nowIso: string,
 ): Promise<void> {
-  if (!records.length) return;
-  // One statement per row keeps SQL simple; row count per cron run is small.
-  for (const rec of records) {
+  for (const id of eventIds) {
     try {
       await db
         .prepare(
-          `INSERT INTO discord_posted_quakes (event_id, posted_at, source, magnitude, place)
-           VALUES (?, ?, 'usgs', ?, ?)
-           ON CONFLICT(event_id) DO NOTHING`,
+          `INSERT INTO kilauea_discord_guild_quake_post (guild_id, event_id, posted_at) VALUES (?, ?, ?)
+           ON CONFLICT(guild_id, event_id) DO NOTHING`,
         )
-        .bind(rec.id, nowIso, rec.mag, rec.place.slice(0, 200))
+        .bind(guildId, id, nowIso)
         .run();
     } catch (e) {
-      console.warn(`usgs_kilauea_discord: markPosted failed for ${rec.id}: ${String(e)}`);
+      console.warn(`usgs_kilauea_discord guild mark ${guildId} ${id}: ${String(e)}`);
     }
   }
 }
 
-async function pruneOldPosts(db: D1Database): Promise<void> {
+async function pruneOldGuildPosts(db: D1Database): Promise<void> {
   const cutoff = new Date(Date.now() - PRUNE_OLDER_THAN_DAYS * 86400 * 1000).toISOString();
   try {
-    await db.prepare(`DELETE FROM discord_posted_quakes WHERE posted_at < ?`).bind(cutoff).run();
-  } catch (e) {
-    console.warn(`usgs_kilauea_discord: prune failed ${String(e)}`);
+    await db.prepare(`DELETE FROM kilauea_discord_guild_quake_post WHERE posted_at < ?`).bind(cutoff).run();
+  } catch {
+    /* ignore */
   }
-}
-
-async function postEmbedsBatch(webhookUrl: string, embeds: DiscordEmbed[]): Promise<boolean> {
-  if (!embeds.length) return true;
-  const payload = {
-    username: DISCORD_USERNAME,
-    avatar_url: DISCORD_AVATAR_URL,
-    embeds,
-  };
-  const r = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!r.ok) {
-    const detail = (await r.text().catch(() => "")).slice(0, 200);
-    console.warn(`usgs_kilauea_discord: webhook POST ${r.status} ${detail}`);
-    return false;
-  }
-  return true;
 }
 
 export async function runUsgsKilaueaDiscordCron(env: {
   DB: D1Database;
   DISCORD_KILAUEA_USGS_WEBHOOK_URL?: string;
-}): Promise<void> {
-  const webhookUrl = String(env.DISCORD_KILAUEA_USGS_WEBHOOK_URL || "").trim();
-  if (!/^https:\/\/discord(?:app)?\.com\/api\/webhooks\//.test(webhookUrl)) {
-    // Silently no-op when the webhook isn't configured (e.g. local dev). Avoids spamming logs.
-    return;
-  }
+} & KilaueaDiscordEnv): Promise<void> {
+  const destinations = await listGuildAlertDestinations(env.DB, env);
+  const hasBot = kilaueaBotToken(env).length >= 40;
+  const hasWebhook = /^https:\/\/discord(?:app)?\.com\/api\/webhooks\//.test(
+    String(env.DISCORD_KILAUEA_USGS_WEBHOOK_URL || "").trim(),
+  );
+  if (!destinations.length || (!hasBot && !hasWebhook)) return;
 
   const features = await fetchKilaueaQuakes();
   if (!features.length) {
-    // Best-effort prune on quiet runs so the table doesn't grow unboundedly.
-    await pruneOldPosts(env.DB);
+    if (Math.random() < 0.1) await pruneOldGuildPosts(env.DB);
     return;
   }
 
-  const eligible = features.filter((f) => Number.isFinite(Number(f?.properties?.mag)) && Number(f.properties!.mag) >= MIN_MAGNITUDE && String(f?.id || "").trim());
-  const ids = eligible.map((f) => String(f.id));
-  const posted = await alreadyPosted(env.DB, ids);
-  const fresh = eligible.filter((f) => !posted.has(String(f.id)));
-  if (!fresh.length) return;
-
-  // Build embeds; drop any that fail the per-embed sanity check.
-  const embeds: DiscordEmbed[] = [];
-  const records: Array<{ id: string; mag: number; place: string }> = [];
-  for (const feat of fresh) {
-    const embed = buildEmbed(feat);
-    if (!embed) continue;
-    embeds.push(embed);
-    records.push({
-      id: String(feat.id),
-      mag: Number(feat.properties?.mag),
-      place: String(feat.properties?.place || ""),
-    });
-  }
-  if (!embeds.length) return;
+  const eligible = features.filter(
+    (f) =>
+      Number.isFinite(Number(f?.properties?.mag)) &&
+      Number(f.properties!.mag) >= MIN_MAGNITUDE &&
+      String(f?.id || "").trim(),
+  );
 
   const nowIso = new Date().toISOString();
-  for (let i = 0; i < embeds.length; i += EMBEDS_PER_REQUEST) {
-    const batchEmbeds = embeds.slice(i, i + EMBEDS_PER_REQUEST);
-    const batchRecords = records.slice(i, i + EMBEDS_PER_REQUEST);
-    const ok = await postEmbedsBatch(webhookUrl, batchEmbeds);
-    if (ok) await markPosted(env.DB, batchRecords, nowIso);
+
+  for (const dest of destinations) {
+    const ids = eligible.map((f) => String(f.id));
+    const posted = await alreadyPostedForGuild(env.DB, dest.guild_id, ids);
+    const fresh = eligible.filter((f) => !posted.has(String(f.id)));
+    if (!fresh.length) continue;
+
+    const embeds: DiscordEmbed[] = [];
+    const postedIds: string[] = [];
+    for (const feat of fresh) {
+      const embed = buildEmbed(feat);
+      if (!embed) continue;
+      embeds.push(embed);
+      postedIds.push(String(feat.id));
+    }
+    if (!embeds.length) continue;
+
+    for (let i = 0; i < embeds.length; i += EMBEDS_PER_REQUEST) {
+      const batch = embeds.slice(i, i + EMBEDS_PER_REQUEST);
+      const batchIds = postedIds.slice(i, i + EMBEDS_PER_REQUEST);
+      const ok = await postKilaueaEmbedsToChannel(env, dest.channel_id, batch);
+      if (ok) await markPostedForGuild(env.DB, dest.guild_id, batchIds, nowIso);
+    }
   }
 
-  // 1-in-N prune to keep the table small without doing it every run.
-  if (Math.random() < 0.1) await pruneOldPosts(env.DB);
+  if (Math.random() < 0.1) await pruneOldGuildPosts(env.DB);
 }

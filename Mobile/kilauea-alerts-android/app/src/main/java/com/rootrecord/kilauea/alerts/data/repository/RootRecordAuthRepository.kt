@@ -29,14 +29,24 @@ private val JsonMedia = "application/json; charset=utf-8".toMediaType()
 // the custom domain `api-kilauea.rootrecord.info` is not reliably resolving from devices, so we hit
 // the Worker's *.workers.dev URL directly until that's fixed in Cloudflare.
 private const val LOGIN_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/auth/login"
+private const val SIGNUP_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/auth/signup"
 private const val LOGOUT_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/auth/logout"
 private const val ME_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/v1/me"
+private const val PUSH_TOKEN_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev/api/me/push-token"
+private const val KILAUEA_APP_ID = "rootrecord_kilauea_alerts_android"
 
 @Serializable
 private data class LoginBody(
     val email: String,
     val password: String,
-    val app_id: String = "rootrecord_kilauea_alerts_android",
+    val app_id: String = KILAUEA_APP_ID,
+)
+
+@Serializable
+private data class PushTokenBody(
+    val token: String,
+    val platform: String = "android",
+    val app_id: String = KILAUEA_APP_ID,
 )
 
 /**
@@ -45,17 +55,36 @@ private data class LoginBody(
  */
 @Singleton
 class RootRecordAuthRepository @Inject constructor(
-    @Named("rootrecord") private val http: OkHttpClient,
+    @param:Named("rootrecord") private val http: OkHttpClient,
     private val prefs: KilaueaPreferences,
 ) {
 
-    suspend fun login(email: String, password: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun login(email: String, password: String): Result<Unit> = authenticate(
+        url = LOGIN_URL,
+        email = email,
+        password = password,
+        failurePrefix = "sign_in_failed",
+    )
+
+    suspend fun createAccount(email: String, password: String): Result<Unit> = authenticate(
+        url = SIGNUP_URL,
+        email = email,
+        password = password,
+        failurePrefix = "account_create_failed",
+    )
+
+    private suspend fun authenticate(
+        url: String,
+        email: String,
+        password: String,
+        failurePrefix: String,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val trimmed = email.trim().lowercase()
             val payload = AppJson.encodeToString(LoginBody.serializer(), LoginBody(trimmed, password))
             val req = Request.Builder()
-                .url(LOGIN_URL)
-                .header("X-RR-App-Id", "rootrecord_kilauea_alerts_android")
+                .url(url)
+                .header("X-RR-App-Id", KILAUEA_APP_ID)
                 .post(payload.toRequestBody(JsonMedia))
                 .build()
             http.newCall(req).execute().use { resp ->
@@ -64,7 +93,7 @@ class RootRecordAuthRepository @Inject constructor(
                     ?: error("invalid_response")
                 if (!resp.isSuccessful) {
                     val detail = root["detail"]?.jsonPrimitive?.content
-                    error(detail ?: "sign_in_failed_${resp.code}")
+                    error(detail ?: "${failurePrefix}_${resp.code}")
                 }
                 val token = root["access_token"]?.jsonPrimitive?.content
                     ?: root["token"]?.jsonPrimitive?.content
@@ -72,8 +101,26 @@ class RootRecordAuthRepository @Inject constructor(
                 val mail = root["email"]?.jsonPrimitive?.content?.trim()?.lowercase() ?: trimmed
                 val accountId = root["account_id"]?.jsonPrimitive?.content
                 val pro = root["proUnlocked"]?.jsonPrimitive?.booleanLike() == true ||
-                    root["pro_unlocked"]?.jsonPrimitive?.booleanLike() == true
+                    root["pro_unlocked"]?.jsonPrimitive?.booleanLike() == true ||
+                    root["lifeMember"]?.jsonPrimitive?.booleanLike() == true ||
+                    root["life_member"]?.jsonPrimitive?.booleanLike() == true
                 prefs.setAuthSession(token, mail, accountId, pro)
+            }
+        }
+    }
+
+    suspend fun registerPushToken(token: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val trimmed = token.trim()
+            if (trimmed.length < 20) return@runCatching
+            val payload = AppJson.encodeToString(PushTokenBody.serializer(), PushTokenBody(trimmed))
+            val req = Request.Builder()
+                .url(PUSH_TOKEN_URL)
+                .header("X-RR-App-Id", KILAUEA_APP_ID)
+                .post(payload.toRequestBody(JsonMedia))
+                .build()
+            http.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) error("push_token_failed_${resp.code}")
             }
         }
     }
@@ -111,7 +158,9 @@ class RootRecordAuthRepository @Inject constructor(
                 val root = runCatching { AppJson.parseToJsonElement(text).jsonObject }.getOrNull()
                     ?: return@runCatching
                 val pro = root["proUnlocked"]?.jsonPrimitive?.booleanLike() == true ||
-                    root["pro_unlocked"]?.jsonPrimitive?.booleanLike() == true
+                    root["pro_unlocked"]?.jsonPrimitive?.booleanLike() == true ||
+                    root["lifeMember"]?.jsonPrimitive?.booleanLike() == true ||
+                    root["life_member"]?.jsonPrimitive?.booleanLike() == true
                 prefs.setAuthProUnlocked(pro)
             }
         }

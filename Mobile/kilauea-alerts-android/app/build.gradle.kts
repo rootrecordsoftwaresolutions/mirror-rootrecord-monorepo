@@ -19,15 +19,15 @@ android {
         applicationId = "com.rootrecord.kilauea"
         minSdk = 24
         targetSdk = 35
-        versionCode = 32
-        versionName = "1.0.32"
+        versionCode = 42
+        versionName = "1.0.42"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val props = Properties()
         rootProject.file("local.properties").takeIf { it.exists() }?.reader()?.use { props.load(it) }
         val ytKey = props.getProperty("YOUTUBE_API_KEY", "") ?: ""
         buildConfigField("String", "YOUTUBE_API_KEY", "\"$ytKey\"")
-        // Production banner unit; debug buildType overrides with Google test banner (policy-safe local testing).
+        // Production banner unit; debug buildType overrides with Google's sample banner ID.
         buildConfigField(
             "String",
             "ADMOB_BANNER_AD_UNIT_ID",

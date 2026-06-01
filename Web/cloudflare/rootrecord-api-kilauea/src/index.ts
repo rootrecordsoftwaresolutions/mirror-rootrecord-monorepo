@@ -4,6 +4,8 @@ import type { Env } from "./router";
 import { handleRequest } from "./router";
 import { runNoaaAlertCron } from "./noaa-alert-cron";
 import { runUsgsKilaueaDiscordCron } from "./usgs-discord-cron";
+import { runKilaueaAiAnalysisCron } from "./kilauea-ai-analysis";
+import { runKilaueaVolcanoNoticePushCron } from "./kilauea-volcano-notice-push-cron";
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -55,9 +57,16 @@ export default {
       await runNoaaAlertCron(env);
       return;
     }
-    // `*/10` (only registered on api-kilauea): USGS Big Island quakes → Discord #kilauea-alerts.
+    // `*/10` (only registered on api-kilauea): USGS Big Island quakes + AI analysis → Discord/app.
     if (c === "*/10 * * * *" && shard === "kilauea") {
-      await runUsgsKilaueaDiscordCron(env);
+      const results = await Promise.allSettled([
+        runUsgsKilaueaDiscordCron(env),
+        runKilaueaAiAnalysisCron(env),
+        runKilaueaVolcanoNoticePushCron(env),
+      ]);
+      for (const r of results) {
+        if (r.status === "rejected") console.warn("kilauea_cron_failed", String(r.reason));
+      }
       return;
     }
   },
