@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cloud, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
-import { api, session, getMobileVersionPolicy } from '../lib/api';
+import { accessFromPayload, api, session, getMobileVersionPolicy } from '../lib/api';
 import { NATIVE_APP_VERSION } from '../lib/nativeAppVersion';
 import { semverLt } from '../lib/semverLt';
 
@@ -76,7 +76,8 @@ export default function AuthGate({ onSignedIn }) {
       const { data } = res;
       const tok = data.access_token || data.token;
       if (!tok) throw new Error('No session token returned. Try again.');
-      session.setSession(tok, data.email, data.pro_unlocked, data.life_member);
+      const access = accessFromPayload(data);
+      session.setSession(tok, data.email, access.pro, access.life);
       onSignedIn?.();
       navigate('/', { replace: true });
     } catch (e2) {
@@ -149,21 +150,21 @@ export default function AuthGate({ onSignedIn }) {
             <div data-testid="auth-pitch">
               <div className="flex items-center gap-2 text-accent/80 text-[11px] uppercase tracking-widest mb-3 font-mono">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                RootRecord Pro
+                RootRecord membership
               </div>
               <h2 className="text-2xl font-semibold leading-tight mb-3">
-                Weather is designed for Pro and Lifetime members only.
+                Some Weather features require additional resources.
               </h2>
               <p className="text-sm text-accent/85 leading-relaxed mb-6">
-                The Weather Manager web dashboard is part of Root Record Pro and Lifetime. The
-                Android app remains usable on the free tier (one saved location, capped refreshes).
+                Some features are limited to members only so we can cover higher-cost weather data,
+                alerts, and sync. The Android app still includes core weather access.
               </p>
               <a
                 href={BILLING_URL}
                 data-testid="auth-become-member"
                 className="bg-accent hover:bg-accentHover text-white py-3 rounded-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
               >
-                Become a Member
+                View membership options
                 <ArrowRight className="w-4 h-4" />
               </a>
               <p className="mt-6 text-[11px] text-accent/70 text-center">

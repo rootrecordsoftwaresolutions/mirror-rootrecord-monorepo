@@ -67,10 +67,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               <button type="button" class="nav-cta nav-account-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="nav-account-panel" data-testid="nav-account-cta">Account</button>
               <div id="nav-account-panel" class="nav-account-panel" role="menu" hidden>
                 <a href="/account.html" role="menuitem" aria-current="page">Account</a>
+                <a href="/account/emails/" role="menuitem">Email preferences</a>
                 <a href="/my-apps.html" role="menuitem">My Apps</a>
                 <a href="/development-notice.html" role="menuitem">Development notice</a>
                 <a href="/billing.html" role="menuitem">Billing</a>
-                <a href="/beta-tester-rewards.html" role="menuitem">Roots</a>
+                <a href="/root-units" role="menuitem">Roots</a>
               </div>
             </span>
           </span>
@@ -84,7 +85,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <div class="page-header-inner">
             <p class="breadcrumb">Account</p>
             <h1 class="page-title">Your <em>account</em>.</h1>
-            <p class="page-lead">Sign in for subscription status and billing. Your <strong>Roots</strong> balance and program details are on <a href="/beta-tester-rewards.html">Roots</a> &mdash; use Discord <strong>/bal</strong> and <strong>/send</strong> after linking your account. This portal is for your rootrecord.info profile; your apps and local data stay on your devices.</p>
+            <p class="page-lead">Sign in for subscription status and billing. Your <strong>Roots</strong> balance, game links, buying options, and full guide are on <a href="/root-units">Root Units</a> &mdash; use Discord <strong>/bal</strong> and <strong>/send</strong> after linking your account. This portal is for your rootrecord.info profile; your apps and local data stay on your devices.</p>
           </div>
         </div>
       </section>
@@ -113,6 +114,22 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <button type="submit" class="btn btn-primary" data-testid="login-submit-btn">Sign in</button>
               </form>
 
+              <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03)" data-testid="password-reset-panel">
+                <h3 style="margin-top:0">Forgot password?</h3>
+                <form id="form-password-reset-request" class="stack-form" style="margin-top:0.75rem">
+                  <label>Email <input type="email" id="reset-request-email" autocomplete="username" data-testid="reset-request-email"></label>
+                  <button type="submit" class="btn btn-secondary" data-testid="reset-request-submit">Email reset link</button>
+                </form>
+                <form id="form-password-reset-confirm" class="stack-form" style="margin-top:1rem">
+                  <input type="hidden" id="reset-token">
+                  <label>Email for code reset <input type="email" id="reset-confirm-email" autocomplete="username" data-testid="reset-confirm-email"></label>
+                  <label>Reset code <input type="text" id="reset-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" data-testid="reset-code"></label>
+                  <label>New password <input type="password" id="reset-new-password" autocomplete="new-password" minlength="6" data-testid="reset-new-password"></label>
+                  <button type="submit" class="btn btn-primary" data-testid="reset-confirm-submit">Set new password</button>
+                </form>
+                <p class="note" style="margin-top:0.75rem">Open the reset link from email, or enter your email, code, and new password here.</p>
+              </section>
+
               <p style="margin-top:1.5rem;margin-bottom:0">
                 <a class="btn btn-secondary" href="/account-signup.html" data-testid="create-account-link">Create an account</a>
               </p>
@@ -121,6 +138,29 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <section id="panel-account" class="card-plain" hidden data-testid="account-details-panel">
               <h2>Your account</h2>
               <div id="account-details" class="account-grid"></div>
+
+              <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.08)" data-testid="account-verification">
+                <h3 style="margin-top:0">Account status</h3>
+                <p class="note" id="account-verification-status" style="margin-top:0.5rem">Checking verification status…</p>
+                <p class="account-discord-actions" id="account-verification-actions" style="margin-top:0.75rem;margin-bottom:0;display:flex;flex-wrap:wrap;gap:0.5rem">
+                  <button type="button" class="btn btn-secondary" id="btn-email-verify" data-testid="btn-email-verify">Send verification email</button>
+                  <a class="btn btn-secondary" href="/discord-verify" data-testid="account-discord-verify-link">Verify with Discord</a>
+                </p>
+              </section>
+
+              <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03)" data-testid="account-security-confirm">
+                <h3 style="margin-top:0">Sensitive changes</h3>
+                <p class="note" id="account-security-confirm-status" style="margin-top:0.5rem">Only confirm here when you are about to change security settings, unlink Discord, or delete the account.</p>
+                <p style="margin-top:0.75rem;margin-bottom:0">
+                  <button type="button" class="btn btn-secondary" id="btn-security-open" data-testid="btn-security-open">Confirm sensitive changes</button>
+                </p>
+                <p class="account-discord-actions" id="account-security-controls" style="margin-top:0.75rem;margin-bottom:0;display:flex;flex-wrap:wrap;gap:0.5rem" hidden>
+                  <button type="button" class="btn btn-secondary" id="btn-security-email" data-testid="btn-security-email">Email confirmation code</button>
+                  <input type="text" id="security-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" aria-label="Email confirmation code" style="max-width:10rem">
+                  <button type="button" class="btn btn-primary" id="btn-security-confirm" data-testid="btn-security-confirm">Confirm code</button>
+                  <a class="btn btn-secondary" href="/discord-verify">Re-verify with Discord</a>
+                </p>
+              </section>
 
               <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03)" data-testid="account-public-profile">
                 <h3 style="margin-top:0">Public profile</h3>
@@ -141,6 +181,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <p class="account-discord-actions" style="margin-top:0.75rem;margin-bottom:0;display:flex;flex-wrap:wrap;gap:0.5rem">
                   <button type="button" class="btn btn-secondary" id="btn-discord-link" data-testid="btn-discord-link">Link Discord</button>
                   <button type="button" class="btn btn-ghost" id="btn-discord-unlink" data-testid="btn-discord-unlink" hidden>Unlink Discord</button>
+                </p>
+              </section>
+
+              <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03)">
+                <h3 style="margin-top:0">Email preferences</h3>
+                <p class="note" style="margin-top:0.5rem">Choose which product newsletters and updates you want to receive.</p>
+                <p style="margin-top:0.75rem;margin-bottom:0">
+                  <a class="btn btn-secondary" href="/account/emails/">Manage email preferences</a>
                 </p>
               </section>
 
@@ -169,8 +217,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <p>Multi-device solutions - your grounding roots for productivity.</p>
           </div>
           <div class="footer-col"><h4>Products</h4><ul><li><a href="/rootrecord-business-manager.html">Business Manager</a></li><li><a href="/rootrecord-weather-manager.html">Weather Manager</a></li><li><a href="/kilauea-alerts.html">Kilauea Alerts</a></li><li><a href="/pricing.html">Pricing</a></li></ul></div>
-          <div class="footer-col"><h4>Company</h4><ul><li><a href="/about.html">About</a></li><li><a href="/faq.html">FAQ</a></li><li><a href="/contact.html">Contact</a></li><li><a href="/account.html">Account</a></li><li><a href="/billing.html">Billing</a></li><li><a href="/beta-tester-rewards.html">Roots</a></li></ul></div>
-          <div class="footer-col"><h4>Community</h4><ul><li><a href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener">Discord</a></li><li><a href="https://x.com/RootRecord" target="_blank" rel="noopener">X (Twitter)</a></li><li><a href="/terms.html">Terms</a></li><li><a href="/privacy.html">Privacy</a></li><li><a href="https://github.com/RootRecord/Doc-Repo" target="_blank" rel="noopener">Developer documentation</a></li></ul></div>
+          <div class="footer-col"><h4>Company</h4><ul><li><a href="/about.html">About</a></li><li><a href="/roadmap/">Roadmap</a></li><li><a href="/faq.html">FAQ</a></li><li><a href="/contact.html">Contact</a></li><li><a href="/account.html">Account</a></li><li><a href="/billing.html">Billing</a></li><li><a href="/root-units">Roots</a></li></ul></div>
+          <div class="footer-col"><h4>Community</h4><ul><li><a href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener">Discord</a></li><li><a href="https://x.com/RootRecord" target="_blank" rel="noopener">X (Twitter)</a></li><li><a href="/terms.html">Terms</a></li><li><a href="/privacy.html">Privacy</a></li><li><a href="https://github.com/RootRecord/Doc-Repo" target="_blank" rel="noopener">Developer Documentation</a></li></ul></div>
         </div>
         <div class="footer-bottom">
           <span>&copy; <span id="yr">2026</span> RootRecord &middot; <a href="https://rootrecord.info/">rootrecord.info</a></span>
@@ -180,7 +228,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
   <script src="/site-nav.js?v=5" defer></script>
-  <script src="/earn-balance.js?v=1" defer></script>
-  <script src="/account.js?v=34" defer></script>
+  <script src="/earn-balance.js?v=2" defer></script>
+  <script src="/account.js?v=39" defer></script>
 </body>
 </html>

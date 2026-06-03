@@ -26,9 +26,9 @@ function AirQualityProGate() {
       data-testid="air-quality-pro-gate"
     >
       <ShieldCheck strokeWidth={1.5} className="w-8 h-8 text-accent mx-auto mb-3" />
-      <p className="text-sm text-white font-medium mb-1">Air quality is Pro &amp; Lifetime</p>
+      <p className="text-sm text-white font-medium mb-1">Air quality requires additional resources</p>
       <p className="text-xs text-accent/70 mb-4 max-w-sm mx-auto">
-        Live AQI, pollutant breakdown, and hourly and daily forecasts for your saved location.
+        Live AQI, pollutant details, and air quality forecasts are limited to members only.
       </p>
       <div className="flex flex-col sm:flex-row gap-2 justify-center">
         <button
@@ -37,7 +37,7 @@ function AirQualityProGate() {
           className="px-4 py-2 rounded bg-accent text-black text-sm font-medium hover:opacity-90"
           data-testid="air-quality-upgrade-btn"
         >
-          See Pro benefits
+          View member features
         </button>
         <a
           href={BILLING_URL}

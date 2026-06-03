@@ -29,9 +29,9 @@ function HazardsProGate({ tabLabel }) {
       data-testid="hazards-pro-gate"
     >
       <ShieldCheck strokeWidth={1.5} className="w-8 h-8 text-accent mx-auto mb-3" />
-      <p className="text-sm text-white font-medium mb-1">Live {tabLabel} data is Pro &amp; Lifetime</p>
+      <p className="text-sm text-white font-medium mb-1">Live {tabLabel} data requires additional resources</p>
       <p className="text-xs text-accent/70 mb-4 max-w-sm mx-auto">
-        Browse every hazard tab on the free tier. Upgrade to load USGS earthquakes, tsunami flags, cyclones, and wildfires.
+        You can browse each hazard tab. Some live feeds are limited to members only because they use higher-cost data.
       </p>
       <div className="flex flex-col sm:flex-row gap-2 justify-center">
         <button
@@ -40,7 +40,7 @@ function HazardsProGate({ tabLabel }) {
           className="px-4 py-2 rounded bg-accent text-black text-sm font-medium hover:opacity-90"
           data-testid="hazards-upgrade-btn"
         >
-          See Pro benefits
+          View member features
         </button>
         <a
           href={BILLING_URL}
@@ -186,7 +186,7 @@ export default function Hazards() {
 
         {!hazardsUnlocked && (
           <p className="text-[10px] font-mono text-accent/70 mb-3" data-testid="hazards-free-hint">
-            Free: preview tabs only — Pro or Lifetime unlocks live hazard feeds.
+            Preview tabs are available here. Live hazard feeds are limited to members only.
           </p>
         )}
 

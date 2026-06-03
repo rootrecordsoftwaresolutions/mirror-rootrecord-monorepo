@@ -40,7 +40,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" onclick="document.querySelector('.site-nav').classList.toggle('is-open');this.setAttribute('aria-expanded',this.getAttribute('aria-expanded')==='true'?'false':'true');">Menu</button>
         <nav class="site-nav">
           <a href="/">Home</a>
-          <a href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener">Discord</a>
+          <a href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener">Discord</a>
         </nav>
       </div>
     </header>
@@ -70,7 +70,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
               <p class="note" id="verify-discord-label" style="margin-top:0.35rem" hidden></p>
               <p class="note" id="verify-success-detail" style="margin-top:0.5rem"></p>
               <p class="account-discord-actions" style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:0.5rem">
-                <a class="btn btn-primary" id="btn-return-discord" href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener" data-testid="btn-return-discord">Return to Discord</a>
+                <a class="btn btn-primary" id="btn-return-discord" href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener" data-testid="btn-return-discord">Return to Discord</a>
+                <a class="btn btn-secondary" href="/account.html" data-testid="btn-view-account">View account</a>
                 <button type="button" class="btn btn-secondary" id="btn-discord-reverify" data-testid="btn-discord-reverify">Re-verify with Discord</button>
               </p>
               <p style="margin-top:1rem;margin-bottom:0">
@@ -87,7 +88,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 <button type="submit" class="btn btn-primary">Sign in and continue</button>
               </form>
               <p class="note" style="margin-top:1rem;margin-bottom:0">
-                <a href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener" style="color:var(--moss)">Return to Discord</a> (verify after you sign in)
+                <a href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener" style="color:var(--moss)">Return to Discord</a> (verify after you sign in)
               </p>
             </section>
 
@@ -97,7 +98,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
               <p class="note" id="discord-link-status" style="margin-top:0.5rem">Not linked.</p>
               <p class="account-discord-actions" style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem">
                 <button type="button" class="btn btn-primary" id="btn-discord-link" data-testid="btn-discord-verify">Verify with Discord</button>
-                <a class="btn btn-secondary" id="btn-return-discord-action" href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener" hidden data-testid="btn-return-discord-when-linked">Return to Discord</a>
+                <a class="btn btn-secondary" id="btn-return-discord-action" href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener" hidden data-testid="btn-return-discord-when-linked">Return to Discord</a>
               </p>
               <p style="margin-top:1rem;margin-bottom:0">
                 <button type="button" class="btn btn-ghost" id="btn-logout" data-testid="discord-verify-logout">Sign out</button>
@@ -118,6 +119,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   </div>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
   <script src="/site-nav.js?v=6" defer></script>
-  <script src="/discord-verify.js?v=4" defer></script>
+  <script src="/discord-verify.js?v=6" defer></script>
 </body>
 </html>

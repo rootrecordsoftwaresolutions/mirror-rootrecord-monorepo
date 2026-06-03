@@ -1,0 +1,8 @@
+{
+  "appId": "com.rootrecord.visitinghawaii",
+  "appName": "Visiting Hawaii",
+  "webDir": "../../Web/apps/visiting-hawaii-web/build",
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { AuthScreen } from "./components/AuthScreen";
+import { DashboardIntelSection } from "./components/DashboardIntelSection";
 import { DetailModal } from "./components/DetailModal";
 import { DeveloperMessage } from "./components/DeveloperMessage";
+import { VisitingHawaiiPromo } from "./components/VisitingHawaiiPromo";
 import { ProPaywall } from "./components/ProPaywall";
 import { UpsellModal, UPSELL_EVENT } from "./components/UpsellModal";
 import { useAuth } from "./contexts/AuthContext";
@@ -91,11 +93,12 @@ export function App() {
   const [detailModal, setDetailModal] = useState<
     null | { kind: "hvo"; h: Record<string, unknown> } | { kind: "quake"; q: Record<string, unknown> }
   >(null);
+  const [intelReady, setIntelReady] = useState(false);
 
   const load = useCallback(
-    async (refresh: boolean) => {
+    async (refresh: boolean, attempt = 0) => {
       setLoading(true);
-      setError(null);
+      if (attempt === 0) setError(null);
       try {
         const res = await apiFetch(dashboardPath(location, refresh), {
           headers: { Accept: "application/json" },
@@ -108,16 +111,33 @@ export function App() {
           return;
         }
         if (!res.ok) {
+          if (attempt < 2 && res.status >= 502) {
+            await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+            return load(refresh, attempt + 1);
+          }
           setBundle(null);
-          setError(`${res.status} ${res.statusText}\n${text.slice(0, 600)}`);
+          let detail = `${res.status} ${res.statusText}`;
+          try {
+            const err = JSON.parse(text) as { detail?: string };
+            if (err.detail) detail = err.detail;
+          } catch {
+            if (text) detail = `${detail}\n${text.slice(0, 400)}`;
+          }
+          setError(detail);
           return;
         }
         const obj = JSON.parse(text) as Record<string, unknown>;
         setBundle(obj);
         setFetchedAt(new Date().toISOString());
+        setError(null);
       } catch (e) {
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+          return load(refresh, attempt + 1);
+        }
         setBundle(null);
-        setError(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg === "Failed to fetch" ? "Could not reach the Kīlauea API. Check your connection and try Refresh." : msg);
       } finally {
         setLoading(false);
       }
@@ -129,6 +149,19 @@ export function App() {
     if (!auth.decided || !auth.authed) return;
     void load(false);
   }, [auth.decided, auth.authed, load]);
+
+  useEffect(() => {
+    if (!auth.decided || !auth.authed) {
+      setIntelReady(false);
+      return;
+    }
+    if (bundle && !loading) {
+      const t = window.setTimeout(() => setIntelReady(true), 400);
+      return () => window.clearTimeout(t);
+    }
+    const fallback = window.setTimeout(() => setIntelReady(true), 3500);
+    return () => window.clearTimeout(fallback);
+  }, [auth.decided, auth.authed, bundle, loading]);
 
   useEffect(() => {
     if (!auth.decided || !auth.authed) return undefined;
@@ -190,7 +223,7 @@ export function App() {
     .filter(Boolean) as Record<string, unknown>[];
 
   const usgs = asRecord(bundle?.usgs);
-  const quakes = Array.isArray(usgs?.events) ? (usgs!.events as unknown[]).slice(0, 8) : [];
+  const quakes = Array.isArray(usgs?.events) ? (usgs!.events as unknown[]).slice(0, 4) : [];
 
   const forecastBlock = asRecord(bundle?.forecast);
   const periodsRaw = Array.isArray(forecastBlock?.periods) ? (forecastBlock!.periods as unknown[]) : [];
@@ -263,7 +296,7 @@ export function App() {
                   const locked = free && l.id !== FREE_TIER_LOC_ID;
                   return (
                     <option key={l.id} value={l.id}>
-                      {l.label}{locked ? " — Pro" : ""}
+                      {l.label}{locked ? " — member" : ""}
                     </option>
                   );
                 })}
@@ -317,6 +350,8 @@ export function App() {
       ) : null}
 
       <DeveloperMessage />
+
+      <VisitingHawaiiPromo />
 
       <div className="dashboard-layout">
         <div className="dashboard-main">
@@ -593,34 +628,39 @@ export function App() {
               </ul>
             )}
           </section>
-
-          <section className="panel panel-links">
-            <div className="panel-head">
-              <span className="panel-icon" aria-hidden>
-                ↗
-              </span>
-              <h2>Resources</h2>
-            </div>
-            <div className="link-row">
-              <a className="link-pill" href="https://rootrecord.info/" target="_blank" rel="noreferrer">
-                rootrecord.info
-              </a>
-              <a className="link-pill" href="https://rootrecord.info/terms" target="_blank" rel="noreferrer">
-                Terms
-              </a>
-              <a className="link-pill" href="https://rootrecord.info/privacy" target="_blank" rel="noreferrer">
-                Privacy
-              </a>
-              <a className="link-pill" href="https://www.usgs.gov/volcanoes/kilauea" target="_blank" rel="noreferrer">
-                USGS Kīlauea
-              </a>
-              <a className="link-pill" href="https://www.weather.gov/hfo/" target="_blank" rel="noreferrer">
-                NWS Honolulu
-              </a>
-            </div>
-          </section>
         </aside>
       </div>
+
+      <section className="panel panel-links dashboard-resources">
+        <div className="panel-head">
+          <span className="panel-icon" aria-hidden>
+            ↗
+          </span>
+          <h2>Resources</h2>
+        </div>
+        <div className="link-row link-row-full">
+          <a className="link-pill" href="https://rootrecord.info/visiting-hawaii.html" target="_blank" rel="noreferrer" data-testid="resources-visiting-hawaii">
+            Visiting Hawaiʻi (coming soon)
+          </a>
+          <a className="link-pill" href="https://rootrecord.info/charts/big-island-earthquakes/" target="_blank" rel="noreferrer">
+            Public earthquake charts
+          </a>
+          <a className="link-pill" href="https://rootrecord.info/terms" target="_blank" rel="noreferrer">
+            Terms
+          </a>
+          <a className="link-pill" href="https://rootrecord.info/privacy" target="_blank" rel="noreferrer">
+            Privacy
+          </a>
+          <a className="link-pill" href="https://www.usgs.gov/volcanoes/kilauea" target="_blank" rel="noreferrer">
+            USGS Kīlauea
+          </a>
+          <a className="link-pill" href="https://www.weather.gov/hfo/" target="_blank" rel="noreferrer">
+            NWS Honolulu
+          </a>
+        </div>
+      </section>
+
+      <DashboardIntelSection ready={intelReady} />
 
       {detailModal?.kind === "hvo" ? (
         <DetailModal

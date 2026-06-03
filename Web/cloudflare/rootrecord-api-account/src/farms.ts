@@ -2210,16 +2210,22 @@ async function farmsPurchase(request: Request, env: FarmsEnv): Promise<Response>
   const newVersion = versionForUpdate + 1;
 
   const storeJsonAfter = farmsStoreToJson(nextStore);
-  const advisoryJson = await syncFarmAdvisories(env.DB, userId, applied.plots, storeJsonAfter);
-  if (advisoryJson !== storeJsonAfter) {
-    await env.DB
-      .prepare(`UPDATE rr_farms_progress SET store_json = ? WHERE user_id = ?`)
-      .bind(advisoryJson, userId)
-      .run();
+  let advisoryJson = storeJsonAfter;
+  try {
+    advisoryJson = await syncFarmAdvisories(env.DB, userId, applied.plots, storeJsonAfter);
+    if (advisoryJson !== storeJsonAfter) {
+      await env.DB
+        .prepare(`UPDATE rr_farms_progress SET store_json = ? WHERE user_id = ?`)
+        .bind(advisoryJson, userId)
+        .run();
+    }
+  } catch (e) {
+    const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
+    console.error("farm purchase advisory sync failed", kind, userId, msg.slice(0, 200));
   }
   const storeOut = parseFarmsStore(advisoryJson);
-  const varmint_events = await listPendingVarmintEvents(env.DB, userId, 12);
-  const orchard_app_bonus = await loadOrchardAppBonusStatus(env.DB, userId, applied.orchards, clientNowMs);
+  const varmint_events = await listPendingVarmintEvents(env.DB, userId, 12).catch(() => []);
+  const orchard_app_bonus = await loadOrchardAppBonusStatus(env.DB, userId, applied.orchards, clientNowMs).catch(() => undefined);
 
   return json({
     ok: true,

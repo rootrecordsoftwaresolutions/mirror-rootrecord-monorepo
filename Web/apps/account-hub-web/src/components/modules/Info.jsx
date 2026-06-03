@@ -22,7 +22,7 @@ export function About() {
             <p className="font-heading font-bold text-base text-ink-primary">RootRecord Account Hub</p>
             <p className="text-ink-secondary">Mobile build · v{NATIVE_APP_VERSION}</p>
             <p className="text-ink-secondary">
-              One sign-in, one subscription, one place to manage security and preferences across every RootRecord app.
+              One sign-in, one membership status, one place to manage security and preferences across every RootRecord app.
             </p>
           </div>
         </Section>
@@ -40,7 +40,7 @@ export function About() {
         <Section title="Plans">
           <div className="p-4 text-sm text-ink-secondary space-y-2">
             <p>
-              <b className="text-ink-primary">Pro</b> purchased on any RootRecord product activates Pro across the suite —
+              <b className="text-ink-primary">Membership</b> on any RootRecord product applies across the suite —
               Weather Manager, Business Manager, and Kīlauea Alerts. Manage it from <b className="text-ink-primary">Account</b>.
             </p>
             <p>
@@ -54,7 +54,7 @@ export function About() {
           <Section title="Desktop version">
             <LinkRow
               icon={Monitor}
-              label="Open Account Hub on desktop — Pro members"
+              label="Open Account Hub on desktop — members"
               href="https://account.rootrecord.info/"
               testid="about-link-desktop"
             />
@@ -78,7 +78,7 @@ export function About() {
         <Section title="Where to get help">
           <div className="p-4 text-sm text-ink-secondary">
             <p>
-              Use <b className="text-ink-primary">Feedback</b> from the Account menu for bug reports, ideas, or subscription
+              Use <b className="text-ink-primary">Feedback</b> from the Account menu for bug reports, ideas, or membership
               questions. Visit <a className="text-brand" href="https://rootrecord.info" target="_blank" rel="noreferrer">rootrecord.info</a> for the latest.
             </p>
           </div>

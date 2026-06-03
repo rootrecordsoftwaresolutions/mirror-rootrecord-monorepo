@@ -18,12 +18,12 @@ export interface EarnEnv {
 /** Bound Solana wait for `/earn/summary` custodial refresh (same order of magnitude as login cache). */
 const EARN_SUMMARY_CUSTODIAL_RPC_MS = 10_000;
 
-/** Per second of credited time on a route; 15 min = 900s → 900×20 = 18,000 units per page visit max. */
-const UNITS_PER_SECOND = 20;
+/** Per second of credited time on a route; 15 min = 900s → 900×200 = 180,000 units per page visit max. */
+const UNITS_PER_SECOND = 200;
 const MAX_SECONDS_PER_PAGE = 15 * 60; // 900
-const DAILY_CHECKIN_UNITS = 10_000;
+const DAILY_CHECKIN_UNITS = 100_000;
 /** Per app, per UTC day (separate app A + B + C can each hit this). */
-const DAILY_MAX_UNITS = 100_000;
+const DAILY_MAX_UNITS = 1_000_000;
 /** Ignore gaps longer than this (app backgrounded / device sleep) — no retroactive credit. */
 const MAX_GAP_SEC = 90;
 /** Per request, cap wall-clock chunk so a burst of heartbeats cannot mint huge amounts. */

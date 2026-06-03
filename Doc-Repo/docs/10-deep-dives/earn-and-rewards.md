@@ -13,4 +13,5 @@ Avoid promising yields. Use “rewards program” language unless legally cleare
 
 ## Related reading
 
+- [discord-roots-onboarding.md](discord-roots-onboarding.md) — first live Discord `/deposit` → `/swap all` case study (May 2026)
 - [internal-vs-external-solana.md](internal-vs-external-solana.md)

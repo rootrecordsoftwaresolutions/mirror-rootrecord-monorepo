@@ -204,8 +204,8 @@ export default function Settings({ onSignedOut }) {
             {showUpgrade && (
               <Row
                 icon={ShieldCheck}
-                label="Upgrade to Pro or Lifetime"
-                value="Live hazards · 5-day forecast · unlimited refreshes"
+                label="Membership options"
+                value="Some resource-heavy features are members-only"
                 onClick={() => showUpsellModal()}
                 testId="settings-upgrade"
               />
@@ -258,11 +258,17 @@ export default function Settings({ onSignedOut }) {
           </div>
         ))}
         <button
-          onClick={() => navigate('/locations/new')}
+          onClick={() => {
+            if (locations.length < 5) navigate('/locations/new');
+          }}
+          disabled={locations.length >= 5}
           data-testid="settings-add-location"
-          className="flex items-center gap-3 w-full p-4 border-t border-subtle hover:bg-containerHover active:scale-[.99] text-accent"
+          className={`flex items-center gap-3 w-full p-4 border-t border-subtle active:scale-[.99] ${
+            locations.length >= 5 ? 'text-accent/50 cursor-not-allowed' : 'text-accent hover:bg-containerHover'
+          }`}
         >
-          <Plus strokeWidth={1.5} className="w-4 h-4" /> Add location
+          <Plus strokeWidth={1.5} className="w-4 h-4" />
+          {locations.length >= 5 ? '5 saved locations max' : 'Add location'}
         </button>
       </Section>
 
@@ -279,14 +285,14 @@ export default function Settings({ onSignedOut }) {
         <Row
           icon={Bell}
           label="Weather alert notifications (NOAA)"
-          value={alertsUnlocked ? (noaaAlertsEnabled ? 'On' : 'Off') : 'Pro & Lifetime'}
+          value={alertsUnlocked ? (noaaAlertsEnabled ? 'On' : 'Off') : 'Members only'}
           onClick={noaaBusy ? undefined : toggleNoaaAlerts}
           testId="settings-noaa-alerts-toggle"
         />
         <div className="p-4 pt-0 text-xs text-accent/70 leading-relaxed">
           {alertsUnlocked
             ? 'Push notifications for active NOAA alerts near your saved locations (Android). Allow notifications when prompted. US locations only.'
-            : 'Upgrade to Pro or Lifetime for NOAA push alerts on Android. Browse hazard tabs on the free tier.'}
+            : 'Kīlauea volcano alerts are included. Some additional alert categories require extra resources and are limited to members only.'}
         </div>
       </Section>
 
@@ -294,7 +300,7 @@ export default function Settings({ onSignedOut }) {
         <Section title="Desktop version" testId="settings-desktop-section">
           <ExternalLinkRow
             icon={Monitor}
-            label="Open on desktop — Pro members"
+            label="Open on desktop — members"
             hint="weather.rootrecord.info — full experience in any desktop or laptop browser"
             href={CONTACT.desktopWeb}
             testId="settings-desktop-link"

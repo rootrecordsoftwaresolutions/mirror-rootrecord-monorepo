@@ -16,11 +16,7 @@ export default function Subscription() {
     setBusy(true);
     try {
       const data = await refreshEntitlement();
-      const label = data?.life_member
-        ? "Lifetime"
-        : data?.pro_unlocked
-        ? "Pro"
-        : "Free";
+      const label = data?.life_member || data?.pro_unlocked ? "Member" : "Free";
       show(`Plan refreshed: ${label}`, "success");
     } catch (err) {
       show(formatApiError(err), "error");
@@ -63,9 +59,9 @@ export default function Subscription() {
             <div className="flex-1 min-w-0">
               <p className="font-heading text-lg text-ink-primary">
                 {plan === "life"
-                  ? "Lifetime access"
+                  ? "Member access"
                   : plan === "pro"
-                  ? "Pro"
+                  ? "Member"
                   : "Free"}
               </p>
               <p className="text-xs text-ink-secondary">
@@ -109,8 +105,8 @@ export default function Subscription() {
         </Section>
 
         <p className="text-xs text-ink-tertiary px-2">
-          Upgrades purchased on the web or in another RootRecord app will be
-          reflected here after tapping refresh. Lifetime members never expire.
+          Membership changes made on the web or in another RootRecord app will be
+          reflected here after tapping refresh. Lifetime access never expires.
         </p>
       </PageContainer>
       <Toast message={toast.message} kind={toast.kind} onDone={clear} />

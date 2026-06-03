@@ -11,7 +11,7 @@ rem   cloudflare-update-pages.bat <name>         - deploy ONE Pages project
 rem
 rem Valid <name> values:
 rem   website                                    - Web\main (marketing)
-rem   weather  business  account  token  kilauea  farms - per-product web app
+rem   weather  business  account  token  kilauea  farms  visiting-hawaii - per-product web app
 
 cd /d "%~dp0"
 set "LOGFILE=%~dp0cloudflare-update-pages.log"
@@ -91,9 +91,19 @@ call pnpm run pages:deploy
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[7/7] Pages: rootrecord-root-farms-web (Web\apps\root-farms-web)"
+set "STEP=[7/8] Pages: rootrecord-root-farms-web (Web\apps\root-farms-web)"
 echo %STEP%
 pushd "Web\apps\root-farms-web"
+if errorlevel 1 goto FAIL
+call pnpm install
+if errorlevel 1 ( popd & goto FAIL )
+call pnpm run pages:deploy
+if errorlevel 1 ( popd & goto FAIL )
+popd
+
+set "STEP=[8/8] Pages: rootrecord-visiting-hawaii-web (Web\apps\visiting-hawaii-web)"
+echo %STEP%
+pushd "Web\apps\visiting-hawaii-web"
 if errorlevel 1 goto FAIL
 call pnpm install
 if errorlevel 1 ( popd & goto FAIL )
@@ -127,10 +137,12 @@ if /I "%ONLY%"=="account"  ( set "TARGET=Web\apps\account-hub-web"            & 
 if /I "%ONLY%"=="token"    ( set "TARGET=Web\apps\token-manager-web"          & set "PKG=pnpm" )
 if /I "%ONLY%"=="kilauea"  ( set "TARGET=Web\apps\kilauea-alerts-web"         & set "PKG=pnpm" )
 if /I "%ONLY%"=="farms"    ( set "TARGET=Web\apps\root-farms-web"             & set "PKG=pnpm" )
+if /I "%ONLY%"=="visiting-hawaii" ( set "TARGET=Web\apps\visiting-hawaii-web" & set "PKG=pnpm" )
+if /I "%ONLY%"=="visiting" ( set "TARGET=Web\apps\visiting-hawaii-web"         & set "PKG=pnpm" )
 
 if "%TARGET%"=="" (
   echo Unknown Pages project: %ONLY%
-  echo Valid: website weather business account token kilauea farms
+  echo Valid: website weather business account token kilauea farms visiting-hawaii
   pause
   endlocal
   exit /b 1

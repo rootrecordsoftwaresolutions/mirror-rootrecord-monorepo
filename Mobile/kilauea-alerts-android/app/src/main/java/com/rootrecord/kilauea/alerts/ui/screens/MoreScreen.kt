@@ -34,7 +34,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -53,6 +56,7 @@ import com.rootrecord.kilauea.alerts.ui.more.MoreViewModel
 
 private const val SimpleWeatherPackage = "com.rootrecord.weathermanager"
 private const val SimpleWeatherPlayUrl = "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager&pcampaignid=web_share"
+private const val VisitingHawaiiUrl = "https://rootrecord.info/visiting-hawaii.html"
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -230,7 +234,11 @@ fun MoreScreen(
             OutlinedTextField(
                 value = emailField,
                 onValueChange = { emailField = it; vm.clearLoginError() },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentType = if (createAccountMode) ContentType.NewUsername else ContentType.Username
+                    },
                 singleLine = true,
                 label = { Text("Email") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -239,7 +247,11 @@ fun MoreScreen(
             OutlinedTextField(
                 value = passwordField,
                 onValueChange = { passwordField = it; vm.clearLoginError() },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentType = if (createAccountMode) ContentType.NewPassword else ContentType.Password
+                    },
                 singleLine = true,
                 label = { Text("Password") },
                 visualTransformation = PasswordVisualTransformation(),
@@ -250,7 +262,9 @@ fun MoreScreen(
                 OutlinedTextField(
                     value = confirmPasswordField,
                     onValueChange = { confirmPasswordField = it; vm.clearLoginError() },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentType = ContentType.NewPassword },
                     singleLine = true,
                     label = { Text("Confirm password") },
                     visualTransformation = PasswordVisualTransformation(),
@@ -451,6 +465,23 @@ fun MoreScreen(
                         )
                     }
                     Text(msg.body, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Coming soon · Visiting Hawaiʻi", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Planning beyond the volcano? RootRecord is building an offline-first travel guide for all six visitor islands — local beaches, hikes, culture, food, and mālama ʻāina ratings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = { uriHandler.openUri(VisitingHawaiiUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Learn more & join waitlist")
                 }
             }
         }

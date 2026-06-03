@@ -1,8 +1,17 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { readUserAccountAccessFlags } from "./accounts";
-import { postKilaueaReportContent } from "./discord-kilauea-bot";
+import { buildKilaueaAnalysisDiscordBody, postKilaueaReportContent } from "./discord-kilauea-bot";
 import { json, NWS_USER_AGENT } from "./cors";
+import {
+  attachEarthquakeActivity,
+  eventsToLegacyRecords,
+  fetchHawaiiEarthquakeEvents,
+  formatEarthquakeActivitySection,
+  KILAUEA_EQ_COUNT_MIN_MAG,
+  slimEarthquakeContextForAi,
+  type EarthquakeActivitySummary,
+} from "./kilauea-earthquake-stats";
 import { sessionFromRequest } from "./primary-auth";
 import { tsunamiBulletins } from "./weather";
 
@@ -17,7 +26,7 @@ const HAWAII_BBOX = {
 
 const HANS_BASE = "https://volcanoes.usgs.gov/hans-public/api/volcano";
 const VNUM_KILAUEA = "332010";
-const EQ_CONTEXT_MIN_MAG = 2.5;
+const EQ_CONTEXT_MIN_MAG = KILAUEA_EQ_COUNT_MIN_MAG;
 const EQ_TRIGGER_MIN_MAG = 3.5;
 const REPORT_LIMIT = 20;
 const DISCORD_LIMIT = 1800;
@@ -85,6 +94,7 @@ type OfficialContext = {
   volcano: Record<string, unknown>;
   active_warning_advisories: Array<Record<string, unknown>>;
   hawaii_earthquakes: Array<Record<string, unknown>>;
+  earthquake_activity?: Record<string, unknown>;
   pacific_tsunami_bulletins: Record<string, unknown>;
   official_x_updates: Record<string, unknown>;
 };
@@ -135,6 +145,16 @@ function cleanDisplayText(raw: unknown, max = 700): string {
     .replace(/\s+/g, " ")
     .trim();
   return truncate(s, max);
+}
+
+function synopsisWithoutHeadlineForFallback(headline: string, synopsis: string): string {
+  if (!synopsis) return "";
+  const h = headline.toLowerCase();
+  let s = synopsis;
+  if (h && s.toLowerCase().startsWith(h)) {
+    s = s.slice(h.length).replace(/^[\s:—-]+/, "").trim();
+  }
+  return s || synopsis;
 }
 
 function recordArray(raw: unknown): Array<Record<string, unknown>> {
@@ -195,33 +215,24 @@ async function fetchWarningAdvisories(): Promise<Array<Record<string, unknown>>>
 }
 
 async function fetchHawaiiEarthquakes(minMag: number): Promise<Array<Record<string, unknown>>> {
-  const u = new URL("https://earthquake.usgs.gov/fdsnws/event/1/query");
-  u.searchParams.set("format", "geojson");
-  u.searchParams.set("orderby", "time");
-  u.searchParams.set("limit", "80");
-  u.searchParams.set("minmagnitude", String(minMag));
-  u.searchParams.set("starttime", new Date(Date.now() - 14 * 86400 * 1000).toISOString());
-  for (const [k, v] of Object.entries(HAWAII_BBOX)) u.searchParams.set(k, String(v));
-  const data = await fetchJson(u.toString()).catch(() => ({ features: [] }));
-  const features = Array.isArray(data.features) ? (data.features as Array<Record<string, unknown>>) : [];
-  return features.map((f) => {
-    const p = (f.properties as Record<string, unknown>) || {};
-    const coords = ((f.geometry as Record<string, unknown>) || {}).coordinates as number[] | undefined;
-    return {
-      id: str(f.id),
-      magnitude: num(p.mag),
-      place: str(p.place),
-      time: p.time || null,
-      time_iso: isoFromMs(p.time),
-      updated: p.updated || null,
-      url: str(p.url),
-      tsunami: Boolean(p.tsunami),
-      alert: p.alert || null,
-      depth_km: coords && coords.length > 2 ? coords[2] : null,
-      lat: coords?.[1] ?? null,
-      lon: coords?.[0] ?? null,
-    };
-  });
+  const result = await fetchHawaiiEarthquakeEvents(minMag);
+  return eventsToLegacyRecords(result.events);
+}
+
+async function fetchHawaiiEarthquakeBundle(minMag: number): Promise<{
+  earthquakes: Array<Record<string, unknown>>;
+  source: Record<string, unknown>;
+}> {
+  const result = await fetchHawaiiEarthquakeEvents(minMag);
+  return {
+    earthquakes: eventsToLegacyRecords(result.events),
+    source: {
+      ok: result.ok,
+      url: result.url,
+      count: result.events.length,
+      error: result.error || null,
+    },
+  };
 }
 
 async function fetchOfficialXUpdates(env: Pick<AiEnv, "GROK_X_BEARER_TOKEN">): Promise<Record<string, unknown>> {
@@ -340,6 +351,8 @@ async function buildTriggers(ctx: Omit<OfficialContext, "trigger" | "previous_re
   for (const q of ctx.hawaii_earthquakes) {
     const mag = num(q.magnitude);
     if (mag == null || mag < EQ_TRIGGER_MIN_MAG) continue;
+    const when = Date.parse(String(q.time_iso || q.time || ""));
+    if (!Number.isFinite(when) || when < Date.now() - 14 * 86400000) continue;
     out.push({
       source_type: "earthquake",
       source_id: str(q.id) || await sha256Short(jsonForArchive(q)),
@@ -403,8 +416,8 @@ function parseAiJson(content: string): { free_text: string; pro_text: string } {
   const candidate = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
   const obj = JSON.parse(candidate) as Record<string, unknown>;
   return {
-    free_text: publicReportText(str(obj.free_text), 1400),
-    pro_text: publicReportText(str(obj.pro_text), 2400),
+    free_text: publicReportText(str(obj.free_text), 6000),
+    pro_text: publicReportText(str(obj.pro_text), 14000),
   };
 }
 
@@ -440,41 +453,57 @@ function fallbackAnalysis(ctx: OfficialContext, detail: string): Record<string, 
   const tsunami = recordArray(ctx.pacific_tsunami_bulletins.bulletins).length
     ? `${recordArray(ctx.pacific_tsunami_bulletins.bulletins).length} tsunami-flagged significant earthquake item(s) were returned in the Pacific context.`
     : "No tsunami-flagged significant earthquake item was returned in the Pacific context.";
-  const xUpdates = recordArray((ctx.official_x_updates as Record<string, unknown> | undefined)?.posts).slice(0, 4);
-  const volcanoNote = cleanDisplayText(
-    (ctx.volcano.newest as Record<string, unknown> | undefined)?.noticeSynopsis ||
-      (ctx.volcano.newest as Record<string, unknown> | undefined)?.Synopsis ||
-      (ctx.volcano.newest as Record<string, unknown> | undefined)?.summary ||
-      "",
-    420,
+  const xUpdates = recordArray((ctx.official_x_updates as Record<string, unknown> | undefined)?.posts).slice(0, 6);
+  const volcanoNote = synopsisWithoutHeadlineForFallback(
+    cleanDisplayText(
+      (ctx.volcano.newest as Record<string, unknown> | undefined)?.noticeTitle ||
+        (ctx.volcano.newest as Record<string, unknown> | undefined)?.Subject ||
+        "",
+      200,
+    ),
+    cleanDisplayText(
+      (ctx.volcano.newest as Record<string, unknown> | undefined)?.noticeSynopsis ||
+        (ctx.volcano.newest as Record<string, unknown> | undefined)?.Synopsis ||
+        (ctx.volcano.newest as Record<string, unknown> | undefined)?.summary ||
+        "",
+      1400,
+    ),
   );
 
   const free = [
-    "AI-assisted summary, not an official USGS/HVO/NWS release.",
+    "AI-assisted brief; not an official USGS/HVO/NWS release.",
     previousLine,
     trigger.source_type === "earthquake"
-      ? `USGS/HVO earthquake trigger: M${mag != null ? mag.toFixed(1) : "?"} near ${place}${triggerTime ? ` at ${triggerTime}` : ""}${depth != null ? `, depth ${depth.toFixed(1)} km` : ""}.`
+      ? `Trigger: M${mag != null ? mag.toFixed(1) : "?"} near ${place}${triggerTime ? ` (${triggerTime})` : ""}.`
       : `Trigger: ${trigger.headline}.`,
-    warnings,
-  ].join(" ");
-
-  const pro = [
-    "What changed: the latest trigger is now part of the report history and should be compared against the prior app report before treating the situation as unchanged.",
-    trigger.source_type === "earthquake"
-      ? `${tsunamiFlag} A Kona-side earthquake can be significant for shaking and aftershock context without implying a direct Kīlauea eruption change; compare it with HVO notes before connecting it to volcanic activity.`
-      : "Volcano, NWS, earthquake, and tsunami context should be read together before assigning concern level.",
-    top ? `Largest Hawaiʻi-region event in the current pull: ${relatedQuakes}.` : "No parsed Hawaiʻi-region earthquake rows were available in the current pull.",
-    volcanoNote ? `Latest HVO note excerpt: ${volcanoNote}` : "HVO volcano context was requested; use the linked official source as the record of authority.",
-    xUpdates.length ? `Official X updates included in context: ${xUpdates.map((p) => `${str(p.account)} ${cleanDisplayText(p.text, 160)}`).join("; ")}` : "No recent official X posts were included in this context.",
-    tsunami,
+    volcanoNote ? `Volcano: ${volcanoNote}` : "",
+    warnings.includes("No active") ? "" : warnings,
   ].filter(Boolean).join(" ");
+
+  const proParts = [
+    ctx.earthquake_activity
+      ? formatEarthquakeActivitySection(ctx.earthquake_activity as EarthquakeActivitySummary)
+      : top
+        ? `**Seismic context:** ${relatedQuakes}.`
+        : "",
+    tsunami.includes("No tsunami") ? "" : tsunami,
+  ].filter(Boolean);
+  const socialBlock = xUpdates.length
+    ? [
+        "**Official social**",
+        ...xUpdates.map((p) => {
+          const text = cleanDisplayText(p.text, 500);
+          return text ? `• ${str(p.account) || "Official"}: ${text}` : "";
+        }).filter(Boolean),
+      ].join("\n")
+    : "";
 
   return {
     ok: false,
     fallback_report: true,
     detail,
-    free_text: publicReportText(free, 1400),
-    pro_text: publicReportText(pro, 2400),
+    free_text: publicReportText(free, 4000),
+    pro_text: publicReportText([...proParts, socialBlock].filter(Boolean).join("\n\n"), 16000),
   };
 }
 
@@ -519,14 +548,15 @@ async function callGrok(env: AiEnv, ctx: OfficialContext): Promise<Record<string
       {
         role: "system",
         content:
-          "You write Kīlauea Alerts AI analysis for a public safety-adjacent app. Use only provided official-source data. " +
-          "Compare the new trigger to the previous report when present. Be calm, specific, and cite USGS, NWS, HVO, PTWC, or USGS earthquake data by name. " +
-          "Use official X.com posts only as supplemental public updates from named agency accounts; agency pages and feeds remain the source of authority. " +
-          "Do not give evacuation, medical, legal, or emergency instructions beyond telling users to follow official agencies. " +
-          "Never mention Grok, xAI, model names, API keys, configuration, archive/debug status, or provider errors in public report text. " +
-          "Return JSON only: {\"free_text\":\"short public preview, <=700 chars\",\"pro_text\":\"deeper comparison, context, watch items, <=1500 chars\"}.",
+          "You write Kīlauea Alerts hazard briefs for a public safety-adjacent app. Synthesize all provided official feeds into one professional situation report. " +
+          "Do NOT repeat the same HVO/USGS notice text in multiple fields. State alert level and aviation color once, summarize volcano activity briefly (no weather in activity), then use earthquake_activity: recent rolling windows for current seismic context; counts are M1.0+ USGS events in the Hawaiʻi region — include the count requirements description under seismic headers. Calendar year totals are historical only. " +
+          "Do not cite prior-calendar-year events as current activity. Skip empty official social posts. " +
+          "Compare to previous_report in one sentence when present. Be calm and specific; cite agencies by name. " +
+          "Do not give evacuation, medical, legal, or emergency instructions beyond directing users to official agencies. " +
+          "Never mention Grok, xAI, model names, API keys, or provider errors in public text. " +
+          'Return JSON only: {"free_text":"public brief, no repetition","pro_text":"seismic windows, watch items, official social — details not repeated from free_text"}',
       },
-      { role: "user", content: jsonForArchive(ctx) },
+      { role: "user", content: jsonForArchive(slimEarthquakeContextForAi(ctx as unknown as Record<string, unknown>)) },
     ],
     temperature: 0.2,
   };
@@ -610,17 +640,20 @@ async function insertReport(
   return row || null;
 }
 
+function officialPostsFromPromptJson(raw: string | null | undefined): Array<Record<string, unknown>> {
+  try {
+    const prompt = JSON.parse(String(raw || "{}")) as Record<string, unknown>;
+    const officialX = (prompt.official_x_updates as Record<string, unknown> | undefined) || {};
+    return recordArray(officialX.posts);
+  } catch {
+    return [];
+  }
+}
+
 async function postReportToDiscord(env: AiEnv, row: AnalysisRow): Promise<void> {
   if (row.discord_posted_at) return;
-  const content = [
-    `**Kīlauea AI Analysis** — ${row.headline || row.event || row.source_type}`,
-    publicReportText(row.free_text, 1400),
-    publicReportText(row.pro_text, 2400),
-    row.url ? `Source: ${row.url}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
+  const officialPosts = officialPostsFromPromptJson(row.prompt_json);
+  const content = buildKilaueaAnalysisDiscordBody(row, { officialPosts });
   const posted = await postKilaueaReportContent(env, content);
   if (posted) {
     await env.DB.prepare(`UPDATE kilauea_ai_analyses SET discord_posted_at = ? WHERE id = ?`)
@@ -659,11 +692,12 @@ async function archiveRawAiDataToDiscord(env: AiEnv, row: AnalysisRow): Promise<
 }
 
 export async function runKilaueaAiAnalysisCron(env: AiEnv): Promise<void> {
+  const eqBundle = await fetchHawaiiEarthquakeBundle(EQ_CONTEXT_MIN_MAG);
   const baseContext = {
     generated_at: new Date().toISOString(),
     volcano: await fetchVolcanoContext(),
     active_warning_advisories: await fetchWarningAdvisories(),
-    hawaii_earthquakes: await fetchHawaiiEarthquakes(EQ_CONTEXT_MIN_MAG),
+    hawaii_earthquakes: eqBundle.earthquakes,
     pacific_tsunami_bulletins: await tsunamiBulletins().catch((e) => ({ available: false, error: String(e), bulletins: [] })),
     official_x_updates: await fetchOfficialXUpdates(env),
   };
@@ -676,6 +710,7 @@ export async function runKilaueaAiAnalysisCron(env: AiEnv): Promise<void> {
       trigger,
       previous_report: previousReportForPrompt(prior),
     };
+    ctx.earthquake_activity = attachEarthquakeActivity(ctx as unknown as Record<string, unknown>, prior?.created_at ?? null);
     const ai = await callGrok(env, ctx);
     const row = await insertReport(env, trigger, prior, ctx, ai);
     if (row) {
@@ -693,11 +728,12 @@ export async function runKilaueaAiManualReport(
   const ymd = now.toISOString().slice(0, 10);
   const requester = requestedByDiscordId.replace(/[^0-9]/g, "").slice(0, 32) || "unknown";
   const manualRunId = crypto.randomUUID();
+  const eqBundle = await fetchHawaiiEarthquakeBundle(EQ_CONTEXT_MIN_MAG);
   const baseContext = {
     generated_at: now.toISOString(),
     volcano: await fetchVolcanoContext(),
     active_warning_advisories: await fetchWarningAdvisories(),
-    hawaii_earthquakes: await fetchHawaiiEarthquakes(EQ_CONTEXT_MIN_MAG),
+    hawaii_earthquakes: eqBundle.earthquakes,
     pacific_tsunami_bulletins: await tsunamiBulletins().catch((e) => ({ available: false, error: String(e), bulletins: [] })),
     official_x_updates: await fetchOfficialXUpdates(env),
   };
@@ -720,6 +756,7 @@ export async function runKilaueaAiManualReport(
     trigger,
     previous_report: previousReportForPrompt(prior),
   };
+  ctx.earthquake_activity = attachEarthquakeActivity(ctx as unknown as Record<string, unknown>, prior?.created_at ?? null);
   const ai = await callGrok(env, ctx);
   const row = await insertReport(env, trigger, prior, ctx, ai);
   if (row) {
@@ -795,25 +832,66 @@ export async function handleKilaueaAiAnalysesGet(request: Request, env: AiEnv): 
   if (pro instanceof Response) return pro;
   const url = new URL(request.url);
   const limit = Math.min(REPORT_LIMIT, Math.max(1, Math.floor(Number(url.searchParams.get("limit") || "10"))));
-  const { results } = await env.DB.prepare(`SELECT * FROM kilauea_ai_analyses ORDER BY created_at DESC LIMIT ?`)
-    .bind(limit)
+  const page = Math.max(1, Math.floor(Number(url.searchParams.get("page") || "1")));
+  const skipFirst = url.searchParams.get("skip_first") === "1";
+  const offset = skipFirst ? 1 + (page - 1) * limit : (page - 1) * limit;
+  const fullText = url.searchParams.get("full") === "1" || (limit === 1 && page === 1 && !skipFirst);
+  const freeMax = fullText ? 8000 : 1400;
+  const proMax = fullText ? 8000 : 2400;
+
+  const totalRow = await env.DB.prepare(`SELECT COUNT(*) AS total FROM kilauea_ai_analyses`)
+    .first<{ total: number }>()
+    .catch(() => null);
+  const total = Number(totalRow?.total || 0);
+  const listTotal = skipFirst ? Math.max(0, total - 1) : total;
+  const totalPages = listTotal > 0 ? Math.ceil(listTotal / limit) : 1;
+
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM kilauea_ai_analyses ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+  )
+    .bind(limit, offset)
     .all<AnalysisRow>();
-  const reports = (results || []).map((r) => ({
-    id: r.id,
-    source_type: r.source_type,
-    source_id: r.source_id,
-    source_time: r.source_time,
-    severity: r.severity,
-    event: r.event,
-    magnitude: r.magnitude,
-    headline: r.headline,
-    url: r.url,
-    free_text: publicReportText(r.free_text, 1400),
-    pro_text: pro ? publicReportText(r.pro_text, 2400) : null,
-    pro_locked: !pro,
-    prior_report_id: r.prior_report_id,
-    previous_summary: r.prior_report_id ? "Compared with the previous Kīlauea AI report." : null,
-    created_at: r.created_at,
-  }));
-  return json({ reports, pro_unlocked: pro }, 200);
+
+  const reports = (results || []).map((r) => {
+    const free = publicReportText(r.free_text, freeMax);
+    const proBody = pro ? publicReportText(r.pro_text, proMax) : null;
+    const combined = [free, proBody].filter(Boolean).join("\n\n").trim();
+    return {
+      id: r.id,
+      source_type: r.source_type,
+      source_id: r.source_id,
+      source_time: r.source_time,
+      severity: r.severity,
+      event: r.event,
+      magnitude: r.magnitude,
+      headline: r.headline,
+      url: r.url,
+      free_text: free,
+      pro_text: proBody,
+      body: combined,
+      summary: publicReportText(combined || r.headline || r.event || "", fullText ? 8000 : 480),
+      pro_locked: !pro,
+      prior_report_id: r.prior_report_id,
+      previous_summary: r.prior_report_id ? "Compared with the previous Kīlauea AI report." : null,
+      created_at: r.created_at,
+      discord_posted_at: r.discord_posted_at,
+    };
+  });
+
+  return json(
+    {
+      reports,
+      pro_unlocked: pro,
+      page,
+      limit,
+      offset,
+      skip_first: skipFirst,
+      total,
+      list_total: listTotal,
+      total_pages: totalPages,
+      has_prev: page > 1,
+      has_next: page < totalPages,
+    },
+    200,
+  );
 }

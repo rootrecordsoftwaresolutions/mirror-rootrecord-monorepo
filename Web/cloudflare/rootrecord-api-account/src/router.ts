@@ -6,7 +6,13 @@ import { resolveUserId } from "./auth";
 
 import { authLogin, authMe, authSignup, extractAuthToken, sessionFromRequest } from "./primary-auth";
 import { buildSessionCookieHeader, ssoCookieDomainForApiHost } from "./web-sso";
-import { buildSessionInsertMeta, handleAuthLogout, handleAuthLogoutAll, handleMeAccountRoutes } from "./me-account-routes";
+import {
+  buildSessionInsertMeta,
+  handleAuthLogout,
+  handleAuthLogoutAll,
+  handleMeAccountRoutes,
+  requireRecentAccountVerification,
+} from "./me-account-routes";
 
 import { createStripeSubscriptionCheckout } from "./billing-stripe";
 
@@ -20,8 +26,11 @@ import { handleMeProfilePatch, handleRootEconomyRoutes } from "./root-economy";
 import { runRootEconomyDiscordCron, runRootEconomyDiscordFullBoard } from "./discord-root-economy-cron";
 import { handleBusinessRoutes, handleBusinessAuthEntitlement, bmWipeOwnedRows } from "./business-mobile";
 import { handleFeedbackRoute } from "./feedback-route";
+import { handlePartnershipSignupRoute } from "./partnership-signup";
+import { handleVisitingHawaiiSponsoredRoutes } from "./visiting-hawaii-sponsored-routes";
 import { performAccountDeletion } from "./account-deletion";
 import { handleRewardsLedgerV1 } from "./earn-rewards-ledger";
+import { handleEmailMarketingPrefsRoute } from "./email-marketing-prefs";
 import {
   handleCustodialInternalBackfillRoute,
   handleCustodialSolWalletV1,
@@ -59,12 +68,19 @@ import { discordLinkCallback, discordLinkStart, discordUnlink } from "./discord-
 import { handleDiscordInteractions } from "./discord-root-units";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
-import { handleTreasuryAccountProvisionRoute } from "./treasury-account";
+import { handleSweepAllCustodialAssetsToTreasuryRoute } from "./custodial-sweep";
+import { handleRootBalanceResetRoute, handleTreasuryAccountProvisionRoute } from "./treasury-account";
+import { handleRootsCustodialDepositsRoute } from "./roots-custodial-deposits";
+import { handleRootsSolSwapV1 } from "./roots-sol-swap";
+import { handleRootsTransactionsV1 } from "./roots-transactions";
+import { handleRootsOnchainBuyMonitorRoute } from "./roots-onchain-buy-monitor";
 
 // Weather/forecast/natural-disaster modules removed from this shard.
 // Live only on rootrecord-api-weather + rootrecord-api-kilauea (see ./weather.ts there).
 
 import { lifeMemberFromLicenseData, upsertUserAccountFromLicense } from "./accounts";
+import { sendEmailVerificationChallenge } from "./account-security";
+import { handleFirstTimeWelcomeBackfillRoute, sendWelcomeEmail } from "./welcome-email";
 
 export interface Env {
 
@@ -97,6 +113,9 @@ export interface Env {
 
   STRIPE_PRICE_ID?: string;
 
+  /** Annual Price id for Visiting Hawaiʻi sponsored listings (`price_…`, $100/year). */
+  STRIPE_VISITING_HAWAII_SPONSORED_PRICE_ID?: string;
+
 
   /**
    * Internal custodial wallet encryption key (AES-256-GCM).
@@ -119,8 +138,14 @@ export interface Env {
   /** Discord bot token (read-only) for announcements channel → D1 `developer_messages` (cron on this Worker). */
   DISCORD_BOT_TOKEN?: string;
 
+  /** Discord channel for partnership signup + Grok report posts. */
+  DISCORD_PARTNERSHIP_REPORT_CHANNEL_ID?: string;
+
   /** Discord announcements channel id (`[vars]`). Bot: View Channel + Read Message History + Message Content intent. */
   DISCORD_ANNOUNCEMENTS_CHANNEL_ID?: string;
+
+  /** Discord channel id for on-chain ROOTS BUY notifications. */
+  DISCORD_ROOTS_BUY_CHANNEL_ID?: string;
 
   /** Discord application public key (hex) for `POST /v1/discord/interactions` signature verify. */
   DISCORD_PUBLIC_KEY?: string;
@@ -130,6 +155,17 @@ export interface Env {
 
   /** Primary guild id (`[vars]`). Used by `/send role` (member list) and account link. */
   DISCORD_GUILD_ID?: string;
+  DISCORD_VERIFIED_ROLE_ID?: string;
+  DISCORD_DEVELOPER_ROLE_ID?: string;
+  DISCORD_LIFETIME_MEMBER_ROLE_ID?: string;
+  DISCORD_MONTHLY_MEMBER_ROLE_ID?: string;
+  ROOTRECORD_API_KILAUEA_URL?: string;
+
+  /** X/Grok API credentials for partnership prospect analysis. */
+  GROK_API_BEARER_TOKEN?: string;
+  GROK_X_BEARER_TOKEN?: string;
+  GROK_API_URL?: string;
+  GROK_MODEL?: string;
 
   /** Lookback days for `/send active` vs `discord_user_activity.last_message_at` (default 14, max 90). */
   DISCORD_ACTIVE_LOOKBACK_DAYS?: string;
@@ -492,6 +528,20 @@ export async function handleRequest(
         licenseDeviceId(creds, request),
       );
 
+      const signupAid = String(data.account_id || "").trim();
+      const signupEmail = String(data.email || creds.email || "").trim().toLowerCase();
+      if (signupAid && signupEmail) {
+        const verify = sendEmailVerificationChallenge(env, signupAid, signupEmail, meta).catch(() => false);
+        const welcome = sendWelcomeEmail(env, signupAid, signupEmail).catch(() => false);
+        if (ctx) {
+          ctx.waitUntil(verify);
+          ctx.waitUntil(welcome);
+        } else {
+          await verify;
+          await welcome;
+        }
+      }
+
       const v1SignupTok = (data.access_token || data.token) as string | undefined;
       return json(data, 200, undefined, webSsoSetCookie(request, v1SignupTok));
 
@@ -595,6 +645,9 @@ export async function handleRequest(
       const email = sess.email.toLowerCase();
       const accountId = sess.accountId;
 
+      const recent = await requireRecentAccountVerification(env.DB, accountId);
+      if (recent) return recent;
+
       const del = await performAccountDeletion(env, accountId, email);
       if (!del.ok) {
         return json({ detail: del.detail, ok: false }, del.status);
@@ -694,6 +747,8 @@ export async function handleRequest(
     if (method === "DELETE" && pathname === "/v1/discord/link") {
       const sess = await sessionFromRequest(env, request);
       if (!sess) return json({ detail: "Unauthorized" }, 401);
+      const recent = await requireRecentAccountVerification(env.DB, sess.accountId);
+      if (recent) return recent;
       return discordUnlink({ env, accountId: sess.accountId });
     }
 
@@ -727,6 +782,11 @@ export async function handleRequest(
     if (method === "PATCH" && pathname === "/v1/me/profile") {
       return handleMeProfilePatch(request, env);
     }
+
+    const directMeAccountRes = await handleMeAccountRoutes(request, env, pathname, method);
+    if (directMeAccountRes) return directMeAccountRes;
+    const directEmailPrefsRes = await handleEmailMarketingPrefsRoute(request, env, pathname, method);
+    if (directEmailPrefsRes) return directEmailPrefsRes;
 
     return json({ ok: false, error: "not_found" }, 404);
 
@@ -780,6 +840,12 @@ export async function handleRequest(
     return handleRootsMintBalanceV1(request, env, method);
   }
 
+  const rootsSolSwapApiRes = await handleRootsSolSwapV1(request, env, sub, method);
+  if (rootsSolSwapApiRes) return rootsSolSwapApiRes;
+
+  const rootsTransactionsRes = await handleRootsTransactionsV1(request, env, sub, method);
+  if (rootsTransactionsRes) return rootsTransactionsRes;
+
   if (sub === "/v1/me/custodial-sol-wallet" || sub.startsWith("/v1/me/custodial-sol-wallet/")) {
     return handleCustodialSolWalletV1(request, env, method, sub);
   }
@@ -812,6 +878,9 @@ export async function handleRequest(
   if (sub === "/v1/me/rewards-ledger") {
     return handleRewardsLedgerV1(request, env, method);
   }
+
+  const emailPrefsRes = await handleEmailMarketingPrefsRoute(request, env, sub, method);
+  if (emailPrefsRes) return emailPrefsRes;
 
   if (method === "GET" && (pathname === "/api" || pathname === "/api/")) {
 
@@ -908,6 +977,9 @@ export async function handleRequest(
     return json(result, result.ok ? 200 : 503);
   }
 
+  const rootsBuyMonitor = await handleRootsOnchainBuyMonitorRoute(request, env, sub, method);
+  if (rootsBuyMonitor) return rootsBuyMonitor;
+
   if (method === "POST" && sub === "/auth/login") {
 
     let creds: { email?: string; password?: string; device_id?: string };
@@ -979,6 +1051,13 @@ export async function handleRequest(
     }
 
     scheduleAuthLoginDiscordSessionNotify(ctx, env, request, creds as Record<string, unknown>, data, deviceId);
+
+    const signupAid = String(data.account_id || "").trim();
+    if (signupAid && emailOut) {
+      const p = sendEmailVerificationChallenge(env, signupAid, emailOut, meta).catch(() => false);
+      if (ctx) ctx.waitUntil(p);
+      else await p;
+    }
 
     return json(
 
@@ -1086,6 +1165,19 @@ export async function handleRequest(
 
     scheduleAuthLoginDiscordSessionNotify(ctx, env, request, creds as Record<string, unknown>, data, deviceId);
 
+    const signupAid = String(data.account_id || "").trim();
+    if (signupAid && emailOut) {
+      const verify = sendEmailVerificationChallenge(env, signupAid, emailOut, meta).catch(() => false);
+      const welcome = sendWelcomeEmail(env, signupAid, emailOut).catch(() => false);
+      if (ctx) {
+        ctx.waitUntil(verify);
+        ctx.waitUntil(welcome);
+      } else {
+        await verify;
+        await welcome;
+      }
+    }
+
     return json(
 
       {
@@ -1184,6 +1276,14 @@ export async function handleRequest(
         pro_unlocked: proMe,
 
         life_member: Boolean(data.life_member || data.lifeMember),
+        discord_linked: Boolean(data.discord_linked),
+        email_verified: Boolean(data.email_verified),
+        email_verified_at: data.email_verified_at || null,
+        verified_by_email: Boolean(data.verified_by_email),
+        verified_by_discord: Boolean(data.verified_by_discord),
+        account_verified: Boolean(data.account_verified),
+        last_challenge_verified_at: data.last_challenge_verified_at || null,
+        last_challenge_method: data.last_challenge_method || null,
 
         subscription_status: String(data.subscription_status || "none"),
 
@@ -1229,6 +1329,18 @@ export async function handleRequest(
   const treasuryAccountProvisionRes = await handleTreasuryAccountProvisionRoute(request, env, sub, method);
 
   if (treasuryAccountProvisionRes) return treasuryAccountProvisionRes;
+
+  const sweepAllCustodialAssetsRes = await handleSweepAllCustodialAssetsToTreasuryRoute(request, env, sub, method);
+
+  if (sweepAllCustodialAssetsRes) return sweepAllCustodialAssetsRes;
+
+  const rootBalanceResetRes = await handleRootBalanceResetRoute(request, env, sub, method);
+
+  if (rootBalanceResetRes) return rootBalanceResetRes;
+
+  const rootsCustodialDepositsRes = await handleRootsCustodialDepositsRoute(request, env, sub, method);
+
+  if (rootsCustodialDepositsRes) return rootsCustodialDepositsRes;
 
   const rrttCronRes = await handleRunRrttCustodialCronRoute(request, env, sub, method);
 
@@ -1294,6 +1406,14 @@ export async function handleRequest(
 
   if (feedbackRes) return feedbackRes;
 
+  const partnershipSignupRes = await handlePartnershipSignupRoute(request, env, sub, method);
+
+  if (partnershipSignupRes) return partnershipSignupRes;
+
+  const visitingHawaiiSponsoredRes = await handleVisitingHawaiiSponsoredRoutes(request, env, sub, method);
+
+  if (visitingHawaiiSponsoredRes) return visitingHawaiiSponsoredRes;
+
   const businessRes = await handleBusinessRoutes(request, env, sub, method);
 
   if (businessRes) return businessRes;
@@ -1323,6 +1443,19 @@ export async function handleRequest(
     const lim = Math.min(200, Math.max(1, Math.floor(num(q, "limit") ?? 50)));
     const events = await readRecentHttpErrorEvents(env.DB, lim);
     return json({ ok: true, events, limit: lim }, 200);
+  }
+
+  if (method === "POST" && sub === "/internal/send-first-time-welcome-emails") {
+    const secret = (env.RR_PUSH_ADMIN_SECRET || "").trim();
+    if (!secret) {
+      return json({ detail: "RR_PUSH_ADMIN_SECRET is not set on this Worker." }, 503);
+    }
+    const adminOk = await verifyWorkerOpsAdmin(request, env);
+    if (!adminOk) {
+      const has = Boolean(request.headers.get("X-RR-Push-Admin-Key"));
+      return json({ detail: has ? "Invalid admin key." : "Missing X-RR-Push-Admin-Key header." }, 401);
+    }
+    return handleFirstTimeWelcomeBackfillRoute(request, env);
   }
 
   if (method === "GET" && sub === "/internal/withdrawal-settlement/summary") {

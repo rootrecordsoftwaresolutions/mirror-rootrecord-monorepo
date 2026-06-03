@@ -229,7 +229,7 @@
 
     foot.innerHTML =
 
-      '<a href="/charts/root-economy/">Top holders</a> · <a href="/beta-tester-rewards.html">Your Roots</a>';
+      '<a href="/charts/root-economy/">Top holders</a> · <a href="/root-units">Your Roots</a>';
 
     body.appendChild(foot);
 

@@ -75,7 +75,7 @@ export async function handlePushRoutes(
   if (method === "POST" && sub === "/me/push-token") {
     const user = await resolveUserId(request, env);
     if (user instanceof Response) return user;
-    let body: { token?: string; platform?: string };
+    let body: { token?: string; platform?: string; app_id?: string };
     try {
       body = (await request.json()) as typeof body;
     } catch {
@@ -87,13 +87,17 @@ export async function handlePushRoutes(
       .trim()
       .toLowerCase()
       .slice(0, 32);
+    const appId = String(body.app_id || request.headers.get("X-RR-App-Id") || "")
+      .trim()
+      .toLowerCase()
+      .slice(0, 80);
     const updatedAt = new Date().toISOString();
     await env.DB.prepare(
-      `INSERT INTO rrwm_push_tokens (token, user_id, platform, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, platform = excluded.platform, updated_at = excluded.updated_at`
+      `INSERT INTO rrwm_push_tokens (token, user_id, platform, updated_at, app_id)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, platform = excluded.platform, updated_at = excluded.updated_at, app_id = excluded.app_id`
     )
-      .bind(tok, user, plat || "android", updatedAt)
+      .bind(tok, user, plat || "android", updatedAt, appId || null)
       .run();
     return json({ ok: true }, 200);
   }

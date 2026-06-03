@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { ROOT_CLUSTER_COUNT, rootClusterName, rootClusterRange } from "../game/catalog";
 import { formatRu } from "../game/format";
 import type { FarmsStoreData } from "../game/storeCatalog";
 import type { MembershipBonus, MembershipBonusTree, OrchardAppBonus } from "../lib/farmsApi";
-import { fetchRootsMintStatus, type RootsMintStatus } from "../lib/rootsMintApi";
+import { fetchRootsMintStatus, quoteSolToRoots, swapSolToRoots, type RootsMintStatus, type RootsSolSwapQuote } from "../lib/rootsMintApi";
 import { AccountBalanceHud } from "./AccountBalanceHud";
 
 type Props = {
@@ -89,6 +90,37 @@ export function OrchardsScreen({ orchardAppBonus, membershipBonus, store, rootLe
   const [treasuryStatus, setTreasuryStatus] = useState<RootsMintStatus | null>(null);
   const [treasuryNote, setTreasuryNote] = useState("");
   const [treasuryBusy, setTreasuryBusy] = useState(false);
+  const [treasuryQr, setTreasuryQr] = useState("");
+  const [treasuryCopyNote, setTreasuryCopyNote] = useState("");
+  const [swapSolAmount, setSwapSolAmount] = useState("0.01");
+  const [swapQuote, setSwapQuote] = useState<RootsSolSwapQuote | null>(null);
+  const [swapBusy, setSwapBusy] = useState(false);
+  const [swapNote, setSwapNote] = useState("");
+
+  const treasuryWallet = treasuryStatus?.custodial_wallet || "";
+
+  useEffect(() => {
+    let cancelled = false;
+    setTreasuryQr("");
+    if (!treasuryWallet) return;
+    QRCode.toDataURL(treasuryWallet, {
+      margin: 1,
+      width: 196,
+      color: {
+        dark: "#06130d",
+        light: "#f2fff4",
+      },
+    })
+      .then((url) => {
+        if (!cancelled) setTreasuryQr(url);
+      })
+      .catch(() => {
+        if (!cancelled) setTreasuryQr("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [treasuryWallet]);
 
   const openTreasuryTree = async () => {
     setTreasuryOpen((open) => !open);
@@ -104,6 +136,52 @@ export function OrchardsScreen({ orchardAppBonus, membershipBonus, store, rootLe
       }
     } finally {
       setTreasuryBusy(false);
+    }
+  };
+
+  const copyTreasuryWallet = async () => {
+    if (!treasuryWallet) return;
+    try {
+      await navigator.clipboard.writeText(treasuryWallet);
+      setTreasuryCopyNote("Copied wallet address.");
+    } catch {
+      setTreasuryCopyNote("Copy failed. Long-press the address to copy it.");
+    }
+  };
+
+  const quoteSwap = async () => {
+    const amount = Number(swapSolAmount);
+    setSwapBusy(true);
+    setSwapNote("");
+    try {
+      const quote = await quoteSolToRoots(amount);
+      setSwapQuote(quote);
+      if (!quote.ok) setSwapNote(quote.detail);
+    } finally {
+      setSwapBusy(false);
+    }
+  };
+
+  const buyInternalRoots = async () => {
+    const amount = Number(swapSolAmount);
+    setSwapBusy(true);
+    setSwapNote("");
+    try {
+      const result = await swapSolToRoots(amount);
+      if (!result.ok) {
+        setSwapNote(result.detail);
+        return;
+      }
+      const status = await fetchRootsMintStatus();
+      if (status.ok) setTreasuryStatus(status);
+      setSwapQuote(null);
+      setSwapNote(
+        result.internal_credit_status === "credited"
+          ? "Purchase complete. SOL moved to treasury and ROOTS were credited internally."
+          : "Swap confirmed. Internal credit is pending and the deposit processor will retry automatically.",
+      );
+    } finally {
+      setSwapBusy(false);
     }
   };
 
@@ -163,10 +241,35 @@ export function OrchardsScreen({ orchardAppBonus, membershipBonus, store, rootLe
         </button>
         {treasuryOpen ? (
           <div className="treasury-tree-detail">
+            {treasuryWallet ? (
+              <div className="treasury-deposit-card">
+                <div className="treasury-qr-card">
+                  {treasuryQr ? (
+                    <img src={treasuryQr} alt="Custodial wallet QR code" />
+                  ) : (
+                    <span className="treasury-qr-placeholder">QR loading</span>
+                  )}
+                </div>
+                <div className="treasury-deposit-copy">
+                  <span className="treasury-label">Public deposit address</span>
+                  <strong className="treasury-public-address">{treasuryWallet}</strong>
+                  <p>Send SOL for actions or ROOTS deposits to this custodial wallet.</p>
+                  <div className="treasury-address-actions">
+                    <button type="button" className="btn btn-ghost" onClick={() => void copyTreasuryWallet()}>
+                      Copy address
+                    </button>
+                    <a className="btn btn-ghost" href={`https://solscan.io/account/${treasuryWallet}`} target="_blank" rel="noreferrer">
+                      Open Solscan
+                    </a>
+                  </div>
+                  {treasuryCopyNote ? <small>{treasuryCopyNote}</small> : null}
+                </div>
+              </div>
+            ) : null}
             <div className="treasury-wallet-grid">
               <div>
                 <span className="treasury-label">Custodial wallet</span>
-                <strong className="treasury-address">{treasuryStatus?.custodial_wallet || (treasuryBusy ? "Loading..." : "Unavailable")}</strong>
+                <strong className="treasury-address">{treasuryWallet || (treasuryBusy ? "Loading..." : "Unavailable")}</strong>
                 <small>Deposit SOL here to perform future on-chain actions.</small>
               </div>
               <div>
@@ -196,6 +299,47 @@ export function OrchardsScreen({ orchardAppBonus, membershipBonus, store, rootLe
                 </p>
               </div>
               <span className="market-lock-badge">{rootLevel >= 30 ? "License required" : `Level ${rootLevel}/30`}</span>
+            </div>
+            <div className="treasury-swap-card">
+              <div>
+                <h2>Buy internal ROOTS with SOL</h2>
+                <p>
+                  Uses the internal rate: 100 ROOTS = $5. SOL moves to treasury and ROOTS are credited internally.
+                </p>
+              </div>
+              <label className="treasury-swap-input">
+                <span>SOL amount</span>
+                <input
+                  type="number"
+                  min="0.00001"
+                  step="0.001"
+                  value={swapSolAmount}
+                  onChange={(e) => {
+                    setSwapSolAmount(e.target.value);
+                    setSwapQuote(null);
+                    setSwapNote("");
+                  }}
+                />
+              </label>
+              {swapQuote?.ok ? (
+                <p className="market-note">
+                  Quote: about {formatRu(swapQuote.out_roots_atomic)} internal ROOTS at {swapQuote.rate_label || "100 ROOTS per $5"}.
+                </p>
+              ) : null}
+              <div className="treasury-address-actions">
+                <button type="button" className="btn btn-ghost" disabled={swapBusy || !treasuryWallet} onClick={() => void quoteSwap()}>
+                  {swapBusy ? "Checking..." : "Get quote"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={swapBusy || !treasuryWallet || !swapQuote?.ok}
+                  onClick={() => void buyInternalRoots()}
+                >
+                  Buy ROOTS
+                </button>
+              </div>
+              {swapNote ? <p className="market-note market-note--warn">{swapNote}</p> : null}
             </div>
             {treasuryNote ? <p className="market-note market-note--warn">{treasuryNote}</p> : null}
           </div>

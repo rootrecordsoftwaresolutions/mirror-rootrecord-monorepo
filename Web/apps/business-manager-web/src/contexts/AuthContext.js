@@ -51,16 +51,59 @@ async function postWithRetry(url, body) {
   }
 }
 
+function storedTruthy(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function accessFromPayload(data) {
+  const raw = data?.raw && typeof data.raw === "object" ? data.raw : {};
+  const access = data?.access && typeof data.access === "object" ? data.access : {};
+  const rawAccess = raw?.access && typeof raw.access === "object" ? raw.access : {};
+  const tier = String(data?.tier || data?.plan || access?.tier || raw?.tier || raw?.plan || rawAccess?.tier || "").trim().toLowerCase();
+  const subscriptionStatus = String(data?.subscription_status || data?.subscriptionStatus || raw?.subscription_status || "").trim().toLowerCase();
+  const life =
+    storedTruthy(data?.life_member) ||
+    storedTruthy(data?.lifeMember) ||
+    storedTruthy(data?.lifetime_member) ||
+    storedTruthy(data?.lifetimeMember) ||
+    storedTruthy(data?.lifetime) ||
+    storedTruthy(access?.life_member) ||
+    storedTruthy(access?.lifeMember) ||
+    storedTruthy(raw?.life_member) ||
+    storedTruthy(raw?.lifeMember) ||
+    storedTruthy(rawAccess?.life_member) ||
+    storedTruthy(rawAccess?.lifeMember) ||
+    tier === "life" ||
+    tier === "lifetime";
+  const pro =
+    life ||
+    storedTruthy(data?.pro_unlocked) ||
+    storedTruthy(data?.proUnlocked) ||
+    storedTruthy(data?.pro) ||
+    storedTruthy(access?.pro_unlocked) ||
+    storedTruthy(access?.proUnlocked) ||
+    storedTruthy(raw?.pro_unlocked) ||
+    storedTruthy(raw?.proUnlocked) ||
+    storedTruthy(rawAccess?.pro_unlocked) ||
+    storedTruthy(rawAccess?.proUnlocked) ||
+    tier === "pro" ||
+    tier === "premium" ||
+    tier === "paid" ||
+    subscriptionStatus === "active" ||
+    subscriptionStatus === "trialing";
+  return { pro, life };
+}
+
 function userFromAuthPayload(data, displayName) {
   const email = String(data.email || "").trim();
-  const pro = Boolean(data.pro_unlocked || data.proUnlocked);
-  const life = Boolean(data.life_member || data.lifeMember);
+  const access = accessFromPayload(data);
   const nm = (displayName && String(displayName).trim()) || email.split("@")[0] || "User";
   return {
     id: String(data.account_id || ""),
     email,
     name: nm,
-    plan: pro || life ? "pro" : "free",
+    plan: access.pro || access.life ? "pro" : "free",
     role: "user",
     created_at: new Date().toISOString(),
     subscription_status: String(data.subscription_status || "none"),
@@ -69,14 +112,13 @@ function userFromAuthPayload(data, displayName) {
 
 function userFromMePayload(data) {
   const email = String(data.email || "").trim();
-  const pro = Boolean(data.pro_unlocked);
-  const life = Boolean(data.life_member);
+  const access = accessFromPayload(data);
   const raw = data.raw && typeof data.raw === "object" ? data.raw : {};
   return {
     id: String(data.account_id || raw.account_id || ""),
     email,
     name: email.split("@")[0] || "User",
-    plan: pro || life ? "pro" : "free",
+    plan: access.pro || access.life ? "pro" : "free",
     role: "user",
     created_at: String(raw.account_created_at || new Date().toISOString()),
     subscription_status: String(data.subscription_status || raw.subscription_status || "none"),
@@ -185,14 +227,21 @@ export function AuthProvider({ children }) {
 
   const refreshEntitlement = useCallback(async () => {
     const { data } = await api.post("/auth/entitlement", { device_id: getDeviceId() });
+    const access = accessFromPayload(data);
+    const normalized = {
+      ...data,
+      plan: access.pro || access.life ? "pro" : "free",
+      pro_unlocked: access.pro,
+      life_member: access.life,
+    };
     setUser((prev) => {
       const next = prev
-        ? { ...prev, plan: data.plan, subscription_status: data.subscription_status || prev.subscription_status }
+        ? { ...prev, plan: normalized.plan, subscription_status: data.subscription_status || prev.subscription_status }
         : prev;
       persistNativeAdTier(next);
       return next;
     });
-    return data;
+    return normalized;
   }, []);
 
   const exitGuest = useCallback(() => {

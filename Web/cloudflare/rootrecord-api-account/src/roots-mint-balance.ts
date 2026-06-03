@@ -161,6 +161,21 @@ async function readMintWalletBase(env: RootsMintBalanceEnv, accountId: string, e
   return { ok: true as const, custodial, userId, balance };
 }
 
+async function readMintWalletDisplayBase(env: RootsMintBalanceEnv, accountId: string, email: string) {
+  await provisionCustodialWalletIfMissing(env, accountId, { suppressDiscord: true });
+  const row = await env.DB
+    .prepare("SELECT pubkey FROM internal_solana_wallets WHERE account_id = ?")
+    .bind(accountId)
+    .first<{ pubkey: string }>();
+  const custodialWallet = String(row?.pubkey || "").trim();
+  if (!custodialWallet) {
+    return { ok: false as const, response: json({ ok: false, detail: "No custodial wallet on file." }, 404) };
+  }
+  const userId = `user:${email.trim().toLowerCase()}`;
+  const balance = await getEarnBalance(env.DB, userId);
+  return { ok: true as const, custodialWallet, userId, balance };
+}
+
 async function readMintStatus(env: RootsMintBalanceEnv, accountId: string, email: string) {
   const base = await readMintWalletBase(env, accountId, email);
   if (!base.ok) return base;
@@ -189,7 +204,7 @@ export async function handleRootsMintBalanceV1(
   if (!sess) return json({ ok: false, detail: "Sign in required." }, 401);
 
   if (method === "GET") {
-    const status = await readMintWalletBase(env, sess.accountId, sess.email);
+    const status = await readMintWalletDisplayBase(env, sess.accountId, sess.email);
     if (!status.ok) return status.response;
     const balances = await readCustodialTreasuryBalances(env, sess.accountId);
     return json({
@@ -197,7 +212,7 @@ export async function handleRootsMintBalanceV1(
       roots_mint: ROOTS_MINT_BASE58,
       internal_balance_atomic: status.balance,
       custodial_roots_atomic: balances.rootsAtomic,
-      custodial_wallet: status.custodial.publicKey.toBase58(),
+      custodial_wallet: status.custodialWallet,
       custodial_sol_lamports: balances.solLamports,
       minimum_sol_lamports: MIN_CUSTODIAL_SOL_LAMPORTS,
       can_mint: status.balance > 0 && balances.solLamports >= MIN_CUSTODIAL_SOL_LAMPORTS,

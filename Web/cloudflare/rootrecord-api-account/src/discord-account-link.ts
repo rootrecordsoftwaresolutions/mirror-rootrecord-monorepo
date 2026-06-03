@@ -4,6 +4,8 @@ import {
   attachLoginEmailAlias,
   deleteMergedDuplicateAccount,
 } from "../../shared/license-login";
+import { markRecentAccountVerification } from "./account-security";
+import { readUserAccountAccessFlags } from "./accounts";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -84,9 +86,16 @@ export type DiscordLinkEnv = {
   DISCORD_BOT_TOKEN?: string;
   DISCORD_GUILD_ID?: string;
   DISCORD_VERIFIED_ROLE_ID?: string;
+  DISCORD_LIFETIME_MEMBER_ROLE_ID?: string;
+  DISCORD_MONTHLY_MEMBER_ROLE_ID?: string;
+  DISCORD_DEVELOPER_ROLE_ID?: string;
   /** If set, bot posts a short notice here after a successful link (only `<@userId>` is mentionable). */
   DISCORD_VERIFIED_CHAT_CHANNEL_ID?: string;
 };
+
+function cleanBotToken(env: { DISCORD_BOT_TOKEN?: string }): string {
+  return String(env.DISCORD_BOT_TOKEN || "").replace(/^bot\s+/i, "").trim();
+}
 
 async function discordBotPutRole(token: string, guildId: string, userId: string, roleId: string): Promise<{
   ok: boolean;
@@ -114,6 +123,25 @@ async function discordBotPutRole(token: string, guildId: string, userId: string,
     );
   }
   return { ok: false, status: res.status };
+}
+
+async function discordMemberRoles(
+  token: string,
+  guildId: string,
+  userId: string,
+): Promise<Set<string>> {
+  const res = await fetch(
+    `https://discord.com/api/v10/guilds/${encodeURIComponent(guildId)}/members/${encodeURIComponent(userId)}`,
+    {
+      headers: {
+        Authorization: `Bot ${token.trim()}`,
+        "User-Agent": "RootRecordAccountWorker (discord member roles)",
+      },
+    },
+  );
+  if (!res.ok) return new Set();
+  const member = (await res.json().catch(() => ({}))) as { roles?: unknown };
+  return new Set(Array.isArray(member.roles) ? member.roles.map((r) => String(r)) : []);
 }
 
 async function discordBotPostVerifyChatNotice(
@@ -200,7 +228,7 @@ async function assignVerifiedRole(
   discord_user_id: string,
   ctx?: ExecutionContext,
 ): Promise<string | null> {
-  const bot = String(env.DISCORD_BOT_TOKEN || "").trim();
+  const bot = cleanBotToken(env);
   const guildId = String(env.DISCORD_GUILD_ID || "").trim();
   const roleId = String(env.DISCORD_VERIFIED_ROLE_ID || "").trim();
   if (!guildId || !roleId) return null;
@@ -216,6 +244,49 @@ async function assignVerifiedRole(
     else await p;
   }
   return null;
+}
+
+async function syncMemberRoles(
+  env: DiscordLinkEnv,
+  discord_user_id: string,
+  email: string,
+): Promise<string | null> {
+  const bot = cleanBotToken(env);
+  const guildId = String(env.DISCORD_GUILD_ID || "").trim();
+  const lifetimeRoleId = String(env.DISCORD_LIFETIME_MEMBER_ROLE_ID || "").trim();
+  const monthlyRoleId = String(env.DISCORD_MONTHLY_MEMBER_ROLE_ID || "").trim();
+  if (!bot || !guildId || (!lifetimeRoleId && !monthlyRoleId)) return null;
+
+  const access = await readUserAccountAccessFlags(env.DB, email).catch(() => null);
+  const life = Boolean(access?.life_member);
+  const monthly = !life && Boolean(access?.pro_unlocked);
+  try {
+    if (lifetimeRoleId) {
+      if (life) await discordBotPutRole(bot, guildId, discord_user_id, lifetimeRoleId);
+      else await discordBotDeleteRole(bot, guildId, discord_user_id, lifetimeRoleId);
+    }
+    if (monthlyRoleId) {
+      if (monthly) await discordBotPutRole(bot, guildId, discord_user_id, monthlyRoleId);
+      else await discordBotDeleteRole(bot, guildId, discord_user_id, monthlyRoleId);
+    }
+  } catch {
+    return "member_role_error";
+  }
+  return null;
+}
+
+export async function discordUserHasConfiguredRole(
+  env: DiscordLinkEnv,
+  discordUserId: string | null | undefined,
+  roleId: string | null | undefined,
+): Promise<boolean> {
+  const bot = cleanBotToken(env);
+  const guildId = String(env.DISCORD_GUILD_ID || "").trim();
+  const userId = String(discordUserId || "").trim();
+  const rid = String(roleId || "").trim();
+  if (!bot || !guildId || !userId || !rid) return false;
+  const roles = await discordMemberRoles(bot, guildId, userId).catch(() => new Set<string>());
+  return roles.has(rid);
 }
 
 async function saveDiscordLink(
@@ -366,13 +437,21 @@ export async function discordLinkCallback(params: {
     }
 
     const roleCode = await assignVerifiedRole(params.env, discord_user_id, params.ctx);
+    const memberRoleCode = await syncMemberRoles(
+      params.env,
+      discord_user_id,
+      merged && existing ? existing.email : acct.email,
+    );
+    const verifiedAccountId = merged && existing ? existing.account_id : acct.id;
+    await markRecentAccountVerification(params.env.DB, verifiedAccountId, "discord").catch(() => {});
+    const statusCode = roleCode || memberRoleCode;
 
     if (merged) {
-      const q = roleCode ? `discord=merged&role=${roleCode}` : "discord=merged";
+      const q = statusCode ? `discord=merged&role=${statusCode}` : "discord=merged";
       return Response.redirect(returnPageUrl(site, state, q), 302);
     }
-    if (roleCode) {
-      return Response.redirect(returnPageUrl(site, state, `discord=linked&role=${roleCode}`), 302);
+    if (statusCode) {
+      return Response.redirect(returnPageUrl(site, state, `discord=linked&role=${statusCode}`), 302);
     }
     return Response.redirect(returnPageUrl(site, state, "discord=linked"), 302);
   } catch (e) {
@@ -402,11 +481,15 @@ export async function discordUnlink(params: {
     return json({ ok: true, linked: false }, 200);
   }
 
-  const bot = String(params.env.DISCORD_BOT_TOKEN || "").trim();
+  const bot = cleanBotToken(params.env);
   const guildId = String(params.env.DISCORD_GUILD_ID || "").trim();
-  const roleId = String(params.env.DISCORD_VERIFIED_ROLE_ID || "").trim();
-  if (bot && guildId && roleId) {
-    await discordBotDeleteRole(bot, guildId, row.discord_user_id, roleId);
+  const roleIds = [
+    params.env.DISCORD_VERIFIED_ROLE_ID,
+    params.env.DISCORD_LIFETIME_MEMBER_ROLE_ID,
+    params.env.DISCORD_MONTHLY_MEMBER_ROLE_ID,
+  ].map((x) => String(x || "").trim()).filter(Boolean);
+  if (bot && guildId) {
+    for (const roleId of roleIds) await discordBotDeleteRole(bot, guildId, row.discord_user_id, roleId);
   }
 
   await params.env.DB.prepare("DELETE FROM discord_account_links WHERE account_id = ?")

@@ -1,14 +1,21 @@
 /discord-verify.html /discord-verify 308
 /privacy.html /privacy 308
 /terms.html /terms 308
+/root-units.html /root-units 308
+/beta-tester-rewards /root-units 301
+/beta-tester-rewards/ /root-units 301
+/beta-tester-rewards.html /root-units 301
 
 # Charts (static directories + trailing slash).
 /charts /charts/ 308
 /charts/discord-activity /charts/discord-activity/ 308
 /charts/kilauea-eruption-summary /charts/kilauea-eruption-summary/ 308
+/charts/big-island-earthquakes /charts/big-island-earthquakes/ 308
 /charts/root-economy /charts/root-economy/ 308
 /chart /charts/root-economy/ 308
 /products/rootunits /products/rootunits/ 308
+/roadmap.html /roadmap/ 308
+/roadmap /roadmap/ 308
 
 # Legacy Discord activity URLs → charts subtree.
 /discord-activity /charts/discord-activity/ 308

@@ -11,6 +11,11 @@ import type { GameSave } from "../game/types";
 
 import { apiFetch } from "./api";
 
+function storedTruthy(value: unknown): boolean {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 export type OrchardAppBonusTree = {
   id: number;
   key: "volcano" | "business" | "weather" | string;
@@ -359,7 +364,7 @@ function parseDiceMarketResponse(data: Record<string, unknown>): DiceMarketRespo
     detail: typeof data.detail === "string" ? data.detail : undefined,
     cost: data.cost != null ? Math.max(0, Math.floor(Number(data.cost) || 0)) : undefined,
     pro_redeemed_until: typeof data.pro_redeemed_until === "string" && data.pro_redeemed_until ? data.pro_redeemed_until : null,
-    pro_unlocked: data.pro_unlocked === true,
+    pro_unlocked: storedTruthy(data.pro_unlocked || data.proUnlocked),
     membership_bonus: parseMembershipBonus(data.membership_bonus),
     market_limit: parseMarketLimit(data.market_limit),
   };

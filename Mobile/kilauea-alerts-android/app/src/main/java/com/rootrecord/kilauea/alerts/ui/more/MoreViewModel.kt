@@ -8,6 +8,7 @@ import com.rootrecord.kilauea.alerts.data.repository.DeveloperMessage
 import com.rootrecord.kilauea.alerts.data.repository.DeveloperMessagesRepository
 import com.rootrecord.kilauea.alerts.data.repository.RootRecordAuthRepository
 import com.rootrecord.kilauea.alerts.notifications.KilaueaNotificationManager
+import com.google.firebase.messaging.FirebaseMessaging
 import com.rootrecord.kilauea.alerts.work.WorkEnqueue
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -146,6 +147,7 @@ class MoreViewModel @Inject constructor(
             _loginError.value = null
             val r = authRepo.login(email, password)
             _loginBusy.value = false
+            r.onSuccess { syncPushTokenAfterAuth() }
             r.onFailure { _loginError.value = it.message ?: "Sign-in failed." }
         }
     }
@@ -156,7 +158,15 @@ class MoreViewModel @Inject constructor(
             _loginError.value = null
             val r = authRepo.createAccount(email, password)
             _loginBusy.value = false
+            r.onSuccess { syncPushTokenAfterAuth() }
             r.onFailure { _loginError.value = it.message ?: "Account creation failed." }
+        }
+    }
+
+    /** Re-bind FCM to the signed-in account so server pushes reach this install. */
+    private fun syncPushTokenAfterAuth() {
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            viewModelScope.launch { authRepo.registerPushToken(token) }
         }
     }
 

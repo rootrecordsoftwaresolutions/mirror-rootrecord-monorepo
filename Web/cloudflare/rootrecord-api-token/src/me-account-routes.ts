@@ -146,6 +146,7 @@ const KNOWN_APPS: {
   id: string;
   name: string;
   android_package: string;
+  play_store_url?: string;
 }[] = [
   {
     id: "rootrecord_weather_manager_android",
@@ -171,6 +172,7 @@ const KNOWN_APPS: {
     id: "rootrecord_kilauea_alerts_android",
     name: "Kīlauea Alerts",
     android_package: "com.rootrecord.kilauea",
+    play_store_url: "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea",
   },
 ];
 
@@ -341,6 +343,7 @@ async function handleMeAppsGet(request: Request, env: MeAccountEnv): Promise<Res
       entitlement: tier,
       last_seen_at,
       android_package: app.android_package,
+      play_store_url: app.play_store_url || null,
     });
   }
   return json(out, 200);

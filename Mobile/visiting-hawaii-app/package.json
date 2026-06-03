@@ -1,0 +1,17 @@
+{
+  "name": "rootrecord-visiting-hawaii-android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capacitor wrapper for Visiting Hawai'i. Web source: Web/apps/visiting-hawaii-web",
+  "scripts": {
+    "build:web": "pnpm -C ../../Web/apps/visiting-hawaii-web run build",
+    "cap:sync": "pnpm run build:web && pnpm exec cap sync",
+    "android:open": "pnpm exec cap open android",
+    "android:assemble:debug": "pnpm run cap:sync && cd android && .\\gradlew.bat assembleDebug"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  }
+}

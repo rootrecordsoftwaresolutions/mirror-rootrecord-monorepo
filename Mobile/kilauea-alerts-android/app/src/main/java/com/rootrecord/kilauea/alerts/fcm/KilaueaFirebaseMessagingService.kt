@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Server FCM for new USGS notices (*/10 cron) plus manual broadcasts.
+ * Server FCM for new USGS notices (10-minute cron) plus manual broadcasts.
  * Marks notice ids seen so opening the app does not re-fire the same alert.
  */
 @AndroidEntryPoint

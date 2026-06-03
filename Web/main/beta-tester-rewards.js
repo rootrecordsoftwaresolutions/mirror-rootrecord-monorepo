@@ -45,14 +45,11 @@
     return typeof j.apiBase === "string" ? j.apiBase.replace(/\/+$/, "") : "";
   }
 
-  var ROOTS_ATOMIC_PER_WHOLE = 100000000;
-
   function formatBalance(atomic) {
-    var a = Number.isFinite(atomic) ? Math.max(0, Math.floor(atomic)) : 0;
-    var whole = a / ROOTS_ATOMIC_PER_WHOLE;
-    if (whole >= 1) return whole.toLocaleString(undefined, { maximumFractionDigits: 8 });
+    if (typeof formatRootUnitsAtomicBalance === "function") return formatRootUnitsAtomicBalance(atomic);
+    var a = Number.isFinite(Number(atomic)) ? Math.max(0, Math.floor(Number(atomic))) : 0;
     if (a <= 0) return "0";
-    return whole.toLocaleString(undefined, { maximumFractionDigits: 8 });
+    return (a / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 });
   }
 
   function rootUnitsFromSummary(j) {

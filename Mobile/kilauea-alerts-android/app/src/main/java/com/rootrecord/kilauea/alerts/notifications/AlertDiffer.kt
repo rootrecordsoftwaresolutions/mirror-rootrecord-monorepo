@@ -35,24 +35,25 @@ object AlertDiffer {
         }.toSet()
     }
 
-    /** Prefer explicit message id fields from USGS newest payload (structure varies). */
+    /**
+     * Stable USGS notice id — must match server [volcanoNewestNoticeId] / FCM `notice_id`
+     * so push dedupe and local poll do not re-fire the same alert when the app opens.
+     */
     fun volcanoNewestId(volcanoBundle: JsonObject): String? {
-        val newest = volcanoBundle["newest"] ?: return null
-        if (newest is JsonObject) {
-            listOf("messageId", "id", "volcanoMessageId", "noticeId").forEach { key ->
-                val v = newest[key]
-                when (v) {
-                    is JsonPrimitive -> v.content.takeIf { it.isNotBlank() }?.let { return it }
-                    else -> { }
-                }
-            }
-            newest["volcanoMessage"]?.let { vm ->
-                if (vm is JsonObject) {
-                    (vm["messageId"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }?.let { return it }
-                }
-            }
+        val newest = volcanoBundle["newest"] as? JsonObject ?: return null
+        for (key in listOf("messageId", "id", "volcanoMessageId", "noticeId", "MessageId")) {
+            (newest[key] as? JsonPrimitive)?.content?.trim()?.takeIf { it.isNotBlank() }?.let { return it.take(220) }
         }
-        return newest.hashCode().toString()
+        val vm = newest["volcanoMessage"] as? JsonObject
+        (vm?.get("messageId") as? JsonPrimitive)?.content?.trim()?.takeIf { it.isNotBlank() }?.let { return it.take(220) }
+        val sent = listOf("sentUtc", "SentUTC", "sent")
+            .firstNotNullOfOrNull { key -> (newest[key] as? JsonPrimitive)?.content?.trim()?.takeIf { it.isNotBlank() } }
+            .orEmpty()
+        val title = listOf("noticeTitle", "title", "Subject")
+            .firstNotNullOfOrNull { key -> (newest[key] as? JsonPrimitive)?.content?.trim()?.takeIf { it.isNotBlank() } }
+            .orEmpty()
+        if (sent.isNotEmpty() || title.isNotEmpty()) return "$sent|$title".take(220)
+        return null
     }
 
     /**

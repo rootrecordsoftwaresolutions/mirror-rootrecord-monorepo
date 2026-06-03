@@ -2,6 +2,13 @@ import type { BillingD1 } from "./billing-state";
 
 import { applyStripeBillingPatch } from "./apply-stripe-billing";
 import { ROOTS_ATOMIC_PER_WHOLE } from "./roots-units";
+import {
+  activateVisitingHawaiiListing,
+  expireVisitingHawaiiListingBySubscription,
+  isVisitingHawaiiSponsoredCheckout,
+  listingIdFromCheckoutSession,
+  refreshVisitingHawaiiListingPeriod,
+} from "./visiting-hawaii-sponsored";
 
 export type StripeWebhookEnv = {
   DB: BillingD1;
@@ -201,11 +208,55 @@ function stripeCustomerId(raw: unknown): string {
   return "";
 }
 
+function subscriptionPeriodEndIso(sub: Record<string, unknown> | null): string | null {
+  if (!sub) return null;
+  const end = Number(sub.current_period_end);
+  if (!Number.isFinite(end) || end <= 0) return null;
+  return new Date(end * 1000).toISOString();
+}
+
+async function onVisitingHawaiiSponsoredCheckout(
+  db: BillingD1,
+  secret: string,
+  session: Record<string, unknown>,
+): Promise<void> {
+  const listingId = listingIdFromCheckoutSession(session);
+  if (!listingId) return;
+
+  const cust = stripeCustomerId(session.customer) || null;
+  const subscription = typeof session.subscription === "string" ? session.subscription : null;
+  const sessionId = typeof session.id === "string" ? session.id : null;
+  let paidThrough: string | null = null;
+  if (subscription) {
+    const sub = await stripeGet(secret, `/subscriptions/${encodeURIComponent(subscription)}`);
+    paidThrough = subscriptionPeriodEndIso(sub);
+  }
+  if (!paidThrough) {
+    const d = new Date();
+    d.setUTCFullYear(d.getUTCFullYear() + 1);
+    paidThrough = d.toISOString();
+  }
+
+  await activateVisitingHawaiiListing(db, listingId, {
+    stripeCustomerId: cust,
+    stripeSubscriptionId: subscription,
+    stripeCheckoutSessionId: sessionId,
+    paidThroughIso: paidThrough,
+  });
+}
+
 async function onCheckoutSessionCompleted(
   db: BillingD1,
   secret: string,
   session: Record<string, unknown>
 ): Promise<void> {
+  if (isVisitingHawaiiSponsoredCheckout(session)) {
+    const paymentStatus = String(session.payment_status || "").toLowerCase();
+    if (paymentStatus && paymentStatus !== "paid" && paymentStatus !== "no_payment_required") return;
+    await onVisitingHawaiiSponsoredCheckout(db, secret, session);
+    return;
+  }
+
   const user = await resolvePortalUser(db, session);
   if (!user) return;
 
@@ -256,6 +307,15 @@ async function onSubscriptionUpdated(
   const customer = stripeCustomerId(sub.customer);
   if (!id) return;
 
+  const meta = sub.metadata as Record<string, unknown> | undefined;
+  if (String(meta?.product || "") === "visiting_hawaii_sponsored") {
+    const paidThrough = subscriptionPeriodEndIso(sub);
+    if (paidThrough && paidSubscriptionStatuses().has(String(sub.status || ""))) {
+      await refreshVisitingHawaiiListingPeriod(db, id, paidThrough);
+    }
+    return;
+  }
+
   let user = await resolvePortalUserBySubscription(db, id);
   if (!user && customer) user = await resolvePortalUserByCustomer(db, customer);
   if (!user && customer) user = await resolvePortalUserByCustomerEmail(db, secret, customer);
@@ -278,6 +338,12 @@ async function onSubscriptionDeleted(db: BillingD1, sub: Record<string, unknown>
   const id = typeof sub.id === "string" ? sub.id : "";
   const customer = stripeCustomerId(sub.customer);
   if (!id) return;
+
+  const meta = sub.metadata as Record<string, unknown> | undefined;
+  if (String(meta?.product || "") === "visiting_hawaii_sponsored") {
+    await expireVisitingHawaiiListingBySubscription(db, id);
+    return;
+  }
 
   let user = await resolvePortalUserBySubscription(db, id);
   if (!user && customer) user = await resolvePortalUserByCustomer(db, customer);

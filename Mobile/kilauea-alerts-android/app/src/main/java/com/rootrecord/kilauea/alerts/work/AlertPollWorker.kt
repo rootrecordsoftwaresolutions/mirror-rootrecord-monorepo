@@ -11,6 +11,7 @@ import com.rootrecord.kilauea.alerts.data.repository.UsgVolcanoRepository
 import com.rootrecord.kilauea.alerts.notifications.AlertDiffer
 import com.rootrecord.kilauea.alerts.notifications.KilaueaNotificationManager
 import com.rootrecord.kilauea.alerts.notifications.VolcanoNoticeSignals
+import com.rootrecord.kilauea.alerts.util.isAppInForeground
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -35,6 +36,8 @@ class AlertPollWorker @AssistedInject constructor(
         val eqOn = pro && prefs.notificationEq.first()
         val threshold = prefs.eqMagnitudeThreshold.first()
         val bootstrapped = prefs.bootstrapNotifyComplete.first()
+        // When the app is open we refresh in the UI; showing a tray alert here feels like "limbo" delivery.
+        val showTrayAlerts = !isAppInForeground()
 
         val volJson = volcanoRepo.refreshVolcanoStatus().getOrNull()
         val nwsJson = nwsRepo.refresh().getOrNull()
@@ -72,18 +75,22 @@ class AlertPollWorker @AssistedInject constructor(
                 if (volcanoElevatedOnly && !urgent) {
                     prefs.setNotifiedVolcanoIds(AlertDiffer.encodeStringSet(seen + curId))
                 } else if (urgent) {
-                    notifications.notifyVolcano(
-                        "Kīlauea — eruptive activity or elevated unrest (USGS)",
-                        "A new USGS notice describes eruption, lava, strong unrest, or elevated aviation color. Open Alerts for the official wording.",
-                        urgent = true,
-                    )
+                    if (showTrayAlerts) {
+                        notifications.notifyVolcano(
+                            "Kīlauea — eruptive activity or elevated unrest (USGS)",
+                            "A new USGS notice describes eruption, lava, strong unrest, or elevated aviation color. Open Alerts for the official wording.",
+                            urgent = true,
+                        )
+                    }
                     prefs.setNotifiedVolcanoIds(AlertDiffer.encodeStringSet(seen + curId))
                 } else {
-                    notifications.notifyVolcano(
-                        "Kīlauea update (USGS)",
-                        "New volcano notice or status change. Open the app for official details.",
-                        urgent = false,
-                    )
+                    if (showTrayAlerts) {
+                        notifications.notifyVolcano(
+                            "Kīlauea update (USGS)",
+                            "New volcano notice or status change. Open the app for official details.",
+                            urgent = false,
+                        )
+                    }
                     prefs.setNotifiedVolcanoIds(AlertDiffer.encodeStringSet(seen + curId))
                 }
             }
@@ -94,9 +101,11 @@ class AlertPollWorker @AssistedInject constructor(
             val seen = AlertDiffer.parseStringSet(prefs.getNotifiedNwsIds())
             val newIds = AlertDiffer.newIds(cur, seen)
             if (newIds.isNotEmpty()) {
-                val summary =
-                    if (newIds.size == 1) "New NWS alert for Hawaiʻi." else "${newIds.size} new NWS alerts for Hawaiʻi."
-                notifications.notifyNws("Weather alert (NWS)", summary)
+                if (showTrayAlerts) {
+                    val summary =
+                        if (newIds.size == 1) "New NWS alert for Hawaiʻi." else "${newIds.size} new NWS alerts for Hawaiʻi."
+                    notifications.notifyNws("Weather alert (NWS)", summary)
+                }
                 prefs.setNotifiedNwsIds(AlertDiffer.encodeStringSet(seen + newIds))
             }
         }
@@ -120,15 +129,17 @@ class AlertPollWorker @AssistedInject constructor(
                 val seen = AlertDiffer.parseStringSet(prefs.getNotifiedEqIds())
                 val newIds = AlertDiffer.newIds(cur, seen)
                 if (newIds.isNotEmpty()) {
-                    val primaryId = AlertDiffer.newestEarthquakeIdAmong(eqJson, newIds)
-                        ?: newIds.first()
-                    val detail = AlertDiffer.earthquakeSummaryForEventId(eqJson, primaryId)
-                    val body = detail?.let { "$it (≥ M ${"%.1f".format(threshold)}, USGS Hawaiʻi region)." }
-                        ?: "Magnitude ≥ ${"%.1f".format(threshold)} in Hawaiʻi region (USGS)."
-                    notifications.notifyEarthquake(
-                        "Earthquake (USGS)",
-                        body,
-                    )
+                    if (showTrayAlerts) {
+                        val primaryId = AlertDiffer.newestEarthquakeIdAmong(eqJson, newIds)
+                            ?: newIds.first()
+                        val detail = AlertDiffer.earthquakeSummaryForEventId(eqJson, primaryId)
+                        val body = detail?.let { "$it (≥ M ${"%.1f".format(threshold)}, USGS Hawaiʻi region)." }
+                            ?: "Magnitude ≥ ${"%.1f".format(threshold)} in Hawaiʻi region (USGS)."
+                        notifications.notifyEarthquake(
+                            "Earthquake (USGS)",
+                            body,
+                        )
+                    }
                     prefs.setNotifiedEqIds(AlertDiffer.encodeStringSet(seen + newIds))
                 }
             }

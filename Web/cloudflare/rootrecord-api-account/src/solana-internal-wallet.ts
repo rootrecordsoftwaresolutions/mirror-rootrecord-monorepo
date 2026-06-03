@@ -838,6 +838,64 @@ async function pickConnectionForRrttCron(envUrl: string, stats: RrttCronRunStats
   return null;
 }
 
+async function readBalanceWithRpcFallback(
+  envUrl: string,
+  preferred: Connection,
+  preferredUrl: string | undefined,
+  wallet: PublicKey,
+): Promise<{ balance: number; connection: Connection; rpcUrl: string } | null> {
+  const preferredKey = String(preferredUrl || "").trim();
+  const candidates = [
+    { connection: preferred, rpcUrl: preferredKey || "selected-rpc" },
+    ...rrttCronRpcCandidates(envUrl)
+      .filter((url) => url && url !== preferredKey)
+      .map((url) => ({ connection: new Connection(url, "confirmed"), rpcUrl: url })),
+  ];
+  for (const candidate of candidates) {
+    try {
+      await candidate.connection.getLatestBlockhash("confirmed");
+      const balance = await candidate.connection.getBalance(wallet, "confirmed");
+      return { balance, connection: candidate.connection, rpcUrl: candidate.rpcUrl };
+    } catch {
+      /* try next RPC for this wallet */
+    }
+  }
+  return null;
+}
+
+async function readBalancesBatchWithRpcFallback(
+  envUrl: string,
+  preferred: Connection,
+  preferredUrl: string | undefined,
+  wallets: PublicKey[],
+): Promise<{ balances: Map<string, number>; connection: Connection; rpcUrl: string } | null> {
+  const preferredKey = String(preferredUrl || "").trim();
+  const candidates = [
+    { connection: preferred, rpcUrl: preferredKey || "selected-rpc" },
+    ...rrttCronRpcCandidates(envUrl)
+      .filter((url) => url && url !== preferredKey)
+      .map((url) => ({ connection: new Connection(url, "confirmed"), rpcUrl: url })),
+  ];
+  const unique = Array.from(new Map(wallets.map((pk) => [pk.toBase58(), pk])).values());
+  for (const candidate of candidates) {
+    try {
+      await candidate.connection.getLatestBlockhash("confirmed");
+      const balances = new Map<string, number>();
+      for (let i = 0; i < unique.length; i += 100) {
+        const chunk = unique.slice(i, i + 100);
+        const infos = await candidate.connection.getMultipleAccountsInfo(chunk, "confirmed");
+        chunk.forEach((pk, idx) => {
+          balances.set(pk.toBase58(), infos[idx]?.lamports ?? 0);
+        });
+      }
+      return { balances, connection: candidate.connection, rpcUrl: candidate.rpcUrl };
+    } catch {
+      /* try next RPC for this batch */
+    }
+  }
+  return null;
+}
+
 /**
  * Default `confirmTransaction` often throws "block height exceeded" on public RPC under load even when
  * the signature later lands — treat that as soft-fail and poll status (up to ~2m).
@@ -1200,6 +1258,7 @@ export type SweepCustodialSolRowResult = {
   balance_lamports_before: number;
   min_rent_lamports: number;
   lamports_sent: string;
+  rpc_url_used?: string;
   signature?: string;
   skipped?: string;
   error?: string;
@@ -1304,6 +1363,23 @@ export async function handleSweepCustodialSolAllRoute(
   const minRent = await connection.getMinimumBalanceForRentExemption(0);
   const results: SweepCustodialSolRowResult[] = [];
   let confirmed = 0;
+  const balanceWallets: PublicKey[] = [];
+  for (const r of list) {
+    const pkStr = String(r.pubkey || "").trim();
+    if (!pkStr) continue;
+    try {
+      const pk = new PublicKey(pkStr);
+      if (!pk.equals(destPk)) balanceWallets.push(pk);
+    } catch {
+      /* invalid rows are handled below */
+    }
+  }
+  const batchBalances = await readBalancesBatchWithRpcFallback(
+    String(env.SOLANA_RPC_URL || "").trim(),
+    connection,
+    dummyStats.rpc_url_used,
+    balanceWallets,
+  );
 
   for (const r of list) {
     const accountId = String(r.account_id || "").trim();
@@ -1331,12 +1407,13 @@ export async function handleSweepCustodialSolAllRoute(
       continue;
     }
 
-    const bal = await connection.getBalance(custodialPk, "confirmed").catch(() => -1);
-    if (bal < 0) {
+    if (!batchBalances) {
       results.push({ ...base, error: "could not read balance" });
       continue;
     }
+    const bal = batchBalances.balances.get(custodialPk.toBase58()) ?? 0;
     base.balance_lamports_before = bal;
+    base.rpc_url_used = batchBalances.rpcUrl;
     const toSend = respectRentFloor ? bal - minRent : bal;
     if (toSend <= 0) {
       results.push({
@@ -1373,7 +1450,8 @@ export async function handleSweepCustodialSolAllRoute(
     }
 
     try {
-      const latest = await connection.getLatestBlockhash("confirmed");
+      const rowConnection = batchBalances.connection;
+      const latest = await rowConnection.getLatestBlockhash("confirmed");
       const ixs: TransactionInstruction[] = [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 80_000 }),
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 0 }),
@@ -1390,8 +1468,8 @@ export async function handleSweepCustodialSolAllRoute(
       });
       const tx = new VersionedTransaction(msg.compileToV0Message());
       tx.sign([treasury, custodialKp]);
-      const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
-      await confirmSignedTxWithPoll(connection, sig, latest);
+      const sig = await rowConnection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      await confirmSignedTxWithPoll(rowConnection, sig, latest);
       confirmed += 1;
       results.push({
         ...base,

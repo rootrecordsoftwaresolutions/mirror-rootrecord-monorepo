@@ -2,6 +2,8 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { json } from "./cors";
 import { resolveUserId } from "./auth";
 
+const MAX_SAVED_LOCATIONS = 5;
+
 export async function handleLocations(
   request: Request,
   env: { DB: D1Database; JWT_SECRET: string },
@@ -39,6 +41,12 @@ export async function handleLocations(
     const lon = Number(body.longitude);
     if (!(-90 <= lat && lat <= 90) || !(-180 <= lon && lon <= 180)) {
       return json({ detail: "Latitude/longitude out of range." }, 400);
+    }
+    const existing = await env.DB.prepare("SELECT COUNT(*) AS count FROM rrwm_locations WHERE user_id = ?")
+      .bind(userId)
+      .first<{ count: number }>();
+    if (Number(existing?.count || 0) >= MAX_SAVED_LOCATIONS) {
+      return json({ detail: "You can save up to 5 locations per account." }, 400);
     }
     const id = crypto.randomUUID();
     const created_at = new Date().toISOString();

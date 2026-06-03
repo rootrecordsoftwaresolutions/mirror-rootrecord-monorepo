@@ -71,6 +71,31 @@ function normalizePage(raw: string | undefined): string {
   return "/";
 }
 
+function decimalRootsToAtomic(raw: string): number {
+  const s = String(raw || "").trim();
+  if (!s || s.startsWith("-")) return 0;
+  const [wholeRaw, fracRaw = ""] = s.split(".");
+  const whole = Math.max(0, Math.floor(Number(wholeRaw || "0") || 0));
+  const fracDigits = fracRaw.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "0");
+  const frac = Math.max(0, Math.floor(Number(fracDigits) || 0));
+  return Math.min(Number.MAX_SAFE_INTEGER, whole * ROOTS_ATOMIC_PER_WHOLE + frac);
+}
+
+function parseIncomingEarnAtomic(raw: unknown): number {
+  if (raw == null || raw === "") return 0;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return 0;
+    if (s.includes(".")) return decimalRootsToAtomic(s);
+    const integerAtomic = Math.floor(Number(s));
+    return Number.isFinite(integerAtomic) && integerAtomic > 0 ? integerAtomic : 0;
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (Number.isInteger(n)) return Math.floor(n);
+  return decimalRootsToAtomic(String(raw));
+}
+
 export async function handleEarnRoutes(
   request: Request,
   env: EarnEnv,
@@ -518,7 +543,17 @@ async function earnHeartbeat(request: Request, env: EarnEnv): Promise<Response> 
     return json({ detail: "Sign in required." }, 401);
   }
   const userId = u;
-  let body: { app_id?: string; appId?: string; page?: string };
+  let body: {
+    app_id?: string;
+    appId?: string;
+    page?: string;
+    earning?: unknown;
+    earnings?: unknown;
+    reward?: unknown;
+    reward_units?: unknown;
+    root_units?: unknown;
+    units?: unknown;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -636,9 +671,12 @@ async function earnHeartbeat(request: Request, env: EarnEnv): Promise<Response> 
     );
   }
 
+  const incomingEarnAtomic = parseIncomingEarnAtomic(
+    body.reward_units ?? body.root_units ?? body.earning ?? body.earnings ?? body.reward ?? body.units,
+  );
   const maxSecByDay = Math.floor(dailyLeft / UNITS_PER_SECOND);
   const rawSec = Math.max(0, Math.min(dtc, pageLeft, maxSecByDay));
-  const granted = rawSec * UNITS_PER_SECOND;
+  const granted = incomingEarnAtomic > 0 ? Math.min(incomingEarnAtomic, dailyLeft) : rawSec * UNITS_PER_SECOND;
   const newSec = sec0 + rawSec;
 
   const bal0 = await getBalance(env.DB, userId);
@@ -665,6 +703,7 @@ async function earnHeartbeat(request: Request, env: EarnEnv): Promise<Response> 
     {
       ok: true,
       granted,
+      incoming_earn_atomic: incomingEarnAtomic || undefined,
       balance: newBalance,
       today: newAppDayTotal,
       ymd,

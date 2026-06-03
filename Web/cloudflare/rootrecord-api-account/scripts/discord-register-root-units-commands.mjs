@@ -74,11 +74,10 @@ if (!token || !guildId || !appId) {
 const assetOption = {
   type: 3,
   name: "asset",
-  description: "ROOTS = in-bot Roots. RRTT/SOL = custodial wallet → wallet on-chain (/send user).",
+  description: "ROOTS = Root Units points. SOL = deposit-wallet transfer (/send user).",
   required: true,
   choices: [
     { name: "ROOTS", value: "ROOTS" },
-    { name: "RRTT (on-chain)", value: "RRTT" },
     { name: "SOL (on-chain)", value: "SOL" },
   ],
 };
@@ -87,14 +86,14 @@ const sendOptions = [
   {
     type: 1,
     name: "user",
-    description: "One linked recipient — ROOTS, RRTT, or SOL",
+    description: "One linked recipient — ROOTS or SOL",
     options: [
       assetOption,
       { type: 6, name: "member", description: "Linked user", required: true },
       {
         type: 10,
         name: "amount",
-        description: "SOL: decimal (e.g. 0.00001). ROOTS: decimal ROOTS. RRTT: whole tokens",
+        description: "SOL: decimal (e.g. 0.00001). ROOTS: decimal ROOTS",
         required: true,
         min_value: 0.00000001,
         max_value: 10,
@@ -179,6 +178,57 @@ const commands = [
     type: 1,
   },
   {
+    name: "userreport",
+    description: "Developer-only AI report on RootRecord user/app behavior",
+    type: 1,
+    options: [
+      {
+        type: 1,
+        name: "all",
+        description: "Full-system user, app, web, mobile, Discord, and ROOTS behavior coverage",
+      },
+      {
+        type: 1,
+        name: "role",
+        description: "Report on verified Discord-linked users who hold a server role",
+        options: [
+          {
+            type: 8,
+            name: "role",
+            description: "Discord role to scan",
+            required: true,
+          },
+        ],
+      },
+      {
+        type: 1,
+        name: "user",
+        description: "Report on one account by email, account id, user id, Discord name/id, or Solana wallet",
+        options: [
+          {
+            type: 3,
+            name: "query",
+            description: "Email, account id, user:<email>, Discord id/name, or Solana wallet",
+            required: true,
+          },
+        ],
+      },
+      {
+        type: 1,
+        name: "member",
+        description: "Report on one linked Discord member",
+        options: [
+          {
+            type: 6,
+            name: "member",
+            description: "Discord member",
+            required: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
     name: "token",
     description: "Developer-only ROOTS token, LP market, holders, and usage AI report",
     type: 1,
@@ -211,9 +261,51 @@ const commands = [
   },
   {
     name: "send",
-    description: "Send ROOTS, or on-chain RRTT/SOL (user): user / everyone / active / role",
+    description: "Send ROOTS, or SOL with user: user / everyone / active / role",
     type: 1,
     options: sendOptions,
+  },
+  {
+    name: "swap",
+    description: "Quote or buy internal ROOTS with SOL at 100 ROOTS = $3",
+    type: 1,
+    options: [
+      {
+        type: 1,
+        name: "quote",
+        description: "Preview SOL → internal ROOTS; SOL goes to treasury",
+        options: [
+          {
+            type: 10,
+            name: "amount",
+            description: "SOL to spend, e.g. 0.01",
+            required: true,
+            min_value: 0.00001,
+            max_value: 1,
+          },
+        ],
+      },
+      {
+        type: 1,
+        name: "buy",
+        description: "Move SOL to treasury and credit ROOTS internally",
+        options: [
+          {
+            type: 10,
+            name: "amount",
+            description: "SOL to spend, e.g. 0.01",
+            required: true,
+            min_value: 0.00001,
+            max_value: 1,
+          },
+        ],
+      },
+      {
+        type: 1,
+        name: "all",
+        description: "Move all spendable SOL to treasury and credit ROOTS internally",
+      },
+    ],
   },
   {
     name: "wallet",

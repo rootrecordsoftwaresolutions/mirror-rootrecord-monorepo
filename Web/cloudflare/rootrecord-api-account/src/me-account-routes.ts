@@ -19,6 +19,15 @@ import {
   type TransactionalEmailEnv,
 } from "../../shared/send-transactional-email";
 import { readUserAccountAccessFlags } from "./accounts";
+import {
+  consumeChallenge,
+  hasRecentAccountVerification,
+  markEmailVerified,
+  markRecentAccountVerification,
+  sendAccountChangeChallenge,
+  sendEmailVerificationChallenge,
+  sendPasswordResetChallenge,
+} from "./account-security";
 
 export type MeAccountEnv = AuthEnv & TransactionalEmailEnv & {
   SITE_URL?: string;
@@ -94,6 +103,26 @@ async function revokeAllSessions(db: D1Database, accountId: string): Promise<voi
   }
 }
 
+export function accountVerificationRequiredResponse(): Response {
+  return json(
+    {
+      detail: "Confirm your account by email or Discord before making this change.",
+      code: "verification_required",
+      verification_required: true,
+    },
+    403,
+  );
+}
+
+export async function requireRecentAccountVerification(db: D1Database, accountId: string): Promise<Response | null> {
+  try {
+    if (await hasRecentAccountVerification(db, accountId)) return null;
+  } catch {
+    /* fail closed for account-changing operations */
+  }
+  return accountVerificationRequiredResponse();
+}
+
 async function revokeSessionById(db: D1Database, accountId: string, sessionId: string): Promise<boolean> {
   const now = new Date().toISOString();
   try {
@@ -147,6 +176,7 @@ const KNOWN_APPS: {
   id: string;
   name: string;
   android_package: string;
+  play_store_url?: string;
 }[] = [
   {
     id: "rootrecord_weather_manager_android",
@@ -172,6 +202,7 @@ const KNOWN_APPS: {
     id: "rootrecord_kilauea_alerts_android",
     name: "Kīlauea Alerts",
     android_package: "com.rootrecord.kilauea",
+    play_store_url: "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea",
   },
 ];
 
@@ -206,6 +237,8 @@ async function lastSeenForApp(db: D1Database, userId: string, appId: string): Pr
 async function handleMePassword(request: Request, env: MeAccountEnv): Promise<Response> {
   const sess = await sessionFromRequest(env, request);
   if (!sess) return json({ detail: "Unauthorized" }, 401);
+  const recent = await requireRecentAccountVerification(env.DB, sess.accountId);
+  if (recent) return recent;
 
   let body: { current_password?: string; new_password?: string; device_id?: string };
   try {
@@ -342,6 +375,7 @@ async function handleMeAppsGet(request: Request, env: MeAccountEnv): Promise<Res
       entitlement: tier,
       last_seen_at,
       android_package: app.android_package,
+      play_store_url: app.play_store_url || null,
     });
   }
   return json(out, 200);
@@ -350,6 +384,8 @@ async function handleMeAppsGet(request: Request, env: MeAccountEnv): Promise<Res
 async function handleEmailRequest(request: Request, env: MeAccountEnv): Promise<Response> {
   const sess = await sessionFromRequest(env, request);
   if (!sess) return json({ detail: "Unauthorized" }, 401);
+  const recent = await requireRecentAccountVerification(env.DB, sess.accountId);
+  if (recent) return recent;
 
   let body: { new_email?: string };
   try {
@@ -474,6 +510,7 @@ async function handleEmailConfirm(request: Request, env: MeAccountEnv): Promise<
       .bind(newEmail, now, oldEmail)
       .run();
     await env.DB.prepare("DELETE FROM license_email_change WHERE id = ?").bind(id).run();
+    await markEmailVerified(env.DB, accountId, "email");
     await revokeAllSessions(env.DB, accountId);
   } catch (e) {
     const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
@@ -482,6 +519,181 @@ async function handleEmailConfirm(request: Request, env: MeAccountEnv): Promise<
   }
 
   return json({ email: newEmail, ok: true }, 200);
+}
+
+async function accountByEmail(db: D1Database, emailRaw: string): Promise<{ id: string; email: string } | null> {
+  const email = String(emailRaw || "").trim().toLowerCase();
+  if (!email.includes("@")) return null;
+  return db
+    .prepare("SELECT id, lower(trim(email)) AS email FROM license_accounts WHERE lower(trim(email)) = ?")
+    .bind(email)
+    .first<{ id: string; email: string }>();
+}
+
+async function consumedEmailVerifyChallengeByToken(
+  db: D1Database,
+  tokenRaw: string | null | undefined,
+): Promise<{ account_id: string; email: string } | null> {
+  const token = String(tokenRaw || "").trim();
+  if (token.length < 16) return null;
+  const tokenHash = await sha256Hex(token);
+  const row = await db
+    .prepare(
+      `SELECT account_id, email, expires_at, consumed_at
+       FROM license_account_challenges
+       WHERE token_hash = ? AND purpose = 'email_verify'
+       LIMIT 1`,
+    )
+    .bind(tokenHash)
+    .first<{ account_id: string; email: string; expires_at: string; consumed_at: string | null }>();
+  if (!row?.account_id || !row.email || !row.consumed_at) return null;
+  const consumedAt = Date.parse(row.consumed_at);
+  const expiresAt = Date.parse(row.expires_at || "");
+  if (!Number.isFinite(consumedAt) || !Number.isFinite(expiresAt) || consumedAt > expiresAt) return null;
+  return { account_id: row.account_id, email: row.email };
+}
+
+async function handleEmailVerifyRequest(request: Request, env: MeAccountEnv): Promise<Response> {
+  const sess = await sessionFromRequest(env, request);
+  if (!sess) return json({ detail: "Unauthorized" }, 401);
+  const sent = await sendEmailVerificationChallenge(
+    env,
+    sess.accountId,
+    sess.email,
+    buildSessionInsertMeta(request, null),
+  );
+  if (!sent) return json({ detail: "Could not send verification email." }, 503);
+  return json({ ok: true, detail: "Verification email sent." }, 202);
+}
+
+async function handleEmailVerifyConfirm(request: Request, env: MeAccountEnv): Promise<Response> {
+  let body: { token?: string; code?: string };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  const sess = await sessionFromRequest(env, request);
+  const consumed =
+    (await consumeChallenge({
+      db: env.DB,
+      purpose: "email_verify",
+      token: body.token,
+      code: body.code,
+      accountId: sess?.accountId || null,
+    })) || (await consumedEmailVerifyChallengeByToken(env.DB, body.token));
+  if (!consumed) return json({ detail: "Invalid or expired verification code." }, 400);
+  await markEmailVerified(env.DB, consumed.account_id, "email");
+  return json({ ok: true, email_verified: true }, 200);
+}
+
+async function handlePasswordResetRequest(request: Request, env: MeAccountEnv): Promise<Response> {
+  let body: { email?: string };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  const email = String(body.email || "").trim().toLowerCase();
+  if (!email.includes("@")) return json({ detail: "Valid email required." }, 422);
+  const row = await accountByEmail(env.DB, email).catch(() => null);
+  if (row?.id && row.email) {
+    const sent = await sendPasswordResetChallenge(env, row.id, row.email, buildSessionInsertMeta(request, null)).catch((e) => {
+      const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
+      console.error("password_reset_email", msg);
+      return false;
+    });
+    if (!sent) console.error("password_reset_email_not_sent", email);
+  }
+  return json({ ok: true, detail: "If that account exists, a reset email has been sent." }, 202);
+}
+
+async function handlePasswordResetConfirm(request: Request, env: MeAccountEnv): Promise<Response> {
+  let body: { token?: string; code?: string; email?: string; new_password?: string; device_id?: string };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  const newPassword = String(body.new_password || "");
+  if (newPassword.length < 6) return json({ detail: "New password must be at least 6 characters." }, 422);
+
+  let accountIdForCode: string | null = null;
+  if (!String(body.token || "").trim() && String(body.code || "").trim() && body.email) {
+    const acc = await accountByEmail(env.DB, body.email).catch(() => null);
+    accountIdForCode = acc?.id || null;
+  }
+  const consumed = await consumeChallenge({
+    db: env.DB,
+    purpose: "password_reset",
+    token: body.token,
+    code: body.code,
+    accountId: accountIdForCode,
+  });
+  if (!consumed) return json({ detail: "Invalid or expired reset code." }, 400);
+
+  let newHash: string;
+  let newSalt: string;
+  try {
+    const creds = await hashNewAccountCredentials(newPassword);
+    newHash = creds.password_hash;
+    newSalt = creds.salt;
+  } catch {
+    return json({ detail: "Could not hash new password." }, 500);
+  }
+
+  const now = new Date().toISOString();
+  await env.DB
+    .prepare("UPDATE license_accounts SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?")
+    .bind(newHash, newSalt, now, consumed.account_id)
+    .run();
+  await markEmailVerified(env.DB, consumed.account_id, "email");
+  await revokeAllSessions(env.DB, consumed.account_id);
+
+  const access_token = await issueFreshSessionToken(
+    env,
+    consumed.email,
+    consumed.account_id,
+    buildSessionInsertMeta(request, String(body.device_id || "").trim() || null),
+  );
+  if (!access_token) return json({ ok: true, detail: "Password reset. Sign in with your new password." }, 200);
+  return json(
+    { ok: true, access_token, token: access_token, email: consumed.email, account_id: consumed.account_id },
+    200,
+    undefined,
+    ssoSetAccessTokenLine(request, access_token),
+  );
+}
+
+async function handleAccountChallengeRequest(request: Request, env: MeAccountEnv): Promise<Response> {
+  const sess = await sessionFromRequest(env, request);
+  if (!sess) return json({ detail: "Unauthorized" }, 401);
+  const sent = await sendAccountChangeChallenge(env, sess.accountId, sess.email, buildSessionInsertMeta(request, null));
+  if (!sent) return json({ detail: "Could not send account confirmation email." }, 503);
+  return json({ ok: true, detail: "Confirmation email sent." }, 202);
+}
+
+async function handleAccountChallengeConfirm(request: Request, env: MeAccountEnv): Promise<Response> {
+  const sess = await sessionFromRequest(env, request);
+  if (!sess) return json({ detail: "Unauthorized" }, 401);
+  let body: { token?: string; code?: string };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  const consumed = await consumeChallenge({
+    db: env.DB,
+    purpose: "account_change",
+    token: body.token,
+    code: body.code,
+    accountId: sess.accountId,
+  });
+  if (!consumed || consumed.account_id !== sess.accountId) {
+    return json({ detail: "Invalid or expired confirmation code." }, 400);
+  }
+  await markRecentAccountVerification(env.DB, sess.accountId, "email");
+  return json({ ok: true, verified: true }, 200);
 }
 
 export async function handleAuthLogout(request: Request, env: MeAccountEnv): Promise<Response> {
@@ -556,7 +768,7 @@ export async function handleMeAccountRoutes(
   sub: string,
   method: string
 ): Promise<Response | null> {
-  if (method === "POST" && sub === "/me/password") {
+  if (method === "POST" && (sub === "/me/password" || sub === "/v1/me/password")) {
     return handleMePassword(request, env);
   }
   if (method === "GET" && sub === "/me/sessions") {
@@ -565,11 +777,29 @@ export async function handleMeAccountRoutes(
   if (method === "GET" && sub === "/me/apps") {
     return handleMeAppsGet(request, env);
   }
-  if (method === "POST" && sub === "/me/email/request") {
+  if (method === "POST" && (sub === "/me/email/request" || sub === "/v1/me/email/request")) {
     return handleEmailRequest(request, env);
   }
-  if (method === "POST" && sub === "/me/email/confirm") {
+  if (method === "POST" && (sub === "/me/email/confirm" || sub === "/v1/me/email/confirm")) {
     return handleEmailConfirm(request, env);
+  }
+  if (method === "POST" && (sub === "/me/email/verify/request" || sub === "/v1/me/email/verify/request")) {
+    return handleEmailVerifyRequest(request, env);
+  }
+  if (method === "POST" && (sub === "/me/email/verify/confirm" || sub === "/v1/me/email/verify/confirm")) {
+    return handleEmailVerifyConfirm(request, env);
+  }
+  if (method === "POST" && (sub === "/auth/password-reset/request" || sub === "/v1/auth/password-reset/request")) {
+    return handlePasswordResetRequest(request, env);
+  }
+  if (method === "POST" && (sub === "/auth/password-reset/confirm" || sub === "/v1/auth/password-reset/confirm")) {
+    return handlePasswordResetConfirm(request, env);
+  }
+  if (method === "POST" && (sub === "/me/security/challenge/request" || sub === "/v1/me/security/challenge/request")) {
+    return handleAccountChallengeRequest(request, env);
+  }
+  if (method === "POST" && (sub === "/me/security/challenge/confirm" || sub === "/v1/me/security/challenge/confirm")) {
+    return handleAccountChallengeConfirm(request, env);
   }
 
   const revokePrefix = "/me/sessions/";

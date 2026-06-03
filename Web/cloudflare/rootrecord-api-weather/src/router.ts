@@ -12,6 +12,7 @@ import { buildSessionInsertMeta, handleAuthLogout, handleAuthLogoutAll, handleMe
 import { createStripeSubscriptionCheckout } from "./billing-stripe";
 
 import { handleLocations } from "./locations";
+import { handleWeatherLocationAi } from "./weather-location-ai";
 
 import { handlePushRoutes, verifyWorkerOpsAdmin } from "./push";
 import { handlePrefsRoutes } from "./prefs";
@@ -103,6 +104,11 @@ export interface Env {
   ACCUWEATHER_LANGUAGE?: string;
 
   ACCUWEATHER_REUSE_RADIUS_MILES?: string;
+
+  /** X/Grok API credentials for member Weather AI reports. */
+  GROK_API_BEARER_TOKEN?: string;
+  GROK_API_URL?: string;
+  GROK_MODEL?: string;
 
   /** Stripe restricted key or secret (`wrangler secret put STRIPE_SECRET_KEY`). */
 
@@ -1080,6 +1086,10 @@ export async function handleRequest(
   const locRes = await handleLocations(request, env, sub, method);
 
   if (locRes) return locRes;
+
+  const weatherAiRes = await handleWeatherLocationAi(request, env, sub, method);
+
+  if (weatherAiRes) return weatherAiRes;
 
 
 

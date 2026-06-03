@@ -22,6 +22,34 @@
     document.documentElement.classList.toggle("nav-lifetime", lifetime);
   }
 
+  function storedTruthy(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return normalized === "1" || normalized === "true" || normalized === "yes";
+  }
+
+  function isLifetimeMember(data) {
+    const d = data && typeof data === "object" ? data : {};
+    const raw = d.raw && typeof d.raw === "object" ? d.raw : {};
+    const access = d.access && typeof d.access === "object" ? d.access : {};
+    const rawAccess = raw.access && typeof raw.access === "object" ? raw.access : {};
+    const tier = String(d.tier || d.plan || access.tier || raw.tier || raw.plan || rawAccess.tier || "").trim().toLowerCase();
+    return (
+      storedTruthy(d.life_member) ||
+      storedTruthy(d.lifeMember) ||
+      storedTruthy(d.lifetime_member) ||
+      storedTruthy(d.lifetimeMember) ||
+      storedTruthy(d.lifetime) ||
+      storedTruthy(access.life_member) ||
+      storedTruthy(access.lifeMember) ||
+      storedTruthy(raw.life_member) ||
+      storedTruthy(raw.lifeMember) ||
+      storedTruthy(rawAccess.life_member) ||
+      storedTruthy(rawAccess.lifeMember) ||
+      tier === "life" ||
+      tier === "lifetime"
+    );
+  }
+
   async function probeWebSession() {
     if (localStorage.getItem(TOKEN_KEY)) return;
     try {
@@ -31,7 +59,7 @@
       const email = data && typeof data === "object" ? String(data.email || "").trim() : "";
       if (!email) return;
       document.documentElement.setAttribute(WEB_AUTH_HINT, "1");
-      if (data.life_member || data.lifeMember) {
+      if (isLifetimeMember(data)) {
         localStorage.setItem(LIFETIME_NAV_KEY, "1");
       } else {
         localStorage.removeItem(LIFETIME_NAV_KEY);
@@ -109,7 +137,7 @@
     if (!footer) return;
 
     // Avoid duplicates if any page already includes it.
-    const existing = footer.querySelector('a[href="/beta-tester-rewards.html"], a[href="https://rootrecord.info/beta-tester-rewards"], a[href="https://rootrecord.info/beta-tester-rewards.html"]');
+    const existing = footer.querySelector('a[href="/root-units"], a[href="/root-units.html"], a[href="/beta-tester-rewards.html"], a[href="https://rootrecord.info/root-units"], a[href="https://rootrecord.info/beta-tester-rewards"], a[href="https://rootrecord.info/beta-tester-rewards.html"]');
     if (existing) return;
 
     const cols = Array.from(footer.querySelectorAll(".footer-col"));
@@ -119,7 +147,7 @@
 
     const li = document.createElement("li");
     const a = document.createElement("a");
-    a.href = "/beta-tester-rewards.html";
+    a.href = "/root-units";
     a.textContent = "Roots";
     li.appendChild(a);
     ul.appendChild(li);

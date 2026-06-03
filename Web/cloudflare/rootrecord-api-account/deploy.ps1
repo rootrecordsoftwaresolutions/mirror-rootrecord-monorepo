@@ -148,6 +148,34 @@ if ($fcmPath -and (Test-Path -LiteralPath $fcmPath)) {
   (Get-Content -LiteralPath $fcmPath -Raw) | npx wrangler secret put FCM_SERVICE_ACCOUNT_JSON
 }
 
+$resendApiKey = [string]$env:RESEND_API_KEY
+if ($resendApiKey.Trim().StartsWith("re_")) {
+  $resendApiKey.Trim() | npx wrangler secret put RESEND_API_KEY
+  Write-Host "Uploaded RESEND_API_KEY for account recovery email fallback."
+}
+$resendFrom = [string]$env:RESEND_FROM
+if ($resendFrom.Trim().Contains("@")) {
+  $resendFrom.Trim() | npx wrangler secret put RESEND_FROM
+  Write-Host "Uploaded RESEND_FROM for account recovery email fallback."
+}
+
+foreach ($zohoSecretName in @(
+  "ZOHO_MAIL_ACCOUNT_ID",
+  "ZOHO_MAIL_FROM",
+  "ZOHO_MAIL_OAUTH_TOKEN",
+  "ZOHO_MAIL_REFRESH_TOKEN",
+  "ZOHO_MAIL_CLIENT_ID",
+  "ZOHO_MAIL_CLIENT_SECRET",
+  "ZOHO_ACCOUNTS_BASE_URL",
+  "ZOHO_MAIL_API_BASE_URL"
+)) {
+  $zohoSecretValue = [string](Get-Item -Path "Env:$zohoSecretName" -ErrorAction SilentlyContinue).Value
+  if ($zohoSecretValue.Trim().Length -ge 4) {
+    $zohoSecretValue.Trim() | npx wrangler secret put $zohoSecretName
+    Write-Host "Uploaded $zohoSecretName for Zoho account recovery email."
+  }
+}
+
 $stripeSecret = [string]$env:STRIPE_SECRET_KEY
 if ($stripeSecret -match '^sk_(live|test)_' -and $stripeSecret.Length -gt 30) {
   $stripeSecret | npx wrangler secret put STRIPE_SECRET_KEY
@@ -200,7 +228,7 @@ if ($appSessionWebhook -match '^https://discord(app)?\.com/api/webhooks/' -and $
 $rootEconomyWebhook = [string]$env:DISCORD_ROOT_ECONOMY_WEBHOOK_URL
 if ($shardLeaf -eq 'rootrecord-api-account' -and $rootEconomyWebhook -match '^https://discord(?:app)?\.com/api/webhooks/' -and $rootEconomyWebhook.Length -gt 60) {
   $rootEconomyWebhook | npx wrangler secret put DISCORD_ROOT_ECONOMY_WEBHOOK_URL
-  Write-Host "Uploaded DISCORD_ROOT_ECONOMY_WEBHOOK_URL (Root Economy */45 cron → Discord)."
+  Write-Host "Uploaded DISCORD_ROOT_ECONOMY_WEBHOOK_URL (donations/swaps/deposits; circulation cron off unless ROOT_ECONOMY_DISCORD_CRON_ENABLED=1)."
 }
 
 $grokWebhook = [string]$env:DISCORD_GROK_WEBHOOK_URL
@@ -221,6 +249,16 @@ foreach ($grokSecretName in @(
   if ($shardLeaf -eq 'rootrecord-api-account' -and $grokSecretValue.Trim().Length -ge 12) {
     $grokSecretValue.Trim() | npx wrangler secret put $grokSecretName
     Write-Host "Uploaded $grokSecretName."
+  }
+}
+
+$grokChatAliases = @("XAI_API_KEY", "X_AI_API_KEY", "GROK_API_KEY")
+foreach ($aliasName in $grokChatAliases) {
+  $aliasValue = [string](Get-Item -Path "Env:$aliasName" -ErrorAction SilentlyContinue).Value
+  if ($shardLeaf -eq 'rootrecord-api-account' -and $aliasValue.Trim().Length -ge 12) {
+    $aliasValue.Trim() | npx wrangler secret put GROK_API_BEARER_TOKEN
+    Write-Host "Uploaded GROK_API_BEARER_TOKEN from $aliasName."
+    break
   }
 }
 

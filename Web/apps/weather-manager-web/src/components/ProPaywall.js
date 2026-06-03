@@ -35,20 +35,19 @@ export default function ProPaywall({ onSignOut }) {
       <div className="mx-auto max-w-4xl px-4 py-10 lg:py-16">
         <div className="flex items-center gap-2 text-accent/80 text-xs uppercase tracking-widest mb-3">
           <ShieldCheck className="w-4 h-4" />
-          RootRecord Pro
+          RootRecord membership
         </div>
         <h1 className="text-3xl md:text-4xl font-semibold leading-tight mb-3">
-          Web access is a Pro feature
+          Some features require additional resources
         </h1>
         <p className="text-sm md:text-base text-neutral-300 max-w-2xl mb-6">
-          The Weather Manager web dashboard is available to <strong className="text-white">Pro</strong> and{' '}
-          <strong className="text-white">Lifetime</strong> members. Pick a plan below and you'll be back here in
-          seconds. Already a member? Sign out and back in to refresh your status.
+          Some features are limited to members only. Membership helps cover higher-cost weather data,
+          alerts, sync, and desktop access. Already a member? Your status refreshes automatically when this page opens.
         </p>
 
         <div className="rounded-md border border-subtle bg-container p-4 md:p-5 mb-6">
           <div className="text-[11px] uppercase tracking-widest text-accent/70 mb-2 flex items-center gap-2">
-            <Monitor className="w-3.5 h-3.5" /> What you get with Pro
+            <Monitor className="w-3.5 h-3.5" /> Member features
           </div>
           <ul className="text-sm text-neutral-200 space-y-1.5 list-disc pl-5">
             <li>Full web dashboard at <span className="font-mono text-white">weather.rootrecord.info</span></li>

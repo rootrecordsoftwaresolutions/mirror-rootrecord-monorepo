@@ -8,6 +8,8 @@ export function isAccountShardApiTail(tail: string): boolean {
   if (t === "earn" || t.startsWith("earn/")) return true;
   if (t === "v1/farms" || t.startsWith("v1/farms/")) return true;
   if (t === "app-session" || t.startsWith("app-session/")) return true;
+  if (t === "partnership" || t.startsWith("partnership/")) return true;
+  if (t === "visiting-hawaii" || t.startsWith("visiting-hawaii/")) return true;
   return false;
 }
 

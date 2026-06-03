@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Loader2,
+  Sparkles,
   Thermometer,
   Cloud,
   Layers,
@@ -187,6 +188,109 @@ function LocationPicker({ locations, activeId, onPick }) {
   );
 }
 
+function formatAiTimestamp(raw) {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function WeatherAiCard({ paid, aiData, loading, refreshing, error, onRefresh }) {
+  const reports = Array.isArray(aiData?.reports) ? aiData.reports : [];
+  const latest = aiData?.report || reports[0] || null;
+  const quota = aiData?.quota || {};
+  const remaining = Number(quota.remaining_today);
+  const limit = Number(quota.limit_per_location) || 2;
+  const remainingLabel = Number.isFinite(remaining)
+    ? `${Math.max(0, remaining)} of ${limit} refreshes left today`
+    : `2 refreshes per location daily`;
+
+  if (!paid) {
+    return (
+      <div className="bg-container border border-subtle p-4 mb-4" data-testid="home-weather-ai-card">
+        <div className="flex items-start gap-3">
+          <Sparkles strokeWidth={1.5} className="w-5 h-5 text-accent shrink-0 mt-0.5" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-1">Weather AI</div>
+            <h2 className="text-base font-medium text-white">Member location report</h2>
+            <p className="text-sm text-accent/75 mt-1">
+              Pro and Lifetime members can generate AI reports from their saved weather data.
+            </p>
+            <button
+              type="button"
+              onClick={() => showUpsellModal()}
+              className="mt-3 text-xs font-mono text-accent hover:text-accentHover"
+              data-testid="home-weather-ai-upsell"
+            >
+              See member plans →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-container border border-subtle p-4 mb-4" data-testid="home-weather-ai-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-1 flex items-center gap-2">
+            <Sparkles strokeWidth={1.5} className="w-3.5 h-3.5" aria-hidden /> Weather AI
+          </div>
+          <h2 className="text-base font-medium text-white">Member location report</h2>
+          <p className="text-xs text-accent/70 mt-1">{remainingLabel}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing || loading || remaining === 0}
+          className={clsx(
+            'px-3 py-2 border border-subtle text-xs font-mono text-neutral-200 hover:bg-containerHover active:scale-95',
+            (refreshing || loading) && 'opacity-70',
+            remaining === 0 && 'opacity-50 cursor-not-allowed'
+          )}
+          data-testid="home-weather-ai-refresh"
+        >
+          {refreshing ? 'Generating…' : latest ? 'Refresh AI' : 'Generate'}
+        </button>
+      </div>
+
+      {loading && !latest ? (
+        <div className="flex items-center gap-2 text-sm text-accent/70 mt-4">
+          <Loader2 strokeWidth={1.5} className="w-4 h-4 animate-spin" aria-hidden />
+          Loading AI report…
+        </div>
+      ) : latest ? (
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-neutral-100 leading-relaxed">{latest.summary_text}</p>
+          <div className="border-t border-subtle pt-3">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-accent/70 mb-1">Report</div>
+            <p className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap">{latest.report_text}</p>
+          </div>
+          <div className="text-[10px] font-mono text-accent/60">
+            Source weather: {formatAiTimestamp(latest.weather_fetched_at) || 'cached data'} · Report: {formatAiTimestamp(latest.created_at) || 'recent'}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-accent/75 mt-4">
+          Generate a report from the latest saved dashboard data for this location.
+        </p>
+      )}
+
+      {error && (
+        <div className="text-xs bg-sev-severe/10 border border-sev-severe/40 text-sev-severe p-2 mt-3" data-testid="home-weather-ai-error">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const navigate = useNavigate();
   // Forces rerender when units change (Settings toggle).
@@ -201,6 +305,10 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState('');
   const [locationsLoading, setLocationsLoading] = useState(true);
+  const [aiData, setAiData] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiRefreshing, setAiRefreshing] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   const loadLocations = useCallback(async () => {
     setLocationsLoading(true);
@@ -309,6 +417,58 @@ export default function Home() {
   };
 
   const activeLoc = locations.find((l) => l.id === activeId) || locations[0];
+  const paid = pro || life;
+
+  const loadLocationAi = useCallback(async (loc, opts = {}) => {
+    if (!loc || !paid) {
+      setAiData(null);
+      setAiError('');
+      return;
+    }
+    if (!opts.silent) setAiLoading(true);
+    setAiError('');
+    try {
+      const { data } = await api.getLocationAi(loc.id);
+      setAiData(data);
+    } catch (e) {
+      setAiError(String(e?.response?.data?.detail || e?.message || 'Failed to load Weather AI'));
+    } finally {
+      if (!opts.silent) setAiLoading(false);
+    }
+  }, [paid]);
+
+  useEffect(() => {
+    loadLocationAi(activeLoc);
+  }, [activeLoc?.id, loadLocationAi]);
+
+  const handleAiRefresh = async () => {
+    if (!paid) {
+      showUpsellModal();
+      return;
+    }
+    if (!activeLoc) return;
+    setAiRefreshing(true);
+    setAiError('');
+    try {
+      const { data } = await api.refreshLocationAi(activeLoc.id);
+      setAiData(data);
+    } catch (e) {
+      if (e?.response?.data?.reports || e?.response?.data?.quota) {
+        setAiData(e.response.data);
+      }
+      const detail = e?.response?.data?.detail;
+      if (detail === 'weather_data_required') {
+        setAiError('Refresh weather for this location first, then generate the AI report.');
+      } else if (e?.response?.status === 429) {
+        setAiError('Daily AI refresh limit reached for this location.');
+      } else {
+        setAiError(String(detail || e?.message || 'Failed to generate Weather AI'));
+      }
+    } finally {
+      setAiRefreshing(false);
+    }
+  };
+
   /** Full skeleton until dashboard matches active location (covers first location + picker changes; not plain refresh). */
   const showWeatherSkeleton = Boolean(activeLoc) && !err && bundleLocId !== activeLoc.id;
 
@@ -445,6 +605,15 @@ export default function Home() {
               </div>
             </div>
 
+            <WeatherAiCard
+              paid={paid}
+              aiData={aiData}
+              loading={aiLoading}
+              refreshing={aiRefreshing}
+              error={aiError}
+              onRefresh={handleAiRefresh}
+            />
+
             {/* Bento metrics */}
             <div className="grid grid-cols-2 gap-2 mb-2">
               <Bento icon={Wind} label="Wind" value={fmtSpeedKmH(wind)} sub={windDirSub} />
@@ -510,7 +679,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Daily forecast — 3 days free, 5 days Pro / Lifetime */}
+                    {/* Daily forecast — standard access shows 3 days; members see 5 days. */}
             {forecastPeriods.length > 0 && (() => {
               // Pair Day/Night periods into one card per day. Handles both AccuWeather
               // (always Day 1 / Night 1 / Day 2 / Night 2…) and NWS (may start with a
@@ -563,7 +732,7 @@ export default function Home() {
                       className="text-[10px] font-mono text-accent/80 mb-2 hover:text-accent text-left"
                       data-testid="home-forecast-upsell"
                     >
-                      Upgrade for {FORECAST_DAYS_PRO}-day forecast and live hazards →
+                      Members can view the {FORECAST_DAYS_PRO}-day forecast and live hazards →
                     </button>
                   )}
                   <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-0.5" data-testid="home-daily-strip">

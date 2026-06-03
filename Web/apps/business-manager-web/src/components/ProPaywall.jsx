@@ -27,26 +27,25 @@ export default function ProPaywall() {
     <div className="min-h-[100dvh]" data-testid="pro-paywall">
       <div className="mx-auto max-w-4xl px-4 py-10 lg:py-16">
         <div className="text-[11px] uppercase tracking-widest text-brand/80 mb-3 flex items-center gap-2">
-          <ShieldCheck size={14} /> RootRecord Pro
+          <ShieldCheck size={14} /> RootRecord membership
         </div>
         <h1 className="text-3xl md:text-4xl font-semibold leading-tight mb-3">
-          Web access is a Pro feature
+          Some features require additional resources
         </h1>
         <p className="text-sm md:text-base text-ink-tertiary max-w-2xl mb-6">
-          The Business Manager web portal is available to <strong>Pro</strong> and{" "}
-          <strong>Lifetime</strong> members. Pick a plan below and you'll be back here in seconds.
-          Already a member? Sign out and back in to refresh your status.
+          Some Business Manager features are limited to members only. Membership helps cover sync,
+          reporting, and desktop access. Already a member? Your status refreshes automatically when this page opens.
         </p>
 
         <div className="card p-4 mb-6">
           <div className="text-[11px] uppercase tracking-widest text-brand/70 mb-2 flex items-center gap-2">
-            <Monitor size={13} /> What you get with Pro
+            <Monitor size={13} /> Member features
           </div>
           <ul className="text-sm space-y-1.5 list-disc pl-5">
             <li>Full web portal at <span className="font-mono">business.rootrecord.info</span></li>
             <li>Unlimited PDF reports (free is capped at 3 reports per month)</li>
             <li>Cross-device sync — Android and web stay in lockstep</li>
-            <li>One subscription unlocks Business, Weather, and Kīlauea on every device</li>
+            <li>One membership supports Business, Weather, and Kīlauea features across devices</li>
           </ul>
         </div>
 

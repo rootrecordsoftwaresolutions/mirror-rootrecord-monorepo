@@ -22,9 +22,9 @@ export default function Home() {
 
   const planLabel =
     user?.plan === "life"
-      ? "Lifetime"
+      ? "Member"
       : user?.plan === "pro"
-      ? "Pro"
+      ? "Member"
       : "Free";
 
   return (

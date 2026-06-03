@@ -107,6 +107,50 @@ const STORAGE_KEYS = {
 
 const ACCESS_EVENT = 'rrwm.access.changed';
 
+function storedTruthy(value) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+export function accessFromPayload(data) {
+  const access = data?.access && typeof data.access === 'object' ? data.access : {};
+  const raw = data?.raw && typeof data.raw === 'object' ? data.raw : {};
+  const rawAccess = raw?.access && typeof raw.access === 'object' ? raw.access : {};
+  const tier = String(data?.tier || data?.plan || access?.tier || access?.plan || raw?.tier || raw?.plan || rawAccess?.tier || '').trim().toLowerCase();
+  const subscriptionStatus = String(data?.subscription_status || data?.subscriptionStatus || raw?.subscription_status || '').trim().toLowerCase();
+  const life =
+    storedTruthy(data?.life_member) ||
+    storedTruthy(data?.lifeMember) ||
+    storedTruthy(data?.lifetime_member) ||
+    storedTruthy(data?.lifetimeMember) ||
+    storedTruthy(data?.lifetime) ||
+    storedTruthy(access?.life_member) ||
+    storedTruthy(access?.lifeMember) ||
+    storedTruthy(raw?.life_member) ||
+    storedTruthy(raw?.lifeMember) ||
+    storedTruthy(rawAccess?.life_member) ||
+    storedTruthy(rawAccess?.lifeMember) ||
+    tier === 'life' ||
+    tier === 'lifetime';
+  const pro =
+    life ||
+    storedTruthy(data?.pro_unlocked) ||
+    storedTruthy(data?.proUnlocked) ||
+    storedTruthy(data?.pro) ||
+    storedTruthy(access?.pro_unlocked) ||
+    storedTruthy(access?.proUnlocked) ||
+    storedTruthy(raw?.pro_unlocked) ||
+    storedTruthy(raw?.proUnlocked) ||
+    storedTruthy(rawAccess?.pro_unlocked) ||
+    storedTruthy(rawAccess?.proUnlocked) ||
+    tier === 'pro' ||
+    tier === 'premium' ||
+    tier === 'paid' ||
+    subscriptionStatus === 'active' ||
+    subscriptionStatus === 'trialing';
+  return { pro, life };
+}
+
 /** Capacitor Android: re-read Pro/Lifetime from localStorage and show or hide the native banner. */
 function notifyNativeAdsSync() {
   try {
@@ -201,27 +245,31 @@ export const session = {
   getEmail: () => safeLocalStorage.getItem(STORAGE_KEYS.email) || '',
   isAuthed: () => Boolean(safeLocalStorage.getItem(STORAGE_KEYS.token)),
   isGuest: () => !safeLocalStorage.getItem(STORAGE_KEYS.token),
-  isPro: () => safeLocalStorage.getItem(STORAGE_KEYS.pro) === '1',
-  isLifeMember: () => safeLocalStorage.getItem(STORAGE_KEYS.life) === '1',
+  isPro: () => storedTruthy(safeLocalStorage.getItem(STORAGE_KEYS.pro)),
+  isLifeMember: () => storedTruthy(safeLocalStorage.getItem(STORAGE_KEYS.life)),
   getProCheckedAtMs: () => {
     const raw = safeLocalStorage.getItem(STORAGE_KEYS.proCheckedAt);
     const n = Number(raw);
     return Number.isFinite(n) ? n : 0;
   },
   setSession: (token, email, pro, lifeMember) => {
+    const nextLife = storedTruthy(lifeMember);
+    const nextPro = nextLife || storedTruthy(pro);
     safeLocalStorage.setItem(STORAGE_KEYS.token, token || '');
     safeLocalStorage.setItem(STORAGE_KEYS.email, email || '');
-    safeLocalStorage.setItem(STORAGE_KEYS.pro, pro ? '1' : '0');
-    safeLocalStorage.setItem(STORAGE_KEYS.life, lifeMember ? '1' : '0');
+    safeLocalStorage.setItem(STORAGE_KEYS.pro, nextPro ? '1' : '0');
+    safeLocalStorage.setItem(STORAGE_KEYS.life, nextLife ? '1' : '0');
     // If this user isn't lifetime, treat sign-in as a tier check.
-    if (!lifeMember) safeLocalStorage.setItem(STORAGE_KEYS.proCheckedAt, String(Date.now()));
+    if (!nextLife) safeLocalStorage.setItem(STORAGE_KEYS.proCheckedAt, String(Date.now()));
     try { window.dispatchEvent(new Event(ACCESS_EVENT)); } catch { /* ignore */ }
     notifyNativeAdsSync();
   },
   setAccess: (pro, lifeMember) => {
-    safeLocalStorage.setItem(STORAGE_KEYS.pro, pro ? '1' : '0');
-    safeLocalStorage.setItem(STORAGE_KEYS.life, lifeMember ? '1' : '0');
-    if (!lifeMember) safeLocalStorage.setItem(STORAGE_KEYS.proCheckedAt, String(Date.now()));
+    const nextLife = storedTruthy(lifeMember);
+    const nextPro = nextLife || storedTruthy(pro);
+    safeLocalStorage.setItem(STORAGE_KEYS.pro, nextPro ? '1' : '0');
+    safeLocalStorage.setItem(STORAGE_KEYS.life, nextLife ? '1' : '0');
+    if (!nextLife) safeLocalStorage.setItem(STORAGE_KEYS.proCheckedAt, String(Date.now()));
     try { window.dispatchEvent(new Event(ACCESS_EVENT)); } catch { /* ignore */ }
     notifyNativeAdsSync();
   },
@@ -257,7 +305,8 @@ export async function tryHydrateSessionFromCookie() {
     const { data } = await client.post('/auth/me');
     const tok = data.access_token || data.token;
     if (!tok || !data.email) return false;
-    session.setSession(tok, data.email, data.pro_unlocked, data.life_member);
+    const access = accessFromPayload(data);
+    session.setSession(tok, data.email, access.pro, access.life);
     return true;
   } catch {
     return false;
@@ -320,6 +369,10 @@ export const api = {
         Pragma: 'no-cache',
       },
     }),
+  getLocationAi: (locationId) =>
+    client.get('/weather/location-ai', { params: { location_id: locationId } }),
+  refreshLocationAi: (locationId) =>
+    client.post('/weather/location-ai', { location_id: locationId }),
   // hazards
   earthquakes: (lat, lon, opts = {}) =>
     client.get('/usgs/earthquakes', {

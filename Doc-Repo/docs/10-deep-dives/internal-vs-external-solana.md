@@ -18,4 +18,5 @@
 
 ## Related reading
 
+- [discord-roots-onboarding.md](discord-roots-onboarding.md) — custodial deposit wallet + `/swap` flow in Discord
 - [../05-solana/solana-ecosystem.md](../05-solana/solana-ecosystem.md)

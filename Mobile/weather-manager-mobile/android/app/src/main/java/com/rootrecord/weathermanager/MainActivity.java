@@ -25,9 +25,11 @@ import androidx.core.view.WindowInsetsCompat;
 public class MainActivity extends BridgeActivity {
   /** Hide banner only when signed in and Pro or lifetime (ignore stale pro flags for guests). */
   private static final String AD_FREE_JS =
-      "(function(){try{var t=localStorage.getItem('rrwm.token');"
-          + "if(!t)return false;return localStorage.getItem('rrwm.pro')==='1'"
-          + "||localStorage.getItem('rrwm.life_member')==='1';}catch(e){return false;}})();";
+      "(function(){try{function yes(k){var v=String(localStorage.getItem(k)||'').toLowerCase();"
+          + "return v==='1'||v==='true'||v==='yes';}var t=localStorage.getItem('rrwm.token');"
+          + "if(!t)return false;return yes('rrwm.pro')||yes('rrwm.pro_unlocked')"
+          + "||yes('rrwm.life_member')||yes('rrwm.lifeMember')"
+          + "||yes('rrwm.lifetime_member');}catch(e){return false;}})();";
 
   /** Small gap between the native banner bottom and the first web content row. */
   private static final int BANNER_TOP_GAP_DP = 4;
@@ -96,6 +98,7 @@ public class MainActivity extends BridgeActivity {
             syncWebBannerInset();
           }
         });
+    adView.setVisibility(View.GONE);
     applyStatusBarMarginToAd();
   }
 
@@ -156,12 +159,12 @@ public class MainActivity extends BridgeActivity {
     }
     Bridge bridge = getBridge();
     if (bridge == null) {
-      applyAdFree(false);
+      hideAdUntilEligibilityResolves();
       return;
     }
     WebView webView = bridge.getWebView();
     if (webView == null) {
-      applyAdFree(false);
+      hideAdUntilEligibilityResolves();
       return;
     }
     webView.evaluateJavascript(
@@ -173,6 +176,15 @@ public class MainActivity extends BridgeActivity {
       return false;
     }
     return "true".equals(value) || "\"true\"".equals(value);
+  }
+
+  private void hideAdUntilEligibilityResolves() {
+    if (adView == null) {
+      return;
+    }
+    adView.setVisibility(View.GONE);
+    adView.pause();
+    syncWebBannerInset();
   }
 
   private void applyAdFree(boolean adFree) {

@@ -29,7 +29,7 @@ name = "EMAIL"
 [vars]
 WORKER_SHARD = "account"
 SITE_URL = "https://rootrecord.info"
-# Outbound mail (POST /api/me/email/request): Cloudflare Email Sending binding `EMAIL` + optional Resend fallback.
+# Outbound mail (account verification/recovery): prefer Zoho/Resend for user inboxes; Cloudflare Email Sending only reaches verified Email Routing destinations.
 EMAIL_FROM = "RootRecord <root@rootrecord.info>"
 DISCORD_CLIENT_ID = "1500289560343740566"
 # Discord Interactions `POST /v1/discord/interactions` — verify_key (hex, public). Rotate app → `node scripts/discord-register-root-units-commands.mjs` for a new value.
@@ -43,8 +43,14 @@ DISCORD_ACTIVE_LOOKBACK_DAYS = "14"
 DISCORD_VERIFIED_ROLE_ID = "1504042901963804742"
 # strip-roles / ops: members with this role are not role-stripped (discord-guild-ops.mjs).
 DISCORD_DEVELOPER_ROLE_ID = "1497040541559558175"
+DISCORD_LIFETIME_MEMBER_ROLE_ID = "1504043473408360558"
+DISCORD_MONTHLY_MEMBER_ROLE_ID = "1497040710665244782"
+DISCORD_KILAUEA_REPORT_CHANNEL_ID = "1502461868990791770"
+DISCORD_KILAUEA_AI_ARCHIVE_CHANNEL_ID = "1507597139465867364"
 # Bot posts here when a member completes RootRecord↔Discord link (content pings only that user via allowed_mentions).
 DISCORD_VERIFIED_CHAT_CHANNEL_ID = "1497039565461000214"
+# Partnership signup endpoint posts Grok reports here.
+DISCORD_PARTNERSHIP_REPORT_CHANNEL_ID = "1499489364147835090"
 # Welcome channel (readable by @everyone; used by discord-guild-ops.mjs). Dev mode → Copy ID.
 DISCORD_WELCOME_CHANNEL_ID = "1497160346358644767"
 # AccuWeather: API key is a Worker **Secret** (`deploy.ps1` from repo-root `credentials.env` → `wrangler secret put ACCUWEATHER_API_KEY`), not [vars] (avoids Secret + var name clash in dashboard).
@@ -60,6 +66,8 @@ ACCUWEATHER_REUSE_RADIUS_MILES = "25"
 # Stripe webhooks live on license: https://rootrecord-license.rootrecord.workers.dev/v1/billing/webhook
 # Recurring monthly subscription (Stripe Dashboard → Product “Monthly”; matches site billing).
 STRIPE_PRICE_ID = "price_1TQIpzIaRpbMiAov5g5iTPh9"
+# Annual Visiting Hawaiʻi sponsored listing ($100/year). Create in Stripe Dashboard, then set:
+# STRIPE_VISITING_HAWAII_SPONSORED_PRICE_ID = "price_..."
 # Stripe Pricing Table (same ids as rootrecord-website Pages Billing; optional here for parity / future use).
 STRIPE_PRICING_TABLE_ID = "prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ"
 STRIPE_PUBLISHABLE_KEY = "pk_live_51T3sezIaRpbMiAov6SUJgKLGR1igmRGOYg1rY1hKJPAWxLXDgJR7kRNSBSM8sJ2Wat1zuC56iE4TCTyPfqmEfTT600cR21LwYA"
@@ -69,6 +77,7 @@ STRIPE_PUBLISHABLE_KEY = "pk_live_51T3sezIaRpbMiAov6SUJgKLGR1igmRGOYg1rY1hKJPAWx
 #   wrangler secret put RRTT_TREASURY_SECRET_KEY_B58
 # ROOTS minting + automated treasury Raydium LP + Discord developer feed: Worker `rootrecord-solana-tx` (plain var, no trailing slash):
 ROOTRECORD_SOLANA_TX_URL = "https://rootrecord-solana-tx.rootrecord.workers.dev"
+ROOTRECORD_API_KILAUEA_URL = "https://rootrecord-api-kilauea.rootrecord.workers.dev"
 RRTT_MINT_BASE58 = "6KfGKe13ASrV5WHvChbapQXxxEFRNqwpwrdEVsX6RQMT"
 RRTT_DECIMALS = "9"
 # Max wait for custodial balance Solana RPC on `/auth/me` + `/earn/summary` (see custodial-onchain-cache.ts).
@@ -92,6 +101,7 @@ PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.
 # (same bot token as previously on api-weather). Bot needs View Channel + Read Message History + Message Content intent.
 # Optional: set DISCORD_GUILD_ID here to skip resolving guild from the announcements channel (same guild only).
 DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1500286864119038103"
+DISCORD_ROOTS_BUY_CHANNEL_ID = "1505853241915736154"
 # Internal custodial wallet encryption (AES-256-GCM). deploy.ps1 uploads INTERNAL_WALLET_ENC_KEY_B64
 # Failsafe: application code never DELETEs `internal_solana_wallets` (encrypted keys) — even on DELETE /v1/me / inactive purge.
 # (from credentials.env, or .deploy-internal-wallet-key, or auto-generated like JWT_SECRET).

@@ -50,6 +50,10 @@ export interface AuthEnv {
 
   STRIPE_PRICE_ID?: string;
 
+  DISCORD_BOT_TOKEN?: string;
+  DISCORD_GUILD_ID?: string;
+  DISCORD_DEVELOPER_ROLE_ID?: string;
+
   /** Mainnet RPC for custodial cache refresh (background `waitUntil` after `/v1/me`, cron, etc.). */
 
   SOLANA_RPC_URL?: string;
@@ -58,6 +62,29 @@ export interface AuthEnv {
 
   RRTT_DECIMALS?: string;
 
+}
+
+async function linkedDiscordUserId(db: D1Database, accountId: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT discord_user_id FROM discord_account_links WHERE account_id = ?")
+    .bind(accountId)
+    .first<{ discord_user_id: string }>();
+  return typeof row?.discord_user_id === "string" && row.discord_user_id.trim() ? row.discord_user_id.trim() : null;
+}
+
+async function discordUserHasRole(env: AuthEnv, discordUserId: string | null, roleId: string | undefined): Promise<boolean> {
+  const token = String(env.DISCORD_BOT_TOKEN || "").replace(/^bot\s+/i, "").trim();
+  const guildId = String(env.DISCORD_GUILD_ID || "").trim();
+  const uid = String(discordUserId || "").trim();
+  const rid = String(roleId || "").trim();
+  if (!token || !guildId || !uid || !rid) return false;
+  const res = await fetch(`https://discord.com/api/v10/guilds/${encodeURIComponent(guildId)}/members/${encodeURIComponent(uid)}`, {
+    headers: { Authorization: `Bot ${token}`, "User-Agent": "RootRecordKilaueaAuth (developer role)" },
+  });
+  if (!res.ok) return false;
+  const member = (await res.json().catch(() => ({}))) as { roles?: unknown };
+  const roles = Array.isArray(member.roles) ? member.roles.map((r) => String(r)) : [];
+  return roles.includes(rid);
 }
 
 
@@ -607,9 +634,16 @@ export async function authMe(
 
   const billing = await fetchBillingSnapshot(env.DB, sess.email);
   const acct = await readUserAccountAccessFlags(env.DB, sess.email);
-  const pro = Boolean(billing?.pro_unlocked) || Boolean(acct?.pro_unlocked);
+  let pro = Boolean(billing?.pro_unlocked) || Boolean(acct?.pro_unlocked);
   const subStatus = billing ? billing.subscription_status : "none";
-  const life = Boolean(billing?.life_member) || Boolean(acct?.life_member);
+  let life = Boolean(billing?.life_member) || Boolean(acct?.life_member);
+  if (life) pro = true;
+  const discordUserId = await linkedDiscordUserId(env.DB, sess.accountId).catch(() => null);
+  const developerUnlimited = await discordUserHasRole(env, discordUserId, env.DISCORD_DEVELOPER_ROLE_ID).catch(() => false);
+  if (developerUnlimited) {
+    pro = true;
+    life = true;
+  }
 
   let apps: Awaited<ReturnType<typeof getAppAssociationsForEmail>>;
   try {
@@ -624,6 +658,7 @@ export async function authMe(
       rootrecord_business_manager_android: { associated: false, last_connected_at: null },
       rootrecord_weather_manager_windows: { associated: false, last_connected_at: null },
       rootrecord_weather_manager_android: { associated: false, last_connected_at: null },
+      usage: [],
       signals: { mobile_push: false, saved_locations: false, weather_cache: false },
     };
   }
@@ -722,7 +757,11 @@ export async function authMe(
 
       lifeMember: life,
 
-      access: { tier: pro ? "pro" : "none", reason: pro ? "paid" : "none" },
+      access: {
+        tier: developerUnlimited ? "developer" : pro ? "pro" : "none",
+        reason: developerUnlimited ? "discord_developer" : pro ? "paid" : "none",
+      },
+      developer_unlimited: developerUnlimited,
 
       subscription_status: subStatus,
 

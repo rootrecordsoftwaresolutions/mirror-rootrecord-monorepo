@@ -86,7 +86,14 @@ async function scalarString(
  */
 /** Accepts a Cloudflare D1Database binding (typed in each Worker package). */
 export async function getAppAssociationsForEmail(
-  db: { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: <T>() => Promise<T | null> } } },
+  db: {
+    prepare: (sql: string) => {
+      bind: (...args: unknown[]) => {
+        first: <T>() => Promise<T | null>;
+        all: <T>() => Promise<{ results?: T[] }>;
+      };
+    };
+  },
   email: string,
 ): Promise<AppAssociationsPayload> {
   const userId = `user:${email.trim().toLowerCase()}`;

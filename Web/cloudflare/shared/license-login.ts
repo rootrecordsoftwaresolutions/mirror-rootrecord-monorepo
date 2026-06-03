@@ -1,6 +1,12 @@
-import type { D1Database } from "@cloudflare/workers-types";
-
 import { verifyLicenseAccountPassword } from "./password-verify";
+
+type D1PreparedStatement = {
+  bind: (...args: unknown[]) => D1PreparedStatement;
+  first: <T>() => Promise<T | null>;
+  all: <T>() => Promise<{ results?: T[] }>;
+  run: () => Promise<unknown>;
+};
+type D1Database = { prepare: (sql: string) => D1PreparedStatement };
 
 export type LicenseLoginRow = {
   id: string;
@@ -103,9 +109,11 @@ export async function deleteMergedDuplicateAccount(
   const aid = accountId.trim();
   const userId = `user:${emailLower}`;
 
-  await db.batch([
+  await (db as unknown as { batch: (statements: D1PreparedStatement[]) => Promise<unknown> }).batch([
     db.prepare("DELETE FROM license_sessions WHERE account_id = ?").bind(aid),
     db.prepare("DELETE FROM license_email_change WHERE account_id = ?").bind(aid),
+    db.prepare("DELETE FROM license_account_security WHERE account_id = ?").bind(aid),
+    db.prepare("DELETE FROM license_account_challenges WHERE account_id = ?").bind(aid),
     db.prepare("DELETE FROM discord_account_links WHERE account_id = ?").bind(aid),
     db.prepare("DELETE FROM solana_linked_wallets WHERE account_id = ?").bind(aid),
     db.prepare("DELETE FROM internal_solana_wallets WHERE account_id = ?").bind(aid),

@@ -122,6 +122,7 @@ async function migrateUserScopedIds(db: D1Database, oldEmail: string, newEmail: 
     { sql: "UPDATE rrwm_push_tokens SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE rrwm_locations SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE weather_data SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
+    { sql: "UPDATE weather_location_ai_reports SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE rrwm_alert_seen SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE rr_earn_balance SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
     { sql: "UPDATE rr_earn_day SET user_id = ? WHERE user_id = ?", binds: [newU, oldU] },
@@ -147,6 +148,7 @@ const KNOWN_APPS: {
   id: string;
   name: string;
   android_package: string;
+  play_store_url?: string;
 }[] = [
   {
     id: "rootrecord_weather_manager_android",
@@ -172,6 +174,7 @@ const KNOWN_APPS: {
     id: "rootrecord_kilauea_alerts_android",
     name: "Kīlauea Alerts",
     android_package: "com.rootrecord.kilauea",
+    play_store_url: "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea",
   },
 ];
 
@@ -342,6 +345,7 @@ async function handleMeAppsGet(request: Request, env: MeAccountEnv): Promise<Res
       entitlement: tier,
       last_seen_at,
       android_package: app.android_package,
+      play_store_url: app.play_store_url || null,
     });
   }
   return json(out, 200);

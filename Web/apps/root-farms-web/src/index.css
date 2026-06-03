@@ -361,8 +361,76 @@ input {
   gap: 0.65rem;
 }
 
+.treasury-deposit-card {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 12rem) 1fr;
+  gap: 0.85rem;
+  align-items: stretch;
+  padding: 0.85rem;
+  border: 1px solid rgba(134, 239, 172, 0.28);
+  border-radius: 0.95rem;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(134, 239, 172, 0.16), transparent 38%),
+    rgba(15, 23, 42, 0.62);
+}
+
+.treasury-qr-card {
+  display: grid;
+  min-height: 10rem;
+  place-items: center;
+  border: 1px solid rgba(134, 239, 172, 0.24);
+  border-radius: 0.85rem;
+  background: rgba(242, 255, 244, 0.96);
+  padding: 0.55rem;
+}
+
+.treasury-qr-card img {
+  width: min(100%, 11rem);
+  height: auto;
+  display: block;
+  border-radius: 0.35rem;
+}
+
+.treasury-qr-placeholder {
+  color: #06130d;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+.treasury-deposit-copy {
+  display: grid;
+  align-content: center;
+  gap: 0.45rem;
+}
+
+.treasury-public-address {
+  display: block;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.treasury-deposit-copy p,
+.treasury-deposit-copy small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.treasury-address-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
 .treasury-wallet-grid > div,
-.treasury-mint-card {
+.treasury-mint-card,
+.treasury-swap-card {
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
@@ -396,6 +464,16 @@ input {
   font-size: 0.82rem;
 }
 
+@media (max-width: 560px) {
+  .treasury-deposit-card {
+    grid-template-columns: 1fr;
+  }
+
+  .treasury-qr-card img {
+    width: min(100%, 13rem);
+  }
+}
+
 .treasury-mint-card {
   display: flex;
   justify-content: space-between;
@@ -417,6 +495,209 @@ input {
 
 .treasury-mint-card--locked {
   opacity: 0.74;
+}
+
+.treasury-swap-card {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.treasury-swap-card h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.treasury-swap-card p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.treasury-swap-input {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 14rem;
+}
+
+.treasury-swap-input span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.treasury-swap-input input {
+  width: 100%;
+}
+
+.transactions-screen {
+  max-width: 76rem;
+}
+
+.transactions-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.transaction-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.transaction-stat-grid > div,
+.transaction-chart-card,
+.transaction-list-card {
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.95rem;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.transaction-stat-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.transaction-stat-grid strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--green);
+  font-family: var(--mono);
+}
+
+.transaction-chart-card,
+.transaction-list-card {
+  margin-top: 1rem;
+}
+
+.transaction-chart {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.transaction-chart-row {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr 7rem;
+  gap: 0.65rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.transaction-chart-track {
+  height: 0.8rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.transaction-chart-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+}
+
+.transaction-chart-row strong {
+  color: var(--text);
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.transaction-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.transaction-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.9rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 0.8rem;
+  background: rgba(2, 6, 23, 0.32);
+}
+
+.transaction-row--swap {
+  border-color: rgba(34, 211, 238, 0.24);
+}
+
+.transaction-row--deposit {
+  border-color: rgba(74, 222, 128, 0.24);
+}
+
+.transaction-row--market {
+  border-color: rgba(250, 204, 21, 0.24);
+}
+
+.transaction-row--onchain {
+  border-color: rgba(168, 85, 247, 0.24);
+}
+
+.transaction-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.transaction-row-title strong {
+  color: var(--text);
+}
+
+.transaction-row-title span {
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--cyan);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.transaction-row p,
+.transaction-row small {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.transaction-row-values {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 0.25rem;
+  min-width: 8rem;
+  font-family: var(--mono);
+}
+
+.transaction-row-values strong {
+  color: var(--green);
+}
+
+.transaction-row-values strong.is-out {
+  color: var(--danger);
+}
+
+.transaction-row-values span,
+.transaction-row-values a {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.transaction-row-values a {
+  color: var(--cyan);
 }
 
 .orchard-empty-card {

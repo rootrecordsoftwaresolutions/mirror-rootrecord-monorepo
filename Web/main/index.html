@@ -48,8 +48,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"WebSite","name":"RootRecord","url":"https://rootrecord.info","description":"Multi-device software for operations, time, money, and weather — mobile-first on Android plus web.","publisher":{"@type":"Organization","name":"RootRecord","url":"https://rootrecord.info"},"inLanguage":"en-US"}
   </script>
-  <link rel="stylesheet" href="/styles.css?v=11">
-  <script src="/root-economy-widget.js?v=12" defer></script>
+  <link rel="stylesheet" href="/styles.css?v=12">
 </head>
 <body>
 <!-- Google Tag Manager (noscript) -->
@@ -86,7 +85,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <a href="/my-apps.html" role="menuitem">My Apps</a>
                 <a href="/development-notice.html" role="menuitem">Development notice</a>
                 <a href="/billing.html" role="menuitem">Billing</a>
-                <a href="/beta-tester-rewards.html" role="menuitem">Roots</a>
               </div>
             </span>
           </span>
@@ -99,9 +97,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <section class="hero">
         <div class="container hero-grid">
           <div class="fade-up">
-            <span class="eyebrow">Android &amp; web · Weather Manager on Google Play</span>
+            <span class="eyebrow">Android &amp; web · Weather Manager and Kīlauea Alerts on Google Play</span>
             <h1 class="hero-title hero-title-brand">RootRecord</h1>
-            <p class="hero-lead">Software for people who run real operations &mdash; <strong style="color:var(--ink);font-weight:600">Weather Manager</strong> is our newest public Android app on <strong style="color:var(--ink);font-weight:600">Google Play</strong>, alongside <strong style="color:var(--ink);font-weight:600">Business Manager</strong> and <strong style="color:var(--ink);font-weight:600">Kīlauea Alerts</strong> (closed testing) and full web apps at <strong style="color:var(--ink);font-weight:600">*.rootrecord.info</strong>. Subscription and online features stay optional until you want them.</p>
+            <p class="hero-lead">Software for people who run real operations &mdash; <strong style="color:var(--ink);font-weight:600">Weather Manager</strong> and <strong style="color:var(--ink);font-weight:600">Kīlauea Alerts</strong> are live on <strong style="color:var(--ink);font-weight:600">Google Play</strong>, alongside <strong style="color:var(--ink);font-weight:600">Business Manager</strong> and full web apps at <strong style="color:var(--ink);font-weight:600">*.rootrecord.info</strong>. Subscription and online features stay optional until you want them.</p>
             <p class="hero-platform-line">Same account on Android and the web &mdash; your data, your devices</p>
             <div class="hero-ctas">
               <a class="btn btn-primary btn-arrow" href="https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager" target="_blank" rel="noopener" data-testid="hero-weather-play-btn">Get Weather Manager on Google Play</a>
@@ -137,6 +135,24 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         </div>
       </section>
 
+      <!-- VISITING HAWAI'I — COMING SOON -->
+      <section class="container home-visiting-hawaii" aria-labelledby="home-visiting-hawaii-heading" data-testid="home-visiting-hawaii-card">
+        <article class="home-visiting-hawaii-card">
+          <div class="home-visiting-hawaii-card-inner">
+            <img class="home-visiting-hawaii-mark" src="/assets/visiting-hawaii-mark.svg" alt="" width="72" height="72" aria-hidden="true">
+            <div>
+              <span class="product-card-tag home-visiting-hawaii-tag">Coming soon</span>
+              <h2 class="home-visiting-hawaii-title" id="home-visiting-hawaii-heading">Visiting Hawaiʻi</h2>
+              <p class="home-visiting-hawaii-lead">A local-first travel guide for all six visitor islands &mdash; authentic beaches, hikes, culture, food, and hidden gems with offline maps and a <em>mālama ʻāina</em> mindset. Built by RootRecord for travelers who want real Hawaiʻi, not just tourist traps.</p>
+              <div class="cta-row">
+                <a class="btn btn-primary btn-arrow" href="/visiting-hawaii.html" data-testid="home-visiting-hawaii-learn-btn">Explore the app &amp; join waitlist</a>
+                <a class="btn btn-secondary" href="/visiting-hawaii.html#waitlist" data-testid="home-visiting-hawaii-waitlist-btn">Join waitlist</a>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
       <!-- NEWEST PUBLIC APP -->
       <section class="container home-featured-public-app" aria-labelledby="home-featured-weather-heading" data-testid="home-featured-weather">
         <article class="home-featured-public-app-card">
@@ -155,6 +171,41 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         </article>
       </section>
 
+      <!-- IOS WAITLIST -->
+      <section class="container home-ios-waitlist" aria-labelledby="home-ios-waitlist-heading">
+        <article class="card-plain home-ios-waitlist-card" data-testid="home-ios-waitlist-card">
+          <div>
+            <span class="product-card-tag">iOS waitlist</span>
+            <h2 class="section-title" id="home-ios-waitlist-heading" style="font-size:1.5rem;margin:0.35rem 0 0.5rem">Want RootRecord on iPhone?</h2>
+            <p class="note" style="margin:0">Join the iOS waitlist and tell us which app you want first. We will use this to prioritize TestFlight and App Store releases.</p>
+          </div>
+          <form id="ios-waitlist-form" class="stack-form home-ios-waitlist-form" data-testid="home-ios-waitlist-form">
+            <label>Name (optional)
+              <input type="text" id="ios-waitlist-name" name="name" autocomplete="name" maxlength="120">
+            </label>
+            <label>Email
+              <input type="email" id="ios-waitlist-email" name="email" autocomplete="email" required maxlength="200">
+            </label>
+            <label>App
+              <select id="ios-waitlist-product" name="product">
+                <option>All RootRecord iOS apps</option>
+                <option>Kīlauea Alerts</option>
+                <option>Weather Manager</option>
+                <option>Business Manager</option>
+                <option>Account Hub</option>
+                <option>Token Manager</option>
+                <option>Visiting Hawaiʻi</option>
+              </select>
+            </label>
+            <label>Notes (optional)
+              <textarea id="ios-waitlist-notes" name="notes" rows="3" maxlength="1200" placeholder="Tell us what you need on iPhone or iPad."></textarea>
+            </label>
+            <button type="submit" class="btn btn-primary btn-arrow" data-testid="home-ios-waitlist-submit">Join iOS waitlist</button>
+            <p id="ios-waitlist-status" class="status" role="status" aria-live="polite"></p>
+          </form>
+        </article>
+      </section>
+
       <!-- PRERELEASE + NEWSLETTER (account) -->
       <section class="container home-prerelease" aria-labelledby="home-prerelease-heading">
         <div class="cta-band home-prerelease-band" data-testid="home-prerelease-banner">
@@ -167,11 +218,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           </div>
           <p class="home-prerelease-foot">We keep mail useful and infrequent. <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a></p>
         </div>
-        <article class="card-plain home-economy-card" aria-labelledby="home-economy-heading">
-          <h2 class="section-title" id="home-economy-heading" style="font-size:1.25rem;margin:0 0 0.5rem">Root Economy</h2>
-          <p class="note" style="margin:0 0 0.75rem">Live internal Roots circulation across linked accounts — updates as members use apps and the Roots program.</p>
-          <div id="home-economy-widget" data-testid="home-economy-widget"></div>
-        </article>
       </section>
 
       <!-- PRINCIPLES STRIP -->
@@ -201,7 +247,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <div class="section-header">
             <div class="section-kicker">What we build</div>
             <h2 class="section-title">Practical tools, <em>carefully made</em>.</h2>
-            <p class="section-lead"><strong style="color:var(--ink)">Weather Manager</strong> is live on <strong style="color:var(--ink)">Google Play</strong>. Business Manager and Kīlauea Alerts are on Android closed testing; every product also has a <strong style="color:var(--ink)">web app</strong> at its own <code>*.rootrecord.info</code> subdomain. One RootRecord account, same data on every device.</p>
+            <p class="section-lead"><strong style="color:var(--ink)">Weather Manager</strong> and <strong style="color:var(--ink)">Kīlauea Alerts</strong> are live on <strong style="color:var(--ink)">Google Play</strong>. Business Manager is in Android closed testing; every product also has a <strong style="color:var(--ink)">web app</strong> at its own <code>*.rootrecord.info</code> subdomain. One RootRecord account, same data on every device.</p>
           </div>
 
           <ul class="products-grid" data-testid="home-products-list">
@@ -233,12 +279,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               <a class="product-card" href="/kilauea-alerts.html" data-testid="product-card-kilauea">
                 <span class="product-card-tag">For Hawaiʻi Island &middot; Android &amp; web</span>
                 <h3 class="product-card-title">Kilauea Alerts</h3>
-                <p class="product-card-desc">Kīlauea dashboards, earthquakes, weather, live feeds, USGS volcano notices, and NWS alerts &mdash; on Android (Google Play closed testing) or in any desktop/laptop browser at kilauea.rootrecord.info.</p>
+                <p class="product-card-desc">Kīlauea dashboards, earthquakes, weather, live feeds, USGS volcano notices, and NWS alerts &mdash; download on Google Play or use any desktop/laptop browser at kilauea.rootrecord.info.</p>
                 <span class="product-card-cta">View product page</span>
               </a>
               <p class="note" style="margin:0.5rem 0 0;font-size:0.875rem;display:flex;flex-wrap:wrap;gap:0.75rem 1.25rem">
                 <a href="https://kilauea.rootrecord.info/" target="_blank" rel="noopener" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px" data-testid="home-kilauea-web-app">Open web app &rarr;</a>
-                <a href="https://play.google.com/apps/testing/com.rootrecord.kilauea" target="_blank" rel="noopener" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px" data-testid="home-kilauea-play-testing">Android beta (Google Play closed testing)</a>
+                <a href="https://play.google.com/store/apps/details?id=com.rootrecord.kilauea" target="_blank" rel="noopener" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px" data-testid="home-kilauea-play-store">Download on Google Play</a>
               </p>
             </li>
           </ul>
@@ -276,7 +322,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <div class="feature">
               <div class="feature-icon"><span aria-hidden="true">&#9679;</span></div>
               <h3>Google Play &amp; updates</h3>
-              <p><a href="https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager" target="_blank" rel="noopener" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px">Weather Manager</a> installs from Google Play like any public app. Other Android builds use closed testing or GitHub Releases; each app shows its version in About.</p>
+              <p><a href="https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager" target="_blank" rel="noopener" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px">Weather Manager</a> and <a href="https://play.google.com/store/apps/details?id=com.rootrecord.kilauea" target="_blank" rel="noopener" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px">Kīlauea Alerts</a> install from Google Play like public apps. Other Android builds use closed testing or GitHub Releases; each app shows its version in About.</p>
             </div>
             <div class="feature">
               <div class="feature-icon"><span aria-hidden="true">&#9679;</span></div>
@@ -321,21 +367,21 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <h4>Company</h4>
             <ul>
               <li><a href="/about.html">About</a></li>
+              <li><a href="/roadmap/">Roadmap</a></li>
               <li><a href="/faq.html">FAQ</a></li>
               <li><a href="/contact.html">Contact</a></li>
               <li><a href="/account.html">Account</a></li>
               <li><a href="/billing.html">Billing</a></li>
-              <li><a href="/beta-tester-rewards.html">Roots</a></li>
             </ul>
           </div>
           <div class="footer-col">
             <h4>Community</h4>
             <ul>
-              <li><a href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener">Discord</a></li>
+              <li><a href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener">Discord</a></li>
               <li><a href="https://x.com/RootRecord" target="_blank" rel="noopener">X (Twitter)</a></li>
               <li><a href="/terms.html">Terms</a></li>
               <li><a href="/privacy.html">Privacy</a></li>
-              <li><a href="https://github.com/RootRecord/Doc-Repo" target="_blank" rel="noopener">Developer documentation</a></li>
+              <li><a href="https://github.com/RootRecord/Doc-Repo" target="_blank" rel="noopener">Developer Documentation</a></li>
             </ul>
           </div>
         </div>
@@ -349,10 +395,46 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <script src="/site-nav.js?v=5" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      var el = document.getElementById("home-economy-widget");
-      if (el && typeof mountRootEconomyWidget === "function") {
-        mountRootEconomyWidget(el, { compact: true, days: 14, pollMs: 30000, showLeaderboard: false });
+      var form = document.getElementById("ios-waitlist-form");
+      if (!form) return;
+      var status = document.getElementById("ios-waitlist-status");
+      var submit = form.querySelector("button[type='submit']");
+      function setWaitlistStatus(message, kind) {
+        if (!status) return;
+        status.textContent = message || "";
+        status.className = "status" + (kind ? " status-" + kind : "");
       }
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        setWaitlistStatus("", "");
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "Submitting...";
+        }
+        try {
+          var res = await fetch("/api/ios-waitlist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: document.getElementById("ios-waitlist-name").value.trim(),
+              email: document.getElementById("ios-waitlist-email").value.trim(),
+              product: document.getElementById("ios-waitlist-product").value,
+              notes: document.getElementById("ios-waitlist-notes").value.trim()
+            })
+          });
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok) throw new Error(data && data.error ? String(data.error) : "Request failed");
+          form.reset();
+          setWaitlistStatus("You're on the iOS waitlist. Mahalo.", "ok");
+        } catch (err) {
+          setWaitlistStatus((err && err.message) ? err.message : "Could not join the waitlist. Please try again.", "err");
+        } finally {
+          if (submit) {
+            submit.disabled = false;
+            submit.textContent = "Join iOS waitlist";
+          }
+        }
+      });
     });
   </script>
 </body>

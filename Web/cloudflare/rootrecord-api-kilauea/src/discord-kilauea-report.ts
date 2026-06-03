@@ -1,6 +1,23 @@
 ﻿import type { D1Database } from "@cloudflare/workers-types";
 import { getFcmAccessToken, sendFcmNotification } from "./fcm-v1";
-import { kilaueaBotToken, postKilaueaDiscordMessage, postKilaueaReportContent } from "./discord-kilauea-bot";
+import {
+  buildKilaueaAnalysisDiscordBody,
+  formatOfficialSocialSection,
+  kilaueaBotToken,
+  postKilaueaDiscordMessage,
+  postKilaueaReportContent,
+  stripOfficialSocialSection,
+} from "./discord-kilauea-bot";
+import {
+  attachEarthquakeActivity,
+  eventsToLegacyRecords,
+  fetchHawaiiEarthquakeEvents,
+  formatEarthquakeActivitySection,
+  KILAUEA_EQ_COUNT_MIN_MAG,
+  peakMagnitude,
+  slimEarthquakeContextForAi,
+  type EarthquakeActivitySummary,
+} from "./kilauea-earthquake-stats";
 
 export type KilaueaReportEnv = {
   DB: D1Database;
@@ -210,8 +227,11 @@ async function callGrokAnalysis(
       {
         role: "system",
         content:
-          `${instruction} Use only provided data. Be precise, mention unavailable/failed sources, and keep under 1200 characters. ` +
-          "Do not reveal secrets, raw credentials, provider names, model names, API configuration, archive/debug status, or provider errors.",
+          `${instruction} Synthesize all feeds into one professional brief — never repeat the same HVO/USGS notice wording in multiple sections. ` +
+          "Use plain text with markdown bold section labels. Include complete detail in each section (full NWS alert summaries, full official social text, full seismic windows). " +
+          "Under **Seismic activity — recent**, include the M1.0+ count requirements description line before the bullet counts. " +
+          "Do not append per-section source attribution (e.g. 'Source: NWS…', 'USGS rolling windows'); the brief header disclaimer is sufficient. " +
+          "Do not reveal secrets, provider names, model names, or API errors.",
       },
       { role: "user", content: jsonForArchive(data) },
     ],
@@ -371,66 +391,110 @@ async function collectOfficialKilaueaXUpdates(env: KilaueaReportEnv): Promise<Re
   }
 }
 
+function activeHourlyPeriod(periods: Array<Record<string, unknown>>): Record<string, unknown> {
+  const now = Date.now();
+  for (const p of periods) {
+    const start = Date.parse(String(p.startTime || ""));
+    const end = Date.parse(String(p.endTime || ""));
+    if (Number.isFinite(start) && Number.isFinite(end) && now >= start && now <= end + 60_000) return p;
+  }
+  return periods[0] || {};
+}
+
+function formatNwsWeather(weather: Record<string, unknown>): { current: string; forecast: string } {
+  const forecastPeriods = recordArray(weather.forecast_periods);
+  const hourlyPeriods = recordArray(weather.hourly_periods);
+  const hour = activeHourlyPeriod(hourlyPeriods);
+  const period = forecastPeriods[0] || hour;
+
+  const hourTemp =
+    hour.temperature != null ? `${hour.temperature}\u00B0${String(hour.temperatureUnit || "F")}` : "";
+  const hourWind = [hour.windSpeed, hour.windDirection].filter(Boolean).map(String).join(" ").trim();
+  const currentParts = [String(hour.shortForecast || ""), hourTemp, hourWind ? `wind ${hourWind}` : ""].filter(Boolean);
+
+  const forecast = [
+    String(period.name || "Next period"),
+    period.temperature != null ? `${period.temperature}\u00B0${String(period.temperatureUnit || "F")}` : "",
+    String(period.shortForecast || ""),
+  ].filter(Boolean).join(", ");
+
+  return {
+    current: currentParts.length ? currentParts.join("; ") : "",
+    forecast: forecast || "",
+  };
+}
+
+function dedupeNwsWarnings(warnings: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const latestByKey = new Map<string, Record<string, unknown>>();
+  for (const w of warnings) {
+    const event = String(w.event || "NWS alert").trim().toLowerCase();
+    const area = String(w.areaDesc || "Hawaiʻi").trim().toLowerCase();
+    const key = `${event}|${area}`;
+    const effective = Date.parse(String(w.effective || w.sent || ""));
+    const existing = latestByKey.get(key);
+    const existingEffective = existing ? Date.parse(String(existing.effective || existing.sent || "")) : 0;
+    if (!existing || (Number.isFinite(effective) && effective > existingEffective)) latestByKey.set(key, w);
+  }
+  return [...latestByKey.values()].sort(
+    (a, b) => Date.parse(String(b.effective || b.sent || "")) - Date.parse(String(a.effective || a.sent || "")),
+  );
+}
+
+function summarizeNwsAreas(areaDesc: string): string {
+  const zones = areaDesc.split(";").map((z) => z.trim()).filter(Boolean);
+  if (zones.length <= 4) return zones.join("; ");
+  const hasSummit = zones.some((z) => /summit/i.test(z));
+  return `${zones.slice(0, 3).join("; ")}; +${zones.length - 3} more zones${hasSummit ? " (includes Big Island Summit)" : ""}`;
+}
+
+function formatNwsAlertLine(w: Record<string, unknown>): string {
+  const event = String(w.event || "NWS alert");
+  const severity = String(w.severity || "").trim();
+  const area = summarizeNwsAreas(String(w.areaDesc || "Hawaiʻi"));
+  const headline = cleanDisplayText(w.headline, 220);
+  const parts = [severity ? `${event} (${severity})` : event, area];
+  if (headline && headline.toLowerCase() !== event.toLowerCase()) parts.push(headline);
+  return parts.filter(Boolean).join(" — ");
+}
+
 async function collectNwsKilaueaWeather(): Promise<Record<string, unknown>> {
   const points = await kilaueaFetchJson(`https://api.weather.gov/points/${KILAUEA_SUMMIT_LAT.toFixed(4)},${KILAUEA_SUMMIT_LON.toFixed(4)}`);
   const props = (points.data as Record<string, unknown> | undefined)?.properties as Record<string, unknown> | undefined;
   const forecastUrl = String(props?.forecast || "");
   const hourlyUrl = String(props?.forecastHourly || "");
-  const stationsUrl = String(props?.observationStations || "");
-  const [forecast, hourly, stations] = await Promise.all([
+  const [forecast, hourly] = await Promise.all([
     forecastUrl ? kilaueaFetchJson(forecastUrl) : Promise.resolve({ ok: false, reason: "missing forecast URL" } as Record<string, unknown>),
     hourlyUrl ? kilaueaFetchJson(hourlyUrl) : Promise.resolve({ ok: false, reason: "missing hourly forecast URL" } as Record<string, unknown>),
-    stationsUrl ? kilaueaFetchJson(stationsUrl) : Promise.resolve({ ok: false, reason: "missing observation stations URL" } as Record<string, unknown>),
   ]);
-  const stationFeatures = Array.isArray((stations.data as Record<string, unknown> | undefined)?.features)
-    ? ((stations.data as Record<string, unknown>).features as Array<Record<string, unknown>>)
-    : [];
-  const firstStation = stationFeatures[0];
-  const stationId =
-    String(firstStation?.id || "").split("/").pop() ||
-    String(((firstStation?.properties as Record<string, unknown> | undefined) || {}).stationIdentifier || "");
-  const observation = stationId
-    ? await kilaueaFetchJson(`https://api.weather.gov/stations/${encodeURIComponent(stationId)}/observations/latest`)
-    : { ok: false, reason: "no observation station" };
   const forecastPeriods = Array.isArray(((forecast.data as Record<string, unknown> | undefined)?.properties as Record<string, unknown> | undefined)?.periods)
     ? ((((forecast.data as Record<string, unknown>).properties as Record<string, unknown>).periods as Array<Record<string, unknown>>).slice(0, 4))
     : [];
   const hourlyPeriods = Array.isArray(((hourly.data as Record<string, unknown> | undefined)?.properties as Record<string, unknown> | undefined)?.periods)
-    ? ((((hourly.data as Record<string, unknown>).properties as Record<string, unknown>).periods as Array<Record<string, unknown>>).slice(0, 6))
+    ? ((((hourly.data as Record<string, unknown>).properties as Record<string, unknown>).periods as Array<Record<string, unknown>>).slice(0, 12))
     : [];
   return {
-    source: "NWS api.weather.gov",
-    point: { lat: KILAUEA_SUMMIT_LAT, lon: KILAUEA_SUMMIT_LON },
+    source: "NWS api.weather.gov grid forecast",
+    point: { lat: KILAUEA_SUMMIT_LAT, lon: KILAUEA_SUMMIT_LON, label: "Kīlauea summit" },
     grid: {
       office: props?.gridId || null,
       x: props?.gridX || null,
       y: props?.gridY || null,
       forecast_url: forecastUrl,
       hourly_url: hourlyUrl,
-      station: stationId || null,
     },
-    observation,
     forecast_periods: forecastPeriods,
     hourly_periods: hourlyPeriods,
   };
 }
 
 async function collectKilaueaManualContext(env: KilaueaReportEnv, requesterDiscordId: string): Promise<Record<string, unknown>> {
-  const eqUrl = new URL("https://earthquake.usgs.gov/fdsnws/event/1/query");
-  eqUrl.searchParams.set("format", "geojson");
-  eqUrl.searchParams.set("orderby", "time");
-  eqUrl.searchParams.set("limit", "80");
-  eqUrl.searchParams.set("minmagnitude", "2.5");
-  eqUrl.searchParams.set("starttime", new Date(Date.now() - 14 * 86400 * 1000).toISOString());
-  for (const [k, v] of Object.entries(HAWAII_BBOX)) eqUrl.searchParams.set(k, String(v));
-
-  const [volcano, newest, newestNotice, recent, nws, earthquakes, tsunami, weather, officialX] = await Promise.all([
+  const [volcano, newest, newestNotice, recent, nws, eqResult, tsunami, weather, officialX] = await Promise.all([
     kilaueaFetchJson(`${HANS_BASE}/getVolcano/${VNUM_KILAUEA}`),
     kilaueaFetchJson(`${HANS_BASE}/getNewestVona/${VNUM_KILAUEA}`),
     kilaueaFetchJson(`${HANS_BASE}/newestForVolcano/${VNUM_KILAUEA}`),
     kilaueaFetchJson(`${HANS_BASE}/getRecentNotices/${VNUM_KILAUEA}`),
     kilaueaFetchJson("https://api.weather.gov/alerts/active?area=HI&status=actual"),
-    kilaueaFetchJson(eqUrl.toString()),
+    fetchHawaiiEarthquakeEvents(KILAUEA_EQ_COUNT_MIN_MAG),
     kilaueaFetchJson("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_week.geojson"),
     collectNwsKilaueaWeather().catch((e) => ({ ok: false, error: e instanceof Error ? e.message : String(e) })),
     collectOfficialKilaueaXUpdates(env),
@@ -439,9 +503,7 @@ async function collectKilaueaManualContext(env: KilaueaReportEnv, requesterDisco
   const nwsFeatures = Array.isArray((nws.data as Record<string, unknown> | undefined)?.features)
     ? (((nws.data as Record<string, unknown>).features as Array<Record<string, unknown>>).slice(0, 20))
     : [];
-  const eqFeatures = Array.isArray((earthquakes.data as Record<string, unknown> | undefined)?.features)
-    ? (((earthquakes.data as Record<string, unknown>).features as Array<Record<string, unknown>>).slice(0, 30))
-    : [];
+  const eqFeatures = eventsToLegacyRecords(eqResult.events || []);
   const tsunamiFeatures = Array.isArray((tsunami.data as Record<string, unknown> | undefined)?.features)
     ? (((tsunami.data as Record<string, unknown>).features as Array<Record<string, unknown>>).filter((f) => {
         const p = (f.properties as Record<string, unknown> | undefined) || {};
@@ -463,11 +525,11 @@ async function collectKilaueaManualContext(env: KilaueaReportEnv, requesterDisco
     official_x_updates: officialX,
     weather,
     earthquake_source: {
-      ok: Boolean(earthquakes.ok),
-      status: earthquakes.status || null,
-      url: eqUrl.toString(),
-      title: ((earthquakes.data as Record<string, unknown> | undefined)?.metadata as Record<string, unknown> | undefined)?.title || null,
+      ok: Boolean(eqResult.ok),
+      status: eqResult.ok ? 200 : null,
+      url: eqResult.url,
       count: eqFeatures.length,
+      error: eqResult.error || null,
     },
     active_warning_advisories: nwsFeatures.map((f) => {
       const p = (f.properties as Record<string, unknown> | undefined) || {};
@@ -482,22 +544,7 @@ async function collectKilaueaManualContext(env: KilaueaReportEnv, requesterDisco
         url: p.uri || f.id,
       };
     }),
-    hawaii_earthquakes: eqFeatures.map((f) => {
-      const p = (f.properties as Record<string, unknown> | undefined) || {};
-      const coords = ((f.geometry as Record<string, unknown> | undefined)?.coordinates as unknown[]) || [];
-      return {
-        id: f.id,
-        title: p.title,
-        place: p.place,
-        magnitude: p.mag,
-        time: p.time,
-        url: p.url,
-        tsunami: p.tsunami,
-        lon: coords[0],
-        lat: coords[1],
-        depth_km: coords[2],
-      };
-    }),
+    hawaii_earthquakes: eqFeatures,
     pacific_tsunami_bulletins: {
       available: true,
       bulletins: tsunamiFeatures.map((f) => {
@@ -522,12 +569,21 @@ function splitKilaueaReportText(content: string): { freeText: string; proText: s
       .replace(/\bGrok\b/gi, "AI")
       .replace(/\bxAI\b/g, "AI")
       .trim() || "Kīlauea AI report generated, but no summary text was returned.";
+  for (const marker of ["\n\n**Seismic activity", "\n\n**Weather", "\n\n**NWS", "\n\n**Official social", "\n\n**Tsunami"]) {
+    const idx = clean.indexOf(marker);
+    if (idx > 300) {
+      return {
+        freeText: clean.slice(0, idx).trim(),
+        proText: clean.slice(idx).trim(),
+      };
+    }
+  }
   const midpoint = Math.max(1, Math.floor(clean.length / 2));
-  const splitAt = clean.indexOf("\n", midpoint);
+  const splitAt = clean.indexOf("\n\n", midpoint);
   const idx = splitAt > midpoint && splitAt < clean.length - 40 ? splitAt : midpoint;
   return {
     freeText: clean.slice(0, idx).trim(),
-    proText: clean.slice(idx).trim() || "Full follow-up details unavailable.",
+    proText: clean.slice(idx).trim() || "Additional details unavailable.",
   };
 }
 
@@ -541,7 +597,7 @@ function msDate(raw: unknown): string {
   return new Date(value).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }
 
-function cleanDisplayText(raw: unknown, max = 420): string {
+function cleanDisplayText(raw: unknown, max = 2000): string {
   const s = decodeHtmlEntities(raw)
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<\/p>/gi, " ")
@@ -549,6 +605,58 @@ function cleanDisplayText(raw: unknown, max = 420): string {
     .replace(/\s+/g, " ")
     .trim();
   return s.length > max ? `${s.slice(0, Math.max(0, max - 1)).trim()}…` : s;
+}
+
+const NOTICE_SYNOPSIS_KEYS = [
+  "noticeSynopsis",
+  "Synopsis",
+  "synopsis",
+  "summary",
+  "description",
+  "activitySummary",
+  "body",
+  "text",
+  "noticeHtml",
+];
+
+/** Prefer the longest USGS/HVO notice body — findStringByKey returns the first shallow match (often too short). */
+function extractVolcanoNoticeText(raw: unknown, maxLen = 8000): string {
+  const candidates: string[] = [];
+  const walk = (node: unknown, depth: number): void => {
+    if (!node || depth > 10) return;
+    if (typeof node === "string") {
+      const t = node.trim();
+      if (t.length > 40) candidates.push(t);
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1);
+      return;
+    }
+    if (typeof node !== "object") return;
+    const obj = node as Record<string, unknown>;
+    for (const key of NOTICE_SYNOPSIS_KEYS) {
+      const v = obj[key];
+      if (typeof v === "string" && v.trim()) candidates.push(v.trim());
+    }
+    for (const value of Object.values(obj)) walk(value, depth + 1);
+  };
+  walk(raw, 0);
+  let best = "";
+  for (const c of candidates) {
+    const cleaned = decodeHtmlEntities(c)
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/<\/p>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleaned.length > best.length) best = cleaned;
+  }
+  return best ? cleanDisplayText(best, maxLen) : "";
+}
+
+function normalizeUsgsNoticeSpacing(text: string): string {
+  return text.replace(/([.!?])([A-Za-z])/g, "$1 $2");
 }
 
 function compactLines(lines: string[], maxChars = 1800): string {
@@ -564,11 +672,11 @@ function compactLines(lines: string[], maxChars = 1800): string {
   return out.join("\n");
 }
 
-function findStringByKey(raw: unknown, keys: string[], depth = 0): string {
+function findStringByKey(raw: unknown, keys: string[], depth = 0, maxLen = 2000): string {
   if (!raw || depth > 6) return "";
   if (Array.isArray(raw)) {
     for (const item of raw) {
-      const found = findStringByKey(item, keys, depth + 1);
+      const found = findStringByKey(item, keys, depth + 1, maxLen);
       if (found) return found;
     }
     return "";
@@ -577,11 +685,11 @@ function findStringByKey(raw: unknown, keys: string[], depth = 0): string {
   const obj = raw as Record<string, unknown>;
   for (const key of keys) {
     const value = obj[key];
-    if (typeof value === "string" && value.trim()) return cleanDisplayText(value, 420);
+    if (typeof value === "string" && value.trim()) return cleanDisplayText(value, maxLen);
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   for (const value of Object.values(obj)) {
-    const found = findStringByKey(value, keys, depth + 1);
+    const found = findStringByKey(value, keys, depth + 1, maxLen);
     if (found) return found;
   }
   return "";
@@ -609,145 +717,233 @@ function collectMatchingSentences(raw: unknown, pattern: RegExp, max = 3, out: s
 }
 
 function cToF(raw: unknown): string {
+  if (raw == null || raw === "") return "";
   const c = Number(raw);
   if (!Number.isFinite(c)) return "";
-  return `${Math.round((c * 9) / 5 + 32)}Â°F`;
+  return `${Math.round((c * 9) / 5 + 32)}\u00B0F`;
 }
 
 function msToMph(raw: unknown): string {
+  if (raw == null || raw === "") return "";
   const ms = Number(raw);
   if (!Number.isFinite(ms)) return "";
   return `${Math.round(ms * 2.23694)} mph`;
 }
 
-function formatNwsWeather(weather: Record<string, unknown>): { current: string; forecast: string; correlation: string } {
-  const obsProps = (((weather.observation as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined)?.properties as Record<string, unknown> | undefined) || {};
-  const temp = cToF((obsProps.temperature as Record<string, unknown> | undefined)?.value);
-  const wind = msToMph((obsProps.windSpeed as Record<string, unknown> | undefined)?.value);
-  const windDir = obsProps.windDirection && typeof obsProps.windDirection === "object" ? String((obsProps.windDirection as Record<string, unknown>).value || "") : "";
-  const desc = String(obsProps.textDescription || "").trim();
-  const timestamp = String(obsProps.timestamp || "").replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
-  const currentParts = [desc, temp, wind ? `wind ${wind}${windDir ? ` @ ${windDir}Â°` : ""}` : "", timestamp ? `obs ${timestamp}` : ""].filter(Boolean);
-  const forecastPeriods = recordArray(weather.forecast_periods);
-  const hourlyPeriods = recordArray(weather.hourly_periods);
-  const period = forecastPeriods[0] || hourlyPeriods[0] || {};
-  const forecast = [
-    String(period.name || "Next period"),
-    period.temperature != null ? `${period.temperature}Â°${String(period.temperatureUnit || "")}` : "",
-    String(period.shortForecast || ""),
-    period.windSpeed ? `wind ${String(period.windSpeed)} ${String(period.windDirection || "")}`.trim() : "",
-  ].filter(Boolean).join(": ");
-  const windText = wind ? "Wind/visibility matter for vog, ash, aviation, and field observations; " : "";
-  const rainText = /rain|showers|fog|cloud|mist/i.test(`${desc} ${forecast}`)
-    ? "cloud/rain/fog can limit webcam/visual confirmation and affect road/visitor conditions."
-    : "weather is not currently adding an obvious alert-level signal in the fetched NWS data.";
-  return {
-    current: currentParts.length ? currentParts.join("; ") : "latest summit-area observation unavailable",
-    forecast: forecast || "forecast period unavailable",
-    correlation: `${windText}${rainText}`,
-  };
+function truncateAtWord(text: string, maxChars: number): string {
+  const clean = text.trim();
+  if (clean.length <= maxChars) return clean;
+  const slice = clean.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(" ");
+  const trimmed = (lastSpace > maxChars * 0.55 ? slice.slice(0, lastSpace) : slice).trimEnd();
+  return trimmed.length < clean.length ? `${trimmed}…` : trimmed;
 }
 
-function buildOfficialKilaueaReport(context: Record<string, unknown>, ai: Record<string, unknown>): string {
+function firstSentences(text: string, maxSentences = 8, maxChars = 2200): string {
+  const clean = normalizeUsgsNoticeSpacing(cleanDisplayText(text, 12000));
+  if (!clean) return "";
+  if (clean.length <= maxChars) return clean;
+  const parts = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
+  let out = "";
+  let count = 0;
+  for (const part of parts) {
+    if (count >= maxSentences) break;
+    const next = out ? `${out} ${part}` : part;
+    if (next.length > maxChars) {
+      const room = maxChars - (out ? out.length + 1 : 0);
+      if (!out && room > 0) return truncateAtWord(part, maxChars);
+      if (room > 60) out = `${out} ${truncateAtWord(part, room)}`.trim();
+      break;
+    }
+    out = next;
+    count += 1;
+  }
+  if (out) return out;
+  return truncateAtWord(clean, maxChars);
+}
+
+function normalizeStatusToken(raw: string): string {
+  const t = raw.trim().toUpperCase();
+  if (!t || t === "N/A" || t === "UNKNOWN") return "";
+  return t.charAt(0) + t.slice(1).toLowerCase();
+}
+
+function volcanoStatusLine(volcano: Record<string, unknown>, newestNotice: Record<string, unknown>, latestVona: Record<string, unknown>): string {
+  const alertLevel = findStringByKey(volcano, [
+    "volcanoAlertLevel",
+    "alertLevel",
+    "noticeHighestAlertLevel",
+    "currentVolcanoAlertLevel",
+  ]) || findStringByKey(newestNotice, ["noticeHighestAlertLevel", "AlertLevel", "alertLevel"]) ||
+    findStringByKey(latestVona, ["noticeHighestAlertLevel", "AlertLevel"]);
+  const aviation = findStringByKey(volcano, [
+    "colorCode",
+    "aviationColorCode",
+    "noticeHighestColorCode",
+    "currentAviationColorCode",
+  ]) || findStringByKey(newestNotice, ["noticeHighestColorCode", "ColorCode"]) ||
+    findStringByKey(latestVona, ["noticeHighestColorCode", "ColorCode"]);
+  const parts: string[] = [];
+  const av = normalizeStatusToken(aviation);
+  const al = normalizeStatusToken(alertLevel);
+  if (av) parts.push(`${av} aviation color`);
+  if (al) parts.push(`${al} volcano alert level`);
+  return parts.join("; ") || "Alert level not parsed from latest USGS/HVO payload";
+}
+
+function stripUsgsNoticeBoilerplate(text: string): string {
+  let s = normalizeUsgsNoticeSpacing(cleanDisplayText(text, 12000));
+  if (!s) return "";
+
+  const summaryIdx = s.search(/\bSummary:\s*/i);
+  if (summaryIdx >= 0) {
+    s = s.slice(summaryIdx).replace(/^\s*Summary:\s*/i, "").trim();
+  } else {
+    const activityIdx = s.search(
+      /\b(Precursory|Lava lake|Lava|Eruptive|Episode|Summit|Halema|Maunaulu|Inflation|Deflation|Spattering|Fountaining|Volcanic tremor)\b/i,
+    );
+    if (activityIdx > 60) s = s.slice(activityIdx);
+  }
+
+  s = s
+    .replace(/^U\.S\. Geological Survey\b[^.]*\.?\s*/i, "")
+    .replace(/\bHAWAIIAN VOLCANO OBSERVATORY\b[^.]*\.?\s*/gi, "")
+    .replace(/\bKILAUEA\s*\(VNUM\s*#\d+\)[^.]*\.?\s*/gi, "")
+    .replace(/\bCurrent Volcano Alert Level:\s*\w+\b/gi, "")
+    .replace(/\bCurrent Aviation Color Code:\s*\w+\b/gi, "")
+    .replace(/\bSummit Elevation[^.]*\.?\s*/gi, "")
+    .replace(/\b\d{1,2}°\d{1,2}'\d{1,2}"\s*[NS]\s*\d{1,3}°\d{1,2}'\d{1,2}"\s*[EW]\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return s;
+}
+
+function formatVolcanoActivityText(headline: string, synopsis: string): string {
+  const h = cleanDisplayText(headline, 300).toLowerCase();
+  let s = stripUsgsNoticeBoilerplate(synopsis);
+  if (!s) s = normalizeUsgsNoticeSpacing(cleanDisplayText(synopsis, 8000));
+  if (h && s.toLowerCase().startsWith(h)) {
+    s = s.slice(h.length).replace(/^[\s:—-]+/, "").trim();
+  }
+  return firstSentences(s, 8, 2200);
+}
+
+function mergeFullOfficialSocialIntoReport(report: string, context: Record<string, unknown>): string {
+  const officialX = (context.official_x_updates as Record<string, unknown> | undefined) || {};
+  const posts = recordArray(officialX.posts);
+  const social = formatOfficialSocialSection(posts, { maxPosts: 6, maxChars: 500 });
+  if (!social) return report;
+  return [stripOfficialSocialSection(report), social].filter(Boolean).join("\n\n");
+}
+
+function mergeFullActivityIntoReport(report: string, context: Record<string, unknown>): string {
+  const volcano = (context.volcano as Record<string, unknown> | undefined) || {};
+  const newestNotice = (volcano.newest_notice as Record<string, unknown> | undefined) || {};
+  const latestVona = (volcano.newest_vona as Record<string, unknown> | undefined) || {};
+  const headline =
+    findStringByKey(newestNotice, ["noticeTitle", "title", "headline", "noticeSubject", "subject"], 0, 800) ||
+    findStringByKey(latestVona, ["noticeTitle", "title", "headline", "noticeSubject", "subject"], 0, 800);
+  const raw =
+    extractVolcanoNoticeText(newestNotice, 8000) || extractVolcanoNoticeText(latestVona, 8000);
+  const activity = formatVolcanoActivityText(headline, raw);
+  if (!activity) return report;
+  const line = `**Activity:** ${activity}`;
+  if (/\*\*Activity:\*\*/i.test(report)) {
+    return report.replace(/\*\*Activity:\*\*[^\n]*/i, line);
+  }
+  return report;
+}
+
+function buildOfficialKilaueaReport(context: Record<string, unknown>, _ai: Record<string, unknown>): string {
   const generated = String(context.generated_at || new Date().toISOString());
-  const warnings = recordArray(context.active_warning_advisories);
-  const earthquakes = recordArray(context.hawaii_earthquakes);
+  const warnings = dedupeNwsWarnings(recordArray(context.active_warning_advisories));
   const earthquakeSource = (context.earthquake_source as Record<string, unknown> | undefined) || {};
   const earthquakeFeedOk = earthquakeSource.ok !== false;
+  const eqActivity = (context.earthquake_activity as EarthquakeActivitySummary | undefined) ||
+    (earthquakeFeedOk ? attachEarthquakeActivity(context, String((context.previous_report as Record<string, unknown> | undefined)?.created_at || "")) : undefined);
   const tsunami = (context.pacific_tsunami_bulletins as Record<string, unknown> | undefined) || {};
   const bulletins = recordArray(tsunami.bulletins);
   const volcano = (context.volcano as Record<string, unknown> | undefined) || {};
   const newestNotice = (volcano.newest_notice as Record<string, unknown> | undefined) || {};
   const latestVona = (volcano.newest_vona as Record<string, unknown> | undefined) || {};
-  const recentNotices = (volcano.recent_notices as Record<string, unknown> | undefined) || {};
   const weather = (context.weather as Record<string, unknown> | undefined) || {};
   const weatherText = formatNwsWeather(weather);
   const officialX = (context.official_x_updates as Record<string, unknown> | undefined) || {};
-  const xPosts = recordArray(officialX.posts).slice(0, 4);
+  const xPosts = recordArray(officialX.posts).slice(0, 6);
   const prior = (context.previous_report as Record<string, unknown> | undefined) || null;
-  const officialSources = [
-    "USGS/HVO Kīlauea volcano notices",
-    "NWS Hawaiʻi active alerts",
-    "NWS summit-area weather",
-    "USGS Hawaiʻi earthquake feed",
-    "USGS significant earthquake tsunami flags",
-    "official X.com posts from agency accounts",
-  ].join(", ");
 
-  const notableQuakes = earthquakes
-    .map((q): Record<string, unknown> & { mag: number } => ({ ...q, mag: Number(q.magnitude) }))
-    .filter((q) => Number.isFinite(q.mag))
-    .sort((a, b) => b.mag - a.mag)
-    .slice(0, 4);
-  const topQuake = notableQuakes[0];
-  const warningLines = warnings.slice(0, 4).map((w) => {
-    const event = String(w.event || "NWS alert");
-    const severity = String(w.severity || "unknown severity");
-    const area = String(w.areaDesc || "Hawaiʻi");
-    return `- ${event} (${severity}) for ${area}`;
-  });
-  const quakeLines = notableQuakes.map((q) => {
-    const place = String(q.place || q.title || "Hawaiʻi region");
-    const when = msDate(q.time);
-    return `- M${Number(q.mag).toFixed(1)} ${place}${when ? ` at ${when}` : ""}`;
-  });
-  const tsunamiLines = bulletins.slice(0, 3).map((b) => {
-    const mag = Number(b.magnitude);
-    const magText = Number.isFinite(mag) ? `M${mag.toFixed(1)} ` : "";
-    return `- ${magText}${String(b.place || b.title || "Pacific event")}`;
-  });
-  const xLines = xPosts.map((post) => {
-    const account = String(post.account || "Official X");
-    const text = cleanDisplayText(post.text, 180);
-    const when = String(post.created_at || "").replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
-    return `- ${account}${when ? ` (${when})` : ""}: ${text}`;
-  });
-  const vonaOk = Boolean(latestVona.ok);
-  const noticesOk = Boolean(recentNotices.ok);
-  const status = findStringByKey(volcano, ["alertLevel", "noticeHighestAlertLevel", "volcanoAlertLevel", "currentAlertLevel", "aviationColorCode", "noticeHighestColorCode"]);
+  const status = volcanoStatusLine(volcano, newestNotice, latestVona);
   const headline = findStringByKey(newestNotice, ["noticeTitle", "title", "headline", "noticeSubject", "subject"]) ||
     findStringByKey(latestVona, ["noticeTitle", "title", "headline", "noticeSubject", "subject"]);
-  const activity = findStringByKey(newestNotice, ["noticeSynopsis", "synopsis", "summary", "description", "activitySummary", "body", "text"]) ||
-    findStringByKey(latestVona, ["noticeSynopsis", "synopsis", "summary", "description", "activitySummary", "body", "text"]);
-  const episodeDetails = collectMatchingSentences(
-    [activity, newestNotice],
-    /\b(episode|episodic|pause|paused|resume|resumed|fountain|lava|summit|eruption|vent|inflation|deflation)\b/i,
-    3,
-  );
-  const concern =
-    !earthquakeFeedOk
-      ? "Verification issue: the USGS earthquake feed did not return a usable result, so earthquake status should be treated as incomplete."
-      :
-    warnings.length > 0 || (topQuake && Number(topQuake.mag) >= 4) || bulletins.length > 0
-      ? "Elevated monitoring: one or more official hazard feeds returned active items worth reviewing."
-      : "Routine monitoring: no active NWS warning/advisory, M4.0+ Big Island earthquake, or tsunami-flagged significant event was found in the pulled data.";
-  const correlation = [
-    !earthquakeFeedOk ? "earthquake correlation is incomplete because the USGS query failed" : topQuake && Number(topQuake.mag) >= 3.5 ? "earthquake activity is high enough to compare against HVO activity notes" : "earthquake feed does not show a major Big Island seismic trigger in this pull",
-    warnings.length ? "NWS hazards may compound access/visibility/response conditions" : "NWS hazards are not currently compounding the volcano picture",
-    bulletins.length ? "tsunami-flagged significant earthquake data should be treated as separate Pacific-basin context" : "no tsunami-flagged significant event is adding coastal hazard context",
-    weatherText.correlation,
-  ].join("; ");
+  const rawActivity =
+    extractVolcanoNoticeText(newestNotice, 8000) || extractVolcanoNoticeText(latestVona, 8000);
+  const activity = formatVolcanoActivityText(headline, rawActivity);
 
-  return compactLines([
-    `**Kīlauea AI-Assisted Hazards Summary**`,
-    `_Generated ${reportTimestamp(generated)} from official-source data. Not an official USGS, HVO, or NWS release._`,
-    `**Overall read:** ${concern}`,
-    `**Volcano status:** USGS/HVO context ${vonaOk || noticesOk ? "was reachable" : "did not return a usable notice payload"}${status ? `; status/color field: ${status}` : ""}${headline ? `; latest notice: ${headline}` : ""}.`,
-    activity ? `**HVO activity note:** ${activity}` : "",
-    episodeDetails.length ? `**Episodes / pending changes:** ${episodeDetails.map((x) => `• ${x}`).join(" ")}` : "**Episodes / pending changes:** No explicit episode/pause/resume language was extracted from the latest HVO payload.",
-    `**Weather near summit:** ${weatherText.current}. Forecast: ${weatherText.forecast}.`,
-    `**NWS Hawaiʻi:** ${warnings.length ? `${warnings.length} active alert item(s) returned.` : "No active Hawaiʻi warning/advisory item was returned by the NWS active-alert feed."}`,
-    ...warningLines,
-    `**Earthquakes:** ${!earthquakeFeedOk ? `USGS feed did not return usable data (HTTP ${String(earthquakeSource.status || "unknown")}); do not interpret this as no earthquakes.` : earthquakes.length ? `${earthquakes.length} Hawaiʻi-region event(s) M2.5+ returned for the last 14 days.` : "No Hawaiʻi-region M2.5+ events were returned for the last 14 days."}`,
-    ...quakeLines,
-    `**Tsunami context:** ${bulletins.length ? `${bulletins.length} tsunami-flagged significant earthquake item(s) returned.` : "No tsunami-flagged significant earthquake item was returned by the USGS significant-week feed."}`,
-    ...tsunamiLines,
-    `**Official X updates:** ${xPosts.length ? `${xPosts.length} recent official post(s) matched the Kīlauea/Big Island query.` : officialX.configured === false ? "X scan not configured; no social update context was included." : "No recent official posts matched the Kīlauea/Big Island query."}`,
-    ...xLines,
-    `**Correlation:** ${correlation}.`,
-    prior ? `**Compared with last report:** Previous app report ${String(prior.id || "").slice(0, 8)} was generated ${String(prior.created_at || "at an unknown time")}. This manual report refreshes the same official-source categories for the current state.` : "",
-    `**Official sources used:** ${officialSources}.`,
-  ], 1900);
+  const peakMag = peakMagnitude(eqActivity, "since_last_report", "last_24_hours", "last_7_days");
+
+  const concern =
+    warnings.some((w) => /warning|emergency|extreme|severe/i.test(String(w.severity || w.event || ""))) ||
+    peakMag >= 4 ||
+    bulletins.length > 0
+      ? "Elevated"
+      : /WATCH|WARNING|ORANGE|RED/i.test(status)
+        ? "Elevated"
+        : "Routine";
+
+  const contextBits: string[] = [];
+  if (weatherText.current || weatherText.forecast) {
+    const wx = [weatherText.current, weatherText.forecast].filter(Boolean).join(". ");
+    contextBits.push(`**Weather:** ${wx}.`);
+  }
+  if (warnings.length) {
+    contextBits.push("**NWS:**");
+    for (const w of warnings.slice(0, 5)) {
+      contextBits.push(`• ${formatNwsAlertLine(w)}`);
+    }
+    if (warnings.length > 5) contextBits.push(`• +${warnings.length - 5} more active alert(s).`);
+  }
+  if (bulletins.length) {
+    const b = bulletins[0]!;
+    const mag = Number(b.magnitude);
+    contextBits.push(
+      `**Tsunami context:** ${Number.isFinite(mag) ? `M${mag.toFixed(1)} ` : ""}${String(b.place || b.title || "Pacific event")}.`,
+    );
+  }
+  const xAdds = xPosts
+    .map((post) => {
+      const account = String(post.account || "Official X");
+      const text = cleanDisplayText(post.text, 500);
+      return text ? `• ${account}: ${text}` : "";
+    })
+    .filter(Boolean);
+  if (xAdds.length) {
+    contextBits.push("**Official social:**");
+    contextBits.push(...xAdds);
+  }
+
+  const seismicSection = earthquakeFeedOk
+    ? formatEarthquakeActivitySection(eqActivity)
+    : "**Seismic activity:** Unavailable this pull.";
+
+  const lines = [
+    "**Kīlauea Hazards Brief**",
+    `_AI-assisted synthesis (${reportTimestamp(generated)}). Not an official USGS, HVO, or NWS release._`,
+    `**Current condition (${concern}):** ${status}.`,
+    activity ? `**Activity:** ${activity}` : headline ? `**Activity:** ${cleanDisplayText(headline, 800)}.` : "",
+    seismicSection,
+    ...contextBits,
+    prior
+      ? `**Since last report:** Prior brief ${String(prior.id || "").slice(0, 8)} (${String(prior.created_at || "unknown time")}).`
+      : "",
+    "_Follow USGS/HVO and NWS Honolulu for authoritative updates._",
+  ];
+
+  return joinReportSections(lines.filter(Boolean));
+}
+
+function joinReportSections(sections: string[]): string {
+  return sections.map((s) => s.trim()).filter(Boolean).join("\n\n");
 }
 
 async function insertKilaueaManualAnalysis(
@@ -897,19 +1093,36 @@ export async function generateKilaueaManualReport(
      LIMIT 1`,
   ).first<Record<string, unknown>>().catch(() => null);
   if (previous) context.previous_report = previous;
+  attachEarthquakeActivity(context, String(previous?.created_at || ""));
   const ai = await callGrokAnalysis(
     env,
-    "Kīlauea Hazards AI Report",
-    "Generate a careful Kīlauea and Hawaiʻi hazards report for Discord and the Kīlauea app. Use volcano notices, VONA context, active NWS warnings/advisories, Big Island earthquakes, tsunami flags, official X.com posts from named agency accounts, and the previous report when present. Treat official X posts as supplemental public updates; agency pages and feeds remain the source of authority. Include what changed, current concern level, watch items, and what official source to follow. Do not invent measurements.",
-    context,
+    "Kīlauea Hazards Brief",
+    "Write a single cohesive Kīlauea/Big Island hazards brief. Cross-check USGS/HVO volcano notices, NWS alerts, summit weather, Hawaiʻi earthquakes, tsunami flags, and official agency X posts. " +
+      "State alert/aviation level once, summarize eruptive activity in at most three sentences (volcano activity only — no weather), then present earthquake_activity recent rolling windows and calendar totals separately. " +
+      "Copy earthquake_activity.count_description verbatim under **Seismic activity — recent** before listing counts. Calendar year totals are historical context, not current activity. " +
+      "Use earthquake_activity only — do not cite old events from prior calendar years as current. Skip empty official social posts. " +
+      "Note what changed versus previous_report when present. Do not invent measurements or give evacuation orders.",
+    slimEarthquakeContextForAi(context),
   );
   if (!ai.ok || !String(ai.content || "").trim()) {
     ai.content = buildOfficialKilaueaReport(context, ai);
     ai.fallback_report = true;
+  } else {
+    ai.content = String(ai.content).trim();
   }
   const row = await insertKilaueaManualAnalysis(env, context, ai);
   const reportId = String(row.id || "");
-  const content = compactLines([String(row.free_text || ""), String(row.pro_text || "")], 1900) || "Kīlauea AI report generated.";
+  let content =
+    String(ai.content || "").trim() ||
+    buildKilaueaAnalysisDiscordBody({
+      headline: String(row.headline || ""),
+      event: String(row.event || ""),
+      free_text: String(row.free_text || ""),
+      pro_text: String(row.pro_text || ""),
+    }) ||
+    "Kīlauea AI report generated.";
+  content = mergeFullActivityIntoReport(content, context);
+  content = mergeFullOfficialSocialIntoReport(content, context);
   const posted = await postKilaueaReportContent(env, content, guildId ? { guildId } : undefined);
   if (posted) {
     await env.DB.prepare(`UPDATE kilauea_ai_analyses SET discord_posted_at = ? WHERE id = ?`)

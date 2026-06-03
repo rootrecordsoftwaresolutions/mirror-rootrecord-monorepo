@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { isPro, isLifeMember } from "../lib/api";
+import { useAuth } from "../contexts/AuthContext";
 
 const BILLING_URL = "https://rootrecord.info/billing";
+const KILAUEA_PLAY_URL = "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea";
 const OPENS_KEY = "rrkil.upsell.opens";
 export const UPSELL_EVENT = "rr.upsell.show";
 
@@ -15,9 +17,11 @@ export const UPSELL_EVENT = "rr.upsell.show";
  */
 export function UpsellModal(): JSX.Element | null {
   const [open, setOpen] = useState(false);
+  const auth = useAuth();
+  const paid = isPro() || isLifeMember();
 
   useEffect(() => {
-    if (isPro() || isLifeMember()) return;
+    if (paid) return;
     let n = 0;
     try {
       n = Number(window.localStorage.getItem(OPENS_KEY) || "0") + 1;
@@ -26,7 +30,11 @@ export function UpsellModal(): JSX.Element | null {
       /* private mode / quota */
     }
     if (n >= 2 && n % 2 === 0) setOpen(true);
-  }, []); // mount-only
+  }, [paid, auth.authed, auth.email]);
+
+  useEffect(() => {
+    if (paid) setOpen(false);
+  }, [paid]);
 
   useEffect(() => {
     const on = (): void => {
@@ -35,7 +43,7 @@ export function UpsellModal(): JSX.Element | null {
     };
     window.addEventListener(UPSELL_EVENT, on);
     return () => window.removeEventListener(UPSELL_EVENT, on);
-  }, []);
+  }, [paid]);
 
   if (!open) return null;
 
@@ -79,18 +87,27 @@ export function UpsellModal(): JSX.Element | null {
             marginBottom: 6,
           }}
         >
-          RootRecord Pro
+          RootRecord membership
         </div>
         <h2 id="upsell-title" style={{ fontSize: "1.15rem", margin: "0 0 0.5rem" }}>
-          Unlock Kīlauea Alerts Pro
+          Some features require additional resources
         </h2>
+        <p style={{ margin: "0 0 0.75rem", lineHeight: 1.5 }}>
+          Some Kīlauea features are limited to members only so we can cover additional locations, alerts, and dashboard resources.
+        </p>
         <ul style={{ paddingLeft: "1.25rem", margin: "0 0 0.85rem", lineHeight: 1.5 }}>
           <li>All Big Island locations (free is locked to Volcano)</li>
           <li>
             Full web dashboard at <code>kilauea.rootrecord.info</code>
           </li>
           <li>Unlimited refreshes — same data your Android app gets</li>
-          <li>One subscription unlocks Weather + Business too</li>
+          <li>One membership supports Weather and Business features too</li>
+          <li>
+            Android app is live on{" "}
+            <a href={KILAUEA_PLAY_URL} target="_blank" rel="noopener noreferrer">
+              Google Play
+            </a>
+          </li>
         </ul>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <a
@@ -111,7 +128,7 @@ export function UpsellModal(): JSX.Element | null {
               textDecoration: "none",
             }}
           >
-            Upgrade now
+            View membership options
           </a>
           <button
             type="button"

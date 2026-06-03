@@ -11,6 +11,7 @@ import { GuideScreen } from "./components/GuideScreen";
 import { MarketScreen } from "./components/MarketScreen";
 import { OrchardsScreen } from "./components/OrchardsScreen";
 import { TierPlotsScreen } from "./components/TierPlotsScreen";
+import { TransactionsScreen } from "./components/TransactionsScreen";
 import {
   vegetableGrowSec,
   vegetableName,
@@ -80,12 +81,18 @@ function TierTabBody({
 }
 
 function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
-  const [tab, setTab] = useState<TabId>("plots");
+  const initialTab: TabId =
+    typeof window !== "undefined" && /\/chart\/transactions\/?$/i.test(window.location.pathname) ? "transactions" : "plots";
+  const [tab, setTab] = useState<TabId>(initialTab);
   const [plotId, setPlotId] = useState<number | null>(null);
 
   const onTab = (t: TabId) => {
     setTab(t);
     setPlotId(null);
+    if (typeof window !== "undefined") {
+      const path = t === "transactions" ? "/chart/transactions" : "/";
+      if (window.location.pathname !== path) window.history.replaceState(null, "", path);
+    }
   };
 
   let body: React.ReactNode;
@@ -106,6 +113,8 @@ function RootFarmsWebApp({ onSignIn }: { onSignIn: () => void }) {
     body = <FarmhandsScreen />;
   } else if (tab === "market") {
     body = <MarketScreen />;
+  } else if (tab === "transactions") {
+    body = <TransactionsScreen />;
   } else if (tab === "guide") {
     body = <GuideScreen />;
   } else if (tab === "settings") {

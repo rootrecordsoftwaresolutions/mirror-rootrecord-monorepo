@@ -1,4 +1,11 @@
-import type { D1Database, ExecutionContext } from "@cloudflare/workers-types";
+type D1PreparedStatement = {
+  bind: (...args: unknown[]) => D1PreparedStatement;
+  first: <T>() => Promise<T | null>;
+  all: <T>() => Promise<{ results?: T[] }>;
+  run: () => Promise<unknown>;
+};
+type D1Database = { prepare: (sql: string) => D1PreparedStatement };
+type ExecutionContext = { waitUntil: (promise: Promise<unknown>) => void };
 
 const MAX_APP_ID_LEN = 96;
 const MAX_GUEST_ID_LEN = 128;
@@ -18,6 +25,10 @@ export const APP_SESSION_LABELS: Record<string, string> = {
   rootrecord_kilauea_alerts_web: "Kīlauea Alerts (Web)",
   rootrecord_portal: "RootRecord portal",
   root_farms_android: "Root Units Idle Farmer (Android)",
+};
+
+const APP_SESSION_LINKS: Record<string, string> = {
+  rootrecord_kilauea_alerts_android: "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea",
 };
 
 function appLabel(appId: string): string {
@@ -148,6 +159,7 @@ function sessionMarkdown(params: { appId: string; mode: string; identityLines: s
   return (
     `**${label}** — ${modeLabel}\n` +
     `**App id:** \`${params.appId}\`\n` +
+    (APP_SESSION_LINKS[params.appId] ? `**App link:** ${APP_SESSION_LINKS[params.appId]}\n` : "") +
     params.identityLines.join("\n")
   );
 }

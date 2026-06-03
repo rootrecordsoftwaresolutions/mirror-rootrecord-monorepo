@@ -46,7 +46,10 @@ if (-not $admin -or $admin.Length -lt 8) {
   throw "RR_PUSH_ADMIN_SECRET missing from credentials.env (or too short)."
 }
 
-$uri = "https://api.rootrecord.info/api/internal/sweep-custodial-sol-all"
+$api = [string]$env:ROOTRECORD_ACCOUNT_API
+if (-not $api) { $api = "https://rootrecord-api-account.rootrecord.workers.dev" }
+$api = $api.Trim().TrimEnd("/")
+$uri = "$api/api/internal/sweep-custodial-sol-all"
 $headers = @{
   "X-RR-Push-Admin-Key" = $admin
 }

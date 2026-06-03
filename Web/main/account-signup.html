@@ -37,7 +37,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <meta name="twitter:description" content="Create a RootRecord account for subscription and online features.">
   <meta name="twitter:image" content="https://rootrecord.info/assets/og.jpg">
   <link rel="stylesheet" href="/styles.css?v=11">
-  <script src="/root-economy-widget.js?v=12" defer></script>
 </head>
 <body data-account-page="signup">
 <!-- Google Tag Manager (noscript) -->
@@ -69,7 +68,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <a href="/my-apps.html" role="menuitem">My Apps</a>
                 <a href="/development-notice.html" role="menuitem">Development notice</a>
                 <a href="/billing.html" role="menuitem">Billing</a>
-                <a href="/beta-tester-rewards.html" role="menuitem">Roots</a>
               </div>
             </span>
           </span>
@@ -109,11 +107,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
               <p class="note" style="margin-top:1.5rem;margin-bottom:0">Already registered? <a href="/account.html" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px">Sign in</a></p>
             </section>
-            <article class="card-plain home-economy-card" style="margin-top:1.25rem" aria-label="Root Economy">
-              <h2 style="font-size:1.1rem;margin:0 0 0.5rem">Root Economy</h2>
-              <p class="note" style="margin:0 0 0.75rem">Live internal Roots in linked accounts.</p>
-              <div id="signup-economy-widget"></div>
-            </article>
           </div>
         </div>
       </section>
@@ -127,8 +120,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <p>Multi-device solutions - your grounding roots for productivity.</p>
           </div>
           <div class="footer-col"><h4>Products</h4><ul><li><a href="/rootrecord-business-manager.html">Business Manager</a></li><li><a href="/rootrecord-weather-manager.html">Weather Manager</a></li><li><a href="/kilauea-alerts.html">Kilauea Alerts</a></li><li><a href="/pricing.html">Pricing</a></li></ul></div>
-          <div class="footer-col"><h4>Company</h4><ul><li><a href="/about.html">About</a></li><li><a href="/faq.html">FAQ</a></li><li><a href="/contact.html">Contact</a></li><li><a href="/account.html">Account</a></li><li><a href="/billing.html">Billing</a></li><li><a href="/beta-tester-rewards.html">Roots</a></li></ul></div>
-          <div class="footer-col"><h4>Community</h4><ul><li><a href="https://discord.gg/CPaDYuFkU" target="_blank" rel="noopener">Discord</a></li><li><a href="https://x.com/RootRecord" target="_blank" rel="noopener">X (Twitter)</a></li><li><a href="/terms.html">Terms</a></li><li><a href="/privacy.html">Privacy</a></li><li><a href="https://github.com/RootRecord/Doc-Repo" target="_blank" rel="noopener">Developer documentation</a></li></ul></div>
+          <div class="footer-col"><h4>Company</h4><ul><li><a href="/about.html">About</a></li><li><a href="/roadmap/">Roadmap</a></li><li><a href="/faq.html">FAQ</a></li><li><a href="/contact.html">Contact</a></li><li><a href="/account.html">Account</a></li><li><a href="/billing.html">Billing</a></li></ul></div>
+          <div class="footer-col"><h4>Community</h4><ul><li><a href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener">Discord</a></li><li><a href="https://x.com/RootRecord" target="_blank" rel="noopener">X (Twitter)</a></li><li><a href="/terms.html">Terms</a></li><li><a href="/privacy.html">Privacy</a></li><li><a href="https://github.com/RootRecord/Doc-Repo" target="_blank" rel="noopener">Developer Documentation</a></li></ul></div>
         </div>
         <div class="footer-bottom">
           <span>&copy; <span id="yr">2026</span> RootRecord &middot; <a href="https://rootrecord.info/">rootrecord.info</a></span>
@@ -138,14 +131,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
   <script src="/site-nav.js?v=5" defer></script>
-  <script src="/account.js?v=26" defer></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      var el = document.getElementById("signup-economy-widget");
-      if (el && typeof mountRootEconomyWidget === "function") {
-        mountRootEconomyWidget(el, { compact: true, days: 14, pollMs: 30000, showLeaderboard: false });
-      }
-    });
-  </script>
+  <script src="/account.js?v=38" defer></script>
 </body>
 </html>

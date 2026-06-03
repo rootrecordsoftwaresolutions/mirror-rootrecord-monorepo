@@ -12,7 +12,7 @@ import { NATIVE_APP_VERSION } from "../../lib/nativeAppVersion";
  * (`Mobile/token-manager-app/bump-and-build-release.bat`) bumps it automatically when the web
  * bundle is rebuilt. Never hard-code a version here.
  *
- * Token Manager is part of the RootRecord suite but does not sell its own Pro tier today
+ * Token Manager is part of the RootRecord suite but does not sell its own membership tier today
  * (see `Web/apps/business-manager-web/src/components/UpsellModal.jsx` for the monetization
  * scope: Weather + Business + Kīlauea). The Plans section reflects that.
  */
@@ -73,8 +73,8 @@ export default function About() {
               subscription required.
             </p>
             <p>
-              <b className="text-ink-primary">Pro</b> purchased on any other RootRecord product
-              activates Pro across the suite. Manage it in <b className="text-ink-primary">Account Hub</b>.
+              Membership on any other RootRecord product applies across the suite. Manage it in{" "}
+              <b className="text-ink-primary">Account Hub</b>.
             </p>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function About() {
           <div className="text-sm text-ink-secondary">
             <p>
               Use <b className="text-ink-primary">Send feedback</b> in Settings for bug reports, ideas, or
-              subscription questions. Visit{" "}
+              membership questions. Visit{" "}
               <a className="text-phos" href="https://rootrecord.info" target="_blank" rel="noopener noreferrer">
                 rootrecord.info
               </a>{" "}

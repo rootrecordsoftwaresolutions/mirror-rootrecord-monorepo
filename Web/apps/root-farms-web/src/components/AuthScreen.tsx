@@ -11,6 +11,10 @@ export function AuthScreen({ onContinueAsBetaTester }: { onContinueAsBetaTester?
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [err, setErr] = useState("");
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetCode, setResetCode] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetMsg, setResetMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -104,6 +108,84 @@ export function AuthScreen({ onContinueAsBetaTester }: { onContinueAsBetaTester?
           </button>
         </form>
 
+        {mode === "signin" ? (
+          <div className="auth-reset">
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setResetOpen((v) => !v)}>
+              Forgot password?
+            </button>
+            {resetOpen ? (
+              <form
+                className="auth-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setErr("");
+                  setResetMsg("");
+                  setBusy(true);
+                  try {
+                    const out = await auth.confirmPasswordReset(email.trim(), resetCode.trim(), resetPassword);
+                    if (out.ok) {
+                      setResetMsg("Password reset. You are signed in.");
+                      return;
+                    }
+                    setErr(out.detail);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <p className="auth-field-hint">
+                  Enter your email above, request a reset code, then paste the code from email.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={busy || !email.trim()}
+                  onClick={async () => {
+                    setErr("");
+                    setResetMsg("");
+                    setBusy(true);
+                    try {
+                      const out = await auth.requestPasswordReset(email.trim());
+                      if (out.ok) setResetMsg("If that account exists, a reset email has been sent.");
+                      else setErr(out.detail);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Email reset code
+                </button>
+                <label>
+                  Reset code
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value)}
+                    placeholder="6-digit code"
+                  />
+                </label>
+                <label>
+                  New password
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    minLength={6}
+                    placeholder="New password"
+                  />
+                </label>
+                {resetMsg ? <p className="auth-field-hint">{resetMsg}</p> : null}
+                <button type="submit" className="btn btn-primary" disabled={busy || !resetCode || !resetPassword}>
+                  Reset password
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
+
         <button
           type="button"
           className="btn btn-ghost auth-guest-btn"
@@ -119,13 +201,7 @@ export function AuthScreen({ onContinueAsBetaTester }: { onContinueAsBetaTester?
           Don&apos;t want to sign in? Play as a <strong>Beta Tester</strong> — progress stays on this device and is not
           saved to your RootRecord account.
         </p>
-        <p className="auth-support-note">
-          Need an account reset? Contact{" "}
-          <a href="https://rootrecord.info/contact.html" target="_blank" rel="noopener noreferrer">
-            RootRecord support
-          </a>
-          .
-        </p>
+        <p className="auth-support-note">Account verification and reset emails come from rootrecord.info.</p>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 (function () {
   const TOKEN_KEY = "rootrecord_portal_token";
   const DEVICE_KEY = "rootrecord_portal_device_id";
-  const DISCORD_INVITE = "https://discord.gg/CPaDYuFkU";
+  const DISCORD_INVITE = "https://discord.gg/uQ7kGFqtbG";
 
   function el(id) {
     return document.getElementById(id);

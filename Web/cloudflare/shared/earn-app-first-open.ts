@@ -1,5 +1,12 @@
-import type { D1Database } from "@cloudflare/workers-types";
 import { FIRST_APP_OPEN_UNITS } from "./earn-program-constants";
+
+type D1PreparedStatement = {
+  bind: (...args: unknown[]) => D1PreparedStatement;
+  first: <T>() => Promise<T | null>;
+  all: <T>() => Promise<{ results?: T[] }>;
+  run: () => Promise<unknown>;
+};
+type D1Database = { prepare: (sql: string) => D1PreparedStatement };
 
 export { FIRST_APP_OPEN_UNITS };
 

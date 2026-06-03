@@ -1,4 +1,10 @@
-import type { D1Database } from "@cloudflare/workers-types";
+type D1PreparedStatement = {
+  bind: (...args: unknown[]) => D1PreparedStatement;
+  first: <T>() => Promise<T | null>;
+  all: <T>() => Promise<{ results?: T[] }>;
+  run: () => Promise<unknown>;
+};
+type D1Database = { prepare: (sql: string) => D1PreparedStatement };
 
 export const CIRCULATION_SQL = `SELECT COALESCE(SUM(b.balance), 0) AS total_circulation,
        COUNT(*) AS account_count

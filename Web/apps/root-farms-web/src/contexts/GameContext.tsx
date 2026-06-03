@@ -98,6 +98,15 @@ export type PurchaseResult = "ok" | "insufficient" | "unavailable" | "need_sign_
 const INSUFFICIENT_FUNDS_AD_BONUS = 100_000;
 const ROOTS_CREDIT_PACK_URL = "https://buy.stripe.com/7sY6oH38FaRD3EUbEX5gc06";
 
+const FARMHAND_TOOL_BY_PURCHASE_KIND: Partial<Record<FarmsPurchaseKind, FarmhandToolKind>> = {
+  buy_gopher_tool: "gopher",
+  buy_mice_tool: "mice",
+  buy_rabbit_tool: "rabbit",
+  buy_birds_tool: "birds",
+  buy_lightning_rod: "lightning_meteorologist",
+  buy_cypress_tool: "cypress_trees",
+};
+
 function rootsCreditPackUrl(email: string): string {
   try {
     const u = new URL(ROOTS_CREDIT_PACK_URL);
@@ -107,6 +116,19 @@ function rootsCreditPackUrl(email: string): string {
   } catch {
     return ROOTS_CREDIT_PACK_URL;
   }
+}
+
+function purchaseSatisfiedByRemoteState(
+  remote: FarmsStateResponse,
+  kind: FarmsPurchaseKind,
+  plotId: number,
+): boolean {
+  const toolKind = FARMHAND_TOOL_BY_PURCHASE_KIND[kind];
+  if (toolKind) return Boolean(remote.store && storeHasFarmhandTool(remote.store, toolKind));
+  if (kind === "root_cluster") return Boolean(remote.store?.root_clusters?.[plotId - 1]);
+  if (kind === "unlock_plot") return Boolean(remote.plots?.some((p) => p.id === plotId && p.unlocked));
+  if (kind === "vegetable_unlock") return Boolean(remote.vegetables?.some((p) => p.id === plotId && p.unlocked));
+  return false;
 }
 
 
@@ -965,17 +987,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
           if (result === "offline") {
             const remote = await fetchFarmsState();
             if (!remote?.ok) return "offline";
-            setProgressVersion(remote.progress_version);
-            progressVersionRef.current = remote.progress_version;
-            if (remote.plots?.length) {
-              persist(
-                applyServerPlots(saveRef.current, {
-                  plots: remote.plots,
-                  lifetimeEarned: remote.lifetime_farms_earned,
-                  lastSettledMs: remote.last_settled_ms,
-                }),
-              );
-            }
+            applyRemoteFarmsState(remote, Date.now(), { skipWelcome: true });
+            if (purchaseSatisfiedByRemoteState(remote, kind, plotId)) return "ok";
             continue;
           }
           /* retry — state synced from rejected response */
@@ -1132,12 +1145,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     async (kind: FarmsPurchaseKind, tierId: number): Promise<PurchaseResult> => {
       let cost = 0;
       const farmhandToolByPurchaseKind: Partial<Record<FarmsPurchaseKind, FarmhandToolKind>> = {
-        buy_gopher_tool: "gopher",
-        buy_mice_tool: "mice",
-        buy_rabbit_tool: "rabbit",
-        buy_birds_tool: "birds",
-        buy_lightning_rod: "lightning_meteorologist",
-        buy_cypress_tool: "cypress_trees",
+        ...FARMHAND_TOOL_BY_PURCHASE_KIND,
       };
       const toolKind = farmhandToolByPurchaseKind[kind];
       if (toolKind) {

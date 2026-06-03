@@ -7,6 +7,9 @@ JWT_SECRET=replace-with-long-random-string-at-least-16-chars
 #   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 INTERNAL_WALLET_ENC_KEY_B64=paste-44-char-base64-here
 
+# Stripe annual price for Visiting Hawaiʻi sponsored listings ($100/year):
+# STRIPE_VISITING_HAWAII_SPONSORED_PRICE_ID=price_...
+
 # Optional local overrides (otherwise wrangler.toml [vars] apply):
 # SITE_URL=http://127.0.0.1:8787
 # ACCUWEATHER_API_KEY=   (AccuWeather dev key for real weather in local dev)
@@ -17,5 +20,7 @@ INTERNAL_WALLET_ENC_KEY_B64=paste-44-char-base64-here
 # App session start → Discord (POST /api/app-session/start from mobile/web apps):
 # DISCORD_APP_SESSION_WEBHOOK_URL=https://discord.com/api/webhooks/…
 #
-# Root Economy circulation pings (*/45 cron on rootrecord-api-account):
+# Root Economy Discord webhook (community donations, swaps, deposits; optional manual ping):
 # DISCORD_ROOT_ECONOMY_WEBHOOK_URL=https://discord.com/api/webhooks/…
+# Scheduled "Internal circulation" pings are OFF unless ROOT_ECONOMY_DISCORD_CRON_ENABLED=1 (wrangler var).
+# Manual ping: POST /api/internal/root-economy-discord-ping (X-RR-Push-Admin-Key).

@@ -16,6 +16,8 @@ export async function deletePortalAccountData(db: D1Database, accountId: string,
   await db.batch([
     db.prepare("DELETE FROM license_sessions WHERE account_id = ?").bind(accountId),
     db.prepare("DELETE FROM license_email_change WHERE account_id = ?").bind(accountId),
+    db.prepare("DELETE FROM license_account_security WHERE account_id = ?").bind(accountId),
+    db.prepare("DELETE FROM license_account_challenges WHERE account_id = ?").bind(accountId),
     db.prepare("DELETE FROM solana_linked_wallets WHERE account_id = ?").bind(accountId),
     db.prepare("DELETE FROM rr_earn_internal_transfer WHERE from_account_id = ? OR to_account_id = ?").bind(accountId, accountId),
     db.prepare("DELETE FROM custodial_wallet_token_slots WHERE account_id = ?").bind(accountId),

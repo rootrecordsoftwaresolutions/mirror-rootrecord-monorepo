@@ -47,7 +47,7 @@ class KilaueaNotificationManager @Inject constructor(
             val soundUri = if (alarmSound) {
                 android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
             } else {
-                android.media.Settings.System.DEFAULT_NOTIFICATION_URI
+                Settings.System.DEFAULT_NOTIFICATION_URI
             }
             setSound(
                 soundUri,

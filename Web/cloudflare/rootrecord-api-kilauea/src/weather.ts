@@ -911,7 +911,9 @@ export async function weatherForecast(
         hourly_grid_units: "si",
       };
     } catch {
-      return { available: false, source: "accuweather", periods: [], hourly: [] };
+      // AccuWeather can fail from quota/key expiry/plan changes. Fall through to NWS instead of
+      // blanking the forecast card.
+      await bumpUsageMetric(db, "accu.forecast.fallthrough_to_nws", 1);
     }
   }
   try {
@@ -968,7 +970,8 @@ export async function weatherAlerts(
       );
       return { available: true, source: "accuweather", attribution: "AccuWeather", raw: { location: loc, alerts: rows }, alerts };
     } catch {
-      return { available: false, source: "accuweather", alerts: [] };
+      // Alerts are plan-dependent on AccuWeather. Fall through to NOAA/NWS when unavailable.
+      await bumpUsageMetric(db, "accu.alerts.fallthrough_to_nws", 1);
     }
   }
   try {

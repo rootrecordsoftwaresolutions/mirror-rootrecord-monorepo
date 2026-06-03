@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ShieldCheck, X } from 'lucide-react';
 import { session } from '../lib/api';
 import { BILLING_URL, UPSELL_EVENT } from '../lib/tierAccess';
+import useAccess from '../lib/useAccess';
 
 const OPENS_KEY = 'rrwm.upsell.opens';
 
@@ -20,9 +21,11 @@ export { UPSELL_EVENT };
 
 export default function UpsellModal() {
   const [open, setOpen] = useState(false);
+  const { pro, life } = useAccess();
+  const paid = pro || life;
 
   useEffect(() => {
-    if (session.isPro() || session.isLifeMember()) return;
+    if (paid) return;
     let n = 0;
     try {
       n = Number(window.localStorage.getItem(OPENS_KEY) || '0') + 1;
@@ -31,7 +34,11 @@ export default function UpsellModal() {
       /* private mode / quota — fall back to in-memory only */
     }
     if (n >= 2 && n % 2 === 0) setOpen(true);
-  }, []);
+  }, [paid]);
+
+  useEffect(() => {
+    if (paid) setOpen(false);
+  }, [paid]);
 
   useEffect(() => {
     const on = () => {
@@ -40,7 +47,7 @@ export default function UpsellModal() {
     };
     window.addEventListener(UPSELL_EVENT, on);
     return () => window.removeEventListener(UPSELL_EVENT, on);
-  }, []);
+  }, [paid]);
 
   if (!open) return null;
 
@@ -60,7 +67,7 @@ export default function UpsellModal() {
       >
         <div className="flex items-start justify-between px-4 pt-4">
           <div className="flex items-center gap-2 text-accent/80 text-[11px] uppercase tracking-widest">
-            <ShieldCheck className="w-3.5 h-3.5" /> RootRecord Pro
+            <ShieldCheck className="w-3.5 h-3.5" /> RootRecord membership
           </div>
           <button
             type="button"
@@ -73,8 +80,11 @@ export default function UpsellModal() {
         </div>
         <div className="px-4 pb-4 pt-2">
           <h2 id="upsell-title" className="text-lg font-semibold mb-2">
-            Unlock Weather Manager Pro
+            Some features require additional resources
           </h2>
+          <p className="text-sm text-neutral-200 mb-3">
+            Some features are limited to members only so we can cover higher-cost data, alerts, and sync.
+          </p>
           <ul className="text-sm text-neutral-200 space-y-1.5 list-disc pl-5 mb-4">
             <li>Live earthquake, tsunami, cyclone, and wildfire feeds</li>
             <li>Air quality index, pollutants, and forecasts</li>
@@ -82,7 +92,7 @@ export default function UpsellModal() {
             <li>5-day forecast (free shows 3 days)</li>
             <li>Unlimited fresh updates (free is capped at two outside-data refreshes per day)</li>
             <li>Multiple saved locations synced across all your devices</li>
-            <li>One subscription unlocks Business + Kīlauea too</li>
+            <li>One membership supports Business and Kīlauea features too</li>
           </ul>
           <div className="flex flex-col sm:flex-row gap-2">
             <a
@@ -92,7 +102,7 @@ export default function UpsellModal() {
               className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded bg-accent text-black font-medium hover:opacity-90"
               data-testid="upsell-upgrade"
             >
-              Upgrade now
+              View membership options
             </a>
             <button
               type="button"

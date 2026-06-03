@@ -66,7 +66,7 @@ export default function UpsellModal() {
       >
         <div className="flex items-start justify-between px-4 pt-4">
           <div className="flex items-center gap-2 text-brand/80 text-[11px] uppercase tracking-widest">
-            <ShieldCheck size={14} /> RootRecord Pro
+            <ShieldCheck size={14} /> RootRecord membership
           </div>
           <button
             type="button"
@@ -79,13 +79,16 @@ export default function UpsellModal() {
         </div>
         <div className="px-4 pb-4 pt-2">
           <h2 id="upsell-title" className="text-lg font-semibold mb-2">
-            Unlock Business Manager Pro
+            Some features require additional resources
           </h2>
+          <p className="text-sm mb-3">
+            Some Business Manager features are limited to members only so we can cover reporting, sync, and desktop access.
+          </p>
           <ul className="text-sm space-y-1.5 list-disc pl-5 mb-4">
             <li>Full web portal at <span className="font-mono">business.rootrecord.info</span></li>
             <li>Unlimited PDF reports (free is capped at 3 reports per month)</li>
             <li>Cross-device sync — Android and web stay in lockstep</li>
-            <li>One subscription unlocks Weather + Kīlauea too</li>
+            <li>One membership supports Weather and Kīlauea features too</li>
           </ul>
           <div className="flex flex-col sm:flex-row gap-2">
             <a
@@ -95,7 +98,7 @@ export default function UpsellModal() {
               className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded bg-brand text-black font-medium hover:opacity-90"
               data-testid="upsell-upgrade"
             >
-              Upgrade now
+              View membership options
             </a>
             <button
               type="button"

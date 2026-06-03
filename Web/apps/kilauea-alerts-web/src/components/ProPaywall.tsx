@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 const STRIPE_PRICING_TABLE_ID = "prctbl_1TQJ0kIaRpbMiAovAUe3X3QJ";
 const STRIPE_PUBLISHABLE_KEY = "pk_live_51T3sezIaRpbMiAov6SUJgKLGR1igmRGOYg1rY1hKJPAWxLXDgJR7kRNSBSM8sJ2Wat1zuC56iE4TCTyPfqmEfTT600cR21LwYA";
 const STRIPE_PRICING_SCRIPT_URL = "https://js.stripe.com/v3/pricing-table.js";
+const KILAUEA_PLAY_URL = "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea";
 
 function ensureStripePricingTableScript(): void {
   if (typeof document === "undefined") return;
@@ -37,12 +38,17 @@ export function ProPaywall(): JSX.Element {
       <header className="site-header">
         <div className="site-header-inner">
           <div className="brand-block">
-            <div className="brand-kicker">RootRecord Pro</div>
-            <h1 className="brand-title">Web access is a Pro feature</h1>
+            <div className="brand-kicker">RootRecord membership</div>
+            <h1 className="brand-title">Some features require additional resources</h1>
             <p className="brand-sub">
-              The Kīlauea Alerts web dashboard is available to <strong>Pro</strong> and{" "}
-              <strong>Lifetime</strong> members. Pick a plan below and you'll be back here in seconds. The
-              Android app remains usable on the free tier (Volcano location only).
+              Some Kīlauea Alerts features are limited to members only. Membership helps cover
+              additional locations, alerts, and dashboard resources. The Android app is live on Google Play
+              and includes core Volcano access.
+            </p>
+            <p className="brand-sub" style={{ marginTop: "0.75rem" }}>
+              <a href={KILAUEA_PLAY_URL} target="_blank" rel="noopener noreferrer">
+                Download Kīlauea Alerts on Google Play
+              </a>
             </p>
           </div>
         </div>
@@ -50,12 +56,12 @@ export function ProPaywall(): JSX.Element {
 
       <main className="dashboard">
         <section className="panel">
-          <h2 className="panel-title">What you get with Pro</h2>
+          <h2 className="panel-title">Member features</h2>
           <ul className="panel-list">
             <li>Full web dashboard at <code>kilauea.rootrecord.info</code></li>
             <li>All Big Island locations (free Android is locked to Volcano)</li>
             <li>Unlimited refreshes — same data your Android app gets</li>
-            <li>One subscription unlocks Weather, Business, and Kīlauea on every device</li>
+            <li>One membership supports Weather, Business, and Kīlauea features across devices</li>
           </ul>
         </section>
 

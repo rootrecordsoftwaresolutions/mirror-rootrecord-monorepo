@@ -61,6 +61,7 @@ import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./devel
 import { handleKilaueaLiveStreamsGet, handleKilaueaLiveStreamsPost } from "./kilauea-live-streams";
 import { handleKilaueaSituationGet, handleKilaueaSituationPost } from "./kilauea-situation";
 import { handleKilaueaAiAnalysesGet, handleKilaueaAiManualRun } from "./kilauea-ai-analysis";
+import { handleBigIslandEarthquakesChartGet, handleKilaueaAiReportsPublicGet } from "./kilauea-charts-public";
 import { handleKilaueaDiscordInteractions } from "./discord-kilauea-bot";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
@@ -813,6 +814,14 @@ export async function handleRequest(
     return handleKilaueaAiAnalysesGet(request, env);
   }
 
+  if (method === "GET" && sub === "/public/kilauea/big-island-earthquakes") {
+    return handleBigIslandEarthquakesChartGet(request);
+  }
+
+  if (method === "GET" && sub === "/public/kilauea/ai-reports") {
+    return handleKilaueaAiReportsPublicGet(request, env);
+  }
+
   if (method === "GET" && sub === "/aqs/hawaii-county-daily") {
     return handleAqsHawaiiCountyDaily(request, env);
   }
@@ -1379,6 +1388,7 @@ export async function handleRequest(
 
   if (method === "GET" && sub === "/dashboard" && lat != null && lon != null) {
 
+    try {
     const uidRes = await resolveUserId(request, env);
 
     if (uidRes instanceof Response) return uidRes;
@@ -1411,6 +1421,11 @@ export async function handleRequest(
       (bundle as Record<string, unknown>).free_location_id = FREE_TIER_LOC_ID;
     }
     return json(bundle, 200);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("dashboard_bundle", msg);
+      return json({ detail: "Dashboard data temporarily unavailable.", error: msg.slice(0, 240) }, 503);
+    }
 
   }
 

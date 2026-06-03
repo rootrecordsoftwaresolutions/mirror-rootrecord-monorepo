@@ -73,7 +73,7 @@ export default function About() {
         <Section title="Plans">
           <div className="p-4 text-sm text-accent/90 space-y-2">
             <p>
-              <b className="text-white">Pro</b> unlocks unlimited saved locations, hazard map layers,
+              <b className="text-white">Pro</b> unlocks up to 5 saved locations, hazard map layers,
               push alerts, and the full desktop dashboard at weather.rootrecord.info.
             </p>
             <p>
@@ -98,7 +98,7 @@ export default function About() {
           <div className="p-4 text-sm text-accent/90">
             <p>
               Use <b className="text-white">Feedback</b> in Settings for bug reports, ideas, or
-              subscription questions. Visit{' '}
+              membership questions. Visit{' '}
               <a className="text-accent" href="https://rootrecord.info" target="_blank" rel="noreferrer">
                 rootrecord.info
               </a>{' '}

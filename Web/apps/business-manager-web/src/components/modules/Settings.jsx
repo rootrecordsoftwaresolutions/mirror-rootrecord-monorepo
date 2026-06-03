@@ -15,6 +15,9 @@ import { Capacitor } from "@capacitor/core";
 import { NATIVE_APP_VERSION } from "../../lib/nativeAppVersion";
 
 const DESKTOP_WEB_URL = "https://business.rootrecord.info/";
+const SIMPLE_WEATHER_PLAY_URL = "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager&pcampaignid=web_share";
+const SIMPLE_WEATHER_INTENT_URL =
+  "intent://simple-weather#Intent;package=com.rootrecord.weathermanager;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.rootrecord.weathermanager%26pcampaignid%3Dweb_share;end";
 
 const IS_NATIVE_ANDROID = (() => {
   try { return Capacitor?.isNativePlatform?.() === true; } catch { return false; }
@@ -76,7 +79,7 @@ export function AccountSettings() {
     try {
       const data = await refreshEntitlement();
       setEnt(data);
-      show(data.plan === "pro" ? "Pro confirmed" : "Plan refreshed", "success");
+      show(data.plan === "pro" ? "Membership confirmed" : "Plan refreshed", "success");
     } catch (e) {
       show("Could not refresh — try again later", "error");
     } finally {
@@ -100,7 +103,7 @@ export function AccountSettings() {
                   <span className="text-sm text-ink-secondary">Membership</span>
                   {isPro ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-brand/15 border border-brand/30 text-brand-light">
-                      <Sparkles size={10} /> Pro
+                      <Sparkles size={10} /> Member
                     </span>
                   ) : <span className="chip">Free</span>}
                 </div>
@@ -138,7 +141,7 @@ export function AccountSettings() {
           <Section title="Desktop version">
             <div className="p-4 space-y-3 text-sm text-ink-secondary">
               <p>
-                <span className="text-ink-primary font-medium">Pro members</span> can open the full Business Manager in any desktop or laptop browser at{" "}
+                <span className="text-ink-primary font-medium">Members</span> can open the full Business Manager in any desktop or laptop browser at{" "}
                 <span className="text-ink-primary font-medium">business.rootrecord.info</span>. Same account, same data.
               </p>
               <a
@@ -154,6 +157,24 @@ export function AccountSettings() {
           </Section>
         )}
 
+        <Section title="Local weather">
+          <div className="p-4 space-y-3 text-sm text-ink-secondary">
+            <p>
+              For local, user-specific detailed weather, try <span className="text-ink-primary font-medium">Simple Weather</span>,
+              our Weather Manager app.
+            </p>
+            <a
+              href={IS_NATIVE_ANDROID ? SIMPLE_WEATHER_INTENT_URL : SIMPLE_WEATHER_PLAY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary w-full inline-flex items-center justify-center gap-2"
+              data-testid="settings-simple-weather-link"
+            >
+              {IS_NATIVE_ANDROID ? "Go to Weather App" : "Open Simple Weather"} <ExternalLink size={14} className="opacity-80" aria-hidden />
+            </a>
+          </div>
+        </Section>
+
         <Section title="Plan overview">
           <div className="p-4 grid grid-cols-2 gap-3">
             <div className={`card p-3 border-2 ${!isPro ? "border-brand/40" : "border-transparent"}`}>
@@ -165,7 +186,7 @@ export function AccountSettings() {
               </ul>
             </div>
             <div className={`card p-3 border-2 ${isPro ? "border-brand/40 bg-brand/5" : "border-transparent"}`}>
-              <p className="font-heading font-bold text-base flex items-center gap-1">Pro <Sparkles size={12} className="text-brand" /></p>
+              <p className="font-heading font-bold text-base flex items-center gap-1">Member <Sparkles size={12} className="text-brand" /></p>
               <ul className="text-xs text-ink-secondary mt-2 space-y-1">
                 <li>• Full Reports + PDF</li>
                 <li>• Multiple businesses in the cloud</li>
@@ -182,7 +203,7 @@ export function AccountSettings() {
                 rel="noreferrer"
                 className="btn btn-primary w-full"
               >
-                <Sparkles size={16} /> Upgrade on rootrecord.info
+                <Sparkles size={16} /> View membership options
               </a>
             </div>
           )}
@@ -481,7 +502,7 @@ export function About() {
         </Section>
         <Section title="Plans">
           <div className="p-4 text-sm text-ink-secondary space-y-2">
-            <p><b className="text-ink-primary">Pro</b> unlocks Reports workspace, multiple businesses in the cloud, and roadmap extras such as AI-assisted reports.</p>
+            <p><b className="text-ink-primary">Membership</b> supports resource-heavy features like Reports workspace, multiple businesses in the cloud, and roadmap extras such as AI-assisted reports.</p>
             <p><b className="text-ink-primary">Free</b> keeps your data on your device. Account Settings shows your current plan.</p>
           </div>
         </Section>
@@ -497,7 +518,7 @@ export function About() {
         </Section>
         <Section title="Where to get help">
           <div className="p-4 text-sm text-ink-secondary space-y-2">
-            <p>Use <b className="text-ink-primary">Feedback</b> in the More menu for bug reports, ideas, or subscription questions. Visit <a className="text-brand" href="https://rootrecord.info" target="_blank" rel="noreferrer">rootrecord.info</a> for the latest.</p>
+            <p>Use <b className="text-ink-primary">Feedback</b> in the More menu for bug reports, ideas, or membership questions. Visit <a className="text-brand" href="https://rootrecord.info" target="_blank" rel="noreferrer">rootrecord.info</a> for the latest.</p>
             <p>
               Join the community on Discord:{" "}
               <a className="text-brand font-semibold" href="https://discord.gg/jBgRdgmsjB" target="_blank" rel="noreferrer">

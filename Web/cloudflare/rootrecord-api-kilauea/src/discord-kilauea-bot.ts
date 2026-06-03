@@ -12,7 +12,120 @@ export type KilaueaDiscordEnv = KilaueaReportEnv & {
   DISCORD_KILAUEA_USGS_WEBHOOK_URL?: string;
 };
 
-const DISCORD_CONTENT_LIMIT = 1800;
+const DISCORD_CONTENT_LIMIT = 1990;
+
+export function chunkDiscordContent(text: string, max = DISCORD_CONTENT_LIMIT): string[] {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [];
+
+  // Prefer splits at markdown section headers so seismic/social blocks stay intact when possible.
+  const sections = normalized.split(/(?=\n(?:\*\*[^*]+\*\*|\#{1,3}\s))/).map((s) => s.trim()).filter(Boolean);
+  const merged: string[] = [];
+  let buf = "";
+  for (const section of sections.length ? sections : [normalized]) {
+    const next = buf ? `${buf}\n\n${section}` : section;
+    if (buf && next.length > max) {
+      merged.push(buf);
+      buf = section;
+    } else {
+      buf = next;
+    }
+  }
+  if (buf) merged.push(buf);
+
+  const out: string[] = [];
+  for (const block of merged) {
+    if (block.length <= max) {
+      out.push(block);
+      continue;
+    }
+    let s = block;
+    while (s.length > 0) {
+      if (s.length <= max) {
+        out.push(s);
+        break;
+      }
+      let cut = s.lastIndexOf("\n", max);
+      if (cut < 200) cut = max;
+      out.push(s.slice(0, cut).trimEnd());
+      s = s.slice(cut).trimStart();
+    }
+  }
+  return out.filter(Boolean);
+}
+
+function scrubAiReportText(raw: string): string {
+  return raw
+    .replace(/\bGrok\b/gi, "AI")
+    .replace(/\bxAI\b/g, "AI")
+    .trim();
+}
+
+function cleanSocialPostText(raw: unknown, max = 500): string {
+  const s = String(raw ?? "")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s.length > max ? `${s.slice(0, Math.max(0, max - 1)).trimEnd()}…` : s;
+}
+
+/** Remove AI-summarized official social (often truncated) before appending full posts. */
+export function stripOfficialSocialSection(text: string): string {
+  const markers = [
+    /\n\n\*{0,2}Official social\*{0,2}:?[\s\S]*$/i,
+    /\nOfficial social:.*$/i,
+  ];
+  let out = text.trim();
+  for (const re of markers) out = out.replace(re, "").trim();
+  return out;
+}
+
+export function formatOfficialSocialSection(
+  posts: Array<Record<string, unknown>>,
+  opts?: { maxPosts?: number; maxChars?: number },
+): string {
+  const maxPosts = opts?.maxPosts ?? 6;
+  const maxChars = opts?.maxChars ?? 500;
+  const lines = posts.slice(0, maxPosts).map((post) => {
+    const account = String(post.account || "Official").trim();
+    const text = cleanSocialPostText(post.text, maxChars);
+    return text ? `• ${account}: ${text}` : "";
+  }).filter(Boolean);
+  if (!lines.length) return "";
+  return ["**Official social**", ...lines].join("\n");
+}
+
+/** Full report body for Discord — no per-field truncation (chunkDiscordContent splits for API limits). */
+export function buildKilaueaAnalysisDiscordBody(
+  row: {
+    headline?: string | null;
+    event?: string | null;
+    source_type?: string | null;
+    free_text?: string | null;
+    pro_text?: string | null;
+  },
+  opts?: { officialPosts?: Array<Record<string, unknown>> },
+): string {
+  const headline = `**Kīlauea AI Analysis** — ${row.headline || row.event || row.source_type || "update"}`;
+  const free = scrubAiReportText(String(row.free_text || ""));
+  let pro = scrubAiReportText(String(row.pro_text || ""));
+  if (opts?.officialPosts?.length) {
+    pro = stripOfficialSocialSection(pro);
+    const social = formatOfficialSocialSection(opts.officialPosts);
+    if (social) pro = pro ? `${pro}\n\n${social}` : social;
+  }
+  const parts = [headline];
+  if (free) parts.push(free);
+  if (pro && pro !== free) parts.push(pro);
+  return parts.join("\n\n");
+}
 
 export function truncateDiscordContent(s: string, max = DISCORD_CONTENT_LIMIT): string {
   if (s.length <= max) return s;
@@ -90,19 +203,34 @@ async function postToChannelWithFallbacks(
   return false;
 }
 
-/** Post AI report — one guild, or fan-out to all configured servers. */
+/** Post AI report — one guild, or fan-out to all configured servers. Long reports are split across messages. */
 export async function postKilaueaReportContent(
   env: KilaueaDiscordEnv,
   content: string,
   opts?: { guildId?: string },
 ): Promise<boolean> {
-  const text = truncateDiscordContent(content);
-  if (!text.trim()) return false;
-  const payload = { content: text, allowed_mentions: { parse: [] } };
+  const chunks = chunkDiscordContent(content);
+  if (!chunks.length) return false;
+
+  async function postAllChunks(channelId: string, allowWebhook: boolean): Promise<boolean> {
+    let posted = false;
+    const total = chunks.length;
+    for (let i = 0; i < chunks.length; i++) {
+      const suffix = total > 1 ? `\n\n_${i + 1}/${total}_` : "";
+      const chunk = chunks[i]!;
+      const room = DISCORD_CONTENT_LIMIT - suffix.length;
+      const body = chunk.length > room ? chunk.slice(0, room).trimEnd() : chunk;
+      const payload = { content: body + suffix, allowed_mentions: { parse: [] } };
+      const ok = await postToChannelWithFallbacks(env, channelId, payload, { allowWebhook });
+      if (!ok) return posted;
+      posted = true;
+    }
+    return posted;
+  }
 
   if (opts?.guildId && env.DB) {
     const channelId = await resolveGuildReportChannelId(env.DB, env, opts.guildId);
-    if (channelId) return postToChannelWithFallbacks(env, channelId, payload);
+    if (channelId) return postAllChunks(channelId, false);
     return false;
   }
 
@@ -110,13 +238,13 @@ export async function postKilaueaReportContent(
     const dests = await listGuildAlertDestinations(env.DB, env);
     let any = false;
     for (const d of dests) {
-      if (await postToChannelWithFallbacks(env, d.channel_id, payload, { allowWebhook: true })) any = true;
+      if (await postAllChunks(d.channel_id, true)) any = true;
     }
     if (any) return true;
   }
 
   const channelId = String(env.DISCORD_KILAUEA_REPORT_CHANNEL_ID || "1502461868990791770").trim();
-  return postToChannelWithFallbacks(env, channelId, payload);
+  return postAllChunks(channelId, true);
 }
 
 export async function postKilaueaEmbedsToChannel(
@@ -147,7 +275,8 @@ export async function postKilaueaEmbeds(
   return any;
 }
 
-function hexToUint8(hex: string): Uint8Array | null {  const h = hex.replace(/\s/g, "").toLowerCase();
+function hexToUint8(hex: string): Uint8Array | null {
+  const h = hex.replace(/\s/g, "").toLowerCase();
   if (!/^[0-9a-f]+$/.test(h) || h.length % 2 !== 0) return null;
   const out = new Uint8Array(h.length / 2);
   for (let i = 0; i < out.length; i++) out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);

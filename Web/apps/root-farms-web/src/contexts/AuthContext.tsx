@@ -1,6 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { getStoredEmail, isAuthed, loginRequest, logoutRequest, signupRequest, tryHydrateSessionFromCookie } from "../lib/api";
+import {
+  confirmPasswordReset,
+  getStoredAccountVerified,
+  getStoredEmail,
+  isAuthed,
+  loginRequest,
+  logoutRequest,
+  requestPasswordReset,
+  signupRequest,
+  tryHydrateSessionFromCookie,
+} from "../lib/api";
 import { clearEntitlement } from "../lib/entitlement";
 import { notifyFarmsSessionStart, FARMS_APP_ID } from "../lib/sessionNotify";
 import { startEarnUsageRewards } from "../lib/earnUsageRewards";
@@ -11,12 +21,19 @@ type AuthCtx = {
   email: string;
   authed: boolean;
   guestMode: boolean;
+  accountVerified: boolean;
   canPlay: boolean;
   login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; detail: string }>;
   register: (
     email: string,
     password: string,
     name?: string,
+  ) => Promise<{ ok: true } | { ok: false; detail: string }>;
+  requestPasswordReset: (email: string) => Promise<{ ok: true } | { ok: false; detail: string }>;
+  confirmPasswordReset: (
+    email: string,
+    code: string,
+    newPassword: string,
   ) => Promise<{ ok: true } | { ok: false; detail: string }>;
   enterBetaTesterMode: () => void;
   logout: () => Promise<void>;
@@ -57,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [decided, epoch]);
 
   const authed = isAuthed();
+  const accountVerified = authed ? getStoredAccountVerified() : false;
   const canPlay = decided && (authed || guestMode);
 
   useEffect(() => {
@@ -117,6 +135,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sync();
   }, [sync]);
 
+  const requestReset = useCallback((email: string) => requestPasswordReset(email), []);
+
+  const confirmReset = useCallback(
+    async (email: string, code: string, newPassword: string) => {
+      const out = await confirmPasswordReset(email, code, newPassword);
+      if (out.ok) {
+        setGuestMode(false);
+        setSessionNotified(false);
+        sync();
+      }
+      return out;
+    },
+    [sync],
+  );
+
   const logout = useCallback(async () => {
     if (guestMode && !authed) {
       setGuestMode(true);
@@ -136,13 +169,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: authed ? getStoredEmail() : "",
       authed,
       guestMode,
+      accountVerified,
       canPlay,
       login,
       register,
+      requestPasswordReset: requestReset,
+      confirmPasswordReset: confirmReset,
       enterBetaTesterMode,
       logout,
     }),
-    [decided, epoch, authed, guestMode, canPlay, login, register, enterBetaTesterMode, logout],
+    [
+      decided,
+      epoch,
+      authed,
+      guestMode,
+      accountVerified,
+      canPlay,
+      login,
+      register,
+      requestReset,
+      confirmReset,
+      enterBetaTesterMode,
+      logout,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

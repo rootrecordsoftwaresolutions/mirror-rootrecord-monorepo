@@ -19,6 +19,9 @@ import {
 } from "@solana/spl-token";
 import bs58 from "bs58";
 
+import { json } from "./cors";
+import { verifyWorkerOpsAdmin } from "./push";
+import { TREASURY_WALLET_PUBKEY } from "./treasury-account";
 import type { InternalWalletEnv } from "./solana-internal-wallet";
 import { loadKeypairForAccount } from "./solana-internal-wallet";
 
@@ -35,6 +38,22 @@ export type CustodialSweepResult = {
   /** Short log line for ops. */
   summary: string;
   signatures: string[];
+  emptyVerified?: boolean;
+};
+
+type SweepOptions = {
+  dryRun?: boolean;
+  drainNativeSol?: boolean;
+};
+
+export type CustodialSweepPreview = {
+  account_id: string;
+  pubkey: string;
+  sol_lamports: string;
+  token_accounts: number;
+  token_raw_total_counted_accounts: number;
+  empty: boolean;
+  error?: string;
 };
 
 function sweepRpcCandidates(env: SweepEnv): string[] {
@@ -76,12 +95,13 @@ async function hasMeaningfulOnChainBalance(connection: Connection, owner: Public
   return false;
 }
 
-async function verifyCustodialEmpty(connection: Connection, owner: PublicKey): Promise<boolean> {
+async function verifyCustodialEmpty(connection: Connection, owner: PublicKey, strictSol = false): Promise<boolean> {
   for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
     const r = await connection.getParsedTokenAccountsByOwner(owner, { programId });
     if ((r.value || []).length > 0) return false;
   }
   const lamports = await connection.getBalance(owner, "confirmed");
+  if (strictSol) return lamports <= 0;
   const min = await connection.getMinimumBalanceForRentExemption(0);
   return lamports <= min + 75_000;
 }
@@ -157,11 +177,109 @@ async function sendSweepTx(
   return sig;
 }
 
+async function sendSelfPaidSolDrainTx(
+  connection: Connection,
+  custodial: Keypair,
+  destination: PublicKey,
+  balanceLamports: number,
+): Promise<{ signature: string; lamportsSent: number } | null> {
+  const latest = await connection.getLatestBlockhash("confirmed");
+  const feeProbeMessage = new TransactionMessage({
+    payerKey: custodial.publicKey,
+    recentBlockhash: latest.blockhash,
+    instructions: [
+      SystemProgram.transfer({
+        fromPubkey: custodial.publicKey,
+        toPubkey: destination,
+        lamports: 0,
+      }),
+    ],
+  }).compileToV0Message();
+  const fee = (await connection.getFeeForMessage(feeProbeMessage, "confirmed")).value ?? 5_000;
+  const send = balanceLamports - fee;
+  if (send <= 0) return null;
+  const msg = new TransactionMessage({
+    payerKey: custodial.publicKey,
+    recentBlockhash: latest.blockhash,
+    instructions: [
+      SystemProgram.transfer({
+        fromPubkey: custodial.publicKey,
+        toPubkey: destination,
+        lamports: send,
+      }),
+    ],
+  });
+  const tx = new VersionedTransaction(msg.compileToV0Message());
+  tx.sign([custodial]);
+  const signature = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 2 });
+  const deadline = Date.now() + 12_000;
+  while (Date.now() < deadline) {
+    const status = await connection.getSignatureStatuses([signature]).catch(() => null);
+    const s = status?.value?.[0];
+    if (s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized") break;
+    if (s?.err) throw new Error(`transaction failed: ${JSON.stringify(s.err)}`);
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+  }
+  return { signature, lamportsSent: send };
+}
+
 /**
  * Transfers all SPL balances from custodial → treasury ATAs, closes custodial token accounts (rent to treasury),
  * then sends remaining SOL (minus rent-exempt minimum) to treasury. Treasury key pays fees.
  */
-export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string): Promise<CustodialSweepResult> {
+async function pickSweepConnection(env: SweepEnv): Promise<Connection | null> {
+  for (const url of sweepRpcCandidates(env)) {
+    try {
+      const c = new Connection(url, "confirmed");
+      await c.getLatestBlockhash("confirmed");
+      return c;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
+async function previewCustodialSweep(
+  env: SweepEnv,
+  connection: Connection,
+  accountId: string,
+  pubkeyRaw?: string,
+): Promise<CustodialSweepPreview> {
+  const pk = pubkeyRaw ? new PublicKey(pubkeyRaw) : await custodialPubkey(env.DB, accountId);
+  if (!pk) {
+    return { account_id: accountId, pubkey: "", sol_lamports: "0", token_accounts: 0, token_raw_total_counted_accounts: 0, empty: true };
+  }
+  try {
+    const [lamports, classic, token2022] = await Promise.all([
+      connection.getBalance(pk, "confirmed"),
+      connection.getParsedTokenAccountsByOwner(pk, { programId: TOKEN_PROGRAM_ID }),
+      connection.getParsedTokenAccountsByOwner(pk, { programId: TOKEN_2022_PROGRAM_ID }),
+    ]);
+    const tokenAccounts = [...collectParsedTokenAccounts(pk, TOKEN_PROGRAM_ID, classic.value), ...collectParsedTokenAccounts(pk, TOKEN_2022_PROGRAM_ID, token2022.value)];
+    const tokenRawPositive = tokenAccounts.filter((t) => t.amount > 0n).length;
+    return {
+      account_id: accountId,
+      pubkey: pk.toBase58(),
+      sol_lamports: String(lamports),
+      token_accounts: tokenAccounts.length,
+      token_raw_total_counted_accounts: tokenRawPositive,
+      empty: lamports <= 0 && tokenAccounts.length === 0,
+    };
+  } catch (e) {
+    return {
+      account_id: accountId,
+      pubkey: pk.toBase58(),
+      sol_lamports: "0",
+      token_accounts: 0,
+      token_raw_total_counted_accounts: 0,
+      empty: false,
+      error: String(e && typeof e === "object" && "message" in e ? (e as Error).message : e).slice(0, 200),
+    };
+  }
+}
+
+export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string, opts: SweepOptions = {}): Promise<CustodialSweepResult> {
   const signatures: string[] = [];
   const treasurySkB58 = String(env.RRTT_TREASURY_SECRET_KEY_B58 || "").trim();
   const pk = await custodialPubkey(env.DB, accountId);
@@ -175,20 +293,7 @@ export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string)
   }
 
   /** Use first RPC that answers; empty-wallet detection must not trust a single blocked/failed host. */
-  let connection: Connection | null = null;
-  let hasAssets = false;
-  for (const url of sweepRpcCandidates(env)) {
-    try {
-      const c = new Connection(url, "confirmed");
-      await c.getLatestBlockhash("confirmed");
-      const h = await hasMeaningfulOnChainBalance(c, pk);
-      connection = c;
-      hasAssets = h;
-      break;
-    } catch {
-      /* try next */
-    }
-  }
+  const connection = await pickSweepConnection(env);
   if (!connection) {
     return {
       blocksDeletion: true,
@@ -198,12 +303,26 @@ export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string)
       signatures,
     };
   }
+  const hasAssets = opts.drainNativeSol
+    ? !(await previewCustodialSweep(env, connection, accountId, pk.toBase58())).empty
+    : await hasMeaningfulOnChainBalance(connection, pk);
   if (!hasAssets) {
     return {
       blocksDeletion: false,
       userMessage: "",
       summary: "nothing_on_chain",
       signatures,
+      emptyVerified: true,
+    };
+  }
+
+  if (opts.dryRun) {
+    return {
+      blocksDeletion: true,
+      userMessage: "Dry run only.",
+      summary: "dry_run_assets_present",
+      signatures,
+      emptyVerified: false,
     };
   }
 
@@ -300,10 +419,27 @@ export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string)
     }
   }
 
-  const minBal = await connection.getMinimumBalanceForRentExemption(0);
   for (let i = 0; i < 4; i++) {
     const lamports = await connection.getBalance(custodial.publicKey, "confirmed");
-    const feePad = 12_000;
+    if (opts.drainNativeSol) {
+      try {
+        const drained = await sendSelfPaidSolDrainTx(connection, custodial, treasury.publicKey, lamports);
+        if (!drained) break;
+        signatures.push(drained.signature);
+        continue;
+      } catch (e) {
+        const msg = String(e && typeof e === "object" && "message" in e ? (e as Error).message : e);
+        return {
+          blocksDeletion: true,
+          userMessage:
+            "Tokens were swept but some SOL could not be sent to treasury. Nothing was deleted. Contact support.",
+          summary: `sweep_sol_failed:${msg.slice(0, 200)}`,
+          signatures,
+        };
+      }
+    }
+    const minBal = opts.drainNativeSol ? 0 : await connection.getMinimumBalanceForRentExemption(0);
+    const feePad = opts.drainNativeSol ? 0 : 12_000;
     const send = lamports - minBal - feePad;
     if (send <= 0) break;
     try {
@@ -327,7 +463,7 @@ export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string)
     }
   }
 
-  const ok = await verifyCustodialEmpty(connection, pk);
+  const ok = await verifyCustodialEmpty(connection, pk, opts.drainNativeSol === true);
   if (!ok) {
     return {
       blocksDeletion: true,
@@ -335,6 +471,7 @@ export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string)
         "Post-sweep verification failed (wallet not empty). Nothing was deleted. Contact support with this message.",
       summary: "verify_failed_non_empty_wallet",
       signatures,
+      emptyVerified: false,
     };
   }
 
@@ -343,5 +480,98 @@ export async function sweepCustodialToTreasury(env: SweepEnv, accountId: string)
     userMessage: "",
     summary: signatures.length ? `sweep_ok_${signatures.length}_tx` : "sweep_ok_no_tx_needed",
     signatures,
+    emptyVerified: true,
   };
+}
+
+export async function handleSweepAllCustodialAssetsToTreasuryRoute(
+  request: Request,
+  env: SweepEnv & { RR_PUSH_ADMIN_SECRET?: string },
+  sub: string,
+  method: string,
+): Promise<Response | null> {
+  if (method !== "POST" || sub !== "/internal/sweep-all-custodial-assets-to-treasury") return null;
+  if (!(await verifyWorkerOpsAdmin(request, env))) return json({ ok: false, detail: "Unauthorized." }, 401);
+
+  let body: { dry_run?: boolean; confirm?: string; limit?: number; after_account_id?: string | null; account_id?: string | null } = {};
+  try {
+    body = (await request.json().catch(() => ({}))) as typeof body;
+  } catch {
+    body = {};
+  }
+  const dryRun = body.dry_run !== false;
+  if (!dryRun && String(body.confirm || "") !== "SWEEP_ALL_CUSTODIAL_ASSETS_TO_TREASURY") {
+    return json({ ok: false, detail: "Live sweep requires confirm = SWEEP_ALL_CUSTODIAL_ASSETS_TO_TREASURY." }, 400);
+  }
+
+  const connection = await pickSweepConnection(env);
+  if (!connection) return json({ ok: false, detail: "No working Solana RPC from this Worker." }, 503);
+  const treasuryPk = new PublicKey(TREASURY_WALLET_PUBKEY);
+  const accountIdFilter = String(body.account_id || "").trim();
+  const limit = Math.max(1, Math.min(50, Math.floor(Number(body.limit) || 10)));
+  const after = String(body.after_account_id || "").trim();
+  const rows = accountIdFilter
+    ? await env.DB
+        .prepare(
+          `SELECT account_id, pubkey
+           FROM internal_solana_wallets
+           WHERE account_id = ?
+           LIMIT 1`,
+        )
+        .bind(accountIdFilter)
+        .all<{ account_id: string; pubkey: string }>()
+    : await env.DB
+        .prepare(
+          `SELECT account_id, pubkey
+           FROM internal_solana_wallets
+           WHERE account_id > ?
+           ORDER BY account_id ASC
+           LIMIT ?`,
+        )
+        .bind(after, limit + 1)
+        .all<{ account_id: string; pubkey: string }>();
+  const rawList = rows.results || [];
+  const list = accountIdFilter ? rawList : rawList.slice(0, limit);
+  const nextCursor = !accountIdFilter && rawList.length > limit ? String(list[list.length - 1]?.account_id || "") : null;
+
+  const results: Array<CustodialSweepPreview & { sweep?: string; signatures?: string[] }> = [];
+  for (const row of list) {
+    const accountId = String(row.account_id || "").trim();
+    const pubkey = String(row.pubkey || "").trim();
+    if (!accountId || !pubkey) continue;
+    let owner: PublicKey;
+    try {
+      owner = new PublicKey(pubkey);
+    } catch {
+      results.push({ account_id: accountId, pubkey, sol_lamports: "0", token_accounts: 0, token_raw_total_counted_accounts: 0, empty: false, error: "invalid pubkey" });
+      continue;
+    }
+    if (owner.equals(treasuryPk)) {
+      results.push({ account_id: accountId, pubkey, sol_lamports: "0", token_accounts: 0, token_raw_total_counted_accounts: 0, empty: true, error: "skipped treasury wallet" });
+      continue;
+    }
+    if (dryRun) {
+      results.push(await previewCustodialSweep(env, connection, accountId, pubkey));
+      continue;
+    }
+    const sweep = await sweepCustodialToTreasury(env, accountId, { drainNativeSol: true });
+    const verify = await previewCustodialSweep(env, connection, accountId, pubkey);
+    results.push({
+      ...verify,
+      ...(sweep.blocksDeletion || verify.empty !== true ? { error: sweep.summary || "post-sweep verification failed" } : {}),
+      sweep: sweep.summary,
+      signatures: sweep.signatures,
+    });
+  }
+
+  return json({
+    ok: true,
+    dry_run: dryRun,
+    destination: TREASURY_WALLET_PUBKEY,
+    limit,
+    next_after_account_id: nextCursor,
+    processed: list.length,
+    results,
+    all_empty_in_batch: results.every((r) => r.empty === true || r.error === "skipped treasury wallet"),
+  });
 }

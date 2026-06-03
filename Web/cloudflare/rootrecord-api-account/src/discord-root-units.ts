@@ -1,4 +1,4 @@
-import type { D1Database, D1PreparedStatement, ExecutionContext } from "@cloudflare/workers-types";
+﻿import type { D1Database, D1PreparedStatement, ExecutionContext } from "@cloudflare/workers-types";
 import nacl from "tweetnacl";
 
 import {
@@ -10,13 +10,20 @@ import { transferRrttCustodialPeerViaTreasury } from "./discord-rrtt-peer-send";
 import { transferSolCustodialPeerViaTreasury } from "./discord-sol-peer-send";
 import type { InternalWalletEnv } from "./solana-internal-wallet";
 import { buildEconomyDiscordMessage, leaderboardEntryLabel, loadEconomyLeaderboardData } from "./root-economy";
+import {
+  clampRootsSolSwapSlippageBps,
+  executeRootsSolSwapForAccount,
+  quoteRootsSolSwapForAccount,
+} from "./roots-sol-swap";
 import { MAX_ROOT_UNITS_PER_TRANSFER } from "../../shared/earn-program-constants";
 import { formatRootsAtomicLocale, rootsWholeToAtomic } from "../../shared/roots-units";
 import { loadEconomyDailySeries, readCirculationTotals } from "../../shared/root-economy-snapshot";
+import { getFcmAccessToken, sendFcmNotification } from "./fcm-v1";
 
 export type DiscordRootUnitsEnv = {
   DB: D1Database;
-  /** Application “Public Key” from Discord Developer Portal (General Information). Hex string. */
+  JWT_SECRET: string;
+  /** Application â€œPublic Keyâ€ from Discord Developer Portal (General Information). Hex string. */
   DISCORD_PUBLIC_KEY?: string;
   /** Application id (snowflake); used to PATCH deferred interaction responses. */
   DISCORD_CLIENT_ID?: string;
@@ -28,7 +35,17 @@ export type DiscordRootUnitsEnv = {
   DISCORD_BOT_TOKEN?: string;
   /** Role assigned after account-to-Discord linking succeeds. */
   DISCORD_VERIFIED_ROLE_ID?: string;
+  DISCORD_LIFETIME_MEMBER_ROLE_ID?: string;
+  DISCORD_MONTHLY_MEMBER_ROLE_ID?: string;
   RR_PUSH_ADMIN_SECRET?: string;
+  ROOTRECORD_API_KILAUEA_URL?: string;
+  DISCORD_KILAUEA_REPORT_CHANNEL_ID?: string;
+  DISCORD_KILAUEA_AI_ARCHIVE_CHANNEL_ID?: string;
+  /** Full Firebase service account JSON (one Wrangler secret). */
+  FCM_SERVICE_ACCOUNT_JSON?: string;
+  FCM_PROJECT_ID?: string;
+  FCM_CLIENT_EMAIL?: string;
+  FCM_PRIVATE_KEY?: string;
   ROOTRECORD_SOLANA_TX_URL?: string;
   /** Used by `/bal` to refresh `custodial_wallet_token_slots` from RPC (same as custodial routes). */
   SOLANA_RPC_URL?: string;
@@ -44,6 +61,8 @@ export type DiscordRootUnitsEnv = {
   INTERNAL_WALLET_ENC_KEY_B64?: string;
   /** Treasury pays ATA + tx fees for RRTT peer sends. */
   RRTT_TREASURY_SECRET_KEY_B58?: string;
+  /** ROOTS deposit/swap sweep notices. */
+  DISCORD_ROOT_ECONOMY_WEBHOOK_URL?: string;
   /** Developer-only /screenshot report archive webhook. */
   DISCORD_GROK_WEBHOOK_URL?: string;
   /** Optional role id for @Developer; otherwise bot fetches role named Developer. */
@@ -119,14 +138,14 @@ function unlinkedRecipientSendFailedContent(
 ): string {
   const amountText = sendFailedAmountText(unitsOrWhole, asset);
   return (
-    `<@${toDiscordId}> — a **${amountText}** transfer could not be delivered because your Discord is not linked to RootRecord.\n\n` +
-    `Link at **${DISCORD_VERIFY_URL}**. Once you're verified, incoming sends are **auto-credited** to your account — this **${amountText}** would have been claimed automatically.`
+    `<@${toDiscordId}> â€” a **${amountText}** transfer could not be delivered because your Discord is not linked to RootRecord.\n\n` +
+    `Link at **${DISCORD_VERIFY_URL}**. Once you're verified, incoming sends are **auto-credited** to your account â€” this **${amountText}** would have been claimed automatically.`
   );
 }
 
 function verifiedButUnlinkedRecipientSendFailedContent(toDiscordId: string, amountText: string): string {
   return (
-    `<@${toDiscordId}> — a **${amountText}** transfer could not be delivered. You have **@Verified** in Discord, but RootRecord does not have a saved account link for your Discord ID.\n\n` +
+    `<@${toDiscordId}> â€” a **${amountText}** transfer could not be delivered. You have **@Verified** in Discord, but RootRecord does not have a saved account link for your Discord ID.\n\n` +
     `Open **${DISCORD_VERIFY_URL}**, sign in, and tap **Re-verify with Discord**. That rebuilds the account link so incoming sends can be **auto-credited**.`
   );
 }
@@ -186,7 +205,7 @@ function jsonInteractionPayload(payload: Record<string, unknown>): Response {
   });
 }
 
-/** After `type: 5` defer, replace the “thinking…” placeholder with the final message. */
+/** After `type: 5` defer, replace the â€œthinkingâ€¦â€ placeholder with the final message. */
 async function patchDeferredInteractionMessage(
   applicationId: string,
   interactionToken: string,
@@ -403,7 +422,7 @@ function optRole(opts: Array<Record<string, unknown>>, name: string): string | n
   return v || null;
 }
 
-/** SUB_COMMAND (type 1): pick the invoked branch — do not `opts.find` alone; some payloads list sibling stubs first. */
+/** SUB_COMMAND (type 1): pick the invoked branch â€” do not `opts.find` alone; some payloads list sibling stubs first. */
 function invokedSubcommand(opts: Array<Record<string, unknown>>): { name: string; inner: Array<Record<string, unknown>> } | null {
   const subs = opts.filter((x) => Number(x.type) === 1);
   if (subs.length === 0) return null;
@@ -486,7 +505,7 @@ function custodialSyncBudgetMs(env: DiscordRootUnitsEnv): number {
 function shortenMintBase58(mint: string): string {
   const m = String(mint || "").trim();
   if (m.length <= 12) return m;
-  return `${m.slice(0, 6)}…${m.slice(-4)}`;
+  return `${m.slice(0, 6)}â€¦${m.slice(-4)}`;
 }
 
 function formatSlotUiAmount(rawStr: string, decimals: number): string {
@@ -543,9 +562,10 @@ async function handleBal(db: D1Database, fromDiscordId: string, env: DiscordRoot
   await ensureBalanceRow(db, uid, now);
   const b = await getEarnBalance(db, uid);
   const lines: string[] = [
-    `**Roots:** ${fmtRoots(b)}`,
-    "**Sharing in Discord:** **`/send`** — **ROOTS** updates the in-bot Roots ledger; **RRTT** / **SOL** move between custodial deposit wallets on-chain (**`/send user`**).",
-    "**Your deposit address:** SOL and SPL balances below. **`/send`** with **SOL** or **RRTT** transfers wallet → wallet; treasury covers network fees.",
+    `**Root Units:** ${fmtRoots(b)} Roots`,
+    "**About Root Units:** experimental RootRecord points for accounts, Discord, and Roots Idle Farmer. They are not cash, securities, or a promise of future value.",
+    "**Sharing:** use **`/send`** for Root Units inside Discord. **SOL** is a separate deposit-wallet asset and only transfers with **`/send user`**.",
+    "**Deposit wallet:** use **`/deposit`** to view your Solana address and QR. SOL and supported SPL token balances from that address appear below after confirmation.",
   ];
   if (!accountId) {
     lines.push(`\n**Deposit-address tokens:** we couldn't load this section. Try **${ACCOUNT_URL}** if it keeps happening.`);
@@ -555,21 +575,21 @@ async function handleBal(db: D1Database, fromDiscordId: string, env: DiscordRoot
     const slots = sortCustodialSlots(slotsAll).filter(slotHasPositiveBalance);
     if (slots.length === 0) {
       lines.push(
-        "\n**From your deposit address:** nothing with a balance yet. Use **`/deposit`** for the address and QR, send tokens, then **`/bal`** again in a minute.",
+        "\n**Deposit wallet balances:** no SOL or supported SPL tokens detected yet. Use **`/deposit`** for your address and QR, send tokens from your wallet, then run **`/bal`** again after confirmation.",
       );
     } else {
-      lines.push("\n**From your deposit address** (what we're seeing now):");
+      lines.push("\n**Deposit wallet balances** (latest detected):");
       const cap = 22;
       for (const s of slots.slice(0, cap)) {
         const label = s.mint_base58 === "native" ? "Solana" : shortenMintBase58(s.mint_base58);
         const ui = formatSlotUiAmount(s.amount_raw, s.decimals);
-        lines.push(`• **${label}:** ${ui}`);
+        lines.push(`â€¢ **${label}:** ${ui}`);
       }
-      if (slots.length > cap) lines.push(`… +${slots.length - cap} more — see **${ACCOUNT_URL}** for the full list.`);
+      if (slots.length > cap) lines.push(`â€¦ +${slots.length - cap} more â€” see **${ACCOUNT_URL}** for the full list.`);
     }
   }
   let content = lines.join("\n");
-  if (content.length > 1950) content = `${content.slice(0, 1940)}…`;
+  if (content.length > 1950) content = `${content.slice(0, 1940)}â€¦`;
   return interactionResponse(4, { content });
 }
 
@@ -685,12 +705,12 @@ async function handleSendRrttUser(
   const toAid = String(toLink?.account_id || "").trim();
   if (!fromAid) {
     return interactionResponse(4, {
-      content: `Your Discord must be linked at **${DISCORD_VERIFY_URL}** before sending **RRTT**.`,
+      content: `Your Discord must be linked at **${DISCORD_VERIFY_URL}** before sending this asset.`,
     });
   }
   if (!toAid) {
     return interactionResponse(4, {
-      content: unlinkedRecipientSendFailedContent(toDiscordId, wholeRrtt, "RRTT"),
+      content: `Recipient <@${toDiscordId}> is not linked to a RootRecord account.`,
     });
   }
 
@@ -701,7 +721,7 @@ async function handleSendRrttUser(
 
   const now = new Date().toISOString();
   const rowId = crypto.randomUUID();
-  const sigShort = res.signature.length > 24 ? `${res.signature.slice(0, 20)}…` : res.signature;
+  const sigShort = res.signature.length > 24 ? `${res.signature.slice(0, 20)}â€¦` : res.signature;
   await env.DB
     .prepare(
       `INSERT INTO rr_earn_discord_peer_transfer (
@@ -712,7 +732,7 @@ async function handleSendRrttUser(
     .run();
 
   return interactionResponse(4, {
-    content: `Sent **${wholeRrtt.toLocaleString()}** **RRTT** to <@${toDiscordId}> (custodial → custodial on-chain). Tx: \`${sigShort}\``,
+    content: `Sent selected asset to <@${toDiscordId}>. Tx: \`${sigShort}\``,
   });
 }
 
@@ -763,7 +783,7 @@ async function handleSendSolUser(
 
   const now = new Date().toISOString();
   const rowId = crypto.randomUUID();
-  const sigShort = res.signature.length > 24 ? `${res.signature.slice(0, 20)}…` : res.signature;
+  const sigShort = res.signature.length > 24 ? `${res.signature.slice(0, 20)}â€¦` : res.signature;
   await env.DB
     .prepare(
       `INSERT INTO rr_earn_discord_peer_transfer (
@@ -774,7 +794,7 @@ async function handleSendSolUser(
     .run();
 
   return interactionResponse(4, {
-    content: `Sent **${formatSolLamports(lamports)}** to <@${toDiscordId}> (custodial → custodial on-chain). Tx: \`${sigShort}\``,
+    content: `Sent **${formatSolLamports(lamports)}** to <@${toDiscordId}> (custodial â†’ custodial on-chain). Tx: \`${sigShort}\``,
   });
 }
 
@@ -846,7 +866,7 @@ async function handleSendExecute(
   });
 }
 
-/** Split `totalUnits` across recipients chosen by `mode` (all linked, recently active ∩ linked, or role ∩ linked). */
+/** Split `totalUnits` across recipients chosen by `mode` (all linked, recently active âˆ© linked, or role âˆ© linked). */
 async function handleSendBulk(
   db: D1Database,
   fromDiscordId: string,
@@ -987,7 +1007,7 @@ async function handleSendBulk(
         ? "linked members who have the chosen server role"
         : `linked members with message activity in the last **${activeLookbackDays(env)}** days`;
   return interactionResponse(4, {
-    content: `Split **${fmtRoots(totalUnits)} ROOTS** among **${m.toLocaleString()}** ${cohort} (${fmtRoots(minShare)}–${fmtRoots(maxShare)} ROOTS each). Your new balance: **${fmtRoots(newBal)} ROOTS**.`,
+    content: `Split **${fmtRoots(totalUnits)} ROOTS** among **${m.toLocaleString()}** ${cohort} (${fmtRoots(minShare)}â€“${fmtRoots(maxShare)} ROOTS each). Your new balance: **${fmtRoots(newBal)} ROOTS**.`,
   });
 }
 
@@ -1015,12 +1035,12 @@ async function handleWalletDeposit(db: D1Database, fromDiscordId: string): Promi
   if (!pk) {
     return interactionResponse(4, {
       content:
-        `No deposit address is set up for this account yet. Sign in at **${ACCOUNT_URL}** — your wallet is created with your account.`,
+        `No deposit address is set up for this account yet. Sign in at **${ACCOUNT_URL}** â€” your wallet is created with your account.`,
     });
   }
   const qrUrl = custodialDepositQrImageUrl(pk);
   return interactionResponse(4, {
-    content: `**Your deposit address (Solana)**\n\`${pk}\`\n\nSend **Solana** or supported tokens from your phone or browser wallet. Amounts show in **\`/bal\`** after a short wait. **ROOTS** are the in-bot credits you share with **\`/send\`**.`,
+      content: `**Your deposit address (Solana)**\n\`${pk}\`\n\nSend **Solana** or supported tokens from your phone or browser wallet. Amounts show in **\`/bal\`** after a short wait. **Root Units** are the experimental points you share with **\`/send\`**.`,
     embeds: [
       {
         title: "Scan to deposit",
@@ -1030,6 +1050,87 @@ async function handleWalletDeposit(db: D1Database, fromDiscordId: string): Promi
       },
     ],
   });
+}
+
+async function handleSwapCommand(env: DiscordRootUnitsEnv, fromDiscordId: string, opts: Array<Record<string, unknown>>): Promise<Response> {
+  const link = await discordLinkForUserId(env.DB, fromDiscordId);
+  if (!link) {
+    return interactionResponse(4, {
+      content: `Your Discord account is not linked. Open **${DISCORD_VERIFY_URL}** to link Discord, then try **\`/swap\`** again.`,
+      flags: 64,
+    });
+  }
+
+  const sc = invokedSubcommand(opts);
+  const scName = sc ? String(sc.name || "").trim().toLowerCase() : "";
+  const inner = (sc ? sc.inner : []) as Array<Record<string, unknown>>;
+  if (scName !== "quote" && scName !== "buy" && scName !== "all") {
+    return interactionResponse(4, {
+      content: "Use **`/swap quote`** to preview, **`/swap buy`** to spend an amount, or **`/swap all`** to send all spendable SOL.",
+      flags: 64,
+    });
+  }
+
+  const amountSol = optNumber(inner, "amount") ?? optNumberDeep(opts, "amount");
+  const lamports = scName === "all" ? MIN_SOL_SEND_LAMPORTS : amountSol == null ? null : solWholeToLamports(amountSol);
+  if (lamports == null || (scName !== "all" && lamports < MIN_SOL_SEND_LAMPORTS)) {
+    return interactionResponse(4, {
+      content: `SOL amount must be at least **${(MIN_SOL_SEND_LAMPORTS / 1e9).toFixed(5)}** SOL.`,
+      flags: 64,
+    });
+  }
+  const slippageBps = clampRootsSolSwapSlippageBps(optNumber(inner, "slippage_bps") ?? optNumberDeep(opts, "slippage_bps") ?? 100);
+
+  try {
+    if (scName === "quote") {
+      const quote = await quoteRootsSolSwapForAccount(env, link.accountId, lamports, slippageBps);
+      return interactionResponse(4, {
+        flags: 64,
+        embeds: [
+          {
+            title: "SOL â†’ Internal ROOTS Quote",
+            color: 0x38bdf8,
+            description:
+              "Internal swap rate is **100 ROOTS = $5**. SOL is transferred to treasury, then ROOTS are credited internally.",
+            fields: [
+              { name: "Spend", value: formatSolLamports(quote.input_lamports), inline: true },
+              { name: "Estimated internal ROOTS", value: `${fmtRoots(quote.out_roots_atomic)} ROOTS`, inline: true },
+              { name: "Rate", value: quote.rate_label, inline: true },
+              { name: "SOL price", value: `$${quote.sol_usd_price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, inline: true },
+              { name: "Custodial wallet", value: `\`${quote.custodial_wallet}\``, inline: false },
+            ],
+          },
+        ],
+      });
+    }
+
+    const result = await executeRootsSolSwapForAccount(env, link.accountId, link.email, lamports, slippageBps, { all: scName === "all" });
+    return interactionResponse(4, {
+      flags: 64,
+      embeds: [
+        {
+          title: result.internal_credit_status === "credited" ? "Swap Complete" : "Swap Confirmed, Credit Pending",
+          color: result.internal_credit_status === "credited" ? 0x22c55e : 0xfacc15,
+          description:
+            result.internal_credit_status === "credited"
+              ? "SOL was moved directly to treasury and internal ROOTS were credited at the fixed **100 ROOTS = $5** rate."
+              : "SOL was submitted to treasury. Internal ROOTS credit is pending confirmation and will be finished by the processor shortly.",
+          fields: [
+            { name: "Spent", value: formatSolLamports(result.input_lamports), inline: true },
+            { name: "Credited ROOTS", value: `${fmtRoots(result.quoted_roots_atomic)} ROOTS`, inline: true },
+            { name: "Path", value: "SOL â†’ treasury internal credit", inline: true },
+            { name: "Status", value: result.internal_credit_status === "credited" ? "Internal credit complete" : "Pending confirmation", inline: true },
+            { name: "Transaction", value: `[${result.tx_signature.slice(0, 10)}â€¦](${result.explorer})`, inline: false },
+          ],
+        },
+      ],
+    });
+  } catch (e) {
+    return interactionResponse(4, {
+      content: `Swap failed: ${String(e instanceof Error ? e.message : e)}`,
+      flags: 64,
+    });
+  }
 }
 
 function handleSlashMenu(): Response {
@@ -1048,6 +1149,7 @@ function handleSlashMenu(): Response {
             options: [
               { label: "Balance", value: "bal", description: "ROOTS + deposit tokens" },
               { label: "Wallet", value: "wallet", description: "Address + QR" },
+              { label: "Swap help", value: "swap", description: "Use /swap quote or /swap buy" },
               { label: "Faucet claim", value: "f_claim", description: "Random ROOTS (12h)" },
               { label: "Help", value: "help", description: "Command list" },
             ],
@@ -1056,6 +1158,11 @@ function handleSlashMenu(): Response {
       },
     ],
   });
+}
+
+function memberRoleSet(member: Record<string, unknown> | undefined): Set<string> {
+  const roles = Array.isArray(member?.roles) ? (member.roles as unknown[]) : [];
+  return new Set(roles.map((r) => String(r)));
 }
 
 async function handleFaucetClaim(db: D1Database, discordUserId: string, interactionId: string): Promise<Response> {
@@ -1075,7 +1182,7 @@ async function handleFaucetClaim(db: D1Database, discordUserId: string, interact
     if (Number.isFinite(last) && Date.now() - last < FAUCET_COOLDOWN_MS) {
       const next = new Date(last + FAUCET_COOLDOWN_MS).toISOString();
       return interactionResponse(4, {
-        content: `Faucet cooldown — next claim after **${next}** (UTC).`,
+        content: `Faucet cooldown â€” next claim after **${next}** (UTC).`,
       });
     }
   }
@@ -1121,7 +1228,7 @@ async function handleFaucetDeposit(
   amount: number,
 ): Promise<Response> {
   if (amount < MIN_SEND || amount > MAX_SEND) {
-    return interactionResponse(4, { content: `Deposit **0.00000001**–**${formatRootsAtomicLocale(MAX_SEND)}** Roots (atomic ledger units).` });
+    return interactionResponse(4, { content: `Deposit **0.00000001**â€“**${formatRootsAtomicLocale(MAX_SEND)}** Roots (atomic ledger units).` });
   }
   const now = new Date().toISOString();
   await ensureBalanceRow(db, fromUid, now);
@@ -1170,7 +1277,7 @@ async function handleDiceCreate(
     });
   }
   if (units < MIN_SEND || units > MAX_SEND) {
-    return interactionResponse(4, { content: `Amount must be **0.00000001**–**${formatRootsAtomicLocale(MAX_SEND)}** Roots.` });
+    return interactionResponse(4, { content: `Amount must be **0.00000001**â€“**${formatRootsAtomicLocale(MAX_SEND)}** Roots.` });
   }
   if (opponentId === challengerId) {
     return interactionResponse(4, { content: "Pick someone else as your opponent." });
@@ -1204,7 +1311,7 @@ async function handleDiceCreate(
     });
   }
   return interactionResponse(4, {
-    content: `<@${opponentId}> — <@${challengerId}> challenges you to **dice** for **${fmtRoots(units)} ROOTS** each (winner takes **${fmtRoots(units * 2)} ROOTS**).`,
+    content: `<@${opponentId}> â€” <@${challengerId}> challenges you to **dice** for **${fmtRoots(units)} ROOTS** each (winner takes **${fmtRoots(units * 2)} ROOTS**).`,
     components: [
       {
         type: 1,
@@ -1308,7 +1415,7 @@ async function settleDiceButtonClick(body: Record<string, unknown>, env: Discord
       return jsonInteractionPayload({
         type: 7,
         data: {
-          content: `**Tie ${r1}–${r2}** (after re-rolls). No wagers taken.`,
+          content: `**Tie ${r1}â€“${r2}** (after re-rolls). No wagers taken.`,
           components: [],
         },
       });
@@ -1352,7 +1459,7 @@ async function settleDiceButtonClick(body: Record<string, unknown>, env: Discord
     return jsonInteractionPayload({
       type: 7,
       data: {
-        content: `🎲 <@${chDid}> rolled **${r1}**, <@${opDid}> rolled **${r2}**. **Winner:** <@${winDid}> takes **${fmtRoots(units * 2)} ROOTS**!`,
+        content: `ðŸŽ² <@${chDid}> rolled **${r1}**, <@${opDid}> rolled **${r2}**. **Winner:** <@${winDid}> takes **${fmtRoots(units * 2)} ROOTS**!`,
         components: [],
       },
     });
@@ -1360,7 +1467,7 @@ async function settleDiceButtonClick(body: Record<string, unknown>, env: Discord
     console.error("dice_settle", e instanceof Error ? e.message : String(e));
     return jsonInteractionPayload({
       type: 4,
-      data: { content: "Could not settle the duel. Balances may have changed — try **`/dice`** again.", flags: 64 },
+      data: { content: "Could not settle the duel. Balances may have changed â€” try **`/dice`** again.", flags: 64 },
     });
   }
 }
@@ -1374,7 +1481,7 @@ async function withEphemeralFromResponse(r: Response): Promise<Response> {
   return jsonInteractionPayload({
     type: 4,
     data: {
-      content: String(d.content ?? (hasEmbeds ? "\u200b" : "—")),
+      content: String(d.content ?? (hasEmbeds ? "\u200b" : "â€”")),
       flags: (typeof d.flags === "number" ? d.flags : 0) | 64,
       ...(Array.isArray(d.components) ? { components: d.components } : {}),
       ...(hasEmbeds ? { embeds: d.embeds } : {}),
@@ -1398,6 +1505,16 @@ async function handleMessageComponent(body: Record<string, unknown>, env: Discor
     }
     if (v === "bal") return withEphemeralFromResponse(await handleBal(env.DB, uid, env));
     if (v === "wallet") return withEphemeralFromResponse(await handleWalletDeposit(env.DB, uid));
+    if (v === "swap") {
+      return jsonInteractionPayload({
+        type: 4,
+        data: {
+          flags: 64,
+          content:
+            "Use **`/swap quote amount:<SOL>`** to preview, **`/swap buy amount:<SOL>`** to buy, or **`/swap all`** to send all spendable SOL from your linked custodial wallet.",
+        },
+      });
+    }
     if (v === "f_claim") {
       const iid = String(body.id || "").trim();
       return withEphemeralFromResponse(await handleFaucetClaim(env.DB, uid, iid));
@@ -1408,7 +1525,7 @@ async function handleMessageComponent(body: Record<string, unknown>, env: Discor
         data: {
           flags: 64,
           content:
-            "**Commands:** `/bal`, `/economy`, `/send` (**ROOTS** ledger, **RRTT**/**SOL** on-chain via `/send user`), `/wallet`, `/deposit`, `/menu`, `/faucet`, `/dice`. Developer: `/screenshot`, `/snapshot`, `/activity`, `/token`, `/mint`. `/withdraw` & `/airdrop` soon.",
+            "**Commands:** `/bal`, `/economy`, `/send` (Root Units sharing; SOL transfers via `/send user`), `/swap` (SOL â†’ internal ROOTS), `/wallet`, `/deposit`, `/menu`, `/faucet`, `/dice`. KÄ«lauea: use the **Kilauea Alerts** bot (`/kilauea`, `/data`). Developer: `/screenshot`, `/snapshot`, `/activity`, `/userreport`, `/token`, `/mint`. `/withdraw` & `/airdrop` soon.",
         },
       });
     }
@@ -1417,13 +1534,68 @@ async function handleMessageComponent(body: Record<string, unknown>, env: Discor
   return jsonInteractionPayload({ type: 4, data: { content: "Unknown component.", flags: 64 } });
 }
 
+const DISCORD_ELLIPSIS = "\u2026";
+const DISCORD_BULLET = "\u2022";
+const DISCORD_ARROW = "\u2192";
+
 function truncateText(raw: unknown, max: number): string {
   const s = String(raw ?? "").replace(/\s+/g, " ").trim();
-  return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}…` : s;
+  return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}${DISCORD_ELLIPSIS}` : s;
+}
+
+function accountAnonId(raw: unknown): string {
+  const clean = String(raw || "").replace(/[^a-zA-Z0-9]/g, "");
+  return clean ? `acct_${clean.slice(0, 10)}` : "acct_unknown";
+}
+
+function emailDomain(raw: unknown): string {
+  const email = String(raw || "").trim().toLowerCase();
+  const i = email.lastIndexOf("@");
+  return i > 0 && i < email.length - 1 ? email.slice(i + 1) : "unknown";
+}
+
+function userIdFromEmail(raw: unknown): string {
+  const email = String(raw || "").trim().toLowerCase();
+  return email.includes("@") ? `user:${email}` : "";
 }
 
 function jsonForArchive(value: unknown): string {
   return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2);
+}
+
+function grokChatBearerToken(env: DiscordRootUnitsEnv): string {
+  return String(env.GROK_API_BEARER_TOKEN || "").trim();
+}
+
+function grokResponseText(response: Record<string, unknown>): string {
+  const message = (response.choices as Array<Record<string, unknown>> | undefined)?.[0]?.message as Record<string, unknown> | undefined;
+  const content = message?.content;
+  if (typeof content === "string") return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          const obj = part as Record<string, unknown>;
+          return String(obj.text || obj.content || "");
+        }
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+  return "";
+}
+
+function grokErrorText(response: Record<string, unknown>, status: number): string {
+  const error = response.error as Record<string, unknown> | string | undefined;
+  if (typeof error === "string" && error.trim()) return `HTTP ${status}: ${error.trim()}`;
+  if (error && typeof error === "object") {
+    const message = String(error.message || error.detail || error.code || "").trim();
+    if (message) return `HTTP ${status}: ${message}`;
+  }
+  const detail = String(response.detail || response.message || "").trim();
+  return detail ? `HTTP ${status}: ${detail}` : `HTTP ${status}: empty Grok response`;
 }
 
 function parseJsonObject(raw: unknown): Record<string, unknown> | null {
@@ -1438,8 +1610,8 @@ function parseJsonObject(raw: unknown): Record<string, unknown> | null {
 
 function decodeHtmlEntities(raw: unknown): string {
   return String(raw ?? "")
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–")
+    .replace(/&mdash;/g, "â€”")
+    .replace(/&ndash;/g, "â€“")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
@@ -1496,6 +1668,241 @@ async function dbFirst<T>(db: D1Database, sql: string, ...binds: unknown[]): Pro
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) } as T;
   }
+}
+
+type UserReportScopeMode = "all" | "role" | "user" | "member";
+
+type UserReportAccountRef = {
+  account_id: string;
+  email: string;
+  discord_user_id?: string | null;
+  discord_username?: string | null;
+  discord_global_name?: string | null;
+};
+
+type UserReportScope = {
+  mode: UserReportScopeMode;
+  label: string;
+  accountIds: string[];
+  userIds: string[];
+  discordUserIds: string[];
+  public: Record<string, unknown>;
+  notes: string[];
+};
+
+function uniqueStrings(values: unknown[], max = 800): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of values) {
+    const s = String(raw || "").trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function allUserReportScope(): UserReportScope {
+  return {
+    mode: "all",
+    label: "all RootRecord users",
+    accountIds: [],
+    userIds: [],
+    discordUserIds: [],
+    public: { mode: "all", label: "all RootRecord users" },
+    notes: [],
+  };
+}
+
+function publicAccountRefs(rows: UserReportAccountRef[]): Array<Record<string, unknown>> {
+  return rows.slice(0, 25).map((row) => ({
+    account: accountAnonId(row.account_id),
+    email_domain: emailDomain(row.email),
+    discord: truncateText(row.discord_global_name || row.discord_username || "", 80) || null,
+    linked_discord: Boolean(String(row.discord_user_id || "").trim()),
+  }));
+}
+
+function redactedLookup(raw: string): string {
+  const q = raw.trim();
+  const mention = q.match(/^<@!?(\d+)>$/);
+  if (mention) return `discord:${mention[1]!.slice(-6)}`;
+  if (q.includes("@")) return `email:*@${emailDomain(q)}`;
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(q)) return `${q.slice(0, 6)}â€¦${q.slice(-4)}`;
+  if (/^\d{12,24}$/.test(q)) return `discord:${q.slice(-6)}`;
+  if (q.length > 16) return `${q.slice(0, 8)}â€¦`;
+  return q.replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 16) || "lookup";
+}
+
+function mentionToDiscordId(raw: string): string {
+  const q = raw.trim();
+  const mention = q.match(/^<@!?(\d+)>$/);
+  return mention?.[1] || q;
+}
+
+function scopeFromAccounts(
+  mode: UserReportScopeMode,
+  label: string,
+  rowsRaw: UserReportAccountRef[],
+  extraPublic: Record<string, unknown> = {},
+  notes: string[] = [],
+): UserReportScope {
+  const rows = rowsRaw.filter((row) => String(row.account_id || "").trim() && String(row.email || "").includes("@"));
+  const accountIds = uniqueStrings(rows.map((row) => row.account_id));
+  const userIds = uniqueStrings(rows.map((row) => userIdFromEmail(row.email)).filter(Boolean));
+  const discordUserIds = uniqueStrings(rows.map((row) => row.discord_user_id || "").filter(Boolean));
+  return {
+    mode,
+    label,
+    accountIds,
+    userIds,
+    discordUserIds,
+    public: {
+      mode,
+      label,
+      matched_accounts: accountIds.length,
+      matched_discord_users: discordUserIds.length,
+      accounts: publicAccountRefs(rows),
+      ...extraPublic,
+    },
+    notes,
+  };
+}
+
+function scopedWhere(column: string, values: string[], keyword: "WHERE" | "AND" = "WHERE"): { sql: string; binds: string[] } {
+  const clean = uniqueStrings(values);
+  if (!clean.length) return { sql: "", binds: [] };
+  return { sql: ` ${keyword} ${column} IN (${clean.map(() => "?").join(",")})`, binds: clean };
+}
+
+function scopedEitherWhere(
+  columnA: string,
+  columnB: string,
+  values: string[],
+  keyword: "WHERE" | "AND" = "WHERE",
+): { sql: string; binds: string[] } {
+  const clean = uniqueStrings(values);
+  if (!clean.length) return { sql: "", binds: [] };
+  const ph = clean.map(() => "?").join(",");
+  return { sql: ` ${keyword} (${columnA} IN (${ph}) OR ${columnB} IN (${ph}))`, binds: [...clean, ...clean] };
+}
+
+async function linkedAccountsForDiscordIds(db: D1Database, discordIdsRaw: string[]): Promise<UserReportAccountRef[]> {
+  const discordIds = uniqueStrings(discordIdsRaw, 2000);
+  const out: UserReportAccountRef[] = [];
+  for (let i = 0; i < discordIds.length; i += 250) {
+    const chunk = discordIds.slice(i, i + 250);
+    const ph = chunk.map(() => "?").join(",");
+    const rows = await dbAll<UserReportAccountRef>(
+      db,
+      `SELECT la.id AS account_id,
+              la.email AS email,
+              link.discord_user_id AS discord_user_id,
+              link.discord_username AS discord_username,
+              link.discord_global_name AS discord_global_name
+       FROM discord_account_links link
+       INNER JOIN license_accounts la ON la.id = link.account_id
+       WHERE link.discord_user_id IN (${ph})
+       ORDER BY la.updated_at DESC
+       LIMIT 250`,
+      ...chunk,
+    );
+    out.push(...rows.filter((row) => !(row as Record<string, unknown>).error));
+  }
+  return out;
+}
+
+async function resolveUserReportQuery(db: D1Database, rawQuery: string): Promise<UserReportAccountRef[]> {
+  const q = rawQuery.trim();
+  const normalized = mentionToDiscordId(q).trim();
+  const lower = normalized.toLowerCase();
+  const like = lower.length >= 3 ? `%${lower}%` : "__never_match__";
+  return (
+    await dbAll<UserReportAccountRef>(
+      db,
+      `SELECT la.id AS account_id,
+              la.email AS email,
+              link.discord_user_id AS discord_user_id,
+              link.discord_username AS discord_username,
+              link.discord_global_name AS discord_global_name
+       FROM license_accounts la
+       LEFT JOIN discord_account_links link ON link.account_id = la.id
+       LEFT JOIN solana_linked_wallets sw ON sw.account_id = la.id
+       LEFT JOIN internal_solana_wallets iw ON iw.account_id = la.id
+       WHERE lower(la.email) = ?
+          OR lower(la.id) = ?
+          OR lower('user:' || la.email) = ?
+          OR link.discord_user_id = ?
+          OR lower(COALESCE(link.discord_username, '')) = ?
+          OR lower(COALESCE(link.discord_global_name, '')) = ?
+          OR lower(COALESCE(sw.pubkey, '')) = ?
+          OR lower(COALESCE(iw.pubkey, '')) = ?
+          OR lower(COALESCE(link.discord_username, '')) LIKE ?
+          OR lower(COALESCE(link.discord_global_name, '')) LIKE ?
+       ORDER BY la.updated_at DESC
+       LIMIT 25`,
+      lower,
+      lower,
+      lower,
+      normalized,
+      lower,
+      lower,
+      lower,
+      lower,
+      like,
+      like,
+    )
+  ).filter((row) => !(row as Record<string, unknown>).error);
+}
+
+async function resolveUserReportScope(
+  env: DiscordRootUnitsEnv,
+  opts: Array<Record<string, unknown>>,
+): Promise<{ scope: UserReportScope } | { error: string }> {
+  const sub = invokedSubcommand(opts);
+  if (!sub || sub.name === "all") return { scope: allUserReportScope() };
+
+  if (sub.name === "role") {
+    const roleId = optRole(sub.inner, "role") || optRoleDeep(sub.inner, "role");
+    if (!roleId) return { error: "Choose a Discord role for `/userreport role`." };
+    const bot = String(env.DISCORD_BOT_TOKEN || "").trim();
+    const guildId = String(env.DISCORD_GUILD_ID || "").trim();
+    if (!bot || !guildId) return { error: "Configure `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID` for role reports." };
+    const fetched = await fetchDiscordUserIdsWithGuildRole(guildId, roleId, bot);
+    if (!fetched.ok) {
+      return { error: `Could not list guild members for that role (${fetched.status}). Bot needs View Server Members + Server Members Intent.` };
+    }
+    const linked = await linkedAccountsForDiscordIds(env.DB, fetched.ids);
+    if (!linked.length) return { error: "No verified RootRecord accounts are linked to users with that role." };
+    return {
+      scope: scopeFromAccounts(
+        "role",
+        `Discord role ${roleId.slice(-6)}`,
+        linked,
+        { role_id_suffix: roleId.slice(-6), discord_members_scanned: fetched.ids.length },
+        fetched.ids.length > linked.length ? [`${fetched.ids.length - linked.length} role members were not linked to RootRecord accounts.`] : [],
+      ),
+    };
+  }
+
+  if (sub.name === "member") {
+    const discordId = optSnowflakeDeep(sub.inner, "member");
+    if (!discordId) return { error: "Choose a Discord member for `/userreport member`." };
+    const linked = await linkedAccountsForDiscordIds(env.DB, [discordId]);
+    if (!linked.length) return { error: "That Discord member is not linked to a RootRecord account." };
+    return { scope: scopeFromAccounts("member", `Discord member ${discordId.slice(-6)}`, linked) };
+  }
+
+  if (sub.name === "user") {
+    const query = optStringDeep(sub.inner, "query");
+    if (!query || query.length < 2) return { error: "Add an email, account id, user id, Discord name/id, or Solana wallet." };
+    const rows = await resolveUserReportQuery(env.DB, query);
+    if (!rows.length) return { error: `No RootRecord account matched \`${redactedLookup(query)}\`.` };
+    return { scope: scopeFromAccounts("user", `lookup ${redactedLookup(query)}`, rows, { lookup: redactedLookup(query) }) };
+  }
+
+  return { error: "Use `/userreport all`, `/userreport role`, `/userreport user`, or `/userreport member`." };
 }
 
 async function fetchRootRecordPageSummary(url: string): Promise<Record<string, unknown>> {
@@ -1823,6 +2230,812 @@ async function generateDiscordActivityAiReport(
   };
 }
 
+function sanitizedUserSamples(usersRaw: unknown, appEarnRaw: unknown, appStateRaw: unknown, appOpenRaw: unknown): Array<Record<string, unknown>> {
+  const users = (Array.isArray(usersRaw) ? usersRaw : []).filter((raw) => !(raw as Record<string, unknown>).error) as Array<Record<string, unknown>>;
+  const byUser = new Map<string, Record<string, Record<string, unknown>>>();
+  const ensureApp = (userId: string, appId: string): Record<string, unknown> => {
+    const app = appId.trim() || "unknown";
+    const perUser = byUser.get(userId) || {};
+    const current = perUser[app] || { app_id: app };
+    perUser[app] = current;
+    byUser.set(userId, perUser);
+    return current;
+  };
+
+  for (const raw of Array.isArray(appEarnRaw) ? appEarnRaw : []) {
+    const row = raw as Record<string, unknown>;
+    if (row.error) continue;
+    const userId = String(row.user_id || "").trim().toLowerCase();
+    const app = ensureApp(userId, String(row.app_id || ""));
+    app.units_earned_30d = Math.max(0, Math.floor(n(row.units_earned_30d)));
+    app.active_days_30d = Math.max(0, Math.floor(n(row.active_days_30d)));
+    app.latest_earn_at = row.latest_earn_at || null;
+  }
+  for (const raw of Array.isArray(appStateRaw) ? appStateRaw : []) {
+    const row = raw as Record<string, unknown>;
+    if (row.error) continue;
+    const userId = String(row.user_id || "").trim().toLowerCase();
+    const app = ensureApp(userId, String(row.app_id || ""));
+    app.sec_on_page = Math.max(0, Math.floor(n(row.sec_on_page)));
+    app.current_page = truncateText(row.page_path || "", 120);
+    app.latest_heartbeat_at = row.updated_at || null;
+  }
+  for (const raw of Array.isArray(appOpenRaw) ? appOpenRaw : []) {
+    const row = raw as Record<string, unknown>;
+    if (row.error) continue;
+    const userId = String(row.user_id || "").trim().toLowerCase();
+    const app = ensureApp(userId, String(row.app_id || ""));
+    app.last_open_at = row.last_open_at || null;
+  }
+
+  return users.map((row) => {
+    const userId = userIdFromEmail(row.email);
+    const appRows = Object.values(byUser.get(userId) || {})
+      .sort((a, b) => n(b.sec_on_page) - n(a.sec_on_page) || n(b.units_earned_30d) - n(a.units_earned_30d))
+      .slice(0, 8);
+    return {
+      account: accountAnonId(row.account_id),
+      email_domain: emailDomain(row.email),
+      created_at: row.created_at || null,
+      updated_at: row.updated_at || null,
+      last_seen_at: row.last_seen_at || row.last_app_open_at || row.latest_heartbeat_at || null,
+      linked_discord: Boolean(n(row.linked_discord)),
+      discord_name: truncateText(row.discord_name || "", 80) || null,
+      session_count: Math.max(0, Math.floor(n(row.session_count))),
+      active_sessions: Math.max(0, Math.floor(n(row.active_sessions))),
+      opened_apps: Math.max(0, Math.floor(n(row.opened_apps))),
+      focused_apps: Math.max(0, Math.floor(n(row.focused_apps))),
+      sec_on_page: Math.max(0, Math.floor(n(row.sec_on_page))),
+      active_days_30d: Math.max(0, Math.floor(n(row.active_days_30d))),
+      units_earned_30d: Math.max(0, Math.floor(n(row.units_earned_30d))),
+      roots_balance: Math.max(0, Math.floor(n(row.roots_balance))),
+      push_tokens: Math.max(0, Math.floor(n(row.push_tokens))),
+      business_rows: Math.max(0, Math.floor(n(row.business_rows))),
+      saved_locations: Math.max(0, Math.floor(n(row.saved_locations))),
+      weather_snapshots: Math.max(0, Math.floor(n(row.weather_snapshots))),
+      apps: appRows,
+    };
+  });
+}
+
+function compactUserAppRows(rows: unknown): Array<Record<string, unknown>> {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((raw) => !(raw as Record<string, unknown>).error)
+    .map((raw) => {
+      const row = raw as Record<string, unknown>;
+      return {
+        app_id: String(row.app_id || "unknown"),
+        units_earned: Math.max(0, Math.floor(n(row.units_earned))),
+        active_days: Math.max(0, Math.floor(n(row.active_days))),
+        sec_on_page: Math.max(0, Math.floor(n(row.sec_on_page))),
+        active_users: Math.max(0, Math.floor(n(row.active_users))),
+        recent_open_users: Math.max(0, Math.floor(n(row.recent_open_users))),
+        latest_open_at: row.latest_open_at || row.latest_heartbeat_at || null,
+        earned_share_pct: n(row.earned_share_pct),
+        time_share_pct: n(row.time_share_pct),
+      };
+    });
+}
+
+async function collectScopedUserSamples(env: DiscordRootUnitsEnv, scope: UserReportScope): Promise<Array<Record<string, unknown>>> {
+  if (scope.mode === "all" || !scope.accountIds.length || !scope.userIds.length) return [];
+  const accountWhere = scopedWhere("la.id", scope.accountIds, "WHERE");
+  const userEarn = scopedWhere("user_id", scope.userIds, "AND");
+  const userOnly = scopedWhere("user_id", scope.userIds, "WHERE");
+  const userRows = await dbAll(
+    env.DB,
+    `WITH earn30 AS (
+       SELECT user_id, COALESCE(SUM(units_earned), 0) AS units_earned_30d, COUNT(DISTINCT ymd) AS active_days_30d
+       FROM rr_earn_app_day
+       WHERE julianday(ymd) >= julianday('now', '-30 days')${userEarn.sql}
+       GROUP BY user_id
+     ),
+     state AS (
+       SELECT user_id, COALESCE(SUM(sec_on_page), 0) AS sec_on_page, COUNT(DISTINCT app_id) AS focused_apps, MAX(updated_at) AS latest_heartbeat_at
+       FROM rr_earn_state${userOnly.sql}
+       GROUP BY user_id
+     ),
+     opens AS (
+       SELECT user_id, COUNT(DISTINCT app_id) AS opened_apps, MAX(last_open_at) AS last_app_open_at
+       FROM rr_app_session_last_open${userOnly.sql}
+       GROUP BY user_id
+     ),
+     sessions AS (
+       SELECT account_id, COUNT(*) AS session_count, COALESCE(SUM(CASE WHEN revoked_at IS NULL THEN 1 ELSE 0 END), 0) AS active_sessions, MAX(last_seen_at) AS last_seen_at
+       FROM license_sessions
+       GROUP BY account_id
+     ),
+     push AS (
+       SELECT user_id, COUNT(*) AS push_tokens
+       FROM rrwm_push_tokens${userOnly.sql}
+       GROUP BY user_id
+     ),
+     bm AS (
+       SELECT user_key, COUNT(*) AS business_rows
+       FROM bm_owned_row
+       GROUP BY user_key
+     ),
+     loc AS (
+       SELECT user_id, COUNT(*) AS saved_locations
+       FROM rrwm_locations${userOnly.sql}
+       GROUP BY user_id
+     ),
+     weather AS (
+       SELECT user_id, COUNT(*) AS weather_snapshots
+       FROM weather_data${userOnly.sql}
+       GROUP BY user_id
+     )
+     SELECT la.id AS account_id,
+            la.email AS email,
+            la.created_at AS created_at,
+            la.updated_at AS updated_at,
+            COALESCE(sessions.session_count, 0) AS session_count,
+            COALESCE(sessions.active_sessions, 0) AS active_sessions,
+            sessions.last_seen_at AS last_seen_at,
+            COALESCE(opens.opened_apps, 0) AS opened_apps,
+            opens.last_app_open_at AS last_app_open_at,
+            COALESCE(state.focused_apps, 0) AS focused_apps,
+            COALESCE(state.sec_on_page, 0) AS sec_on_page,
+            state.latest_heartbeat_at AS latest_heartbeat_at,
+            COALESCE(earn30.units_earned_30d, 0) AS units_earned_30d,
+            COALESCE(earn30.active_days_30d, 0) AS active_days_30d,
+            COALESCE(balance.balance, 0) AS roots_balance,
+            COALESCE(push.push_tokens, 0) AS push_tokens,
+            COALESCE(bm.business_rows, 0) AS business_rows,
+            COALESCE(loc.saved_locations, 0) AS saved_locations,
+            COALESCE(weather.weather_snapshots, 0) AS weather_snapshots,
+            CASE WHEN link.discord_user_id IS NULL THEN 0 ELSE 1 END AS linked_discord,
+            COALESCE(link.discord_global_name, link.discord_username, '') AS discord_name
+     FROM license_accounts la
+     LEFT JOIN earn30 ON earn30.user_id = 'user:' || lower(la.email)
+     LEFT JOIN state ON state.user_id = 'user:' || lower(la.email)
+     LEFT JOIN opens ON opens.user_id = 'user:' || lower(la.email)
+     LEFT JOIN sessions ON sessions.account_id = la.id
+     LEFT JOIN rr_earn_balance balance ON balance.user_id = 'user:' || lower(la.email)
+     LEFT JOIN push ON push.user_id = 'user:' || lower(la.email)
+     LEFT JOIN bm ON bm.user_key = 'user:' || lower(la.email)
+     LEFT JOIN loc ON loc.user_id = 'user:' || lower(la.email)
+     LEFT JOIN weather ON weather.user_id = 'user:' || lower(la.email)
+     LEFT JOIN discord_account_links link ON link.account_id = la.id
+     ${accountWhere.sql}
+     ORDER BY COALESCE(opens.last_app_open_at, state.latest_heartbeat_at, sessions.last_seen_at, la.created_at) DESC
+     LIMIT 80`,
+    ...userEarn.binds,
+    ...userOnly.binds,
+    ...userOnly.binds,
+    ...userOnly.binds,
+    ...userOnly.binds,
+    ...userOnly.binds,
+    ...accountWhere.binds,
+  );
+  const appEarnRows = await dbAll(
+    env.DB,
+    `SELECT user_id, app_id, COALESCE(SUM(units_earned), 0) AS units_earned_30d, COUNT(DISTINCT ymd) AS active_days_30d, MAX(updated_at) AS latest_earn_at
+     FROM rr_earn_app_day
+     WHERE julianday(ymd) >= julianday('now', '-30 days')${userEarn.sql}
+     GROUP BY user_id, app_id
+     ORDER BY units_earned_30d DESC
+     LIMIT 300`,
+    ...userEarn.binds,
+  );
+  const appStateRows = await dbAll(
+    env.DB,
+    `SELECT user_id, app_id, page_path, sec_on_page, updated_at
+     FROM rr_earn_state${userOnly.sql}
+     ORDER BY updated_at DESC
+     LIMIT 300`,
+    ...userOnly.binds,
+  );
+  const appOpenRows = await dbAll(
+    env.DB,
+    `SELECT user_id, app_id, last_open_at
+     FROM rr_app_session_last_open${userOnly.sql}
+     ORDER BY last_open_at DESC
+     LIMIT 300`,
+    ...userOnly.binds,
+  );
+  return sanitizedUserSamples(userRows, appEarnRows, appStateRows, appOpenRows);
+}
+
+async function collectUserReportScopeDetails(env: DiscordRootUnitsEnv, scope: UserReportScope): Promise<Record<string, unknown>> {
+  const accountWhere = scopedWhere("account_id", scope.accountIds, "WHERE");
+  const userWhere = scopedWhere("user_id", scope.userIds, "WHERE");
+  const userAnd = scopedWhere("user_id", scope.userIds, "AND");
+  const discordWhere = scopedWhere("discord_user_id", scope.discordUserIds, "WHERE");
+  const transferUsers = scopedEitherWhere("from_user_id", "to_user_id", scope.userIds, "WHERE");
+  const transferDiscord = scopedEitherWhere("from_discord_user_id", "to_discord_user_id", scope.discordUserIds, "WHERE");
+  const [
+    scopedUserSamples,
+    billingByStatus,
+    billingTotals,
+    linkedWallets,
+    custodialWallets,
+    rootsDeposits,
+    rootsSwaps,
+    withdrawals,
+    appTransfers,
+    discordTransfers,
+    farmsProgress,
+    farmsMarket,
+    discordUsers,
+  ] = await Promise.all([
+    collectScopedUserSamples(env, scope),
+    dbAll(
+      env.DB,
+      `SELECT subscription_status, COUNT(*) AS accounts,
+              COALESCE(SUM(CASE WHEN pro_unlocked != 0 THEN 1 ELSE 0 END), 0) AS pro_unlocked,
+              COALESCE(SUM(CASE WHEN life_member != 0 THEN 1 ELSE 0 END), 0) AS life_member
+       FROM user_accounts${accountWhere.sql}
+       GROUP BY subscription_status
+       ORDER BY accounts DESC
+       LIMIT 20`,
+      ...accountWhere.binds,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS user_account_rows,
+              COALESCE(SUM(CASE WHEN pro_unlocked != 0 THEN 1 ELSE 0 END), 0) AS pro_unlocked,
+              COALESCE(SUM(CASE WHEN life_member != 0 THEN 1 ELSE 0 END), 0) AS life_member,
+              COALESCE(SUM(CASE WHEN pro_redeemed_until IS NOT NULL AND pro_redeemed_until > strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN 1 ELSE 0 END), 0) AS active_redeemed_pro
+       FROM user_accounts${accountWhere.sql}`,
+      ...accountWhere.binds,
+    ),
+    dbFirst(env.DB, `SELECT COUNT(*) AS linked_wallets, MAX(verified_at) AS latest_verified_at FROM solana_linked_wallets${accountWhere.sql}`, ...accountWhere.binds),
+    dbFirst(env.DB, `SELECT COUNT(*) AS custodial_wallets, MAX(created_at) AS latest_created_at FROM internal_solana_wallets${accountWhere.sql}`, ...accountWhere.binds),
+    dbAll(
+      env.DB,
+      `SELECT status, COUNT(*) AS deposits, COALESCE(SUM(amount_atomic), 0) AS amount_atomic, MAX(created_at) AS latest_created_at
+       FROM rr_roots_custodial_deposits${accountWhere.sql}
+       GROUP BY status
+       ORDER BY deposits DESC
+       LIMIT 20`,
+      ...accountWhere.binds,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT status, COUNT(*) AS swaps, COALESCE(SUM(CAST(input_lamports AS INTEGER)), 0) AS input_lamports, COALESCE(SUM(quoted_roots_atomic), 0) AS quoted_roots_atomic, MAX(created_at) AS latest_created_at
+       FROM rr_roots_sol_swaps${accountWhere.sql}
+       GROUP BY status
+       ORDER BY swaps DESC
+       LIMIT 20`,
+      ...accountWhere.binds,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT status, COUNT(*) AS withdrawals, COALESCE(SUM(amount_ledger_whole), 0) AS amount_ledger_whole, MAX(created_at) AS latest_created_at
+       FROM rr_withdrawal_intent${accountWhere.sql}
+       GROUP BY status
+       ORDER BY withdrawals DESC
+       LIMIT 20`,
+      ...accountWhere.binds,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS transfers, COALESCE(SUM(units), 0) AS units, MAX(created_at) AS latest_created_at
+       FROM rr_earn_internal_transfer${transferUsers.sql}`,
+      ...transferUsers.binds,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT COALESCE(asset, 'ROOTS') AS asset, COUNT(*) AS transfers, COALESCE(SUM(units), 0) AS units, MAX(created_at) AS latest_created_at
+       FROM rr_earn_discord_peer_transfer${transferDiscord.sql}
+       GROUP BY COALESCE(asset, 'ROOTS')
+       ORDER BY transfers DESC
+       LIMIT 20`,
+      ...transferDiscord.binds,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS farms_users,
+              COALESCE(SUM(lifetime_farms_earned), 0) AS lifetime_farms_earned,
+              MAX(updated_at) AS latest_updated_at
+       FROM rr_farms_progress${userWhere.sql}`,
+      ...userWhere.binds,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT game, COUNT(*) AS plays, COALESCE(SUM(stake), 0) AS stake, COALESCE(SUM(payout), 0) AS payout, COALESCE(SUM(net), 0) AS net, MAX(created_at) AS latest_created_at
+       FROM rr_farms_market_activity${userWhere.sql}
+       GROUP BY game
+       ORDER BY plays DESC
+       LIMIT 20`,
+      ...userWhere.binds,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS tracked_discord_users,
+              COALESCE(SUM(message_count), 0) AS tracked_messages,
+              COALESCE(SUM(CASE WHEN julianday(last_message_at) >= julianday('now', '-7 days') THEN 1 ELSE 0 END), 0) AS active_discord_users_7d,
+              MAX(last_message_at) AS latest_message_at
+       FROM discord_user_activity${discordWhere.sql}`,
+      ...discordWhere.binds,
+    ),
+  ]);
+  return {
+    scope: scope.public,
+    notes: scope.notes,
+    scoped_user_samples: scopedUserSamples,
+    billing: { totals: billingTotals, by_status: billingByStatus },
+    wallets: { linked_solana: linkedWallets, custodial: custodialWallets },
+    roots_flows: {
+      custodial_deposits: rootsDeposits,
+      sol_swaps: rootsSwaps,
+      withdrawals,
+      app_transfers: appTransfers,
+      discord_transfers: discordTransfers,
+    },
+    farms: { progress: farmsProgress, market_activity: farmsMarket },
+    discord: discordUsers,
+    telemetry_gaps: [
+      "Some web apps still report Android-style app_id values unless their env overrides are set, so web/mobile split may be blended.",
+      "KÄ«lauea Android normal opens/page time are not fully captured unless users login/signup or hit push/feedback/developer-message flows.",
+      "Feedback is currently forwarded to Discord and not persisted in D1, so this report can only infer feedback volume when a table exists later.",
+    ],
+  };
+}
+
+async function collectUserBehaviorReportData(
+  env: DiscordRootUnitsEnv,
+  requesterDiscordId: string,
+  scope: UserReportScope = allUserReportScope(),
+): Promise<Record<string, unknown>> {
+  const nowIso = new Date().toISOString();
+  const [
+    accountSummary,
+    accountDomains,
+    sessionSummary,
+    deviceSummary,
+    appDays30,
+    appSessionTime,
+    appRecentOpens,
+    pushTokensByApp,
+    weatherSummary,
+    locationSummary,
+    businessSummary,
+    photoSummary,
+    aiSummary,
+    developerMessages,
+    workerErrors,
+    discordActivity,
+    userRows,
+    userAppEarnRows,
+    userAppStateRows,
+    userAppOpenRows,
+  ] = await Promise.all([
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS total_accounts,
+              COALESCE(SUM(CASE WHEN julianday(created_at) >= julianday('now', '-1 day') THEN 1 ELSE 0 END), 0) AS new_accounts_24h,
+              COALESCE(SUM(CASE WHEN julianday(created_at) >= julianday('now', '-7 days') THEN 1 ELSE 0 END), 0) AS new_accounts_7d,
+              COALESCE(SUM(CASE WHEN julianday(created_at) >= julianday('now', '-30 days') THEN 1 ELSE 0 END), 0) AS new_accounts_30d,
+              MIN(created_at) AS first_account_at,
+              MAX(created_at) AS latest_account_at
+       FROM license_accounts`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT CASE WHEN instr(email, '@') > 0 THEN lower(substr(email, instr(email, '@') + 1)) ELSE 'unknown' END AS domain,
+              COUNT(*) AS accounts
+       FROM license_accounts
+       GROUP BY domain
+       ORDER BY accounts DESC
+       LIMIT 15`,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS total_sessions,
+              COUNT(DISTINCT account_id) AS accounts_with_sessions,
+              COALESCE(SUM(CASE WHEN revoked_at IS NULL THEN 1 ELSE 0 END), 0) AS active_sessions,
+              COUNT(DISTINCT CASE WHEN julianday(last_seen_at) >= julianday('now', '-1 day') THEN account_id END) AS accounts_seen_24h,
+              COUNT(DISTINCT CASE WHEN julianday(last_seen_at) >= julianday('now', '-7 days') THEN account_id END) AS accounts_seen_7d,
+              COUNT(DISTINCT CASE WHEN julianday(last_seen_at) >= julianday('now', '-30 days') THEN account_id END) AS accounts_seen_30d,
+              MAX(last_seen_at) AS latest_seen_at
+       FROM license_sessions`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT CASE
+                WHEN lower(COALESCE(user_agent, '')) LIKE '%android%' THEN 'android'
+                WHEN lower(COALESCE(user_agent, '')) LIKE '%iphone%' OR lower(COALESCE(user_agent, '')) LIKE '%ipad%' THEN 'ios'
+                WHEN lower(COALESCE(user_agent, '')) LIKE '%windows%' THEN 'windows'
+                WHEN lower(COALESCE(user_agent, '')) LIKE '%mac%' THEN 'mac'
+                WHEN lower(COALESCE(user_agent, '')) LIKE '%linux%' THEN 'linux'
+                WHEN COALESCE(user_agent, '') = '' THEN 'unknown'
+                ELSE 'browser_or_other'
+              END AS device_kind,
+              COUNT(*) AS sessions,
+              COUNT(DISTINCT account_id) AS accounts,
+              MAX(last_seen_at) AS latest_seen_at
+       FROM license_sessions
+       GROUP BY device_kind
+       ORDER BY sessions DESC`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT app_id, SUM(units_earned) AS units_earned, COUNT(DISTINCT user_id) AS active_users, COUNT(DISTINCT ymd) AS active_days
+       FROM rr_earn_app_day
+       WHERE julianday(ymd) >= julianday('now', '-30 days')
+       GROUP BY app_id
+       ORDER BY units_earned DESC
+       LIMIT 30`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT app_id, COUNT(DISTINCT user_id) AS active_users, COALESCE(SUM(sec_on_page), 0) AS sec_on_page, MAX(updated_at) AS latest_heartbeat_at
+       FROM rr_earn_state
+       GROUP BY app_id
+       ORDER BY sec_on_page DESC
+       LIMIT 30`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT app_id, COUNT(DISTINCT user_id) AS recent_open_users, MAX(last_open_at) AS latest_open_at
+       FROM rr_app_session_last_open
+       WHERE julianday(last_open_at) >= julianday('now', '-30 days')
+       GROUP BY app_id
+       ORDER BY recent_open_users DESC
+       LIMIT 30`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT COALESCE(app_id, 'unknown') AS app_id, platform, COUNT(*) AS tokens, COUNT(DISTINCT user_id) AS users, MAX(updated_at) AS latest_token_at
+       FROM rrwm_push_tokens
+       GROUP BY COALESCE(app_id, 'unknown'), platform
+       ORDER BY tokens DESC
+       LIMIT 30`,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS snapshots,
+              COUNT(DISTINCT user_id) AS users,
+              COUNT(DISTINCT location_id) AS locations,
+              COUNT(DISTINCT grid_key) AS grids,
+              MAX(fetched_at) AS latest_fetched_at
+       FROM weather_data`,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS saved_locations, COUNT(DISTINCT user_id) AS users, MAX(created_at) AS latest_created_at
+       FROM rrwm_locations`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT coll, COUNT(*) AS rows, COUNT(DISTINCT user_key) AS users, MAX(updated_at) AS latest_updated_at
+       FROM bm_owned_row
+       GROUP BY coll
+       ORDER BY rows DESC
+       LIMIT 25`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT status, COUNT(*) AS count, COUNT(DISTINCT account_id) AS users, MAX(created_at) AS latest_created_at
+       FROM volcano_photo_submissions
+       GROUP BY status
+       ORDER BY status ASC`,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS reports, COUNT(DISTINCT source_type) AS source_types, MAX(created_at) AS latest_created_at
+       FROM kilauea_ai_analyses`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT app_scope, title, created_at
+       FROM developer_messages
+       ORDER BY created_at DESC
+       LIMIT 15`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT method, path_redacted, status, duration_ms, message, created_at
+       FROM worker_http_error_events
+       ORDER BY created_at DESC
+       LIMIT 15`,
+    ),
+    dbFirst(
+      env.DB,
+      `SELECT COUNT(*) AS tracked_discord_users,
+              COALESCE(SUM(message_count), 0) AS tracked_messages,
+              COALESCE(SUM(CASE WHEN julianday(last_message_at) >= julianday('now', '-7 days') THEN 1 ELSE 0 END), 0) AS active_discord_users_7d,
+              COALESCE(SUM(CASE WHEN julianday(last_message_at) >= julianday('now', '-30 days') THEN 1 ELSE 0 END), 0) AS active_discord_users_30d,
+              MAX(last_message_at) AS latest_message_at
+       FROM discord_user_activity`,
+    ),
+    dbAll(
+      env.DB,
+      `WITH earn30 AS (
+         SELECT user_id, COALESCE(SUM(units_earned), 0) AS units_earned_30d, COUNT(DISTINCT ymd) AS active_days_30d
+         FROM rr_earn_app_day
+         WHERE julianday(ymd) >= julianday('now', '-30 days')
+         GROUP BY user_id
+       ),
+       state AS (
+         SELECT user_id, COALESCE(SUM(sec_on_page), 0) AS sec_on_page, COUNT(DISTINCT app_id) AS focused_apps, MAX(updated_at) AS latest_heartbeat_at
+         FROM rr_earn_state
+         GROUP BY user_id
+       ),
+       opens AS (
+         SELECT user_id, COUNT(DISTINCT app_id) AS opened_apps, MAX(last_open_at) AS last_app_open_at
+         FROM rr_app_session_last_open
+         GROUP BY user_id
+       ),
+       sessions AS (
+         SELECT account_id, COUNT(*) AS session_count, COALESCE(SUM(CASE WHEN revoked_at IS NULL THEN 1 ELSE 0 END), 0) AS active_sessions, MAX(last_seen_at) AS last_seen_at
+         FROM license_sessions
+         GROUP BY account_id
+       ),
+       push AS (
+         SELECT user_id, COUNT(*) AS push_tokens
+         FROM rrwm_push_tokens
+         GROUP BY user_id
+       ),
+       bm AS (
+         SELECT user_key, COUNT(*) AS business_rows
+         FROM bm_owned_row
+         GROUP BY user_key
+       ),
+       loc AS (
+         SELECT user_id, COUNT(*) AS saved_locations
+         FROM rrwm_locations
+         GROUP BY user_id
+       ),
+       weather AS (
+         SELECT user_id, COUNT(*) AS weather_snapshots
+         FROM weather_data
+         GROUP BY user_id
+       )
+       SELECT la.id AS account_id,
+              la.email AS email,
+              la.created_at AS created_at,
+              la.updated_at AS updated_at,
+              COALESCE(sessions.session_count, 0) AS session_count,
+              COALESCE(sessions.active_sessions, 0) AS active_sessions,
+              sessions.last_seen_at AS last_seen_at,
+              COALESCE(opens.opened_apps, 0) AS opened_apps,
+              opens.last_app_open_at AS last_app_open_at,
+              COALESCE(state.focused_apps, 0) AS focused_apps,
+              COALESCE(state.sec_on_page, 0) AS sec_on_page,
+              state.latest_heartbeat_at AS latest_heartbeat_at,
+              COALESCE(earn30.units_earned_30d, 0) AS units_earned_30d,
+              COALESCE(earn30.active_days_30d, 0) AS active_days_30d,
+              COALESCE(balance.balance, 0) AS roots_balance,
+              COALESCE(push.push_tokens, 0) AS push_tokens,
+              COALESCE(bm.business_rows, 0) AS business_rows,
+              COALESCE(loc.saved_locations, 0) AS saved_locations,
+              COALESCE(weather.weather_snapshots, 0) AS weather_snapshots,
+              CASE WHEN link.discord_user_id IS NULL THEN 0 ELSE 1 END AS linked_discord,
+              COALESCE(link.discord_global_name, link.discord_username, '') AS discord_name
+       FROM license_accounts la
+       LEFT JOIN earn30 ON earn30.user_id = 'user:' || lower(la.email)
+       LEFT JOIN state ON state.user_id = 'user:' || lower(la.email)
+       LEFT JOIN opens ON opens.user_id = 'user:' || lower(la.email)
+       LEFT JOIN sessions ON sessions.account_id = la.id
+       LEFT JOIN rr_earn_balance balance ON balance.user_id = 'user:' || lower(la.email)
+       LEFT JOIN push ON push.user_id = 'user:' || lower(la.email)
+       LEFT JOIN bm ON bm.user_key = 'user:' || lower(la.email)
+       LEFT JOIN loc ON loc.user_id = 'user:' || lower(la.email)
+       LEFT JOIN weather ON weather.user_id = 'user:' || lower(la.email)
+       LEFT JOIN discord_account_links link ON link.account_id = la.id
+       ORDER BY COALESCE(opens.last_app_open_at, state.latest_heartbeat_at, sessions.last_seen_at, la.created_at) DESC
+       LIMIT 60`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT user_id, app_id, COALESCE(SUM(units_earned), 0) AS units_earned_30d, COUNT(DISTINCT ymd) AS active_days_30d, MAX(updated_at) AS latest_earn_at
+       FROM rr_earn_app_day
+       WHERE julianday(ymd) >= julianday('now', '-30 days')
+       GROUP BY user_id, app_id
+       ORDER BY units_earned_30d DESC
+       LIMIT 250`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT user_id, app_id, page_path, sec_on_page, updated_at
+       FROM rr_earn_state
+       ORDER BY updated_at DESC
+       LIMIT 250`,
+    ),
+    dbAll(
+      env.DB,
+      `SELECT user_id, app_id, last_open_at
+       FROM rr_app_session_last_open
+       ORDER BY last_open_at DESC
+       LIMIT 250`,
+    ),
+  ]);
+
+  const appUsage30d = compactUserAppRows(enrichAppUsageRows(appDays30, appSessionTime, appRecentOpens));
+  const userSamples = sanitizedUserSamples(userRows, userAppEarnRows, userAppStateRows, userAppOpenRows);
+  const scopedDetails = await collectUserReportScopeDetails(env, scope);
+  return {
+    generated_at: nowIso,
+    requested_by_discord_id: requesterDiscordId,
+    purpose: "Developer-only /userreport for app and web behavior analysis",
+    privacy_note:
+      "Sent to Grok with account ids shortened, email domains only, no password hashes, salts, raw emails, IP addresses, or session ids.",
+    report_scope: scope.public,
+    source_tables: [
+      "license_accounts",
+      "license_sessions",
+      "user_accounts",
+      "rr_earn_state",
+      "rr_earn_app_day",
+      "rr_app_session_last_open",
+      "rr_earn_balance",
+      "rr_earn_internal_transfer",
+      "rr_earn_discord_peer_transfer",
+      "rrwm_push_tokens",
+      "rrwm_locations",
+      "weather_data",
+      "bm_owned_row",
+      "volcano_photo_submissions",
+      "kilauea_ai_analyses",
+      "discord_user_activity",
+      "discord_account_links",
+      "solana_linked_wallets",
+      "internal_solana_wallets",
+      "rr_roots_custodial_deposits",
+      "rr_roots_sol_swaps",
+      "rr_withdrawal_intent",
+      "rr_farms_progress",
+      "rr_farms_market_activity",
+      "developer_messages",
+      "worker_http_error_events",
+    ],
+    account_summary: accountSummary,
+    account_domains: accountDomains,
+    session_summary: sessionSummary,
+    device_summary: deviceSummary,
+    app_usage_30d: appUsage30d,
+    push_tokens_by_app: pushTokensByApp,
+    feature_usage: {
+      weather: weatherSummary,
+      saved_locations: locationSummary,
+      business_collections: businessSummary,
+      volcano_photos: photoSummary,
+      kilauea_ai: aiSummary,
+      developer_messages: developerMessages,
+    },
+    discord_activity: discordActivity,
+    recent_worker_errors: workerErrors,
+    user_behavior_samples: userSamples,
+    scoped_usage: scopedDetails,
+    calculated: {
+      sampled_users: userSamples.length,
+      scoped_sampled_users: Array.isArray(scopedDetails.scoped_user_samples) ? scopedDetails.scoped_user_samples.length : 0,
+      apps_with_30d_usage: appUsage30d.length,
+      accounts_seen_30d: n((sessionSummary as Record<string, unknown> | null | undefined)?.accounts_seen_30d),
+      accounts_with_app_opens_30d: appUsage30d.reduce((sum, row) => Math.max(sum, n(row.recent_open_users)), 0),
+      total_sec_on_page_current_state: appUsage30d.reduce((sum, row) => sum + n(row.sec_on_page), 0),
+      total_units_earned_30d: appUsage30d.reduce((sum, row) => sum + n(row.units_earned), 0),
+    },
+  };
+}
+
+function topUserBehaviorLine(row: Record<string, unknown>): string {
+  const apps = Array.isArray(row.apps) ? row.apps.slice(0, 3) : [];
+  const appText = apps
+    .map((raw) => {
+      const app = raw as Record<string, unknown>;
+      return `${app.app_id}:${Math.floor(n(app.sec_on_page) / 60)}m/${formatRootsAtomicLocale(n(app.units_earned_30d))}`;
+    })
+    .join(", ");
+  return `${row.account} (${row.email_domain}) ${Math.floor(n(row.sec_on_page) / 60)}m, ${n(row.opened_apps)} apps, ${formatRootsAtomicLocale(n(row.units_earned_30d))} ROOTS${appText ? `; ${appText}` : ""}`;
+}
+
+function buildFallbackUserBehaviorReport(reportData: Record<string, unknown>): string {
+  const accounts = (reportData.account_summary as Record<string, unknown> | null | undefined) || {};
+  const sessions = (reportData.session_summary as Record<string, unknown> | null | undefined) || {};
+  const calc = (reportData.calculated as Record<string, unknown> | null | undefined) || {};
+  const scope = (reportData.report_scope as Record<string, unknown> | null | undefined) || {};
+  const scopedUsage = (reportData.scoped_usage as Record<string, unknown> | null | undefined) || {};
+  const scopedUsers = Array.isArray(scopedUsage.scoped_user_samples) ? scopedUsage.scoped_user_samples : [];
+  const users = (scopedUsers.length ? scopedUsers : Array.isArray(reportData.user_behavior_samples) ? reportData.user_behavior_samples : []).slice(0, 6);
+  return [
+    "**RootRecord User Behavior Report**",
+    `_Generated ${reportTimestamp(reportData.generated_at)} for ${String(scope.label || "all RootRecord users")}. Developer-only; raw PII is redacted before Grok._`,
+    "",
+    "**User Base**",
+    `â€¢ Accounts: **${n(accounts.total_accounts).toLocaleString()}** total; **${n(accounts.new_accounts_7d).toLocaleString()}** new in 7d; **${n(accounts.new_accounts_30d).toLocaleString()}** new in 30d.`,
+    `â€¢ Sessions: **${n(sessions.total_sessions).toLocaleString()}** total; **${n(sessions.accounts_seen_7d).toLocaleString()}** accounts seen in 7d; **${n(sessions.accounts_seen_30d).toLocaleString()}** in 30d.`,
+    scope.mode && scope.mode !== "all" ? `â€¢ Scope: **${n(scope.matched_accounts).toLocaleString()}** matched account(s); **${n(scope.matched_discord_users).toLocaleString()}** linked Discord user(s).` : "",
+    "",
+    "**App Behavior**",
+    `â€¢ 30d app mix: ${formatAppUsage(reportData.app_usage_30d)}.`,
+    `â€¢ Current tracked page time: **${Math.floor(n(calc.total_sec_on_page_current_state) / 60).toLocaleString()} min**; 30d earned: **${formatRootsAtomicLocale(n(calc.total_units_earned_30d))} ROOTS**.`,
+    "",
+    "**Sampled Users**",
+    ...users.map((raw) => `â€¢ ${topUserBehaviorLine(raw as Record<string, unknown>)}`),
+  ].join("\n");
+}
+
+async function callGrokUserBehaviorReport(env: DiscordRootUnitsEnv, reportData: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const token = grokChatBearerToken(env);
+  const apiUrl = String(env.GROK_API_URL || "https://api.x.ai/v1/chat/completions").trim();
+  const model = String(env.GROK_MODEL || "grok-3-latest").trim();
+  const prompt =
+    "Create an extensive developer-only RootRecord user behavior report from the provided app/web/mobile data. " +
+    "Use report_scope and scoped_usage as the primary target; use global summaries as context. " +
+    "For all-system reports, focus on account growth, retention, app usage by product, web/mobile session signals, feature adoption, friction, anomalies, and recommended product actions. " +
+    "For role or specific-user reports, focus on that cohort/account first, including activity timeline, app mix, billing/access, wallet/ROOTS behavior, Discord behavior, feature adoption, and product follow-up. " +
+    "Use clear Discord-ready Markdown sections: Executive Read, Scope, Growth & Retention, App/Product Behavior, User/Cohort Signals, Risks/Anomalies, Next Actions. " +
+    "Do not ask for more data. Do not reveal raw credentials, full emails, raw session ids, raw push tokens, private-key material, or IP addresses. Keep it under 3600 characters.";
+  const body = {
+    model,
+    messages: [
+      { role: "system", content: prompt },
+      { role: "user", content: jsonForArchive(reportData) },
+    ],
+    temperature: 0.25,
+  };
+  if (!token) {
+    return {
+      ok: false,
+      detail: "Grok API bearer token is not configured.",
+      content: buildFallbackUserBehaviorReport(reportData),
+      request: body,
+    };
+  }
+  try {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const response = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const content = grokResponseText(response);
+    const detail = content ? "" : grokErrorText(response, res.status);
+    return {
+      ok: res.ok && Boolean(content),
+      status: res.status,
+      detail,
+      content: content || buildFallbackUserBehaviorReport(reportData),
+      request: body,
+      response,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: e instanceof Error ? e.message : String(e),
+      content: buildFallbackUserBehaviorReport(reportData),
+      request: body,
+    };
+  }
+}
+
+function userReportEmbed(finalReport: Record<string, unknown>, reportData: Record<string, unknown>, archiveId: string): DiscordEmbed[] {
+  const accounts = (reportData.account_summary as Record<string, unknown> | null | undefined) || {};
+  const sessions = (reportData.session_summary as Record<string, unknown> | null | undefined) || {};
+  const calc = (reportData.calculated as Record<string, unknown> | null | undefined) || {};
+  const scope = (reportData.report_scope as Record<string, unknown> | null | undefined) || {};
+  return [
+    {
+      title: "RootRecord User Behavior Report",
+      description: fieldValue(finalReport.content || "User behavior report generated.", 3600),
+      color: 0x0ea5e9,
+      fields: [
+        {
+          name: "Scope",
+          value: fieldValue(`${scope.label || "all RootRecord users"}${scope.mode && scope.mode !== "all" ? ` Â· ${n(scope.matched_accounts).toLocaleString()} account(s)` : ""}`, 240),
+          inline: false,
+        },
+        {
+          name: "Accounts",
+          value: `${n(accounts.total_accounts).toLocaleString()} total Â· ${n(accounts.new_accounts_7d).toLocaleString()} new 7d Â· ${n(accounts.new_accounts_30d).toLocaleString()} new 30d`,
+          inline: false,
+        },
+        {
+          name: "Activity",
+          value: `${n(sessions.accounts_seen_7d).toLocaleString()} seen 7d Â· ${n(sessions.accounts_seen_30d).toLocaleString()} seen 30d Â· ${n(calc.sampled_users).toLocaleString()} sampled users`,
+          inline: false,
+        },
+      ],
+      footer: { text: `AI record saved: ${archiveId.slice(0, 8)} Â· PII redacted before Grok` },
+      timestamp: String(reportData.generated_at || new Date().toISOString()),
+    },
+  ];
+}
+
 async function collectScreenshotReportData(env: DiscordRootUnitsEnv, requesterDiscordId: string): Promise<Record<string, unknown>> {
   const nowIso = new Date().toISOString();
   const [
@@ -1957,7 +3170,7 @@ async function loadPreviousScreenshotReport(env: DiscordRootUnitsEnv): Promise<R
 }
 
 async function callGrokReport(env: DiscordRootUnitsEnv, reportData: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const token = String(env.GROK_API_BEARER_TOKEN || "").trim();
+  const token = grokChatBearerToken(env);
   const apiUrl = String(env.GROK_API_URL || "https://api.x.ai/v1/chat/completions").trim();
   const model = String(env.GROK_MODEL || "grok-3-latest").trim();
   const prompt =
@@ -2019,12 +3232,13 @@ async function callGrokSocialUpdate(
   reportData: Record<string, unknown>,
   reportEmbeds: DiscordEmbed[],
 ): Promise<Record<string, unknown>> {
-  const token = String(env.GROK_API_BEARER_TOKEN || "").trim();
+  const token = grokChatBearerToken(env);
   const apiUrl = String(env.GROK_API_URL || "https://api.x.ai/v1/chat/completions").trim();
   const model = String(env.GROK_MODEL || "grok-3-latest").trim();
   const prompt =
     "You are drafting a short daily Root Record community update after reviewing the generated ecosystem report. " +
-    "Return two clearly labeled sections: DISCORD and X. Keep both short. Include only meaningful changes, one daily unique update angle, and no hashtags. " +
+    "Return exactly two labeled sections: **DISCORD** then **X**. DISCORD must be under 400 characters. X must be under 270 characters (tweet-length). " +
+    "Mention at most the top 2 apps by usage; do not paste the full app usage mix. Include only meaningful changes and no hashtags. " +
     "Do not mention internal archive ids, secrets, raw JSON, prompts, or unavailable data.";
   const body = {
     model,
@@ -2138,6 +3352,20 @@ function formatAppUsage(rows: unknown): string {
   );
 }
 
+/** Short app line for Discord/X drafts (top apps only). */
+function formatAppUsageBrief(rows: unknown, maxApps = 2): string {
+  if (!Array.isArray(rows) || !rows.length) return "no recent app usage";
+  return compactList(
+    rows.slice(0, maxApps).map((raw) => {
+      const row = raw as Record<string, unknown>;
+      const users = n(row.recent_open_users || row.active_users);
+      const id = String(row.app_id || "unknown").replace(/^rootrecord_/, "").replace(/_android$/, "");
+      return `${id} (${users} users)`;
+    }),
+    maxApps,
+  );
+}
+
 function formatRedditSummary(reddit: Record<string, unknown> | undefined): string {
   if (!reddit) return "Reddit r/rootrecord scan unavailable.";
   if (reddit.error) return `Reddit r/rootrecord error: ${truncateText(reddit.error, 100)}`;
@@ -2181,7 +3409,17 @@ function formatWebsiteSummary(rows: unknown): string {
 function formatOpsSummary(reportData: Record<string, unknown>): string {
   const errors = Array.isArray(reportData.recent_worker_errors) ? reportData.recent_worker_errors : [];
   const discordDays = Array.isArray(reportData.discord_activity) ? reportData.discord_activity : [];
-  const recentErrors = errors.filter((raw) => !(raw as Record<string, unknown>).error).slice(0, 2);
+  const seenErrors = new Set<string>();
+  const recentErrors = errors
+    .filter((raw) => !(raw as Record<string, unknown>).error)
+    .filter((raw) => {
+      const row = raw as Record<string, unknown>;
+      const key = `${row.status || "?"}:${String(row.path_redacted || row.message || "").trim()}`;
+      if (seenErrors.has(key)) return false;
+      seenErrors.add(key);
+      return true;
+    })
+    .slice(0, 2);
   const discordMessages = discordDays.reduce((sum, raw) => sum + n((raw as Record<string, unknown>).message_count), 0);
   const errText = recentErrors.length
     ? recentErrors
@@ -2272,12 +3510,15 @@ function formatComparison(reportData: Record<string, unknown>): string {
   if (!previous) return "First archived comparison run; future reports will show movement here.";
   const cur = reportMetrics(reportData);
   const prev = reportMetrics(previous);
-  const topText = cur.topHolder === prev.topHolder ? `Top holder unchanged: ${truncateText(cur.topHolder, 36)}` : `Top holder changed: ${truncateText(prev.topHolder, 24)} → ${truncateText(cur.topHolder, 24)}`;
+  const topText =
+    cur.topHolder === prev.topHolder
+      ? `Top holder unchanged: ${truncateText(cur.topHolder, 36)}`
+      : `Top holder changed: ${truncateText(prev.topHolder, 24)} ${DISCORD_ARROW} ${truncateText(cur.topHolder, 24)}`;
   return [
-    `• Accounts: **${signedDelta(cur.accounts, prev.accounts, "count")}** (${cur.accounts.toLocaleString()} total)`,
-    `• Circulation: **${signedDelta(cur.circulation, prev.circulation, "roots")}** (${formatRootsAtomicLocale(cur.circulation)} ROOTS total)`,
-    `• ${topText}`,
-    `• App leader: ${cur.appLeader} (${formatRootsAtomicLocale(cur.appLeaderUnits)} ROOTS / 14d)`,
+    `${DISCORD_BULLET} Accounts: **${signedDelta(cur.accounts, prev.accounts, "count")}** (${cur.accounts.toLocaleString()} total)`,
+    `${DISCORD_BULLET} Circulation: **${signedDelta(cur.circulation, prev.circulation, "roots")}** (${formatRootsAtomicLocale(cur.circulation)} ROOTS total)`,
+    `${DISCORD_BULLET} ${topText}`,
+    `${DISCORD_BULLET} App leader: ${cur.appLeader} (${formatRootsAtomicLocale(cur.appLeaderUnits)} ROOTS / 14d)`,
   ].join("\n");
 }
 
@@ -2291,16 +3532,16 @@ function buildXCopy(reportData: Record<string, unknown>): string {
   const xSignal = formatXSummary(reportData.rootrecord_x as Record<string, unknown> | undefined)
     .replace(/^@rootrecord latest(?: \([^)]*\))?:\s*/i, "Latest RootRecord update: ")
     .replace(/^@rootrecord:\s*/i, "RootRecord X: ");
-  const appUsage = formatAppUsage(reportData.app_usage_14d);
+  const appUsage = formatAppUsageBrief(reportData.app_usage_14d);
   return truncateText(
     [
       "Root Record ecosystem update:",
-      `${cur.accounts.toLocaleString()} accounts are using Root Record services.`,
+      `${cur.accounts.toLocaleString()} accounts.`,
       movement,
-      `App usage: ${appUsage}.`,
+      `Top apps: ${appUsage}.`,
       xSignal,
     ].join(" "),
-    420,
+    275,
   );
 }
 
@@ -2314,23 +3555,36 @@ function buildSocialUpdateFallback(reportData: Record<string, unknown>): string 
   const discordCopy = truncateText(
     [
       "Daily Root Record update:",
-      `${cur.accounts.toLocaleString()} accounts are tracked across Root Record services.`,
+      `${cur.accounts.toLocaleString()} accounts tracked.`,
       movement,
-      `App usage mix: ${formatAppUsage(reportData.app_usage_14d)}.`,
+      `Leading apps: ${formatAppUsageBrief(reportData.app_usage_14d)}.`,
     ].join(" "),
-    650,
+    480,
   );
   return [`**DISCORD**`, discordCopy, "", `**X**`, xCopy].join("\n");
 }
 
+function parseSocialDraftSections(raw: string): { discord: string; x: string } {
+  const text = String(raw || "").trim();
+  const discordMatch = text.match(/\*\*DISCORD\*\*\s*([\s\S]*?)(?=\*\*X\*\*|$)/i);
+  const xMatch = text.match(/\*\*X\*\*\s*([\s\S]*?)$/i);
+  return {
+    discord: (discordMatch?.[1] || text).trim(),
+    x: (xMatch?.[1] || "").trim(),
+  };
+}
+
 function buildSocialUpdateEmbed(social: Record<string, unknown>): DiscordEmbed[] {
-  const content = fieldValue(social.content || "Daily update generated.", 1800);
+  const { discord, x } = parseSocialDraftSections(String(social.content || ""));
   return [
     {
       title: "Daily Social Update Draft",
       description: "Short copy for Discord and X. No hashtags.",
       color: 0x1d9bf0,
-      fields: [{ name: "Copy", value: content }],
+      fields: [
+        { name: "Discord", value: fieldValue(discord || "Daily update generated.", 500) },
+        { name: "X (max ~280 chars)", value: fieldValue(x || "No X draft returned.", 280) },
+      ],
     },
   ];
 }
@@ -2347,7 +3601,7 @@ type DiscordEmbed = {
 function fieldValue(raw: unknown, max = 980): string {
   const s = String(raw ?? "").trim();
   if (!s) return "No data returned.";
-  return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}…` : s;
+  return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}${DISCORD_ELLIPSIS}` : s;
 }
 
 async function postAiChannelMessage(
@@ -2456,20 +3710,20 @@ function buildFallbackScreenshotPost(reportData: Record<string, unknown>): strin
     formatComparison(reportData),
     "",
     "**Usage & Services**",
-    `• Total accounts: **${n(accounts?.total_accounts).toLocaleString()}**`,
-    `• App usage mix: ${formatAppUsage(reportData.app_usage_14d)}`,
-    `• Internal ROOTS: **${formatRootsAtomicLocale(total)}** across **${holders.toLocaleString()}** holders`,
+    `${DISCORD_BULLET} Total accounts: **${n(accounts?.total_accounts).toLocaleString()}**`,
+    `${DISCORD_BULLET} App usage mix: ${formatAppUsage(reportData.app_usage_14d)}`,
+    `${DISCORD_BULLET} Internal ROOTS: **${formatRootsAtomicLocale(total)}** across **${holders.toLocaleString()}** holders`,
     "",
     "**Activity & Queues**",
-    `• Volcano photo queue: ${formatPhotoQueue(photos)}`,
-    `• ${formatOpsSummary(reportData)}`,
+    `${DISCORD_BULLET} Volcano photo queue: ${formatPhotoQueue(photos)}`,
+    `${DISCORD_BULLET} ${formatOpsSummary(reportData)}`,
     "",
     "**Content Signals**",
-    `• ${formatXSummary(reportData.rootrecord_x as Record<string, unknown> | undefined)}`,
-    `• Reddit: ${formatRedditSummary(reportData.reddit as Record<string, unknown> | undefined)}`,
-    `• Discord: ${formatDiscordActivityAiSummary(reportData)}`,
-    `• Website: ${formatWebsiteSummary(reportData.website)}`,
-    `• Top holders (secondary): ${formatTopHolders(leaderboard).replace(/\n/g, "; ")}`,
+    `${DISCORD_BULLET} ${formatXSummary(reportData.rootrecord_x as Record<string, unknown> | undefined)}`,
+    `${DISCORD_BULLET} Reddit: ${formatRedditSummary(reportData.reddit as Record<string, unknown> | undefined)}`,
+    `${DISCORD_BULLET} Discord: ${formatDiscordActivityAiSummary(reportData)}`,
+    `${DISCORD_BULLET} Website: ${formatWebsiteSummary(reportData.website)}`,
+    `${DISCORD_BULLET} Top holders (secondary): ${formatTopHolders(leaderboard).replace(/\n/g, "; ")}`,
     "",
     "**X Copy**",
     "```text",
@@ -2652,7 +3906,7 @@ async function callGrokAnalysis(
   instruction: string,
   data: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const token = String(env.GROK_API_BEARER_TOKEN || "").trim();
+  const token = grokChatBearerToken(env);
   const apiUrl = String(env.GROK_API_URL || "https://api.x.ai/v1/chat/completions").trim();
   const model = String(env.GROK_MODEL || "grok-3-latest").trim();
   const body = {
@@ -2662,14 +3916,14 @@ async function callGrokAnalysis(
         role: "system",
         content:
           `${instruction} Use only provided data. Be precise, mention unavailable/failed sources, and keep under 1200 characters. ` +
-          "Do not reveal secrets or raw credentials.",
+          "Do not reveal secrets, raw credentials, provider names, model names, API configuration, archive/debug status, or provider errors.",
       },
       { role: "user", content: jsonForArchive(data) },
     ],
     temperature: 0.25,
   };
   if (!token) {
-    return { ok: false, title, detail: "Grok API bearer token is not configured.", content: `${title}: AI unavailable; data archived.`, request: body };
+    return { ok: false, title, detail: "Grok bearer token is not configured.", content: `${title}: AI unavailable; data archived.`, request: body };
   }
   try {
     const res = await fetch(apiUrl, {
@@ -2678,11 +3932,17 @@ async function callGrokAnalysis(
       body: JSON.stringify(body),
     });
     const response = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    const content = String(
-      (((response.choices as Array<Record<string, unknown>> | undefined)?.[0]?.message as Record<string, unknown> | undefined)
-        ?.content as string | undefined) || "",
-    ).trim();
-    return { ok: res.ok && Boolean(content), title, status: res.status, content: content || `${title}: no AI text returned.`, request: body, response };
+    const content = grokResponseText(response);
+    const detail = content ? "" : grokErrorText(response, res.status);
+    return {
+      ok: res.ok && Boolean(content),
+      title,
+      status: res.status,
+      detail,
+      content: content || `${title}: ${detail}`,
+      request: body,
+      response,
+    };
   } catch (e) {
     return { ok: false, title, detail: e instanceof Error ? e.message : String(e), content: `${title}: AI request failed.`, request: body };
   }
@@ -2744,7 +4004,7 @@ function tokenReportEmbed(finalReport: Record<string, unknown>, archiveId: strin
       color: 0x7c3aed,
       fields: [
         { name: "Mint", value: `\`${ROOTS_MINT_BASE58}\`` },
-        { name: "Solscan", value: `[Token](https://solscan.io/token/${ROOTS_MINT_BASE58}) · [Holders](https://solscan.io/token/${ROOTS_MINT_BASE58}#holders)` },
+        { name: "Solscan", value: `[Token](https://solscan.io/token/${ROOTS_MINT_BASE58}) Â· [Holders](https://solscan.io/token/${ROOTS_MINT_BASE58}#holders)` },
       ],
       footer: { text: `AI record saved: ${archiveId.slice(0, 8)}` },
       timestamp: new Date().toISOString(),
@@ -2768,7 +4028,7 @@ function activityReportEmbed(activityReport: Record<string, unknown>): DiscordEm
         },
         {
           name: "Latest Day",
-          value: `${metrics.latest_day || "n/a"} · ${n(metrics.latest_day_messages).toLocaleString()}`,
+          value: `${metrics.latest_day || "n/a"} Â· ${n(metrics.latest_day_messages).toLocaleString()}`,
           inline: true,
         },
         {
@@ -2802,6 +4062,48 @@ async function handleActivityCommand(
     type: 4,
     data: {
       embeds: activityReportEmbed(activityReport),
+      flags: 64,
+    },
+  });
+}
+
+async function handleUserReportCommand(
+  body: Record<string, unknown>,
+  env: DiscordRootUnitsEnv,
+  member: Record<string, unknown> | undefined,
+  requesterDiscordId: string,
+  opts: Array<Record<string, unknown>>,
+): Promise<Response> {
+  if (!(await hasDeveloperRole(member, env))) {
+    return interactionResponse(4, { content: "Only @Developer can use `/userreport`.", flags: 64 });
+  }
+  const resolved = await resolveUserReportScope(env, opts);
+  if ("error" in resolved) {
+    return interactionResponse(4, { content: resolved.error, flags: 64 });
+  }
+  const reportData = await collectUserBehaviorReportData(env, requesterDiscordId, resolved.scope);
+  const final = await callGrokUserBehaviorReport(env, reportData);
+  const archiveId = crypto.randomUUID();
+  await archiveAiReport(
+    env,
+    "/userreport",
+    {
+      id: archiveId,
+      created_at: new Date().toISOString(),
+      prompt: reportData,
+      response: final,
+    },
+    {
+      interactionId: String(body.id || ""),
+      channelId: String(body.channel_id || ""),
+      guildId: String(body.guild_id || ""),
+      userId: requesterDiscordId,
+    },
+  );
+  return jsonInteractionPayload({
+    type: 4,
+    data: {
+      embeds: userReportEmbed(final, reportData, archiveId),
       flags: 64,
     },
   });
@@ -2921,12 +4223,6 @@ async function handleScreenshotCommand(
   const archiveId = crypto.randomUUID();
   const reportEmbeds = buildScreenshotReportEmbeds(reportData, archiveId);
   const social = await callGrokSocialUpdate(env, reportData, reportEmbeds);
-  await postAiChannelMessage(env, {
-    content: `**/screenshot AI report ${archiveId.slice(0, 8)}**\n${String(grok.content || grok.fallback || "Report generated.").slice(0, 1700)}`,
-  });
-  await postAiChannelMessage(env, {
-    content: `**/screenshot social draft ${archiveId.slice(0, 8)}**\n${String(social.content || "Social draft generated.").slice(0, 1700)}`,
-  });
   await archiveScreenshotReport(
     env,
     {
@@ -3030,7 +4326,7 @@ async function handleMintCommand(
           { name: "Minted", value: `${minted} ROOTS`, inline: true },
           { name: "Mint", value: `\`${ROOTS_MINT_BASE58}\``, inline: false },
           { name: "Destination", value: `\`${dest}\``, inline: false },
-          { name: "Transaction", value: skipped ? "No transaction needed" : sig ? `[${sig.slice(0, 10)}…](${String(data.explorer || `https://solscan.io/tx/${sig}`)})` : "submitted", inline: false },
+          { name: "Transaction", value: skipped ? "No transaction needed" : sig ? `[${sig.slice(0, 10)}â€¦](${String(data.explorer || `https://solscan.io/tx/${sig}`)})` : "submitted", inline: false },
         ],
       },
     ],
@@ -3068,6 +4364,10 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
     return handleActivityCommand(body, env, member, fromDiscordId);
   }
 
+  if (name === "userreport") {
+    return handleUserReportCommand(body, env, member, fromDiscordId, opts);
+  }
+
   if (name === "token") {
     return handleTokenCommand(body, env, member, fromDiscordId);
   }
@@ -3078,6 +4378,10 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
 
   if (name === "wallet" || name === "deposit") {
     return handleWalletDeposit(env.DB, fromDiscordId);
+  }
+
+  if (name === "swap") {
+    return handleSwapCommand(env, fromDiscordId, opts);
   }
 
   if (name === "menu") {
@@ -3092,7 +4396,7 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
 
   if (name === "airdrop") {
     return interactionResponse(4, {
-      content: "**`/airdrop`** `claim` / `create` — coming soon.",
+      content: "**`/airdrop`** `claim` / `create` â€” coming soon.",
     });
   }
 
@@ -3147,7 +4451,12 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
     const scName = sc ? String(sc.name || "").trim().toLowerCase() : "";
     const inner = (sc ? sc.inner : []) as Array<Record<string, unknown>>;
     const sendAsset = parseSendAsset(optStringChoice(inner, "asset") ?? optStringDeep(opts, "asset"));
-    if ((sendAsset === "RRTT" || sendAsset === "SOL") && scName !== "" && scName !== "user") {
+    if (sendAsset === "RRTT") {
+      return interactionResponse(4, {
+        content: "That asset is not available in Discord sends. Use **ROOTS** or **SOL**.",
+      });
+    }
+    if (sendAsset === "SOL" && scName !== "" && scName !== "user") {
       return interactionResponse(4, {
         content:
           `**${sendAsset}** only works under **\`/send user\`**: pick **${sendAsset}**, **member**, then **amount**. For splits to many people, use **ROOTS** with **everyone** / **active** / **role**.`,
@@ -3206,7 +4515,7 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
       if (!toDiscordId || amountRaw == null) {
         return interactionResponse(4, {
           content:
-            "Use **`/send user`**: **asset**, **member**, **amount** (SOL = decimal e.g. `0.00001`; ROOTS = decimal ROOTS; RRTT = whole tokens).",
+            "Use **`/send user`**: **asset**, **member**, **amount** (SOL = decimal e.g. `0.00001`; ROOTS = decimal ROOTS).",
         });
       }
       if (toDiscordId === fromDiscordId) {
@@ -3227,16 +4536,6 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
               )
             : unlinkedRecipientSendFailedContent(toDiscordId, failedDisplayUnits, sendAsset),
         });
-      }
-      if (sendAsset === "RRTT") {
-        const wholeRrtt = Math.floor(amountRaw);
-        if (wholeRrtt < 1) {
-          return interactionResponse(4, { content: "RRTT amount must be at least **1** whole token." });
-        }
-        if (wholeRrtt > 10_000_000) {
-          return interactionResponse(4, { content: "Max **10,000,000** whole RRTT per send." });
-        }
-        return handleSendRrttUser(env, fromDiscordId, toDiscordId, fromUid, toUid, wholeRrtt, interactionId);
       }
       if (sendAsset === "SOL") {
         const lamports = solWholeToLamports(amountRaw);
@@ -3269,7 +4568,7 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
 
     return interactionResponse(4, {
       content:
-        "Use **`/send user`**, **`everyone`**, **`active`**, or **`role`**. **ROOTS** = in-bot ledger; **RRTT** / **SOL** = on-chain custodial wallets (**`/send user`** only). `@everyone` is not a user field — use **everyone** (linked members only).",
+        "Use **`/send user`**, **`everyone`**, **`active`**, or **`role`**. **ROOTS** = Root Units shared inside Discord; **SOL** = deposit-wallet transfer (**`/send user`** only). `@everyone` is not a user field â€” use **everyone** (linked members only).",
     });
   }
 
@@ -3310,7 +4609,7 @@ export async function handleDiscordInteractions(
   if (t === 1) {
     return interactionResponse(1);
   }
-  // APPLICATION_COMMAND_AUTOCOMPLETE — must ACK with callback type 8 (not a channel message).
+  // APPLICATION_COMMAND_AUTOCOMPLETE â€” must ACK with callback type 8 (not a channel message).
   if (t === 4) {
     return new Response(JSON.stringify({ type: 8, data: { choices: [] } }), {
       status: 200,
@@ -3353,7 +4652,7 @@ export async function handleDiscordInteractions(
       }
     };
 
-    // Discord requires an initial response in ~3s. D1 work can exceed that — defer (type 5), then PATCH @original.
+    // Discord requires an initial response in ~3s. D1 work can exceed that â€” defer (type 5), then PATCH @original.
     // Only `interactionToken` is required to PATCH; `applicationId` falls back to env.DISCORD_CLIENT_ID.
     if (ctx?.waitUntil && interactionToken) {
       const appIdForPatch = applicationId || String(env.DISCORD_CLIENT_ID || "").trim();

@@ -1,4 +1,4 @@
-import { api, session } from './api';
+import { accessFromPayload, api, session } from './api';
 
 export const UPSELL_EVENT = 'rr.upsell.show';
 export const FORECAST_DAYS_FREE = 3;
@@ -24,8 +24,8 @@ export function memberStatusLabel() {
 
 export function memberStatusHint() {
   const tier = getMemberTier();
-  if (tier === 'lifetime' || tier === 'pro') return 'All features enabled · NOAA push alerts on Android';
-  return '3-day forecast · hazard tabs · upgrade for live data, air quality & push alerts';
+  if (tier === 'lifetime' || tier === 'pro') return 'Member features enabled · NOAA push alerts on Android';
+  return 'Core forecast access · some resource-heavy features are members-only';
 }
 
 export function forecastDayLimit() {
@@ -42,11 +42,14 @@ export function showUpsellModal() {
 
 /** Refresh Pro / Lifetime flags from the server (e.g. after billing changes). */
 export async function refreshSessionAccess() {
-  if (!session.isAuthed()) return;
+  if (!session.isAuthed()) return false;
   try {
     const { data } = await api.me();
-    session.setAccess(Boolean(data?.pro_unlocked), Boolean(data?.life_member));
+    const access = accessFromPayload(data);
+    session.setAccess(access.pro, access.life);
+    return true;
   } catch {
     /* offline — keep cached tier */
+    return false;
   }
 }

@@ -26,12 +26,13 @@ import { getAppAssociationsForEmail } from "../../shared/app-associations";
 import { grantSignupBonusOnRegistration } from "./earn-signup-bonus";
 import { refreshCustodialOnchainCacheFromRpc } from "./custodial-onchain-cache";
 import type { CustodialCacheRpcEnv } from "./custodial-onchain-cache";
-import { readDiscordLink } from "./discord-account-link";
+import { discordUserHasConfiguredRole, readDiscordLink } from "./discord-account-link";
 import {
   isMergedLoginAliasEmail,
   resolveLicenseLoginRow,
   verifyPasswordForLoginRow,
 } from "../../shared/license-login";
+import { readAccountSecurity } from "./account-security";
 
 
 
@@ -52,6 +53,10 @@ export interface AuthEnv {
   /** Recurring Price id for web checkout (wrangler [vars] STRIPE_PRICE_ID). */
 
   STRIPE_PRICE_ID?: string;
+
+  DISCORD_BOT_TOKEN?: string;
+  DISCORD_GUILD_ID?: string;
+  DISCORD_DEVELOPER_ROLE_ID?: string;
 
   /** Mainnet RPC for custodial cache refresh (background `waitUntil` after `/v1/me`, cron, etc.). */
 
@@ -610,9 +615,10 @@ export async function authMe(
 
   const billing = await fetchBillingSnapshot(env.DB, sess.email);
   const acct = await readUserAccountAccessFlags(env.DB, sess.email);
-  const pro = Boolean(billing?.pro_unlocked) || Boolean(acct?.pro_unlocked);
+  let pro = Boolean(billing?.pro_unlocked) || Boolean(acct?.pro_unlocked);
   const subStatus = billing ? billing.subscription_status : "none";
-  const life = Boolean(billing?.life_member) || Boolean(acct?.life_member);
+  let life = Boolean(billing?.life_member) || Boolean(acct?.life_member);
+  if (life) pro = true;
 
   let apps: Awaited<ReturnType<typeof getAppAssociationsForEmail>>;
   try {
@@ -712,6 +718,18 @@ export async function authMe(
     discord_username: null,
     discord_global_name: null,
   }));
+  const developerUnlimited = await discordUserHasConfiguredRole(
+    env,
+    discord?.discord_user_id,
+    env.DISCORD_DEVELOPER_ROLE_ID,
+  ).catch(() => false);
+  if (developerUnlimited) {
+    pro = true;
+    life = true;
+  }
+  const security = await readAccountSecurity(env.DB, sess.accountId);
+  const verifiedByDiscord = Boolean(discord?.linked);
+  const verifiedByEmail = Boolean(security.email_verified);
 
   let public_display_name: string | null = null;
   try {
@@ -743,7 +761,11 @@ export async function authMe(
 
       lifeMember: life,
 
-      access: { tier: pro ? "pro" : "none", reason: pro ? "paid" : "none" },
+      access: {
+        tier: developerUnlimited ? "developer" : pro ? "pro" : "none",
+        reason: developerUnlimited ? "discord_developer" : pro ? "paid" : "none",
+      },
+      developer_unlimited: developerUnlimited,
 
       subscription_status: subStatus,
 
@@ -777,6 +799,13 @@ export async function authMe(
       discord_user_id: discord?.discord_user_id ?? null,
       discord_username: discord?.discord_username ?? null,
       discord_global_name: discord?.discord_global_name ?? null,
+      email_verified: verifiedByEmail,
+      email_verified_at: security.email_verified_at,
+      verified_by_email: verifiedByEmail,
+      verified_by_discord: verifiedByDiscord,
+      account_verified: verifiedByEmail || verifiedByDiscord,
+      last_challenge_verified_at: security.last_challenge_verified_at,
+      last_challenge_method: security.last_challenge_method,
 
       apps,
 

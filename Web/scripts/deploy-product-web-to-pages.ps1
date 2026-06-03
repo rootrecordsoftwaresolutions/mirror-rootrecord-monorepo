@@ -117,6 +117,24 @@ if (-not (Test-Path (Join-Path $buildDir "index.html"))) {
   throw "Build output missing: $buildDir\index.html"
 }
 
+$builtIndex = Get-Content -LiteralPath (Join-Path $buildDir "index.html") -Raw
+if ($builtIndex -match '/src/main\.tsx') {
+  throw "build/index.html still references Vite dev entry (/src/main.tsx). Fix the production build before deploy."
+}
+
+$deployDir = "."
+$wranglerPath = Join-Path $frontendRoot "wrangler.toml"
+if (Test-Path -LiteralPath $wranglerPath) {
+  $tomlRaw = Get-Content -LiteralPath $wranglerPath -Raw
+  if ($tomlRaw -match 'pages_build_output_dir\s*=\s*"([^"]+)"') {
+    $outRel = $Matches[1].Trim()
+    $outIndex = Join-Path (Join-Path $frontendRoot $outRel) "index.html"
+    if ($outRel -and (Test-Path -LiteralPath $outIndex)) {
+      $deployDir = $outRel
+    }
+  }
+}
+
 $analyticsEnvByProject = @{
   "rootrecord-weather-web"   = "CF_WEB_ANALYTICS_TOKEN_WEATHER"
   "rootrecord-business-web"  = "CF_WEB_ANALYTICS_TOKEN_BUSINESS"
@@ -137,4 +155,20 @@ if ($analyticsVar) {
 }
 
 $env:WRANGLER_CI = "1"
-npx wrangler pages deploy build --project-name=$ProjectName --branch=main @args
+Write-Host "Ensuring Cloudflare Pages project exists: $ProjectName"
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+  $createLog = (npx wrangler pages project create $ProjectName --production-branch=main 2>&1 | Out-String)
+} finally {
+  $ErrorActionPreference = $prevEap
+}
+if ($createLog.Trim()) { Write-Host $createLog.Trim() }
+if ($LASTEXITCODE -ne 0 -and $createLog -notmatch "(?i)already exists|8000012") {
+  Write-Host "Note: pages project create exited $LASTEXITCODE (continuing to deploy)."
+}
+# Deploy pages_build_output_dir (e.g. build/) so a Vite root index.html is not served instead of the bundle.
+# Pages Functions in functions/ are still picked up from the project cwd.
+Write-Host "Deploying static assets from: $deployDir"
+npx wrangler pages deploy $deployDir --project-name=$ProjectName --branch=main @args
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

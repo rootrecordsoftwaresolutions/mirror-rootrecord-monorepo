@@ -37,7 +37,7 @@ export default function Account() {
   }
 
   const planLabel =
-    user?.plan === "life" ? "Lifetime" : user?.plan === "pro" ? "Pro" : "Free";
+    user?.plan === "life" || user?.plan === "pro" ? "Member" : "Free";
 
   return (
     <>

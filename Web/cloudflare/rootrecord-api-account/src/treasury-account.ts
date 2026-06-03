@@ -12,6 +12,7 @@ import {
 export const TREASURY_ACCOUNT_EMAIL = "treasury@rootrecord.info";
 export const TREASURY_USER_ID = `user:${TREASURY_ACCOUNT_EMAIL}`;
 export const TREASURY_WALLET_PUBKEY = "G1DHctEcwkiLw8NZDfCbDCbuPktQBmWa6P2aobDuMKuZ";
+export const ROOTS_BASELINE_BALANCE_ATOMIC = 1_000_000; // 0.01 ROOTS at 8 decimals.
 
 export type TreasuryAccountEnv = InternalWalletEnv & {
   RR_PUSH_ADMIN_SECRET?: string;
@@ -150,5 +151,109 @@ export async function handleTreasuryAccountProvisionRoute(
     created: result.created,
     custodial_wallet: result.custodial_wallet,
     treasury_user_id: TREASURY_USER_ID,
+  });
+}
+
+export async function handleRootBalanceResetRoute(
+  request: Request,
+  env: TreasuryAccountEnv,
+  sub: string,
+  method: string,
+): Promise<Response | null> {
+  if (sub !== "/internal/reset-root-balances-to-001" || method !== "POST") return null;
+  if (!(await verifyWorkerOpsAdmin(request, env))) return json({ ok: false, detail: "Unauthorized." }, 401);
+
+  let body: { dry_run?: boolean; confirm?: string } = {};
+  try {
+    body = (await request.json().catch(() => ({}))) as typeof body;
+  } catch {
+    body = {};
+  }
+  const dryRun = body.dry_run !== false;
+  if (!dryRun && String(body.confirm || "") !== "RESET_ALL_ROOTS_BALANCES_TO_0_01") {
+    return json({ ok: false, detail: "Live reset requires confirm = RESET_ALL_ROOTS_BALANCES_TO_0_01." }, 400);
+  }
+
+  const before = await env.DB
+    .prepare(
+      `SELECT COUNT(*) AS balance_rows,
+              COALESCE(SUM(balance), 0) AS total_balance,
+              COALESCE(MIN(balance), 0) AS min_balance,
+              COALESCE(MAX(balance), 0) AS max_balance
+       FROM rr_earn_balance`,
+    )
+    .first<{ balance_rows: number; total_balance: number; min_balance: number; max_balance: number }>();
+  const accounts = await env.DB.prepare("SELECT COUNT(*) AS account_count FROM license_accounts").first<{ account_count: number }>();
+  const farmsBefore = await env.DB
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM rr_farms_progress) AS progress_rows,
+         (SELECT COUNT(*) FROM rr_farms_varmint_events) AS varmint_rows,
+         (SELECT COUNT(*) FROM rr_farms_dice_requests) AS dice_rows,
+         (SELECT COUNT(*) FROM rr_farms_hilo_sessions) AS hilo_rows,
+         (SELECT COUNT(*) FROM rr_farms_market_activity) AS market_activity_rows`,
+    )
+    .first<{
+      progress_rows: number;
+      varmint_rows: number;
+      dice_rows: number;
+      hilo_rows: number;
+      market_activity_rows: number;
+    }>();
+
+  if (dryRun) {
+    return json({
+      ok: true,
+      dry_run: true,
+      target_atomic: ROOTS_BASELINE_BALANCE_ATOMIC,
+      target_roots: 0.01,
+      account_count: Math.max(0, Math.floor(Number(accounts?.account_count) || 0)),
+      before,
+      farms_before: farmsBefore,
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+  await env.DB.batch([
+    env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO rr_earn_balance (user_id, balance, updated_at)
+         SELECT 'user:' || lower(trim(email)), ?, ?
+         FROM license_accounts
+         WHERE trim(email) != ''`,
+      )
+      .bind(ROOTS_BASELINE_BALANCE_ATOMIC, nowIso),
+    env.DB
+      .prepare("UPDATE rr_earn_balance SET balance = ?, updated_at = ? WHERE user_id LIKE 'user:%'")
+      .bind(ROOTS_BASELINE_BALANCE_ATOMIC, nowIso),
+    env.DB
+      .prepare("UPDATE rr_earn_signup_bonus SET units = ? WHERE user_id LIKE 'user:%'")
+      .bind(ROOTS_BASELINE_BALANCE_ATOMIC),
+    env.DB.prepare("DELETE FROM rr_farms_market_activity"),
+    env.DB.prepare("DELETE FROM rr_farms_hilo_sessions"),
+    env.DB.prepare("DELETE FROM rr_farms_dice_requests"),
+    env.DB.prepare("DELETE FROM rr_farms_varmint_events"),
+    env.DB.prepare("DELETE FROM rr_farms_global_state"),
+    env.DB.prepare("DELETE FROM rr_farms_progress"),
+  ]);
+
+  const after = await env.DB
+    .prepare(
+      `SELECT COUNT(*) AS balance_rows,
+              COALESCE(SUM(balance), 0) AS total_balance,
+              COALESCE(MIN(balance), 0) AS min_balance,
+              COALESCE(MAX(balance), 0) AS max_balance
+       FROM rr_earn_balance`,
+    )
+    .first<{ balance_rows: number; total_balance: number; min_balance: number; max_balance: number }>();
+
+  return json({
+    ok: true,
+    dry_run: false,
+    target_atomic: ROOTS_BASELINE_BALANCE_ATOMIC,
+    target_roots: 0.01,
+    before,
+    farms_before: farmsBefore,
+    after,
   });
 }

@@ -3,6 +3,8 @@ export interface Env {
   APP_BUILD_REQUEST_WEBHOOK_BEARER?: string;
   APP_BUILD_DISCORD_BOT_TOKEN?: string;
   APP_BUILD_DISCORD_DM_USER_ID?: string;
+  APP_BUILD_IOS_WAITLIST_CHANNEL_ID?: string;
+  APP_BUILD_VISITING_HAWAII_WAITLIST_CHANNEL_ID?: string;
 }
 
 type AppBuildRequestPayload = {
@@ -25,6 +27,24 @@ type AppBuildRequestPayload = {
   support: string;
   notes?: string;
 };
+
+type IosWaitlistPayload = {
+  name?: string;
+  email: string;
+  product: string;
+  notes?: string;
+};
+
+type VisitingHawaiiWaitlistPayload = {
+  name?: string;
+  email: string;
+  homeIsland?: string;
+  travelWhen?: string;
+  platform?: string;
+  notes?: string;
+};
+
+const DEFAULT_IOS_WAITLIST_CHANNEL_ID = "1509812977069592676";
 
 function clampText(value: unknown, max: number): string {
   return String(value ?? "")
@@ -138,6 +158,22 @@ async function sendDiscordDmChunks(botToken: string, recipientUserId: string, fu
       method: "POST",
       headers: {
         Authorization: auth,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content: chunk }),
+    });
+    if (!msgRes.ok) return msgRes;
+  }
+  return new Response(null, { status: 204 });
+}
+
+async function sendDiscordChannelChunks(botToken: string, channelId: string, fullText: string): Promise<Response> {
+  const chunks = chunkDiscordContent(fullText, 1900);
+  for (const chunk of chunks) {
+    const msgRes = await fetch(`https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${botToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ content: chunk }),
@@ -296,6 +332,138 @@ async function handlePost(request: Request, env: Env): Promise<Response> {
   return json(200, { ok: true }, cors);
 }
 
+function formatIosWaitlistMessage(p: IosWaitlistPayload, meta: Record<string, string>) {
+  const lines: string[] = [];
+  lines.push("**New iOS waitlist signup**");
+  lines.push("");
+  if (p.name) lines.push(`**Name:** ${p.name}`);
+  lines.push(`**Email:** ${p.email}`);
+  lines.push(`**Product:** ${p.product}`);
+  if (p.notes) {
+    lines.push("");
+    lines.push("**Notes**");
+    lines.push(purposeSafe(p.notes));
+  }
+  lines.push("");
+  lines.push(`_Meta: ip=${meta.ip || "?"}, ua=${meta.ua || "?"}, ref=${meta.ref || "?"}_`);
+  return lines.join("\n");
+}
+
+async function handleIosWaitlistPost(request: Request, env: Env): Promise<Response> {
+  const cors = corsForRequest(request);
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return json(415, { error: "Expected application/json" }, cors);
+  }
+
+  let incoming: Record<string, unknown>;
+  try {
+    incoming = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return json(400, { error: "Invalid JSON" }, cors);
+  }
+
+  const p: IosWaitlistPayload = {
+    name: clampText(incoming.name, 120),
+    email: clampText(incoming.email, 200),
+    product: clampText(incoming.product, 120) || "All RootRecord iOS apps",
+    notes: clampText(incoming.notes, 1200),
+  };
+
+  if (!p.email) return json(400, { error: "Email is required" }, cors);
+  if (!isEmailLike(p.email)) return json(400, { error: "Email looks invalid" }, cors);
+
+  const botToken = normalizeDiscordBotToken(String(env.APP_BUILD_DISCORD_BOT_TOKEN || ""));
+  const channelId = String(env.APP_BUILD_IOS_WAITLIST_CHANNEL_ID || DEFAULT_IOS_WAITLIST_CHANNEL_ID).trim();
+  if (!botToken) return json(503, { error: "iOS waitlist is not configured: missing Discord bot token." }, cors);
+  if (!isDiscordSnowflake(channelId)) return json(503, { error: "iOS waitlist Discord channel id is invalid." }, cors);
+
+  const res = await sendDiscordChannelChunks(botToken, channelId, formatIosWaitlistMessage(p, clientMeta(request)));
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return json(
+      502,
+      {
+        error: "Discord channel delivery failed.",
+        status: res.status,
+        detail: text.slice(0, 500),
+      },
+      cors,
+    );
+  }
+
+  return json(200, { ok: true }, cors);
+}
+
+function formatVisitingHawaiiWaitlistMessage(p: VisitingHawaiiWaitlistPayload, meta: Record<string, string>) {
+  const lines: string[] = [];
+  lines.push("**New Visiting Hawaiʻi waitlist signup**");
+  lines.push("");
+  if (p.name) lines.push(`**Name:** ${p.name}`);
+  lines.push(`**Email:** ${p.email}`);
+  if (p.homeIsland) lines.push(`**Island focus:** ${p.homeIsland}`);
+  if (p.travelWhen) lines.push(`**Travel timing:** ${p.travelWhen}`);
+  if (p.platform) lines.push(`**Platform interest:** ${p.platform}`);
+  if (p.notes) {
+    lines.push("");
+    lines.push("**Notes**");
+    lines.push(purposeSafe(p.notes));
+  }
+  lines.push("");
+  lines.push(`_Meta: ip=${meta.ip || "?"}, ua=${meta.ua || "?"}, ref=${meta.ref || "?"}_`);
+  return lines.join("\n");
+}
+
+async function handleVisitingHawaiiWaitlistPost(request: Request, env: Env): Promise<Response> {
+  const cors = corsForRequest(request);
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return json(415, { error: "Expected application/json" }, cors);
+  }
+
+  let incoming: Record<string, unknown>;
+  try {
+    incoming = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return json(400, { error: "Invalid JSON" }, cors);
+  }
+
+  const p: VisitingHawaiiWaitlistPayload = {
+    name: clampText(incoming.name, 120),
+    email: clampText(incoming.email, 200),
+    homeIsland: clampText(incoming.homeIsland, 80),
+    travelWhen: clampText(incoming.travelWhen, 120),
+    platform: clampText(incoming.platform, 80),
+    notes: clampText(incoming.notes, 1200),
+  };
+
+  if (!p.email) return json(400, { error: "Email is required" }, cors);
+  if (!isEmailLike(p.email)) return json(400, { error: "Email looks invalid" }, cors);
+
+  const botToken = normalizeDiscordBotToken(String(env.APP_BUILD_DISCORD_BOT_TOKEN || ""));
+  const channelId = String(
+    env.APP_BUILD_VISITING_HAWAII_WAITLIST_CHANNEL_ID || env.APP_BUILD_IOS_WAITLIST_CHANNEL_ID || DEFAULT_IOS_WAITLIST_CHANNEL_ID,
+  ).trim();
+  if (!botToken) return json(503, { error: "Waitlist is not configured: missing Discord bot token." }, cors);
+  if (!isDiscordSnowflake(channelId)) return json(503, { error: "Waitlist Discord channel id is invalid." }, cors);
+
+  const res = await sendDiscordChannelChunks(botToken, channelId, formatVisitingHawaiiWaitlistMessage(p, clientMeta(request)));
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return json(
+      502,
+      {
+        error: "Discord channel delivery failed.",
+        status: res.status,
+        detail: text.slice(0, 500),
+      },
+      cors,
+    );
+  }
+
+  return json(200, { ok: true }, cors);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -305,6 +473,14 @@ export default {
       return new Response(null, { status: 204, headers: corsForRequest(request) });
     }
 
+    if (request.method === "POST" && path === "/ios-waitlist") {
+      return handleIosWaitlistPost(request, env);
+    }
+
+    if (request.method === "POST" && path === "/visiting-hawaii-waitlist") {
+      return handleVisitingHawaiiWaitlistPost(request, env);
+    }
+
     if (request.method === "POST" && (path === "/" || path === "/submit")) {
       return handlePost(request, env);
     }
@@ -312,7 +488,10 @@ export default {
     if (request.method === "GET" && path === "/") {
       const h = corsForRequest(request);
       h.set("Content-Type", "text/plain; charset=utf-8");
-      return new Response("rootrecord-app-build: POST JSON to / or /submit", { status: 200, headers: h });
+      return new Response("rootrecord-app-build: POST JSON to /, /submit, /ios-waitlist, or /visiting-hawaii-waitlist", {
+        status: 200,
+        headers: h,
+      });
     }
 
     return new Response("Not found", { status: 404, headers: corsForRequest(request) });

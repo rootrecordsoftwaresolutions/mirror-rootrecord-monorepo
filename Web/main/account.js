@@ -23,10 +23,55 @@
     }
   }
 
+  function storedTruthy(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return normalized === "1" || normalized === "true" || normalized === "yes";
+  }
+
+  function accessFromPayload(data) {
+    const d = data && typeof data === "object" ? data : {};
+    const raw = d.raw && typeof d.raw === "object" ? d.raw : {};
+    const access = d.access && typeof d.access === "object" ? d.access : {};
+    const rawAccess = raw.access && typeof raw.access === "object" ? raw.access : {};
+    const tier = String(d.tier || d.plan || access.tier || raw.tier || raw.plan || rawAccess.tier || "").trim().toLowerCase();
+    const subscriptionStatus = String(d.subscription_status || d.subscriptionStatus || raw.subscription_status || "").trim().toLowerCase();
+    const life =
+      storedTruthy(d.life_member) ||
+      storedTruthy(d.lifeMember) ||
+      storedTruthy(d.lifetime_member) ||
+      storedTruthy(d.lifetimeMember) ||
+      storedTruthy(d.lifetime) ||
+      storedTruthy(access.life_member) ||
+      storedTruthy(access.lifeMember) ||
+      storedTruthy(raw.life_member) ||
+      storedTruthy(raw.lifeMember) ||
+      storedTruthy(rawAccess.life_member) ||
+      storedTruthy(rawAccess.lifeMember) ||
+      tier === "life" ||
+      tier === "lifetime";
+    const pro =
+      life ||
+      storedTruthy(d.pro_unlocked) ||
+      storedTruthy(d.proUnlocked) ||
+      storedTruthy(d.pro) ||
+      storedTruthy(access.pro_unlocked) ||
+      storedTruthy(access.proUnlocked) ||
+      storedTruthy(raw.pro_unlocked) ||
+      storedTruthy(raw.proUnlocked) ||
+      storedTruthy(rawAccess.pro_unlocked) ||
+      storedTruthy(rawAccess.proUnlocked) ||
+      tier === "pro" ||
+      tier === "premium" ||
+      tier === "paid" ||
+      subscriptionStatus === "active" ||
+      subscriptionStatus === "trialing";
+    return { pro, life };
+  }
+
   function syncPortalLifetimeNav(data) {
     if (!data || typeof data !== "object") {
       localStorage.removeItem(LIFETIME_NAV_KEY);
-    } else if (data.life_member || data.lifeMember) {
+    } else if (accessFromPayload(data).life) {
       localStorage.setItem(LIFETIME_NAV_KEY, "1");
     } else {
       localStorage.removeItem(LIFETIME_NAV_KEY);
@@ -108,6 +153,10 @@
       const res = await apiFetch("/v1/discord/link", { method: "DELETE" });
       const { j } = await parseJsonRes(res);
       if (!res.ok) {
+        if (isVerificationRequired(j)) {
+          setStatus("Confirm account changes by email or Discord before unlinking Discord.", "warn");
+          return;
+        }
         setStatus(friendlyFromApiError(j) || "Could not unlink Discord.", "err");
         return;
       }
@@ -201,8 +250,23 @@
     return "";
   }
 
+  function isVerificationRequired(j) {
+    return Boolean(j && typeof j === "object" && (j.verification_required || j.code === "verification_required"));
+  }
+
   function stripDiscordQueryFromUrl() {
     stripDiscordQueryFromUrlFull();
+  }
+
+  function securityTokenFromUrl() {
+    const qs = new URLSearchParams(window.location.search);
+    return String(qs.get("security_token") || "").trim();
+  }
+
+  function stripSecurityQueryFromUrl() {
+    const u = new URL(window.location.href);
+    ["verify_email_token", "reset_token", "security_token"].forEach((key) => u.searchParams.delete(key));
+    window.history.replaceState({}, document.title, u.toString());
   }
 
   /** Human text for `/account?discord=…` (OAuth return or unauthenticated /v1/discord/oauth/start redirect). */
@@ -327,6 +391,15 @@
     });
   }
 
+  function showEmailPrefsPanel(name) {
+    const map = { loading: "panel-emailprefs-loading", guest: "panel-emailprefs-guest", main: "panel-emailprefs-main" };
+    const target = map[name];
+    ["panel-emailprefs-loading", "panel-emailprefs-guest", "panel-emailprefs-main"].forEach((id) => {
+      const n = el(id);
+      if (n) n.hidden = id !== target;
+    });
+  }
+
   function showDevNoticePanel(name) {
     const map = { loading: "panel-devnotice-loading", guest: "panel-devnotice-guest", main: "panel-devnotice-main" };
     const target = map[name];
@@ -337,27 +410,29 @@
   }
 
   function planLabelFromMe(data) {
-    if (data.life_member || data.lifeMember) return "Lifetime";
+    const access = accessFromPayload(data);
+    if (access.life) return "Member";
     const v = String(data.subscription_status || "").toLowerCase();
     if (v === "active") return "Active";
     if (v === "past_due") return "Past due";
     if (v === "canceled") return "Canceled";
     if (v === "trialing" || v === "trial") return "Trial";
     if (v === "none" || !v) {
-      if (data.pro_unlocked || data.proUnlocked) return "Pro";
+      if (access.pro) return "Member";
       return "Free";
     }
     return String(data.subscription_status || "—");
   }
 
   function subscriptionAccountValueHtml(data) {
-    if (data.life_member || data.lifeMember) return escapeHtml(planLabelFromMe(data));
+    const access = accessFromPayload(data);
+    if (access.life) return escapeHtml(planLabelFromMe(data));
     const v = String(data.subscription_status || "").toLowerCase();
     if (v === "none" || !v) {
-      if (data.pro_unlocked || data.proUnlocked) return escapeHtml(planLabelFromMe(data));
+      if (access.pro) return escapeHtml(planLabelFromMe(data));
       return (
         escapeHtml("Free") +
-        ' — <a href="/billing.html" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px">Become a Member</a>'
+        ' — <a href="/billing.html" style="color:var(--moss);text-decoration:underline;text-underline-offset:3px">View membership options</a>'
       );
     }
     return escapeHtml(planLabelFromMe(data));
@@ -368,7 +443,7 @@
     if (!wrap) return;
     // Only lifetime members skip the table (no paid upgrade path). Everyone else
     // sees the Stripe embed for compare / change / add products your Dashboard allows.
-    if (data.life_member || data.lifeMember) {
+    if (accessFromPayload(data).life) {
       wrap.hidden = true;
       wrap.innerHTML = "";
       return;
@@ -439,19 +514,23 @@
   function betaTesterRewardsValueHtml(earn) {
     const moss = "color:var(--moss);text-decoration:underline;text-underline-offset:3px";
     const program =
-      ' <a href="/beta-tester-rewards.html" style="' +
+      ' <a href="/root-units" style="' +
       moss +
       '">Roots</a>';
     const note =
-      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance and program details are on the Roots page. In Discord, use /bal and /send after linking your account.</span>';
+      '<span class="note" style="display:block;margin-top:0.4rem;font-size:0.875rem;line-height:1.45">Full balance, game links, buying options, and guide are on the Root Units page. In Discord, use /bal and /send after linking your account.</span>';
     if (!earn) {
       return escapeHtml("—") + program + note;
     }
     const n = Number(earn.balance);
     const b = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+    const display =
+      typeof formatRootUnitsAtomicBalance === "function"
+        ? formatRootUnitsAtomicBalance(b)
+        : (b / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 });
     return (
       '<strong class="rewards-balance" data-testid="account-rewards-balance">' +
-      escapeHtml(String(b.toLocaleString())) +
+      escapeHtml(String(display)) +
       "</strong>" +
       program +
       note
@@ -537,7 +616,131 @@
       });
     }
 
+    renderAccountVerification(data);
     bindDiscordUi(data);
+  }
+
+  function renderAccountVerification(data) {
+    const verificationCard = document.querySelector('[data-testid="account-verification"]');
+    const st = el("account-verification-status");
+    const emailBtn = el("btn-email-verify");
+    const verificationActions = el("account-verification-actions");
+    const securityStatus = el("account-security-confirm-status");
+    const securityOpen = el("btn-security-open");
+    const securityControls = el("account-security-controls");
+    const verifiedByEmail = Boolean(data && data.verified_by_email);
+    const verifiedByDiscord = Boolean(data && data.verified_by_discord);
+    const verified = Boolean(data && data.account_verified);
+    if (st) {
+      if (verified) {
+        const parts = [];
+        if (verifiedByEmail) parts.push("email");
+        if (verifiedByDiscord) parts.push("Discord");
+        st.textContent = "Verified by " + (parts.join(" and ") || "account proof") + ". You're set.";
+        st.style.color = "var(--moss, #6b8f71)";
+      } else {
+        st.textContent =
+          "Not verified yet. Verify once by email or Discord to protect recovery and account changes.";
+        st.style.color = "var(--amber, #fbbf24)";
+      }
+    }
+    if (verificationCard) {
+      verificationCard.style.borderColor = verified ? "rgba(52,211,153,0.45)" : "rgba(245,158,11,0.4)";
+      verificationCard.style.background = verified ? "rgba(52,211,153,0.08)" : "rgba(245,158,11,0.08)";
+    }
+    if (verificationActions) {
+      verificationActions.hidden = verified;
+    }
+    if (securityStatus) {
+      securityStatus.textContent = verified
+        ? "Need to unlink Discord or delete this account? Open this only when the page asks for a fresh confirmation."
+        : "Verify the account first. Sensitive changes will then ask for a short-lived confirmation when needed.";
+    }
+    if (securityControls) {
+      securityControls.hidden = !securityTokenFromUrl();
+    }
+    if (securityOpen && !securityOpen.dataset.bound) {
+      securityOpen.dataset.bound = "1";
+      securityOpen.addEventListener("click", function () {
+        const controls = el("account-security-controls");
+        if (controls) controls.hidden = !controls.hidden;
+      });
+    }
+    if (emailBtn && !emailBtn.dataset.bound) {
+      emailBtn.dataset.bound = "1";
+      emailBtn.addEventListener("click", requestEmailVerification);
+    }
+    const securityEmail = el("btn-security-email");
+    if (securityEmail && !securityEmail.dataset.bound) {
+      securityEmail.dataset.bound = "1";
+      securityEmail.addEventListener("click", requestSecurityChallenge);
+    }
+    const securityConfirm = el("btn-security-confirm");
+    if (securityConfirm && !securityConfirm.dataset.bound) {
+      securityConfirm.dataset.bound = "1";
+      securityConfirm.addEventListener("click", confirmSecurityChallenge);
+    }
+  }
+
+  async function requestEmailVerification() {
+    setStatus("Sending verification email…", "");
+    try {
+      const res = await apiFetch("/v1/me/email/verify/request", { method: "POST", body: "{}" });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        setStatus(friendlyFromApiError(j) || "Could not send verification email.", "err");
+        return;
+      }
+      setStatus("Verification email sent. Check your inbox.", "ok");
+    } catch {
+      setStatus("Could not send verification email. Try again.", "err");
+    }
+  }
+
+  async function requestSecurityChallenge() {
+    setStatus("Sending account confirmation code…", "");
+    try {
+      const res = await apiFetch("/v1/me/security/challenge/request", { method: "POST", body: "{}" });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        setStatus(friendlyFromApiError(j) || "Could not send confirmation code.", "err");
+        return;
+      }
+      const ss = el("account-security-confirm-status");
+      if (ss) ss.textContent = "Confirmation code sent. Enter it here within 15 minutes.";
+      const controls = el("account-security-controls");
+      if (controls) controls.hidden = false;
+      setStatus("Confirmation code sent.", "ok");
+    } catch {
+      setStatus("Could not send confirmation code. Try again.", "err");
+    }
+  }
+
+  async function confirmSecurityChallenge() {
+    const code = String(el("security-code")?.value || "").trim();
+    const token = securityTokenFromUrl();
+    if (!code && !token) {
+      setStatus("Enter the confirmation code from your email.", "warn");
+      return;
+    }
+    try {
+      const res = await apiFetch("/v1/me/security/challenge/confirm", {
+        method: "POST",
+        body: JSON.stringify({ code, token }),
+      });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        setStatus(friendlyFromApiError(j) || "Could not confirm this code.", "err");
+        return;
+      }
+      stripSecurityQueryFromUrl();
+      const controls = el("account-security-controls");
+      if (controls) controls.hidden = true;
+      setStatus("Account changes confirmed for the next few minutes.", "ok");
+      await refreshMe();
+    } catch {
+      setStatus("Could not confirm this code. Try again.", "err");
+    }
   }
 
   function formatMyAppsLastConnected(iso) {
@@ -585,7 +788,7 @@
       platform: "Android / web",
       href: "/kilauea-alerts.html",
       webAppUrl: "https://kilauea.rootrecord.info/",
-      playTestUrl: "https://play.google.com/apps/testing/com.rootrecord.kilauea",
+      playStoreUrl: "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea",
       note: "Signed-in Kīlauea dashboard or earn activity on this account.",
     },
     rootrecord_token_manager_android: {
@@ -681,7 +884,7 @@
       box.innerHTML =
         '<p class="note" style="margin:0">No linked apps yet. When you sign in inside a RootRecord app and we see saved data, notifications, or synced weather for this account, it will appear here.</p>' +
         '<p style="margin-top:1rem"><a class="btn btn-secondary" href="/products.html">Browse products</a></p>' +
-        '<p class="note" style="margin-top:1rem">Android closed testing: <a href="https://play.google.com/apps/testing/com.rootrecord.businessmanager" target="_blank" rel="noopener">Business Manager</a> &middot; <a href="https://play.google.com/apps/testing/com.rootrecord.weathermanager" target="_blank" rel="noopener">Weather Manager</a></p>';
+        '<p class="note" style="margin-top:1rem">Google Play: <a href="https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager" target="_blank" rel="noopener">Weather Manager</a> &middot; <a href="https://play.google.com/store/apps/details?id=com.rootrecord.kilauea" target="_blank" rel="noopener">Kilauea Alerts</a>. Closed testing: <a href="https://play.google.com/apps/testing/com.rootrecord.businessmanager" target="_blank" rel="noopener">Business Manager</a></p>';
       return;
     }
     box.innerHTML =
@@ -773,6 +976,92 @@
     showMyAppsPanel("main");
   }
 
+  function renderEmailPrefs(preferences) {
+    const p = preferences || {};
+    const checks = {
+      general: el("pref-general-newsletter"),
+      kilauea: el("pref-kilauea-newsletter"),
+      business: el("pref-business-manager-newsletter"),
+      weather: el("pref-simple-weather-newsletter"),
+    };
+    if (checks.general) checks.general.checked = Boolean(p.general_newsletter);
+    if (checks.kilauea) checks.kilauea.checked = Boolean(p.kilauea_newsletter);
+    if (checks.business) checks.business.checked = Boolean(p.business_manager_newsletter);
+    if (checks.weather) checks.weather.checked = Boolean(p.simple_weather_newsletter);
+    const updated = el("email-prefs-updated-at");
+    if (updated) {
+      const raw = typeof p.updated_at === "string" ? p.updated_at.trim() : "";
+      if (!raw) {
+        updated.textContent = "";
+      } else {
+        const ms = Date.parse(raw);
+        const label = Number.isFinite(ms) ? new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : raw;
+        updated.textContent = "Last updated: " + label;
+      }
+    }
+  }
+
+  async function saveEmailPrefs(ev) {
+    ev.preventDefault();
+    setStatus("Saving email preferences...", "");
+    try {
+      const payload = {
+        general_newsletter: Boolean(el("pref-general-newsletter")?.checked),
+        kilauea_newsletter: Boolean(el("pref-kilauea-newsletter")?.checked),
+        business_manager_newsletter: Boolean(el("pref-business-manager-newsletter")?.checked),
+        simple_weather_newsletter: Boolean(el("pref-simple-weather-newsletter")?.checked),
+      };
+      const res = await apiFetch("/v1/me/email-marketing-prefs", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      const { j } = await parseJsonRes(res);
+      if (res.status === 401) {
+        localStorage.removeItem(TOKEN_KEY);
+        syncPortalLifetimeNav(null);
+        notifyPortalAuthChange();
+        showEmailPrefsPanel("guest");
+        setStatus("Your session ended. Sign in from Account, then open Email preferences again.", "warn");
+        return;
+      }
+      if (!res.ok) {
+        setStatus(friendlyFromApiError(j) || "Could not save email preferences.", "err");
+        return;
+      }
+      renderEmailPrefs(j && j.preferences ? j.preferences : payload);
+      setStatus("Email preferences saved.", "ok");
+    } catch {
+      setStatus("Could not save email preferences. Try again.", "err");
+    }
+  }
+
+  async function refreshEmailPrefs() {
+    if (!apiBase) {
+      showEmailPrefsPanel("guest");
+      return;
+    }
+    showEmailPrefsPanel("loading");
+    setStatus("");
+    const res = await apiFetch("/v1/me/email-marketing-prefs", { method: "GET" });
+    if (res.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      syncPortalLifetimeNav(null);
+      notifyPortalAuthChange();
+      showEmailPrefsPanel("guest");
+      setStatus("Your session ended. Sign in from Account, then open Email preferences again.", "warn");
+      return;
+    }
+    if (!res.ok) {
+      showEmailPrefsPanel("guest");
+      const { j } = await parseJsonRes(res);
+      setStatus(friendlyFromApiError(j) || "Could not load email preferences.", "err");
+      return;
+    }
+    const data = await res.json();
+    renderEmailPrefs(data && data.preferences ? data.preferences : {});
+    showEmailPrefsPanel("main");
+  }
+
   function renderDevNoticeSignedIn(data) {
     const p = el("dev-notice-signed-in");
     if (!p) return;
@@ -818,9 +1107,9 @@
     if (!box) return;
     const plan = escapeHtml(planLabelFromMe(data));
     let html = '<p class="note" style="margin-top:0">Current plan: <strong>' + plan + "</strong></p>";
-    if (data.life_member || data.lifeMember) {
+    if (accessFromPayload(data).life) {
       html +=
-        '<p class="note" style="margin-top:0.75rem">Lifetime access is on this account. Nothing renews; keep using the apps you’ve installed.</p>';
+        '<p class="note" style="margin-top:0.75rem">Membership is active on this account. Keep using the apps you’ve installed.</p>';
     }
     box.innerHTML = html;
 
@@ -828,9 +1117,12 @@
     const portalLink = el("billing-portal-link");
     if (portalWrap && portalLink) {
       portalWrap.hidden = true;
-      const isFree = planLabelFromMe(data) === "Free";
+      const isLifetime = accessFromPayload(data).life;
+      const isStripeManaged = ["active", "trialing", "past_due", "canceled"].includes(
+        String(data.subscription_status || "").toLowerCase()
+      );
       const raw = String(stripeCustomerPortalUrl || "").trim();
-      if (!isFree && raw) {
+      if (!isLifetime && isStripeManaged && raw) {
         try {
           const u = new URL(raw);
           if (u.protocol === "https:" && /\.stripe\.com$/i.test(u.hostname)) {
@@ -852,7 +1144,7 @@
     if (!popup) return;
     const close = el("member-perk-popup-close");
     const cta = el("member-perk-popup-cta");
-    const isMember = Boolean(data && (data.life_member || data.lifeMember || data.pro_unlocked || data.proUnlocked));
+    const isMember = Boolean(data && (accessFromPayload(data).life || accessFromPayload(data).pro));
     const dismissed = sessionStorage.getItem("rootrecord_member_perk_popup_seen") === "1";
     function hide() {
       popup.hidden = true;
@@ -901,7 +1193,7 @@
   async function refreshMe() {
     if (!apiBase) {
       showPanel("panel-forms");
-      return;
+      return null;
     }
     const discordQ = discordQueryFromUrl();
     showPanel("panel-loading");
@@ -919,12 +1211,12 @@
         setStatus("Your session ended. Please sign in again.", "warn");
       }
       if (discordQ.discord) stripDiscordQueryFromUrl();
-      return;
+      return null;
     }
     if (!res.ok) {
       showPanel("panel-account");
       setStatus("We could not load your account. Please try again in a moment.", "err");
-      return;
+      return null;
     }
     const data = await res.json();
     const earn = await fetchBetaTesterRewardsSummary();
@@ -936,6 +1228,7 @@
       setStatus(dm, discordQ.discord === "linked" && !discordQ.role ? "ok" : "warn");
       stripDiscordQueryFromUrl();
     }
+    return data;
   }
 
   async function refreshVerify(autoStartOAuth) {
@@ -1053,6 +1346,138 @@
     }
   }
 
+  async function onPasswordResetRequest(ev) {
+    ev.preventDefault();
+    const email = String(el("reset-request-email")?.value || el("login-email")?.value || "").trim().toLowerCase();
+    if (!email) {
+      setStatus("Enter your email to request a reset link.", "warn");
+      return;
+    }
+    try {
+      const res = await apiFetch("/v1/auth/password-reset/request", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        setStatus(friendlyFromApiError(j) || "Could not request password reset.", "err");
+        return;
+      }
+      setStatus("If that account exists, a reset email has been sent.", "ok");
+    } catch {
+      setStatus("Could not request password reset. Try again.", "err");
+    }
+  }
+
+  async function onPasswordResetConfirm(ev) {
+    ev.preventDefault();
+    const token = String(el("reset-token")?.value || "").trim();
+    const email = String(el("reset-confirm-email")?.value || "").trim().toLowerCase();
+    const code = String(el("reset-code")?.value || "").trim();
+    const new_password = String(el("reset-new-password")?.value || "");
+    if (!new_password || new_password.length < 6) {
+      setStatus("Enter a new password with at least 6 characters.", "warn");
+      return;
+    }
+    if (!token && (!email || !code)) {
+      setStatus("Open your reset link, or enter both email and reset code.", "warn");
+      return;
+    }
+    try {
+      const res = await apiFetch("/v1/auth/password-reset/confirm", {
+        method: "POST",
+        body: JSON.stringify({ token, email, code, new_password, device_id: getOrCreateDeviceId() }),
+      });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        setStatus(friendlyFromApiError(j) || "Could not reset password.", "err");
+        return;
+      }
+      if (j.access_token) {
+        localStorage.setItem(TOKEN_KEY, j.access_token);
+        notifyPortalAuthChange();
+      }
+      stripSecurityQueryFromUrl();
+      setStatus("Password reset. You are signed in with your new password.", "ok");
+      await refreshMe();
+    } catch {
+      setStatus("Could not reset password. Try again.", "err");
+    }
+  }
+
+  async function handleSecurityQueryTokens() {
+    const qs = new URLSearchParams(window.location.search);
+    const verifyToken = String(qs.get("verify_email_token") || "").trim();
+    const resetToken = String(qs.get("reset_token") || "").trim();
+    const acctToken = String(qs.get("security_token") || "").trim();
+
+    if (resetToken) {
+      const input = el("reset-token");
+      if (input) input.value = resetToken;
+      showPanel("panel-forms");
+      setStatus("Enter a new password to finish the reset.", "ok");
+      return true;
+    }
+
+    if (verifyToken) {
+      let msg = "";
+      let kind = "ok";
+      try {
+        const res = await apiFetch("/v1/me/email/verify/confirm", {
+          method: "POST",
+          body: JSON.stringify({ token: verifyToken }),
+        });
+        const { j } = await parseJsonRes(res);
+        if (res.ok) {
+          stripSecurityQueryFromUrl();
+          msg = "Email verified.";
+        } else {
+          msg = friendlyFromApiError(j) || "Email verification link is invalid or expired.";
+          kind = "err";
+        }
+      } catch {
+        msg = "Could not verify email. Try again.";
+        kind = "err";
+      }
+      const accountData = await refreshMe();
+      if (
+        kind === "err" &&
+        accountData &&
+        (accountData.email_verified || accountData.verified_by_email)
+      ) {
+        stripSecurityQueryFromUrl();
+        msg = "Email already verified.";
+        kind = "ok";
+      }
+      setStatus(msg, kind);
+      return true;
+    } else if (acctToken && localStorage.getItem(TOKEN_KEY)) {
+      let msg = "";
+      let kind = "ok";
+      try {
+        const res = await apiFetch("/v1/me/security/challenge/confirm", {
+          method: "POST",
+          body: JSON.stringify({ token: acctToken }),
+        });
+        const { j } = await parseJsonRes(res);
+        if (res.ok) {
+          stripSecurityQueryFromUrl();
+          msg = "Account changes confirmed for the next few minutes.";
+        } else {
+          msg = friendlyFromApiError(j) || "Account confirmation link is invalid or expired.";
+          kind = "err";
+        }
+      } catch {
+        msg = "Could not confirm account change. Try again.";
+        kind = "err";
+      }
+      await refreshMe();
+      setStatus(msg, kind);
+      return true;
+    }
+    return false;
+  }
+
   async function onSignup(ev) {
     ev.preventDefault();
     setStatus("");
@@ -1118,6 +1543,8 @@
       showBillingPanel("guest");
     } else if (pageMode() === "my-apps") {
       showMyAppsPanel("guest");
+    } else if (pageMode() === "emails") {
+      showEmailPrefsPanel("guest");
     } else if (pageMode() === "development-notice") {
       showDevNoticePanel("guest");
     } else if (isDiscordVerifyPage()) {
@@ -1152,6 +1579,11 @@
       const res = await apiFetch("/v1/me", { method: "DELETE" });
       const { j } = await parseJsonRes(res);
       if (!res.ok) {
+        if (isVerificationRequired(j)) {
+          setStatus("Confirm account changes by email or Discord before deleting your account.", "warn");
+          if (btn) btn.disabled = false;
+          return;
+        }
         const human = friendlyFromApiError(j) || "Could not delete your account.";
         setStatus(human, "err");
         if (btn) btn.disabled = false;
@@ -1174,6 +1606,8 @@
       showBillingPanel("loading");
     } else if (page === "my-apps") {
       showMyAppsPanel("loading");
+    } else if (page === "emails") {
+      showEmailPrefsPanel("loading");
     } else if (page === "development-notice") {
       showDevNoticePanel("loading");
     } else if (page === "discord-verify") {
@@ -1194,6 +1628,8 @@
         showBillingPanel("guest");
       } else if (page === "my-apps") {
         showMyAppsPanel("guest");
+      } else if (page === "emails") {
+        showEmailPrefsPanel("guest");
       } else if (page === "development-notice") {
         showDevNoticePanel("guest");
       } else {
@@ -1220,6 +1656,13 @@
       return;
     }
 
+    if (page === "emails") {
+      el("btn-emailprefs-logout")?.addEventListener("click", onLogout);
+      el("form-email-prefs")?.addEventListener("submit", saveEmailPrefs);
+      await refreshEmailPrefs();
+      return;
+    }
+
     if (page === "development-notice") {
       el("btn-devnotice-logout")?.addEventListener("click", onLogout);
       await refreshDevNotice();
@@ -1236,9 +1679,12 @@
     }
 
     el("form-login")?.addEventListener("submit", onLogin);
+    el("form-password-reset-request")?.addEventListener("submit", onPasswordResetRequest);
+    el("form-password-reset-confirm")?.addEventListener("submit", onPasswordResetConfirm);
     el("btn-logout")?.addEventListener("click", onLogout);
     el("btn-delete-account")?.addEventListener("click", onDeleteAccount);
 
+    if (await handleSecurityQueryTokens()) return;
     await refreshMe();
   });
 })();

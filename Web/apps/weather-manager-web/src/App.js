@@ -42,6 +42,7 @@ function useGate() {
     (async () => {
       try {
         await tryHydrateSessionFromCookie();
+        if (session.isAuthed()) await refreshSessionAccess();
       } finally {
         if (!cancelled) {
           setAuthed(session.isAuthed());

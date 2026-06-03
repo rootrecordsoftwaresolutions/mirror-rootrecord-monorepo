@@ -135,7 +135,7 @@ export default function Settings() {
             <div className="flex items-center gap-3">
               <Monitor size={18} className="text-phos" />
               <div className="text-left">
-                <div className="font-semibold text-ink-primary">Desktop version — Pro members</div>
+                <div className="font-semibold text-ink-primary">Desktop version — members</div>
                 <div className="text-[11px] text-ink-tertiary mt-0.5">token.rootrecord.info — full experience in any desktop or laptop browser.</div>
               </div>
             </div>

@@ -7,6 +7,7 @@ import { ensureGuestId } from "../guest";
 const STORAGE = {
   token: "rrfarms.token",
   email: "rrfarms.email",
+  accountVerified: "rrfarms.accountVerified",
 } as const;
 
 /** Farms + earn + auth for this app live on the account shard (not legacy `api.rootrecord.info` / primary). */
@@ -67,6 +68,14 @@ export function getStoredEmail(): string {
   }
 }
 
+export function getStoredAccountVerified(): boolean {
+  try {
+    return localStorage.getItem(STORAGE.accountVerified) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function isAuthed(): boolean {
   return Boolean(getStoredToken());
 }
@@ -80,10 +89,19 @@ export function setSession(token: string, email: string): void {
   }
 }
 
+function setAccountVerifiedFromPayload(data: Record<string, unknown>): void {
+  try {
+    localStorage.setItem(STORAGE.accountVerified, data.account_verified ? "1" : "0");
+  } catch {
+    /* */
+  }
+}
+
 export function clearSession(): void {
   try {
     localStorage.removeItem(STORAGE.token);
     localStorage.removeItem(STORAGE.email);
+    localStorage.removeItem(STORAGE.accountVerified);
   } catch {
     /* */
   }
@@ -115,6 +133,7 @@ async function applyAuthMeResponse(res: Response): Promise<boolean> {
   const email = String(data.email || "").trim();
   if (!tok || !email) return false;
   setSession(tok, email);
+  setAccountVerifiedFromPayload(data);
   setEntitlementFromAuthPayload(data);
   return true;
 }
@@ -165,7 +184,13 @@ async function authPost(
   const emailOut = String(data.email || (typeof body.email === "string" ? body.email : "")).trim();
   if (!tok || !emailOut) return { ok: false, detail: "Invalid response from server." };
   setSession(tok, emailOut);
+  setAccountVerifiedFromPayload(data);
   setEntitlementFromAuthPayload(data);
+  try {
+    await applyAuthMeResponse(await apiFetch("/api/auth/me", { method: "POST" }));
+  } catch {
+    /* Login/signup response is still enough to start the session. */
+  }
   return { ok: true };
 }
 
@@ -190,6 +215,66 @@ export async function signupRequest(
   const trimmedName = name?.trim();
   if (trimmedName) body.name = trimmedName;
   return authPost("/api/auth/signup", body);
+}
+
+export async function requestPasswordReset(email: string): Promise<{ ok: true } | { ok: false; detail: string }> {
+  let res: Response;
+  try {
+    res = await apiFetchNoBearer("/api/auth/password-reset/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : "Could not reach the server." };
+  }
+  if (res.ok) return { ok: true };
+  const text = await res.text();
+  let data: Record<string, unknown> = {};
+  try {
+    data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    /* */
+  }
+  return { ok: false, detail: String(data.detail || text || res.statusText) };
+}
+
+export async function confirmPasswordReset(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; detail: string }> {
+  let res: Response;
+  try {
+    res = await apiFetchNoBearer("/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        email: email.trim(),
+        code: code.trim(),
+        new_password: newPassword,
+        device_id: ensureGuestId(),
+      }),
+    });
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : "Could not reach the server." };
+  }
+  const text = await res.text();
+  let data: Record<string, unknown> = {};
+  try {
+    data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    /* */
+  }
+  if (!res.ok) return { ok: false, detail: String(data.detail || text || res.statusText) };
+  const tok = String(data.access_token || data.token || "").trim();
+  const emailOut = String(data.email || email).trim();
+  if (tok && emailOut) {
+    setSession(tok, emailOut);
+    setAccountVerifiedFromPayload({ ...data, account_verified: true });
+    setEntitlementFromAuthPayload(data);
+  }
+  return { ok: true };
 }
 
 export async function logoutRequest(): Promise<void> {

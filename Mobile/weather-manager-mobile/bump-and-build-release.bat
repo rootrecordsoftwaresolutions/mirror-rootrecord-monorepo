@@ -1,5 +1,29 @@
 @echo off
 setlocal EnableExtensions
+if defined RR_WEATHER_RELEASE_LOGGING goto RUN_RELEASE
+set "APP=%~dp0"
+set "LOGDIR=%APP%release-logs"
+if not exist "%LOGDIR%" mkdir "%LOGDIR%"
+for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"`) do set "STAMP=%%T"
+set "LOG=%LOGDIR%\weather-release-%STAMP%.log"
+echo === Weather Manager release ===
+echo Logging full output to:
+echo   %LOG%
+echo.
+set "RR_WEATHER_RELEASE_LOGGING=1"
+call "%~f0" %* > "%LOG%" 2>&1
+set "ERR=%ERRORLEVEL%"
+echo.
+echo ============================================================
+echo Weather release finished with exit code: %ERR%
+echo Full log saved to:
+echo   %LOG%
+echo ============================================================
+pause
+endlocal
+exit /b %ERR%
+
+:RUN_RELEASE
 rem Build signed Android release for Weather Manager.
 rem
 rem 0) Mobile\scripts\bump-mobile-version.ps1                            (PATCH +1 across wrapper package.json, web package.json, build.gradle)
@@ -38,6 +62,7 @@ pushd "%WEB%"
 if errorlevel 1 goto FAIL
 call pnpm install
 if errorlevel 1 ( popd & goto FAIL )
+set "CI=false"
 set "GENERATE_SOURCEMAP=false"
 set "REACT_APP_ENABLE_PUSH=1"
 rem CRA/webpack OOM on Windows without a larger heap + semi-space (see Web\scripts\deploy-product-web-to-pages.ps1)

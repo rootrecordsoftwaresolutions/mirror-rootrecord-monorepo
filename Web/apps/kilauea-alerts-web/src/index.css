@@ -490,6 +490,58 @@ a:hover {
   color: #fde68a;
 }
 
+.visiting-hawaii-promo {
+  margin-bottom: 1rem;
+  border-color: rgba(244, 162, 97, 0.35);
+  background:
+    radial-gradient(ellipse 80% 60% at 100% 0%, rgba(244, 162, 97, 0.12), transparent 50%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(26, 95, 122, 0.2), transparent 45%),
+    var(--panel);
+}
+
+.visiting-hawaii-promo-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+}
+
+.visiting-hawaii-promo-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f4a261;
+  margin-bottom: 0.35rem;
+}
+
+.visiting-hawaii-promo-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.visiting-hawaii-promo-lead {
+  margin: 0;
+  max-width: 36rem;
+  line-height: 1.5;
+}
+
+.visiting-hawaii-promo-cta {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .visiting-hawaii-promo-cta {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 .detail-bento {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -613,6 +665,29 @@ a:hover {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+.dashboard-resources {
+  width: 100%;
+  margin-top: 1.1rem;
+}
+
+.link-row-full {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 0.55rem 0.65rem;
+}
+
+@media (min-width: 640px) {
+  .link-row-full {
+    justify-content: space-between;
+  }
+  .link-row-full .link-pill {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-width: min(100%, 9.5rem);
+  }
+}
+
 .link-pill {
   display: inline-flex;
   align-items: center;
@@ -925,4 +1000,213 @@ a:hover {
 .modal-external {
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+/* AI reports + earthquake charts (below main dashboard) */
+.dashboard-below {
+  margin-top: 2rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.dashboard-below-head {
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-below-head h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.panel-ai-latest,
+.panel-ai-previous,
+.panel-charts {
+  margin-bottom: 1.25rem;
+}
+
+.panel-head-wrap {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.panel-head-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-report-latest-meta {
+  margin-bottom: 0.35rem;
+}
+
+.ai-report-latest-headline {
+  font-weight: 600;
+  margin-bottom: 0.65rem;
+}
+
+.ai-report-latest-body,
+.ai-table-body {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.22);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-height: 28rem;
+  overflow: auto;
+}
+
+.ai-report-disclaimer {
+  margin: 0.75rem 0 0;
+}
+
+.chart-count-desc {
+  margin: 0 0 0.85rem;
+  font-style: italic;
+}
+
+.chart-day-filters,
+.chart-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.chart-day-chip {
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chart-day-chip.is-on {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.chart-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.chart-stat {
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  padding: 0.65rem 0.75rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.chart-stat-v {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.15rem;
+}
+
+.chart-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .chart-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .chart-card-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.chart-card {
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 0.85rem;
+}
+
+.chart-card-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.chart-pager-label {
+  min-width: 10rem;
+  text-align: center;
+}
+
+.ai-table-wrap {
+  overflow: auto;
+}
+
+.ai-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.ai-table th,
+.ai-table td {
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid var(--panel-border);
+  vertical-align: top;
+}
+
+.ai-table th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-table tbody tr:not(.ai-table-detail) {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ai-table tbody tr:not(.ai-table-detail):hover,
+.ai-table tbody tr.is-open {
+  background: rgba(94, 233, 176, 0.06);
+}
+
+.ai-table td.mono {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.ai-table-summary {
+  max-width: 36ch;
+  line-height: 1.4;
+}
+
+.ai-table-detail td {
+  padding-top: 0;
+}
+
+.capitalize {
+  text-transform: capitalize;
 }

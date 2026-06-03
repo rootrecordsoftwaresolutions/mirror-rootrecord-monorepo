@@ -7,8 +7,12 @@ import { runDiscordDeveloperMessageSync } from "./discord-developer-sync";
 import { reconcileStaleStripeSubscriptions } from "../../shared/stripe-reconcile";
 import { runFarmsVarmintCron } from "./farms-varmint";
 import { runRootEconomyDiscordCron } from "./discord-root-economy-cron";
+import { runRootsCustodialDepositProcessor } from "./roots-custodial-deposits";
+import { runRootsSolSwapPendingCreditProcessor } from "./roots-sol-swap";
+import { runRootsOnchainBuyMonitor } from "./roots-onchain-buy-monitor";
 // NOAA alert cron lives only on rootrecord-api-weather (and api-kilauea if it ever needs alerts).
-// This Worker: `* * * * *` Discord stats + Root Economy ping at :00/:45 UTC; `45 8` inactive-account cleanup.
+// This Worker: `* * * * *` Discord dev sync + farms/deposit crons; Root Economy Discord ping disabled (manual only).
+// `45 8` inactive-account cleanup.
 
 type WorkerShard = "primary" | "weather" | "business" | "account" | "token" | "kilauea";
 
@@ -75,13 +79,20 @@ export default {
       return;
     }
     if (c === "* * * * *" && shard === "account") {
-      const utcMin = new Date(event.scheduledTime || Date.now()).getUTCMinutes();
-      if (utcMin === 0 || utcMin === 45) {
-        const er = await runRootEconomyDiscordCron(env).catch((e) => ({
-          ok: false,
-          skipped: e instanceof Error ? e.message : String(e),
-        }));
-        console.log("root_economy_discord_cron", JSON.stringify(er));
+      // Root Economy "Internal circulation" Discord webhook disabled (was every :00/:45 UTC).
+      // Re-enable: call runRootEconomyDiscordCron when utcMin is 0 or 45, or set ROOT_ECONOMY_DISCORD_CRON_ENABLED=1.
+      const economyCronEnabled =
+        String((env as { ROOT_ECONOMY_DISCORD_CRON_ENABLED?: string }).ROOT_ECONOMY_DISCORD_CRON_ENABLED || "")
+          .trim() === "1";
+      if (economyCronEnabled) {
+        const utcMin = new Date(event.scheduledTime || Date.now()).getUTCMinutes();
+        if (utcMin === 0 || utcMin === 45) {
+          const er = await runRootEconomyDiscordCron(env).catch((e) => ({
+            ok: false,
+            skipped: e instanceof Error ? e.message : String(e),
+          }));
+          console.log("root_economy_discord_cron", JSON.stringify(er));
+        }
       }
       await runDiscordDeveloperMessageSync(env).catch((e) =>
         console.error("discord_developer_sync_err", e instanceof Error ? e.message : String(e)),
@@ -92,6 +103,33 @@ export default {
       });
       if (vr.sampled > 0) {
         console.log("farms_varmint_cron", JSON.stringify(vr));
+      }
+      const dr = await runRootsCustodialDepositProcessor(env, { limit: 6 }).catch((e) => ({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      }));
+      if ("deposits_found" in dr && dr.deposits_found > 0) {
+        console.log("roots_custodial_deposit_processor", JSON.stringify(dr));
+      } else if (!dr.ok) {
+        console.error("roots_custodial_deposit_processor_err", JSON.stringify(dr));
+      }
+      const sr = await runRootsSolSwapPendingCreditProcessor(env, { limit: 8 }).catch((e) => ({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      }));
+      if ("credited" in sr && (sr.credited > 0 || sr.pending > 0 || sr.errors.length > 0)) {
+        console.log("roots_sol_swap_pending_processor", JSON.stringify(sr));
+      } else if (!sr.ok) {
+        console.error("roots_sol_swap_pending_processor_err", JSON.stringify(sr));
+      }
+      const br = await runRootsOnchainBuyMonitor(env, { limit: 80 }).catch((e) => ({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      }));
+      if ("notified" in br && (br.notified > 0 || br.errors.length > 0 || br.bootstrapped)) {
+        console.log("roots_onchain_buy_monitor", JSON.stringify(br));
+      } else if (!br.ok) {
+        console.error("roots_onchain_buy_monitor_err", JSON.stringify(br));
       }
     }
   },

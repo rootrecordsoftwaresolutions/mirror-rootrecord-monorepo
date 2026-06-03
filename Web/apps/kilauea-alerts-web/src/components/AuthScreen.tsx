@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { VISITING_HAWAII_URL } from "./VisitingHawaiiPromo";
 
 // Single source of truth used by every RootRecord web upsell button (also referenced by
 // Business Manager's UpsellModal). Keeping it inline here avoids a one-line shared file.
 const BILLING_URL = "https://rootrecord.info/billing";
+const KILAUEA_PLAY_URL = "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea";
 
 /**
  * kilauea.rootrecord.info landing for signed-out visitors.
  *
- * The Kīlauea web dashboard is Pro/Lifetime only — there is no free-tier value behind a sign-in
- * here, so the default view is a paywall pitch ("Become a Member") rather than a sign-in form
- * that just leads to ProPaywall.tsx anyway. Existing members can still sign in via the toggle;
+ * The Kīlauea web dashboard has member-only features, so the default view is a membership pitch
+ * rather than a sign-in form that just leads to ProPaywall.tsx anyway. Existing members can still sign in via the toggle;
  * the form is the same one that lived here before, just collapsed by default.
  */
 export function AuthScreen() {
@@ -46,15 +47,31 @@ export function AuthScreen() {
           <div className="brand-kicker">RootRecord</div>
           <h1 className="auth-title">Kīlauea observatory</h1>
           <p className="muted auth-lead">
-            Kīlauea is designed for <strong>Pro</strong> and <strong>Lifetime</strong> members only. The Android app remains usable on the free tier (Volcano location).
+            Some Kīlauea web features require additional resources. Some features are limited to members only.
+            The Android app is live on Google Play and includes core Volcano access.
           </p>
           <a
             className="btn btn-primary auth-submit"
             href={BILLING_URL}
             data-testid="auth-become-member"
           >
-            Become a Member
+            View membership options
           </a>
+          <a
+            className="btn btn-secondary auth-submit"
+            href={KILAUEA_PLAY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="auth-kilauea-play-store"
+          >
+            Get Android App
+          </a>
+          <p className="muted auth-lead" style={{ marginTop: "1.25rem", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
+            <strong style={{ color: "var(--text)" }}>Visiting Hawaiʻi</strong> — our all-island travel guide is coming soon.{" "}
+            <a href={VISITING_HAWAII_URL} target="_blank" rel="noopener noreferrer" data-testid="auth-visiting-hawaii-promo">
+              Learn more &amp; join the waitlist
+            </a>
+          </p>
           <p className="muted auth-lead" style={{ textAlign: "center", marginTop: "1rem", marginBottom: 0 }}>
             Already a member?{" "}
             <button
@@ -87,20 +104,35 @@ export function AuthScreen() {
           </button>
         </div>
 
-        <form className="auth-form" onSubmit={(ev) => void onSubmit(ev)}>
+        <form
+          className="auth-form"
+          autoComplete="on"
+          onSubmit={(ev) => void onSubmit(ev)}
+        >
           {view === "register" ? (
             <label className="field">
               <span className="field-label">Name (optional)</span>
-              <input className="input" type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+              <input
+                className="input"
+                id="rr-auth-name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </label>
           ) : null}
           <label className="field">
             <span className="field-label">Email</span>
             <input
               className="input"
+              id="rr-auth-email"
+              name="email"
               type="email"
               required
-              autoComplete="email"
+              autoComplete={view === "signin" ? "username" : "email"}
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -109,6 +141,8 @@ export function AuthScreen() {
             <span className="field-label">Password</span>
             <input
               className="input"
+              id="rr-auth-password"
+              name="password"
               type="password"
               required
               minLength={6}

@@ -41,6 +41,7 @@ export type TabId =
   | "vegetables"
   | "farmhands"
   | "market"
+  | "transactions"
   | "guide"
   | "leaderboard"
   | "replant"

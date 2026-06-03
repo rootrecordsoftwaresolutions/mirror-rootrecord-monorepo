@@ -8,4 +8,12 @@ export default defineConfig({
     outDir: "build",
     emptyOutDir: true,
   },
+  server: {
+    proxy: {
+      "/api/public/kilauea": {
+        target: "https://api-kilauea.rootrecord.info",
+        changeOrigin: true,
+      },
+    },
+  },
 });

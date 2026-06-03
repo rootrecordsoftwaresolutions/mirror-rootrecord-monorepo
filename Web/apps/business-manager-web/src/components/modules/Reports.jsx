@@ -546,11 +546,11 @@ export default function Reports() {
 
   async function downloadPdf() {
     if (!data) return;
-    // Free-plan gate: ignore the entry count, gate on monthly PDF quota instead. Pro is unlimited.
-    // The upsell modal explains the cap and offers an upgrade path without blocking the UI.
+    // Standard-plan gate: ignore the entry count, gate on monthly PDF quota instead.
+    // The upsell modal explains the cap and offers a membership path without blocking the UI.
     if (!isPro && readPdfCount() >= PDF_QUOTA_FREE) {
       try { window.dispatchEvent(new Event(UPSELL_EVENT)); } catch { /* ignore */ }
-      show(`Free plan: ${PDF_QUOTA_FREE} reports per month. Upgrade to Pro for unlimited reports.`, "warn");
+      show(`Standard access: ${PDF_QUOTA_FREE} reports per month. More reports are limited to members only.`, "warn");
       return;
     }
     const filename = `rootrecord-timesheet-${start}-${end}.pdf`;
@@ -708,12 +708,12 @@ export default function Reports() {
                   isPro
                     ? ""
                     : quotaUsedUp
-                    ? `Free plan: ${PDF_QUOTA_FREE} reports per month used up. Upgrade to Pro for unlimited reports.`
-                    : `Free plan: ${pdfRemaining} of ${PDF_QUOTA_FREE} reports remaining this month.`
+                    ? `Standard access: ${PDF_QUOTA_FREE} reports per month used up. More reports are limited to members only.`
+                    : `Standard access: ${pdfRemaining} of ${PDF_QUOTA_FREE} reports remaining this month.`
                 }
               >
                 <Download size={16} /> Save time-keeping PDF
-                {!isPro && (quotaUsedUp ? " (Upgrade for more)" : ` (${pdfRemaining} of ${PDF_QUOTA_FREE} this month)`)}
+                {!isPro && (quotaUsedUp ? " (Members only after limit)" : ` (${pdfRemaining} of ${PDF_QUOTA_FREE} this month)`)}
               </button>
               <button
                 type="button"

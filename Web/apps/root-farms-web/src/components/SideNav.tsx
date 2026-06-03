@@ -7,6 +7,7 @@ const TABS: { id: TabId; label: string; soon?: boolean }[] = [
   { id: "vegetables", label: "Vegetables" },
   { id: "farmhands", label: "Farmhands" },
   { id: "market", label: "The Well" },
+  { id: "transactions", label: "Transactions" },
   { id: "guide", label: "Guide" },
   { id: "leaderboard", label: "Root Economy" },
   { id: "replant", label: "Replant", soon: true },
@@ -60,6 +61,8 @@ function iconFor(id: TabId): string {
       return "◉";
     case "market":
       return "◇";
+    case "transactions":
+      return "↔";
     case "guide":
       return "ℹ";
     case "leaderboard":

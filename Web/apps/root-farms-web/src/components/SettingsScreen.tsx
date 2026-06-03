@@ -91,6 +91,19 @@ export function SettingsScreen({ onSignIn }: { onSignIn?: () => void }) {
         ) : (
           <>
             <p className="settings-line">Signed in as {auth.email}</p>
+            {!auth.accountVerified ? (
+              <p className="settings-note">
+                This RootRecord account is not verified yet. Verify by email on{" "}
+                <a href="https://rootrecord.info/account.html" target="_blank" rel="noopener noreferrer">
+                  rootrecord.info/account
+                </a>{" "}
+                or link Discord at{" "}
+                <a href="https://rootrecord.info/discord-verify" target="_blank" rel="noopener noreferrer">
+                  /discord-verify
+                </a>{" "}
+                so password recovery and account changes are protected.
+              </p>
+            ) : null}
             <button type="button" className="btn btn-ghost" onClick={() => void auth.logout()}>
               Sign out
             </button>
