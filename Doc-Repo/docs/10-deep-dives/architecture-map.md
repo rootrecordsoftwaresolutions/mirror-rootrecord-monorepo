@@ -9,15 +9,22 @@ flowchart TB
     WM[Weather Manager]
     TM[Token Manager]
     AH[Account Hub]
+    BN[Block Notes Android]
     WEB[rootrecord.info Pages]
     SOL[solana.rootrecord.info Next.js]
   end
 
   subgraph cf [Cloudflare]
     API[api.rootrecord.info — primary Worker]
+    BNAPI[rootrecord-api-blocknotes]
     LIC[rootrecord-license Worker]
     PAGES[Pages — static site]
     D1[(D1 SQLite)]
+  end
+
+  subgraph mc [Minecraft]
+    PAPER[Paper + BlockNotes plugin]
+    MYSQL[(MySQL)]
   end
 
   subgraph external [External]
@@ -30,8 +37,13 @@ flowchart TB
   WM --> API
   TM --> API
   AH --> API
+  BN --> BNAPI
+  PAPER --> BNAPI
+  PAPER --> MYSQL
   WEB --> LIC
   WEB --> PAGES
+  WEB --> BNAPI
+  BNAPI --> D1
   API --> D1
   API --> STRIPE
   API --> PROV

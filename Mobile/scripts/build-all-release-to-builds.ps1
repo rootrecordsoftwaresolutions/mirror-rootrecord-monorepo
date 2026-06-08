@@ -124,6 +124,7 @@ Invoke-OneApp -Subfolder "root-farms"       -WebRel "Web\apps\root-farms-mobile-
 Invoke-OneApp -Subfolder "token-manager"    -WebRel "Web\apps\token-manager-web"    -AppRel "token-manager-app"      -BaseName "RootRecord-TokenManager"    -Version (Get-PackageVersion (Join-Path $MobileRoot "token-manager-app\package.json"))
 Invoke-OneApp -Subfolder "account-hub"      -WebRel "Web\apps\account-hub-web"      -AppRel "account-hub-app"        -BaseName "RootRecord-AccountHub"      -Version (Get-PackageVersion (Join-Path $MobileRoot "account-hub-app\package.json"))
 Invoke-OneApp -Subfolder "business-manager" -WebRel "Web\apps\business-manager-web" -AppRel "business-manager-app"   -BaseName "RootRecord-BusinessManager" -Version (Get-PackageVersion (Join-Path $MobileRoot "business-manager-app\package.json"))
+Invoke-OneApp -Subfolder "root-goals"       -WebRel "Web\apps\root-goals-web"       -AppRel "root-goals-mobile"      -BaseName "RootRecord-RootGoals"       -Version (Get-PackageVersion (Join-Path $MobileRoot "root-goals-mobile\package.json"))
 Invoke-OneApp -Subfolder "weather-manager"  -WebRel "Web\apps\weather-manager-web"  -AppRel "weather-manager-mobile" -BaseName "RootRecord-WeatherManager"  -Version (Get-PackageVersion (Join-Path $MobileRoot "weather-manager-mobile\package.json"))
 
 function Invoke-KilaueaAlertsNative {
@@ -154,5 +155,34 @@ function Invoke-KilaueaAlertsNative {
 }
 
 Invoke-KilaueaAlertsNative -Version (Get-GradleVersionName (Join-Path $MobileRoot "kilauea-alerts-android\app\build.gradle.kts"))
+
+function Invoke-BlockNotesNative {
+    param(
+        [string]$Version = "0.1.0"
+    )
+    $proj = Join-Path $MobileRoot "blocknotes-android"
+    if (-not (Test-Path -LiteralPath $proj)) {
+        Write-Host "Skip blocknotes (directory missing): $proj" -ForegroundColor Yellow
+        return
+    }
+    Write-Host "`n========== blocknotes (native Kotlin / $Version) ==========" -ForegroundColor Cyan
+    Push-Location $proj
+    try {
+        Invoke-NoisyNative ".\gradlew.bat bundleRelease assembleRelease --no-daemon" "blocknotes-android gradle bundleRelease assembleRelease failed"
+        $dest = Join-Path $OutRoot "blocknotes"
+        $stageScript = Join-Path $PSScriptRoot "stage-release-artifacts.ps1"
+        $lines = & powershell -NoProfile -ExecutionPolicy Bypass -File $stageScript `
+            -AppDir $proj -DestDir $dest -BaseName "RootRecord-BlockNotes" -Version $Version -Native
+        if ($LASTEXITCODE -ne 0) { throw "stage-release-artifacts.ps1 failed for blocknotes" }
+        foreach ($line in $lines) {
+            if ($line -match '^(APK|AAB)\|') { Write-Host "  $line" }
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+Invoke-BlockNotesNative -Version (Get-GradleVersionName (Join-Path $MobileRoot "blocknotes-android\app\build.gradle.kts"))
 
 Write-Host "`nAll builds finished. Output root: $OutRoot" -ForegroundColor Green

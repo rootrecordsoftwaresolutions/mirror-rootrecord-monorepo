@@ -133,3 +133,4 @@ foreach ($name in @(
 Write-Host ""
 Write-Host "Done. Do not generate new Zoho clients or grant codes for routine sends."
 Write-Host "Welcome backfill: node scripts/send-first-time-welcome-emails.mjs --execute"
+Write-Host "Kilauea 1.0.44: node scripts/send-kilauea-v1044-release-emails.mjs --execute"

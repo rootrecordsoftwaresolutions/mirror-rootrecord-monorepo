@@ -1,5 +1,6 @@
 package com.rootrecord.businessmanager;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -12,17 +13,25 @@ import android.widget.FrameLayout;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
+import com.google.android.gms.ads.AdError;
 import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdSize;
 import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.FullScreenContentCallback;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.interstitial.InterstitialAd;
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
 
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 public class MainActivity extends BridgeActivity {
+  private static final String AD_PREFS = "businessmanager_ads";
+  private static final String KEY_ACTION_COUNT = "action_count";
+  private static final int ACTIONS_PER_INTERSTITIAL = 50;
+
   private static final String AD_FREE_JS =
       "(function(){try{return localStorage.getItem('rrbm.plan')==='pro';}catch(e){return false;}})();";
 
@@ -33,6 +42,10 @@ public class MainActivity extends BridgeActivity {
 
   private AdView adView;
   private boolean adLoaded;
+  private boolean adFree;
+  private InterstitialAd interstitialAd;
+  private boolean interstitialLoading;
+  private boolean showInterstitialWhenLoaded;
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
   @Override
@@ -42,6 +55,7 @@ public class MainActivity extends BridgeActivity {
     MobileAds.initialize(this, initializationStatus -> {});
 
     ensureAdView();
+    preloadInterstitialIfNeeded();
 
     mainHandler.post(this::attachWebAdsBridge);
     mainHandler.post(this::syncAdVisibilityFromWeb);
@@ -197,7 +211,91 @@ public class MainActivity extends BridgeActivity {
     return "true".equals(value) || "\"true\"".equals(value);
   }
 
+  private SharedPreferences adPrefs() {
+    return getSharedPreferences(AD_PREFS, MODE_PRIVATE);
+  }
+
+  private void onUserAction() {
+    if (adFree) {
+      return;
+    }
+    String unitId = BuildConfig.ADMOB_INTERSTITIAL_AD_UNIT_ID;
+    if (unitId == null || unitId.isEmpty()) {
+      return;
+    }
+    SharedPreferences prefs = adPrefs();
+    int count = prefs.getInt(KEY_ACTION_COUNT, 0) + 1;
+    if (count >= ACTIONS_PER_INTERSTITIAL) {
+      prefs.edit().putInt(KEY_ACTION_COUNT, 0).apply();
+      showInterstitialIfReady();
+    } else {
+      prefs.edit().putInt(KEY_ACTION_COUNT, count).apply();
+      preloadInterstitialIfNeeded();
+    }
+  }
+
+  private void preloadInterstitialIfNeeded() {
+    if (adFree || interstitialAd != null || interstitialLoading) {
+      return;
+    }
+    String unitId = BuildConfig.ADMOB_INTERSTITIAL_AD_UNIT_ID;
+    if (unitId == null || unitId.isEmpty()) {
+      return;
+    }
+    interstitialLoading = true;
+    InterstitialAd.load(
+        this,
+        unitId,
+        new AdRequest.Builder().build(),
+        new InterstitialAdLoadCallback() {
+          @Override
+          public void onAdLoaded(InterstitialAd ad) {
+            interstitialLoading = false;
+            interstitialAd = ad;
+            ad.setFullScreenContentCallback(
+                new FullScreenContentCallback() {
+                  @Override
+                  public void onAdDismissedFullScreenContent() {
+                    interstitialAd = null;
+                    preloadInterstitialIfNeeded();
+                  }
+
+                  @Override
+                  public void onAdFailedToShowFullScreenContent(AdError adError) {
+                    interstitialAd = null;
+                    preloadInterstitialIfNeeded();
+                  }
+                });
+            if (showInterstitialWhenLoaded) {
+              showInterstitialWhenLoaded = false;
+              showInterstitialIfReady();
+            }
+          }
+
+          @Override
+          public void onAdFailedToLoad(LoadAdError loadAdError) {
+            interstitialLoading = false;
+            showInterstitialWhenLoaded = false;
+          }
+        });
+  }
+
+  private void showInterstitialIfReady() {
+    if (adFree) {
+      return;
+    }
+    InterstitialAd ad = interstitialAd;
+    if (ad != null) {
+      interstitialAd = null;
+      ad.show(this);
+    } else {
+      showInterstitialWhenLoaded = true;
+      preloadInterstitialIfNeeded();
+    }
+  }
+
   private void applyAdFree(boolean adFree) {
+    this.adFree = adFree;
     if (adView == null) {
       return;
     }
@@ -260,6 +358,11 @@ public class MainActivity extends BridgeActivity {
     @JavascriptInterface
     public void sync() {
       runOnUiThread(MainActivity.this::syncAdVisibilityFromWeb);
+    }
+
+    @JavascriptInterface
+    public void recordAction() {
+      runOnUiThread(MainActivity.this::onUserAction);
     }
   }
 }

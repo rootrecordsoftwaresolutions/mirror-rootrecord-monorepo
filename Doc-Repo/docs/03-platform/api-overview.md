@@ -23,6 +23,18 @@ Routing is centralized in `router.ts`. Major families include:
 
 Exact paths evolve—**read `router.ts`** when integrating a new client.
 
+## API shards (per-product Workers)
+
+Several products call **dedicated Workers** instead of routing everything through `rootrecord-primary`:
+
+| Worker | Base URL (typical) | Product |
+|--------|-------------------|---------|
+| `rootrecord-api-blocknotes` | `https://rootrecord-api-blocknotes.rootrecord.workers.dev/` | Block Notes, Realm, Minecraft server heartbeat |
+| `rootrecord-api-goals` | `https://api-goals.rootrecord.info/api` (or Workers dev URL) | Root Goals |
+| `rootrecord-api-kilauea` | Kīlauea-specific routes | Kīlauea Alerts |
+
+Shard routers live under `Web/cloudflare/<worker-name>/src/router.ts`. Pages Functions may proxy selected paths on `rootrecord.info`.
+
 ## Companion services
 
 - **`rootrecord-license`** — Legacy/companion licence Worker; marketing site historically integrates via configured API base.

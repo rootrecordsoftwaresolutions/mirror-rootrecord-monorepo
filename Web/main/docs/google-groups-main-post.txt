@@ -2,11 +2,17 @@ Subject: RootRecord — all app links (official reference)
 
 Use this post as the one pinned / welcome message for the group. Update the “Last updated” line when links change.
 
-Last updated: 2026-05-18
+Last updated: 2026-06-03
 
 ————————————————————————————————————————
 ROOTRECORD — ALL APPS & LINKS
 ————————————————————————————————————————
+
+Full page (install steps, closed testing, public Play, web apps — update this URL when links change):
+https://rootrecord.info/android-closed-testing.html
+
+How to join this Google Group:
+https://rootrecord.info/join-tester-group.html
 
 One account at https://rootrecord.info works across RootRecord apps where sign-in is supported.
 
@@ -18,34 +24,20 @@ https://rootrecord.info/pricing.html
 https://rootrecord.info/faq.html
 
 Root Units program (balance, Discord /bal and /send)
-https://rootrecord.info/beta-tester-rewards.html
+https://rootrecord.info/root-units
 
 Discord community
-https://discord.gg/CPaDYuFkU
+https://discord.gg/uQ7kGFqtbG
 
 ————————————————————————————————————————
-NEWEST PUBLIC ANDROID APP
+PUBLIC ANDROID APPS (GOOGLE PLAY)
 ————————————————————————————————————————
 
-Root Record Weather Manager
-• Google Play (public — install like any app):
-  https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager
-• Web app (any browser):
-  https://weather.rootrecord.info/
-• Product page:
-  https://rootrecord.info/rootrecord-weather-manager.html
-• Optional APK (GitHub Releases):
-  https://github.com/RootRecord/rootrecord-weather-manager-mobile/releases/latest
+No Google Group required — install from the Play Store like any app.
 
-————————————————————————————————————————
-ANDROID — GOOGLE PLAY CLOSED TESTING
-————————————————————————————————————————
-
-You must be a member of this Google Group to opt in to closed testing for these apps (same Google account on your phone as in the Play Store).
-
-Business Manager
-• Join closed testing:
-  https://play.google.com/apps/testing/com.rootrecord.businessmanager
+RootRecord Business Manager
+• Google Play (public):
+  https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager
 • Web app:
   https://business.rootrecord.info/
 • Product page:
@@ -53,15 +45,31 @@ Business Manager
 • Optional APK (GitHub Releases):
   https://github.com/RootRecord/rootrecord-business-manager-download/releases/latest
 
+Root Record Weather Manager
+• Google Play (public):
+  https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager
+• Web app:
+  https://weather.rootrecord.info/
+• Product page:
+  https://rootrecord.info/rootrecord-weather-manager.html
+• Optional APK (GitHub Releases):
+  https://github.com/RootRecord/rootrecord-weather-manager-mobile/releases/latest
+
 Kīlauea Alerts
-• Join closed testing:
-  https://play.google.com/apps/testing/com.rootrecord.kilauea
+• Google Play (public):
+  https://play.google.com/store/apps/details?id=com.rootrecord.kilauea
 • Web app:
   https://kilauea.rootrecord.info/
 • Product page:
   https://rootrecord.info/kilauea-alerts.html
 
-Root Units Idle Farmer (package: com.rootrecord.rootunits)
+————————————————————————————————————————
+ANDROID — GOOGLE PLAY CLOSED TESTING
+————————————————————————————————————————
+
+You must be a member of this Google Group to opt in to closed testing for these apps (same Google account on your phone as in the Play Store).
+
+Roots Idle Farmer (package: com.rootrecord.rootunits)
 • Web app:
   https://farms.rootrecord.info/
 • Android: closed testing on Play when your invite is active (ask in Discord if you need the opt-in link).
@@ -84,7 +92,8 @@ HOW TO INSTALL (CLOSED TESTING)
 ————————————————————————————————————————
 
 1. Join this group: https://groups.google.com/g/rootrecordtesting
-2. On your Android device, open the “Join closed testing” link for the app (above).
+   (step-by-step: https://rootrecord.info/join-tester-group.html)
+2. On your Android device, open the “Join closed testing” link for the app (see https://rootrecord.info/android-closed-testing.html).
 3. Sign in with the same Google account you use on the Play Store.
 4. Accept the test, then install or update from the Play Store.
 5. Sign in inside the app with your rootrecord.info account.

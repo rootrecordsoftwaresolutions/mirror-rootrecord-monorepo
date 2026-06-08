@@ -8,6 +8,9 @@ One-page lookup for URLs, source repos, and integration touchpoints. For narrati
 |---------|-----|------|
 | Marketing + legal + account shell | [rootrecord.info](https://rootrecord.info) | Cloudflare Pages (`Web/main/`) |
 | Primary API | [api.rootrecord.info](https://api.rootrecord.info) | Worker `rootrecord-primary` (auth, weather, business, earn, Solana routes, crons) |
+| Block Notes API shard | [rootrecord-api-blocknotes.rootrecord.workers.dev](https://rootrecord-api-blocknotes.rootrecord.workers.dev/) | Realm, sync, World AI, server heartbeat |
+| RootRecord Realm | [rootrecord.info/realm/](https://rootrecord.info/realm/) | Player linking, stats, SMP hub |
+| Block Notes product page | [rootrecord.info/blocknotes](https://rootrecord.info/blocknotes) | Marketing + app links |
 | Solana Tools (browser) | [solana.rootrecord.info](https://solana.rootrecord.info) | Next.js app ([solana-rootrecord-site](https://github.com/RootRecord/solana-rootrecord-site)) |
 | Doc Repo (this knowledge base) | [github.com/RootRecord/Doc-Repo](https://github.com/RootRecord/Doc-Repo) | Markdown only—safe to index |
 
@@ -15,8 +18,9 @@ One-page lookup for URLs, source repos, and integration touchpoints. For narrati
 
 | Area | GitHub / layout | Package manager |
 |------|-----------------|-----------------|
-| Mobile apps monorepo | `Mobile-Development-2026` (Weather, Business, Token Manager, Account Hub) | `pnpm` |
-| Web Workers + Pages | `Web-Development-2026` (`cloudflare/rootrecord-primary`, `main/`, etc.) | `npm ci` (Workers) |
+| Mobile apps monorepo | `Mobile-Development-2026` / `MonoRepo/Mobile/` | `pnpm` (Capacitor) · Gradle (Kotlin natives) |
+| Web Workers + Pages | `Web-Development-2026` / `MonoRepo/Web/` | `npm ci` (Workers) |
+| Minecraft plugins | `MonoRepo/Minecraft/` | Gradle (`build-with-server-jdk.bat`) |
 | Solana Tools site (canonical) | [`RootRecord/solana-rootrecord-site`](https://github.com/RootRecord/solana-rootrecord-site) | `pnpm` at repo root |
 
 ## Integration matrix (at a glance)

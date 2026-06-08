@@ -67,6 +67,18 @@ importers:
         specifier: ^6.2.0
         version: 6.2.1
 
+  visiting-hawaii-app:
+    devDependencies:
+      '@capacitor/android':
+        specifier: ^6.2.0
+        version: 6.2.1(@capacitor/core@6.2.1)
+      '@capacitor/cli':
+        specifier: ^6.2.0
+        version: 6.2.1
+      '@capacitor/core':
+        specifier: ^6.2.0
+        version: 6.2.1
+
   weather-manager-mobile:
     devDependencies:
       '@capacitor/android':

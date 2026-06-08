@@ -1,8 +1,14 @@
-import { accountApiBaseFromEnv, isAccountShardApiTail } from "../_lib/accountApiBase";
+import {
+  accountApiBaseFromEnv,
+  blocknotesApiBaseFromEnv,
+  isAccountShardApiTail,
+  isBlocknotesShardApiTail,
+} from "../_lib/accountApiBase";
 
 type Env = {
   ROOTRECORD_API_BASE?: string;
   ROOTRECORD_API_ACCOUNT_BASE?: string;
+  ROOTRECORD_API_BLOCKNOTES_BASE?: string;
 };
 
 const DEFAULT_PRIMARY_API = "https://rootrecord-primary.rootrecord.workers.dev";
@@ -23,10 +29,13 @@ export const onRequest = async (context: {
   params: Record<string, string | string[] | undefined>;
 }): Promise<Response> => {
   const tail = tailFromParams(context.params.path);
-  const useAccount = isAccountShardApiTail(tail);
-  const base = useAccount
-    ? accountApiBaseFromEnv(context.env)
-    : (context.env.ROOTRECORD_API_BASE ?? "").trim().replace(/\/+$/, "") || DEFAULT_PRIMARY_API;
+  const useBlocknotes = isBlocknotesShardApiTail(tail);
+  const useAccount = !useBlocknotes && isAccountShardApiTail(tail);
+  const base = useBlocknotes
+    ? blocknotesApiBaseFromEnv(context.env)
+    : useAccount
+      ? accountApiBaseFromEnv(context.env)
+      : (context.env.ROOTRECORD_API_BASE ?? "").trim().replace(/\/+$/, "") || DEFAULT_PRIMARY_API;
   const url = new URL(context.request.url);
   const upstreamPath = tail ? `/api/${tail}` : "/api";
   const target = `${base}${upstreamPath}${url.search}`;

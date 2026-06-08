@@ -85,25 +85,21 @@ export async function handleAppSessionStartRoute(
     }
   }
 
-  const webhook = String(env.DISCORD_APP_SESSION_WEBHOOK_URL || "").trim();
   let notified = false;
-  if (webhook) {
-    if (sess) {
-      await notifyDiscordAppSessionForAccount(env, {
-        accountId: sess.accountId,
-        email: sess.email,
-        appId,
-        mode: "signed_in",
-        guestId: guestId || undefined,
-      });
-    } else {
-      await notifyDiscordGuestAppSession(env, {
-        appId,
-        mode: betaTester ? "beta_tester" : "anonymous",
-        guestId: guestId || undefined,
-      });
-    }
-    notified = true;
+  if (sess) {
+    notified = await notifyDiscordAppSessionForAccount(env, {
+      accountId: sess.accountId,
+      email: sess.email,
+      appId,
+      mode: "signed_in",
+      guestId: guestId || undefined,
+    });
+  } else {
+    notified = await notifyDiscordGuestAppSession(env, {
+      appId,
+      mode: betaTester ? "beta_tester" : "anonymous",
+      guestId: guestId || undefined,
+    });
   }
 
   return json(

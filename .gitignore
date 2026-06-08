@@ -35,3 +35,20 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Android / Gradle local SDK paths (never commit)
+**/local.properties
+
+# Minecraft Paper runtime (downloaded jars, world, logs)
+Minecraft/server/world/
+Minecraft/server/logs/
+Minecraft/server/cache/
+Minecraft/server/libraries/
+Minecraft/server/versions/
+Minecraft/server/crash-reports/
+Minecraft/server/plugins/*.jar
+Minecraft/server/plugins/.paper-remapped/
+Minecraft/local.properties
+
+# Pages function build artifact
+Web/main/_worker.bundle

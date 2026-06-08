@@ -153,10 +153,7 @@
       const res = await apiFetch("/v1/discord/link", { method: "DELETE" });
       const { j } = await parseJsonRes(res);
       if (!res.ok) {
-        if (isVerificationRequired(j)) {
-          setStatus("Confirm account changes by email or Discord before unlinking Discord.", "warn");
-          return;
-        }
+        if (handleVerificationGate(j, "Confirm account changes before unlinking Discord.")) return;
         setStatus(friendlyFromApiError(j) || "Could not unlink Discord.", "err");
         return;
       }
@@ -252,6 +249,58 @@
 
   function isVerificationRequired(j) {
     return Boolean(j && typeof j === "object" && (j.verification_required || j.code === "verification_required"));
+  }
+
+  function isAccountNotVerified(j) {
+    return Boolean(j && typeof j === "object" && (j.account_not_verified || j.code === "account_not_verified"));
+  }
+
+  function openAccountSecurityPanel(options) {
+    const opts = options || {};
+    if (opts.accountNotVerified) {
+      const verifyCard = document.querySelector('[data-testid="account-verification"]');
+      if (verifyCard) verifyCard.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const card = document.querySelector('[data-testid="account-security-confirm"]');
+    const controls = el("account-security-controls");
+    const status = el("account-security-confirm-status");
+    if (controls) controls.hidden = false;
+    if (status && opts.message) status.textContent = opts.message;
+    if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function handleVerificationGate(j, fallbackMsg) {
+    if (isAccountNotVerified(j)) {
+      const msg = (j && j.detail) || fallbackMsg || "Verify your account by email or Discord first.";
+      setStatus(msg, "warn");
+      openAccountSecurityPanel({ accountNotVerified: true, message: msg });
+      return true;
+    }
+    if (isVerificationRequired(j)) {
+      const msg =
+        (j && j.detail) ||
+        fallbackMsg ||
+        "Confirm sensitive changes under Account → Sensitive changes, then try again.";
+      setStatus(msg, "warn");
+      openAccountSecurityPanel({ message: msg });
+      return true;
+    }
+    return false;
+  }
+
+  function formatRecentVerificationHint(data) {
+    const raw = String((data && data.last_challenge_verified_at) || "").trim();
+    if (!raw) return "";
+    const ts = Date.parse(raw);
+    if (!Number.isFinite(ts)) return "";
+    const expires = ts + 15 * 60 * 1000;
+    if (Date.now() > expires) return "";
+    try {
+      return "Confirmed for sensitive changes until " + new Date(expires).toLocaleTimeString(undefined, { timeStyle: "short" }) + ".";
+    } catch {
+      return "Confirmed for sensitive changes for the next few minutes.";
+    }
   }
 
   function stripDiscordQueryFromUrl() {
@@ -652,9 +701,19 @@
       verificationActions.hidden = verified;
     }
     if (securityStatus) {
-      securityStatus.textContent = verified
-        ? "Need to unlink Discord or delete this account? Open this only when the page asks for a fresh confirmation."
-        : "Verify the account first. Sensitive changes will then ask for a short-lived confirmation when needed.";
+      const recentHint = formatRecentVerificationHint(data);
+      if (recentHint) {
+        securityStatus.textContent = recentHint;
+        securityStatus.style.color = "var(--moss, #6b8f71)";
+      } else if (verified) {
+        securityStatus.textContent =
+          "Need to unlink Discord, change email or password, or delete this account? Confirm below first (valid 15 minutes).";
+        securityStatus.style.color = "";
+      } else {
+        securityStatus.textContent =
+          "Verify the account first. Sensitive changes will then ask for a short-lived confirmation when needed.";
+        securityStatus.style.color = "";
+      }
     }
     if (securityControls) {
       securityControls.hidden = !securityTokenFromUrl();
@@ -716,6 +775,91 @@
     }
   }
 
+  async function onChangePassword(ev) {
+    ev.preventDefault();
+    if (!apiBase) return;
+    const current_password = String(el("change-current-password")?.value || "");
+    const new_password = String(el("change-new-password")?.value || "");
+    const statusEl = el("change-password-status");
+    if (!current_password || new_password.length < 6) {
+      setStatus("Enter your current password and a new password with at least 6 characters.", "warn");
+      return;
+    }
+    setStatus("Updating password…", "");
+    try {
+      const res = await apiFetch("/v1/me/password", {
+        method: "POST",
+        body: JSON.stringify({ current_password, new_password, device_id: getOrCreateDeviceId() }),
+      });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        if (handleVerificationGate(j, "Confirm sensitive changes before updating your password.")) return;
+        const msg = friendlyFromApiError(j) || "Could not update password.";
+        setStatus(msg, "err");
+        if (statusEl) {
+          statusEl.hidden = false;
+          statusEl.textContent = msg;
+        }
+        return;
+      }
+      if (j.access_token) {
+        localStorage.setItem(TOKEN_KEY, j.access_token);
+        notifyPortalAuthChange();
+      }
+      if (el("change-current-password")) el("change-current-password").value = "";
+      if (el("change-new-password")) el("change-new-password").value = "";
+      if (statusEl) {
+        statusEl.hidden = false;
+        statusEl.textContent = "Password updated. Other sessions were signed out.";
+        statusEl.style.color = "var(--moss, #6b8f71)";
+      }
+      setStatus("Password updated.", "ok");
+      await refreshMe();
+    } catch {
+      setStatus("Could not update password. Try again.", "err");
+    }
+  }
+
+  async function onChangeEmailRequest(ev) {
+    ev.preventDefault();
+    if (!apiBase) return;
+    const new_email = String(el("change-new-email")?.value || "")
+      .trim()
+      .toLowerCase();
+    const statusEl = el("change-email-status");
+    if (!new_email.includes("@")) {
+      setStatus("Enter a valid new email address.", "warn");
+      return;
+    }
+    setStatus("Sending email change link…", "");
+    try {
+      const res = await apiFetch("/v1/me/email/request", {
+        method: "POST",
+        body: JSON.stringify({ new_email }),
+      });
+      const { j } = await parseJsonRes(res);
+      if (!res.ok) {
+        if (handleVerificationGate(j, "Confirm sensitive changes before changing your email.")) return;
+        const msg = friendlyFromApiError(j) || "Could not start email change.";
+        setStatus(msg, "err");
+        if (statusEl) {
+          statusEl.hidden = false;
+          statusEl.textContent = msg;
+        }
+        return;
+      }
+      const msg = "Confirmation link sent to " + new_email + ". Open it from that inbox to finish.";
+      setStatus(msg, "ok");
+      if (statusEl) {
+        statusEl.hidden = false;
+        statusEl.textContent = msg;
+        statusEl.style.color = "var(--moss, #6b8f71)";
+      }
+    } catch {
+      setStatus("Could not start email change. Try again.", "err");
+    }
+  }
+
   async function confirmSecurityChallenge() {
     const code = String(el("security-code")?.value || "").trim();
     const token = securityTokenFromUrl();
@@ -763,8 +907,8 @@
       platform: "Android / web",
       href: "/rootrecord-business-manager.html",
       webAppUrl: "https://business.rootrecord.info/",
-      playTestUrl:
-        "https://play.google.com/apps/testing/com.rootrecord.businessmanager",
+      playStoreUrl:
+        "https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager",
       note: "Cloud business workspace or Roots activity on this account.",
     },
     rootrecord_weather_manager_windows: {
@@ -884,7 +1028,7 @@
       box.innerHTML =
         '<p class="note" style="margin:0">No linked apps yet. When you sign in inside a RootRecord app and we see saved data, notifications, or synced weather for this account, it will appear here.</p>' +
         '<p style="margin-top:1rem"><a class="btn btn-secondary" href="/products.html">Browse products</a></p>' +
-        '<p class="note" style="margin-top:1rem">Google Play: <a href="https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager" target="_blank" rel="noopener">Weather Manager</a> &middot; <a href="https://play.google.com/store/apps/details?id=com.rootrecord.kilauea" target="_blank" rel="noopener">Kilauea Alerts</a>. Closed testing: <a href="https://play.google.com/apps/testing/com.rootrecord.businessmanager" target="_blank" rel="noopener">Business Manager</a></p>';
+        '<p class="note" style="margin-top:1rem">Google Play: <a href="https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager" target="_blank" rel="noopener">Business Manager</a> &middot; <a href="https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager" target="_blank" rel="noopener">Weather Manager</a> &middot; <a href="https://play.google.com/store/apps/details?id=com.rootrecord.kilauea" target="_blank" rel="noopener">Kilauea Alerts</a></p>';
       return;
     }
     box.innerHTML =
@@ -1579,8 +1723,7 @@
       const res = await apiFetch("/v1/me", { method: "DELETE" });
       const { j } = await parseJsonRes(res);
       if (!res.ok) {
-        if (isVerificationRequired(j)) {
-          setStatus("Confirm account changes by email or Discord before deleting your account.", "warn");
+        if (handleVerificationGate(j, "Confirm sensitive changes before deleting your account.")) {
           if (btn) btn.disabled = false;
           return;
         }
@@ -1682,6 +1825,8 @@
     el("form-password-reset-request")?.addEventListener("submit", onPasswordResetRequest);
     el("form-password-reset-confirm")?.addEventListener("submit", onPasswordResetConfirm);
     el("btn-logout")?.addEventListener("click", onLogout);
+    el("form-change-password")?.addEventListener("submit", onChangePassword);
+    el("form-change-email")?.addEventListener("submit", onChangeEmailRequest);
     el("btn-delete-account")?.addEventListener("click", onDeleteAccount);
 
     if (await handleSecurityQueryTokens()) return;

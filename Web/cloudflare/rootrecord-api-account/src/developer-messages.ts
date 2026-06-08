@@ -6,13 +6,35 @@ export interface DeveloperMessagesEnv {
   RR_PUSH_ADMIN_SECRET?: string;
 }
 
+/** Mobile in-app developer message scopes (includes products without Global Updater feeds). */
+const DEVELOPER_MESSAGE_SCOPES = [
+  "releases",
+  "weather",
+  "bm",
+  "token_manager",
+  "account_hub",
+  "kilauea",
+  "blocknotes",
+  "root_goals",
+  "root_farms",
+  "solana",
+  "visiting_hawaii",
+] as const;
+
+type DeveloperMessageScope = (typeof DEVELOPER_MESSAGE_SCOPES)[number];
+
 /**
  * Map RR_APP_ID-style string to a single scope bucket for filtering rows. Must stay in lockstep
  * with `discord-developer-sync.ts` (write side: hashtag -> scope) and the POST allow-list below.
  */
-function scopeForAppId(appId: string): "weather" | "bm" | "token_manager" | "account_hub" | "kilauea" {
+function scopeForAppId(appId: string): DeveloperMessageScope | "all" {
   const a = appId.toLowerCase();
   if (a.includes("kilauea")) return "kilauea";
+  if (a.includes("blocknotes") || a.includes("block_notes")) return "blocknotes";
+  if (a.includes("root_goals") || a.includes("rootgoals")) return "root_goals";
+  if (a.includes("root_farms") || a.includes("rootfarms")) return "root_farms";
+  if (a.includes("visiting_hawaii") || a.includes("visitinghawaii")) return "visiting_hawaii";
+  if (a.includes("solana")) return "solana";
   if (a.includes("business_manager")) return "bm";
   if (a.includes("token_manager")) return "token_manager";
   if (a.includes("account_hub")) return "account_hub";
@@ -69,7 +91,8 @@ export async function handleDeveloperMessagesPost(request: Request, env: Develop
   const title = String(body.title || "").trim();
   const text = String(body.body || "").trim();
   const rawScope = String(body.app_scope || "all").trim().toLowerCase();
-  const app_scope = ["all", "weather", "bm", "token_manager", "account_hub", "kilauea"].includes(rawScope) ? rawScope : "all";
+  const allowed = new Set<string>(["all", ...DEVELOPER_MESSAGE_SCOPES]);
+  const app_scope = allowed.has(rawScope) ? rawScope : "all";
   if (!title || title.length > 200) return json({ detail: "title required (1–200 chars)." }, 400);
   if (!text || text.length > 8000) return json({ detail: "body required (1–8000 chars)." }, 400);
   const id = crypto.randomUUID();

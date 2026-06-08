@@ -8,6 +8,7 @@ The active workspace is a single git root: `MonoRepo/`.
 | `Web/` | Cloudflare Workers, Pages marketing site, web app deploy tooling |
 | `Web/apps/kilauea-alerts-web/` | Kilauea web app (Pages project `rootrecord-kilauea-web`) |
 | `solana-rootrecord-site/` | Solana Tools Next.js app source |
+| `Minecraft/` | Paper plugins (BlockNotes, RootStat) + local dev server |
 | `Doc-Repo/` | Product/platform documentation |
 
 ## Mobile paths (typical)
@@ -16,6 +17,9 @@ The active workspace is a single git root: `MonoRepo/`.
 - `business-manager-app/` — Business Manager
 - `token-manager-app/` — Token Manager
 - `account-hub-app/` — Account Hub
+- `blocknotes-android/` — Block Notes (native Kotlin / Compose)
+- `root-goals-mobile/` — Root Goals Android
+- `kilauea-alerts-android/` — Kīlauea Alerts (native Kotlin)
 - `builds/` — Staged release APK/AAB outputs per app token
 
 ## Web paths (typical)
@@ -23,6 +27,14 @@ The active workspace is a single git root: `MonoRepo/`.
 - `cloudflare/rootrecord-primary/` — **Canonical** primary Worker
 - `cloudflare/shared/` — Shared TS modules
 - `main/` — rootrecord.info Pages site
+- `cloudflare/rootrecord-api-blocknotes/` — Block Notes + Realm API shard
+- `cloudflare/rootrecord-api-goals/` — Root Goals API shard
+- `cloudflare/rootrecord-api-kilauea/` — Kīlauea API shard
+
+## Minecraft (`Minecraft/`)
+
+- `plugins/blocknotes/` — production Paper plugin (heartbeat + linking + stats)
+- `server/` — local Paper 26.1.2 + `start_paper.bat`
 
 ## Solana site source
 

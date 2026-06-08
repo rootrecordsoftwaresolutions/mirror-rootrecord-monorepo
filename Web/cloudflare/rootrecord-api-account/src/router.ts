@@ -11,7 +11,7 @@ import {
   handleAuthLogout,
   handleAuthLogoutAll,
   handleMeAccountRoutes,
-  requireRecentAccountVerification,
+  requireSensitiveAccountAction,
 } from "./me-account-routes";
 
 import { createStripeSubscriptionCheckout } from "./billing-stripe";
@@ -61,11 +61,13 @@ import { handleRootUnitsTransferV1 } from "./root-units-transfer";
 import { readRecentHttpErrorEvents } from "./observability";
 import { handleMobileVersionPolicy } from "./mobile-client-version";
 import { handleDeveloperMessagesGet, handleDeveloperMessagesPost } from "./developer-messages";
+import { handleRootUpdatesBroadcastPost } from "./discord-root-updates";
 import { handleDiscordUserActivityGet } from "./discord-user-activity";
 import { handleDiscordChannelBackfillPost } from "./discord-channel-backfill";
 import { handleDiscordActivityDailyGet, handleDiscordActivityDailyRebuildPost } from "./discord-activity-stats";
 import { discordLinkCallback, discordLinkStart, discordUnlink } from "./discord-account-link";
-import { handleDiscordInteractions } from "./discord-root-units";
+import { handleDiscordEconomyInteractions } from "./discord-root-economy";
+import { handleDiscordUpdaterInteractions } from "./discord-updater-interactions";
 import { handlePhotosRoutes } from "./photos";
 import { handleDevWalletAdminRoutes } from "./dev-wallet-admin";
 import { handleSweepAllCustodialAssetsToTreasuryRoute } from "./custodial-sweep";
@@ -81,6 +83,7 @@ import { handleRootsOnchainBuyMonitorRoute } from "./roots-onchain-buy-monitor";
 import { lifeMemberFromLicenseData, upsertUserAccountFromLicense } from "./accounts";
 import { sendEmailVerificationChallenge } from "./account-security";
 import { handleFirstTimeWelcomeBackfillRoute, sendWelcomeEmail } from "./welcome-email";
+import { handleKilaueaV1044ReleaseBackfillRoute } from "./kilauea-release-email";
 
 export interface Env {
 
@@ -147,8 +150,17 @@ export interface Env {
   /** Discord channel id for on-chain ROOTS BUY notifications. */
   DISCORD_ROOTS_BUY_CHANNEL_ID?: string;
 
-  /** Discord application public key (hex) for `POST /v1/discord/interactions` signature verify. */
+  /** Discord application public key (hex) for Global Updater `POST /v1/discord/interactions`. */
   DISCORD_PUBLIC_KEY?: string;
+
+  /** Root Economy Discord application public key (hex) for `POST /v1/discord/economy/interactions`. */
+  DISCORD_ECONOMY_PUBLIC_KEY?: string;
+
+  /** Root Economy bot token (`wrangler secret put DISCORD_ECONOMY_BOT_TOKEN`). */
+  DISCORD_ECONOMY_BOT_TOKEN?: string;
+
+  /** Root Economy application id. */
+  DISCORD_ECONOMY_CLIENT_ID?: string;
 
   /** Discord application id (`[vars]`). Slash commands + interaction PATCH. */
   DISCORD_CLIENT_ID?: string;
@@ -253,6 +265,18 @@ export interface Env {
 /** Collapse repeated slashes (`//v1/...`) and strip trailing slash so route tables match. */
 function normalizePathname(pathname: string): string {
   return pathname.replace(/\/+/g, "/").replace(/\/+$/, "") || "/";
+}
+
+/** Require one-time account proof + recent confirmation before wallet or custody mutations. */
+async function gateSensitiveWalletMutation(
+  request: Request,
+  env: Env,
+  method: string,
+): Promise<Response | null> {
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
+  const sess = await sessionFromRequest(env, request);
+  if (!sess) return json({ detail: "Unauthorized" }, 401);
+  return requireSensitiveAccountAction(env.DB, sess.accountId);
 }
 
 /**
@@ -568,9 +592,9 @@ export async function handleRequest(
     }
 
     if (pathname === "/v1/me/linked-wallet") {
-
+      const gate = await gateSensitiveWalletMutation(request, env, method);
+      if (gate) return gate;
       return handleSolanaLinkedWalletRoute(request, env, method);
-
     }
 
     if (pathname === "/v1/me/custodial-sol-wallet" || pathname.startsWith("/v1/me/custodial-sol-wallet/")) {
@@ -586,15 +610,15 @@ export async function handleRequest(
     }
 
     if (pathname === "/v1/me/custodial-withdraw-dest") {
-
+      const gate = await gateSensitiveWalletMutation(request, env, method);
+      if (gate) return gate;
       return handleCustodialWithdrawDestV1(request, env, method);
-
     }
 
     if (pathname === "/v1/me/custodial-withdraw-rrtt") {
-
+      const gate = await gateSensitiveWalletMutation(request, env, method);
+      if (gate) return gate;
       return handleCustodialRrttWithdrawV1(request, env, method);
-
     }
 
     if (pathname === "/v1/me/roots/mint-balance") {
@@ -612,6 +636,8 @@ export async function handleRequest(
     }
 
     if (method === "POST" && pathname === "/v1/me/withdrawal-intents") {
+      const gate = await gateSensitiveWalletMutation(request, env, method);
+      if (gate) return gate;
       return handleWithdrawalIntentCreate(request, env);
     }
 
@@ -621,9 +647,9 @@ export async function handleRequest(
     }
 
     if (method === "POST" && pathname === "/v1/me/root-units/transfer") {
-
+      const gate = await gateSensitiveWalletMutation(request, env, method);
+      if (gate) return gate;
       return handleRootUnitsTransferV1(request, env);
-
     }
 
     if (pathname === "/v1/me/rewards-ledger") {
@@ -645,7 +671,7 @@ export async function handleRequest(
       const email = sess.email.toLowerCase();
       const accountId = sess.accountId;
 
-      const recent = await requireRecentAccountVerification(env.DB, accountId);
+      const recent = await requireSensitiveAccountAction(env.DB, accountId);
       if (recent) return recent;
 
       const del = await performAccountDeletion(env, accountId, email);
@@ -747,7 +773,7 @@ export async function handleRequest(
     if (method === "DELETE" && pathname === "/v1/discord/link") {
       const sess = await sessionFromRequest(env, request);
       if (!sess) return json({ detail: "Unauthorized" }, 401);
-      const recent = await requireRecentAccountVerification(env.DB, sess.accountId);
+      const recent = await requireSensitiveAccountAction(env.DB, sess.accountId);
       if (recent) return recent;
       return discordUnlink({ env, accountId: sess.accountId });
     }
@@ -771,7 +797,22 @@ export async function handleRequest(
     }
 
     if (method === "POST" && pathname === "/v1/discord/interactions") {
-      return handleDiscordInteractions(request, env, ctx);
+      return handleDiscordUpdaterInteractions(request, env, ctx);
+    }
+
+    if (method === "GET" && pathname === "/v1/discord/economy/interactions") {
+      return json(
+        {
+          ok: true,
+          post_only: true,
+          hint: "Root Economy slash commands POST here. Set Interactions Endpoint URL on the Economy Discord application.",
+        },
+        200,
+      );
+    }
+
+    if (method === "POST" && pathname === "/v1/discord/economy/interactions") {
+      return handleDiscordEconomyInteractions(request, env, ctx);
     }
 
     if (method === "GET" && pathname.startsWith("/v1/economy")) {
@@ -811,11 +852,28 @@ export async function handleRequest(
   }
 
   if (method === "POST" && sub === "/v1/discord/interactions") {
-    return handleDiscordInteractions(request, env, ctx);
+    return handleDiscordUpdaterInteractions(request, env, ctx);
+  }
+
+  if (method === "GET" && sub === "/v1/discord/economy/interactions") {
+    return json(
+      {
+        ok: true,
+        post_only: true,
+        hint: "Root Economy slash commands POST here.",
+      },
+      200,
+    );
+  }
+
+  if (method === "POST" && sub === "/v1/discord/economy/interactions") {
+    return handleDiscordEconomyInteractions(request, env, ctx);
   }
 
   /** Same handlers as `/v1/*` when the client uses `NEXT_PUBLIC_ROOTRECORD_API_BASE` with an `/api` prefix. */
   if (sub === "/v1/me/linked-wallet") {
+    const gate = await gateSensitiveWalletMutation(request, env, method);
+    if (gate) return gate;
     return handleSolanaLinkedWalletRoute(request, env, method);
   }
 
@@ -829,10 +887,14 @@ export async function handleRequest(
   }
 
   if (sub === "/v1/me/custodial-withdraw-dest") {
+    const gate = await gateSensitiveWalletMutation(request, env, method);
+    if (gate) return gate;
     return handleCustodialWithdrawDestV1(request, env, method);
   }
 
   if (sub === "/v1/me/custodial-withdraw-rrtt") {
+    const gate = await gateSensitiveWalletMutation(request, env, method);
+    if (gate) return gate;
     return handleCustodialRrttWithdrawV1(request, env, method);
   }
 
@@ -863,6 +925,8 @@ export async function handleRequest(
   }
 
   if (sub === "/v1/me/withdrawal-intents" && method === "POST") {
+    const gate = await gateSensitiveWalletMutation(request, env, method);
+    if (gate) return gate;
     return handleWithdrawalIntentCreate(request, env);
   }
 
@@ -872,6 +936,8 @@ export async function handleRequest(
   }
 
   if (method === "POST" && sub === "/v1/me/root-units/transfer") {
+    const gate = await gateSensitiveWalletMutation(request, env, method);
+    if (gate) return gate;
     return handleRootUnitsTransferV1(request, env);
   }
 
@@ -947,6 +1013,10 @@ export async function handleRequest(
 
   if (method === "POST" && sub === "/internal/developer-messages") {
     return handleDeveloperMessagesPost(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/discord-updates-broadcast") {
+    return handleRootUpdatesBroadcastPost(request, env);
   }
 
   if (method === "GET" && sub === "/internal/discord-user-activity") {
@@ -1456,6 +1526,19 @@ export async function handleRequest(
       return json({ detail: has ? "Invalid admin key." : "Missing X-RR-Push-Admin-Key header." }, 401);
     }
     return handleFirstTimeWelcomeBackfillRoute(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/send-kilauea-v1044-release-emails") {
+    const secret = (env.RR_PUSH_ADMIN_SECRET || "").trim();
+    if (!secret) {
+      return json({ detail: "RR_PUSH_ADMIN_SECRET is not set on this Worker." }, 503);
+    }
+    const adminOk = await verifyWorkerOpsAdmin(request, env);
+    if (!adminOk) {
+      const has = Boolean(request.headers.get("X-RR-Push-Admin-Key"));
+      return json({ detail: has ? "Invalid admin key." : "Missing X-RR-Push-Admin-Key header." }, 401);
+    }
+    return handleKilaueaV1044ReleaseBackfillRoute(request, env);
   }
 
   if (method === "GET" && sub === "/internal/withdrawal-settlement/summary") {

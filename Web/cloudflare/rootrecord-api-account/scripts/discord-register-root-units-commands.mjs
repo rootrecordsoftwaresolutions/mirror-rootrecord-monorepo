@@ -1,8 +1,7 @@
 /**
- * Register guild slash commands for Root Record (flat `/bal`, `/send`, …).
- *
- * Reads DISCORD_BOT_TOKEN from credentials.env (or env). DISCORD_GUILD_ID and DISCORD_CLIENT_ID
- * from credentials.env, env, or wrangler.toml [vars] in this Worker folder.
+ * Register guild-only dev/ops slash commands for Root Economy on the primary Root Record server.
+ * Public ROOTS commands (`/bal`, `/send`, …) are global on the Economy bot —
+ * see discord-register-root-economy-commands.mjs.
  *
  * Usage:
  *   node scripts/discord-register-root-units-commands.mjs
@@ -56,17 +55,28 @@ const credPath = findCredentialsPath();
 const fileEnv = readEnvFile(credPath);
 const wranglerPathFs = path.join(process.cwd(), "wrangler.toml");
 const wranglerVars = readWranglerStringVars(wranglerPathFs);
-const token = String(process.env.DISCORD_BOT_TOKEN || fileEnv.DISCORD_BOT_TOKEN || "").trim();
+const token = String(
+  process.env.DISCORD_ECONOMY_BOT_TOKEN ||
+    fileEnv.DISCORD_ECONOMY_BOT_TOKEN ||
+    process.env.DISCORD_BOT_TOKEN ||
+    fileEnv.DISCORD_BOT_TOKEN ||
+    "",
+).trim();
 const guildId = String(
   process.env.DISCORD_GUILD_ID || fileEnv.DISCORD_GUILD_ID || wranglerVars.DISCORD_GUILD_ID || "",
 ).trim();
 const appId = String(
-  process.env.DISCORD_CLIENT_ID || fileEnv.DISCORD_CLIENT_ID || wranglerVars.DISCORD_CLIENT_ID || "",
+  process.env.DISCORD_ECONOMY_CLIENT_ID ||
+    fileEnv.DISCORD_ECONOMY_CLIENT_ID ||
+    process.env.DISCORD_CLIENT_ID ||
+    fileEnv.DISCORD_CLIENT_ID ||
+    wranglerVars.DISCORD_CLIENT_ID ||
+    "",
 ).trim();
 
 if (!token || !guildId || !appId) {
   console.error(
-    "Need DISCORD_BOT_TOKEN (credentials.env), and DISCORD_GUILD_ID + DISCORD_CLIENT_ID (credentials.env, env, or wrangler.toml [vars]).",
+    "Need DISCORD_ECONOMY_BOT_TOKEN (or DISCORD_BOT_TOKEN), DISCORD_GUILD_ID, and DISCORD_ECONOMY_CLIENT_ID.",
   );
   process.exit(1);
 }
@@ -112,7 +122,7 @@ const sendOptions = [
         description: "Total Roots to split (decimal, e.g. 0.00224631)",
         required: true,
         min_value: 0.00000001,
-        max_value: 0.1,
+        max_value: 10,
       },
     ],
   },
@@ -128,7 +138,7 @@ const sendOptions = [
         description: "Total Roots to split (decimal); window from DISCORD_ACTIVE_LOOKBACK_DAYS",
         required: true,
         min_value: 0.00000001,
-        max_value: 0.1,
+        max_value: 10,
       },
     ],
   },
@@ -145,7 +155,7 @@ const sendOptions = [
         description: "Total Roots to split (decimal, e.g. 0.01)",
         required: true,
         min_value: 0.00000001,
-        max_value: 0.1,
+        max_value: 10,
       },
     ],
   },
@@ -339,7 +349,7 @@ const commands = [
             description: "Roots to add to pool (decimal)",
             required: true,
             min_value: 0.00000001,
-            max_value: 0.1,
+            max_value: 10,
           },
         ],
       },
@@ -375,7 +385,7 @@ const commands = [
         description: "Roots each (decimal; winner takes 2x)",
         required: true,
         min_value: 0.00000001,
-        max_value: 0.1,
+        max_value: 10,
       },
     ],
   },
@@ -394,12 +404,9 @@ const verifyKey = typeof me.verify_key === "string" ? me.verify_key.trim() : "";
 console.log("--- If you rotate the app, update wrangler.toml [vars] DISCORD_PUBLIC_KEY in rootrecord-api-account ---");
 console.log(`DISCORD_PUBLIC_KEY=${verifyKey}`);
 console.log(
-  "--- REQUIRED: Developer Portal → YOUR APPLICATION → General Information → Interactions Endpoint URL ---",
+  "--- REQUIRED: Developer Portal → ROOT ECONOMY APPLICATION → General Information → Interactions Endpoint URL ---",
 );
-console.log("https://rootrecord-api-account.rootrecord.workers.dev/v1/discord/interactions");
-console.log(
-  "Do NOT rely on Settings → Webhooks / Events “Endpoint URL” alone — that is a different product; slash commands need the General Information field (or your bot must handle Gateway INTERACTION_CREATE).",
-);
+console.log("https://rootrecord-api-account.rootrecord.workers.dev/v1/discord/economy/interactions");
 
 const putRes = await fetch(`${API}/applications/${encodeURIComponent(appId)}/guilds/${encodeURIComponent(guildId)}/commands`, {
   method: "PUT",

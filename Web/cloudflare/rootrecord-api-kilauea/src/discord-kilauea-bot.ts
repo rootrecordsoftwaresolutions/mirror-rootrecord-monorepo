@@ -3,6 +3,7 @@ import nacl from "tweetnacl";
 
 import { handleConfigCommand, listGuildAlertDestinations, resolveGuildReportChannelId } from "./discord-kilauea-guild-config";
 import { handleKilaueaCommand, type KilaueaReportEnv } from "./discord-kilauea-report";
+import { filterKilaueaRelevantOfficialXPosts } from "./kilauea-official-x";
 export type KilaueaDiscordEnv = KilaueaReportEnv & {
   DISCORD_KILAUEA_CLIENT_ID?: string;
   DISCORD_KILAUEA_PUBLIC_KEY?: string;
@@ -93,7 +94,7 @@ export function formatOfficialSocialSection(
 ): string {
   const maxPosts = opts?.maxPosts ?? 6;
   const maxChars = opts?.maxChars ?? 500;
-  const lines = posts.slice(0, maxPosts).map((post) => {
+  const lines = filterKilaueaRelevantOfficialXPosts(posts).slice(0, maxPosts).map((post) => {
     const account = String(post.account || "Official").trim();
     const text = cleanSocialPostText(post.text, maxChars);
     return text ? `• ${account}: ${text}` : "";
@@ -207,7 +208,7 @@ async function postToChannelWithFallbacks(
 export async function postKilaueaReportContent(
   env: KilaueaDiscordEnv,
   content: string,
-  opts?: { guildId?: string },
+  opts?: { guildId?: string; sourceId?: string },
 ): Promise<boolean> {
   const chunks = chunkDiscordContent(content);
   if (!chunks.length) return false;
@@ -228,23 +229,26 @@ export async function postKilaueaReportContent(
     return posted;
   }
 
+  let nativeOk = false;
+
   if (opts?.guildId && env.DB) {
     const channelId = await resolveGuildReportChannelId(env.DB, env, opts.guildId);
-    if (channelId) return postAllChunks(channelId, false);
-    return false;
-  }
-
-  if (env.DB) {
+    if (channelId) nativeOk = await postAllChunks(channelId, false);
+  } else if (env.DB) {
     const dests = await listGuildAlertDestinations(env.DB, env);
-    let any = false;
     for (const d of dests) {
-      if (await postAllChunks(d.channel_id, true)) any = true;
+      if (await postAllChunks(d.channel_id, true)) nativeOk = true;
     }
-    if (any) return true;
+    if (!nativeOk) {
+      const channelId = String(env.DISCORD_KILAUEA_REPORT_CHANNEL_ID || "1502461868990791770").trim();
+      nativeOk = await postAllChunks(channelId, true);
+    }
+  } else {
+    const channelId = String(env.DISCORD_KILAUEA_REPORT_CHANNEL_ID || "1502461868990791770").trim();
+    nativeOk = await postAllChunks(channelId, true);
   }
 
-  const channelId = String(env.DISCORD_KILAUEA_REPORT_CHANNEL_ID || "1502461868990791770").trim();
-  return postAllChunks(channelId, true);
+  return nativeOk;
 }
 
 export async function postKilaueaEmbedsToChannel(

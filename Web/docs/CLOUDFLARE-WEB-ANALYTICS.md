@@ -21,6 +21,7 @@ Repeat for each product subdomain **and** marketing (`rootrecord.info`) if you w
 | Account Hub web | `CF_WEB_ANALYTICS_TOKEN_ACCOUNT` |
 | Token Manager web | `CF_WEB_ANALYTICS_TOKEN_TOKEN` |
 | Kīlauea web | `CF_WEB_ANALYTICS_TOKEN_KILAUEA` |
+| Root Goals web | `CF_WEB_ANALYTICS_TOKEN_GOALS` |
 
 See **`Web/credentials.env.example`** for copy-paste lines.
 

@@ -1,0 +1,7 @@
+-keep class com.rootrecord.blocknotes.data.local.** { *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn kotlinx.serialization.**
+-keepclassmembers class kotlinx.serialization.json.** { *; }
+-keep @kotlinx.serialization.Serializable class com.rootrecord.blocknotes.** { *; }

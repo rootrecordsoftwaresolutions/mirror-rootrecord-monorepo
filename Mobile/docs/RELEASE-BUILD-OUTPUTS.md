@@ -23,6 +23,7 @@ On a typical dev PC the absolute path matches your clone, for example:
 | `business-manager/` | `Web/apps/business-manager-web/` | `Mobile/business-manager-app/` |
 | `weather-manager/` | `Web/apps/weather-manager-web/` | `Mobile/weather-manager-mobile/` |
 | `kilauea-alerts/` | n/a (native) | `Mobile/kilauea-alerts-android/` (native Kotlin / Gradle) |
+| `blocknotes/` | n/a (native) | `Mobile/blocknotes-android/` (native Kotlin / Gradle) |
 | `root-farms/` | `Web/apps/root-farms-mobile-web/` | `Mobile/root-farms-app/` |
 
 Filenames follow the pattern **`RootRecord-<Product>-<version>.apk`** and **`.aab`** (version from each app’s `package.json` / Android `versionName` used by the build script). If an app has no local release signing configured, the staging script keeps the build moving and marks the copied file with **`-unsigned`**.

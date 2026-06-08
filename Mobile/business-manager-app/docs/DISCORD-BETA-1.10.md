@@ -4,15 +4,15 @@ Copy everything below the line into your Discord announcement (adjust **#busines
 
 ---
 
-We’re opening another beta round on **Google Play** (Android). This release is **Business Manager 1.10** with **versionCode 10**
+**Business Manager** is on the **public Google Play** listing (Android). This announcement references **1.10** / **versionCode 10** for testers tracking that build.
 
 **What this app is**
 Mobile workspace for **small business ops**: **dashboard**, **time tracking**, **finance & clients** (money, clients, invoices, debts, funds, tax-related views, and more), **schedule**, plus **More** for **work log**, **categories**, **reports** (including charts / PDF-style export flows), **stock & supplies**, and **settings** (account, business, program, about, feedback, developer messages). Uses a **Root Record account** (or guest where supported) so data can sync with the backend — **not** accounting or legal advice; you’re responsible for your own books and compliance.
 
-**How to join**
-1. Join the beta tester group **https://groups.google.com/u/1/g/rootrecordtesting**
-2. Open the Play testing link: **https://play.google.com/apps/testing/com.rootrecord.businessmanager**
-3. Accept the beta, install **Business Manager**, leave auto-update on if you can.
+**How to install**
+1. Open **https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager** on your Android device (or search **RootRecord Business Manager** in the Play Store).
+2. Install or update **Business Manager**; leave auto-update on if you can.
+3. Full install links: **https://rootrecord.info/android-closed-testing.html**
 
 **What to stress-test**
 - First launch: sign-in, sign-up, any guest path, and navigation to the main tabs

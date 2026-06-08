@@ -1,0 +1,8 @@
+{
+  "appId": "com.rootrecord.rootgoals",
+  "appName": "Root Goals",
+  "webDir": "../../Web/apps/root-goals-web/build",
+  "server": {
+    "androidScheme": "https"
+  }
+}

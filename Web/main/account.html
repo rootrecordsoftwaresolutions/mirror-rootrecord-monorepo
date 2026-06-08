@@ -162,6 +162,27 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 </p>
               </section>
 
+              <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03)" data-testid="account-password-change">
+                <h3 style="margin-top:0">Change password</h3>
+                <p class="note" style="margin-top:0.5rem">Requires a recent confirmation under <strong>Sensitive changes</strong> above.</p>
+                <form id="form-change-password" class="stack-form" style="margin-top:0.75rem;max-width:22rem">
+                  <label>Current password <input type="password" id="change-current-password" autocomplete="current-password" required data-testid="change-current-password"></label>
+                  <label>New password <input type="password" id="change-new-password" autocomplete="new-password" minlength="6" required data-testid="change-new-password"></label>
+                  <button type="submit" class="btn btn-secondary" data-testid="change-password-submit">Update password</button>
+                </form>
+                <p class="note" id="change-password-status" style="margin-top:0.5rem" hidden></p>
+              </section>
+
+              <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03)" data-testid="account-email-change">
+                <h3 style="margin-top:0">Change email</h3>
+                <p class="note" style="margin-top:0.5rem">We send a confirmation link to the new address. Requires a recent confirmation under <strong>Sensitive changes</strong>.</p>
+                <form id="form-change-email" class="stack-form" style="margin-top:0.75rem;max-width:22rem">
+                  <label>New email <input type="email" id="change-new-email" autocomplete="email" required data-testid="change-new-email"></label>
+                  <button type="submit" class="btn btn-secondary" data-testid="change-email-submit">Send change link</button>
+                </form>
+                <p class="note" id="change-email-status" style="margin-top:0.5rem" hidden></p>
+              </section>
+
               <section class="card-plain" style="margin-top:1.25rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03)" data-testid="account-public-profile">
                 <h3 style="margin-top:0">Public profile</h3>
                 <p class="note" style="margin-top:0.5rem">Shown on <strong>Root Economy</strong> in Root Farms (with your custodial Solana address). Letters, numbers, spaces, underscore, hyphen, or period — up to 32 characters.</p>
@@ -229,6 +250,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
   <script src="/site-nav.js?v=5" defer></script>
   <script src="/earn-balance.js?v=2" defer></script>
-  <script src="/account.js?v=39" defer></script>
+  <script src="/account.js?v=40" defer></script>
 </body>
 </html>

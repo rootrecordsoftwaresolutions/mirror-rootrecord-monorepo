@@ -50,6 +50,15 @@ Named **2026 ecosystem neighbors** (e.g. **Jupiter** price/Jupiter Wallet paths,
 | Channel | Role |
 |---------|--------|
 | **Discord webhooks** | Feedback route, Solana tooling notifications, token mint hooks—internal visibility. |
+| **Discord bot (Global Updater)** | Product announcements, Kīlauea reports—`DISCORD_BOT_TOKEN` in ops env. |
+
+## Minecraft & Realm
+
+| Piece | Role |
+|-------|------|
+| **Paper plugin (BlockNotes)** | Server heartbeat, player linking headers (`X-RootStat-Server-Id`), MySQL cache for McMMO/playtime |
+| **MySQL** | Optional on-game-server DB shared with McMMO/Vault; plugin pushes aggregates to D1 via API |
+| **D1 (`rootrecord-api-blocknotes`)** | Linked players, Realm social, server registry, account snapshots |
 
 ## Client stacks (integration boundary)
 

@@ -77,6 +77,9 @@ function Get-AabUploadRsaSha1([string]$Path) {
 
 function Get-ArtifactSha1([string]$Path) {
     $ext = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
+    if ($Path -match '(?i)unsigned') {
+        throw "Cannot read upload cert from unsigned artifact: $Path (configure android/keystore.properties + upload-release.jks)."
+    }
     if ($ext -eq ".apk") {
         $apksigner = Get-ApksignerPath
         if ($apksigner) {
@@ -99,6 +102,10 @@ function Get-ArtifactSha1([string]$Path) {
 }
 
 function Assert-UploadCert([string]$Path, [string]$Label) {
+    if ($Path -match '(?i)unsigned') {
+        Write-Host "WARNING: Skipping cert check for unsigned $Label." -ForegroundColor Yellow
+        return
+    }
     $sha1 = Get-ArtifactSha1 $Path
     Write-Host "$Label cert SHA1: $sha1"
     if ($RequiredUploadSha1 -and $sha1 -ne $RequiredUploadSha1) {

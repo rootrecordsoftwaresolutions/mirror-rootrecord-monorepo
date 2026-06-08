@@ -69,19 +69,28 @@ export default function ConnectedApps() {
           className="text-xs text-ink-tertiary text-center px-4 mt-2"
           data-testid="apps-footnote"
         >
-          <strong className="text-ink-secondary">Weather Manager</strong>,{" "}
-          <strong className="text-ink-secondary">Business Manager</strong>, and{" "}
+          <strong className="text-ink-secondary">Business Manager</strong>,{" "}
+          <strong className="text-ink-secondary">Weather Manager</strong>, and{" "}
           <strong className="text-ink-secondary">Kīlauea Alerts</strong>: on the web,{" "}
-          <span className="font-mono">Open</span> goes to each product subdomain; on Android it tries the installed app, then the{" "}
+          <span className="font-mono">Open</span> goes to each product subdomain; on Android it tries the installed app, then Google Play. Other betas may use the{" "}
           <a
             className="text-brand font-semibold underline underline-offset-2"
-            href="https://groups.google.com/u/1/g/rootrecordtesting"
+            href="https://rootrecord.info/join-tester-group.html"
             target="_blank"
             rel="noopener noreferrer"
           >
-            RootRecord beta testing group
+            tester Google Group
           </a>{" "}
-          on Google Groups for Play internal testing access.
+          for closed testing (see{" "}
+          <a
+            className="text-brand font-semibold underline underline-offset-2"
+            href="https://rootrecord.info/android-closed-testing.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Android beta links
+          </a>
+          ).
           <strong className="text-ink-secondary"> Token Manager</strong> is coming soon.
           Last activity and plan come from <span className="font-mono">GET /api/me/apps</span> when you are signed in.
         </p>

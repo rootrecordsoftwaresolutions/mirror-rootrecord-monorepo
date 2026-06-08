@@ -274,5 +274,15 @@ if ($discordBot.Length -ge 45 -and $discordBot.Contains(".")) {
   Write-Host "Uploaded DISCORD_BOT_TOKEN (Discord → developer_messages sync)."
 }
 
+$economyBot = [string]$env:DISCORD_ECONOMY_BOT_TOKEN
+$economyBot = $economyBot.Trim()
+if ($economyBot -match '^(?i)bot\s+') {
+  $economyBot = ($economyBot -replace '^(?i)bot\s+', '').Trim()
+}
+if ($shardLeaf -eq 'rootrecord-api-account' -and $economyBot.Length -ge 45 -and $economyBot.Contains(".")) {
+  $economyBot | npx wrangler secret put DISCORD_ECONOMY_BOT_TOKEN
+  Write-Host "Uploaded DISCORD_ECONOMY_BOT_TOKEN (Root Economy bot)."
+}
+
 npx wrangler d1 migrations apply root-record --remote
 npx wrangler deploy

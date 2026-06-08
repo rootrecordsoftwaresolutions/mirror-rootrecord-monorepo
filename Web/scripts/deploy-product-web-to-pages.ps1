@@ -142,6 +142,7 @@ $analyticsEnvByProject = @{
   "rootrecord-token-web"     = "CF_WEB_ANALYTICS_TOKEN_TOKEN"
   "rootrecord-kilauea-web"   = "CF_WEB_ANALYTICS_TOKEN_KILAUEA"
   "rootrecord-root-farms-web" = "CF_WEB_ANALYTICS_TOKEN_ROOT_FARMS"
+  "rootrecord-goals-web"     = "CF_WEB_ANALYTICS_TOKEN_GOALS"
 }
 $analyticsVar = $analyticsEnvByProject[$ProjectName]
 if ($analyticsVar) {

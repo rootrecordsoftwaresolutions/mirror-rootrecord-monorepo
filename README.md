@@ -10,7 +10,7 @@ Single git repo housing every Root Record property: Android (Capacitor) wrappers
 
 ```
 MonoRepo/
-├── Mobile/                  Android (Capacitor) wrappers + native Kotlin (kilauea)
+├── Mobile/                  Android (Capacitor) wrappers + native Kotlin (kilauea, blocknotes)
 ├── Web/
 │   ├── apps/                Product web apps (Cloudflare Pages)
 │   ├── cloudflare/          Cloudflare Workers (APIs, license, solana-tx, etc.)
@@ -43,6 +43,8 @@ MonoRepo/
 | Account Hub | `Web/apps/account-hub-web/` → `rootrecord-account-web` | `Mobile/account-hub-app/` | `Web/cloudflare/rootrecord-api-account/` |
 | Token Manager | `Web/apps/token-manager-web/` → `rootrecord-token-web` | `Mobile/token-manager-app/` | `Web/cloudflare/rootrecord-api-token/` |
 | Kīlauea Alerts | `Web/apps/kilauea-alerts-web/` → `rootrecord-kilauea-web` (Vite) | `Mobile/kilauea-alerts-android/` (native Kotlin) | `Web/cloudflare/rootrecord-api-kilauea/` |
+| Minecraft Notes (BlockNotes) | — (Android-first) | `Mobile/blocknotes-android/` (native Kotlin) | `Web/cloudflare/rootrecord-api-blocknotes/` |
+| Root Goals | `Web/apps/root-goals-web/` → `rootrecord-goals-web` | `Mobile/root-goals-mobile/` | `Web/cloudflare/rootrecord-api-goals/` |
 | Marketing site | `Web/main/` → `rootrecord-website` | — | (Pages Functions in `Web/main/functions/`) |
 | Solana tools | `solana-rootrecord-site/` → `solana.rootrecord.info` | — | — |
 

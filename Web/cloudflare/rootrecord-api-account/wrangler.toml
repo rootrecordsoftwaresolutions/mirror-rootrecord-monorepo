@@ -32,7 +32,10 @@ SITE_URL = "https://rootrecord.info"
 # Outbound mail (account verification/recovery): prefer Zoho/Resend for user inboxes; Cloudflare Email Sending only reaches verified Email Routing destinations.
 EMAIL_FROM = "RootRecord <root@rootrecord.info>"
 DISCORD_CLIENT_ID = "1500289560343740566"
-# Discord Interactions `POST /v1/discord/interactions` — verify_key (hex, public). Rotate app → `node scripts/discord-register-root-units-commands.mjs` for a new value.
+# Root Economy bot (separate Discord application)
+DISCORD_ECONOMY_CLIENT_ID = "1513252482229338324"
+DISCORD_ECONOMY_PUBLIC_KEY = "46d0a100a886776b944bb67e666827363419ab91058b9e31c2eff7ca5f1d4815"
+# Discord Interactions `POST /v1/discord/interactions` — Global Updater verify_key (hex, public).
 # Slash commands require Discord Developer Portal → this application → General Information → Interactions Endpoint URL (not the separate Webhooks/Events page).
 DISCORD_PUBLIC_KEY = "7c708f3b7e1712bb90017ced01ec2d96304063d97c2faf6f18ef8da935c2da15"
 # Discord guild + role for auto-assigning @Verified on successful link.
@@ -100,7 +103,19 @@ PLAY_STORE_URL_ACCOUNT_HUB = "https://play.google.com/store/apps/details?id=com.
 #   wrangler secret put DISCORD_BOT_TOKEN
 # (same bot token as previously on api-weather). Bot needs View Channel + Read Message History + Message Content intent.
 # Optional: set DISCORD_GUILD_ID here to skip resolving guild from the announcements channel (same guild only).
-DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1500286864119038103"
+#
+# Root Record Global Updater (multi-server product updates via `/root` slash commands):
+#   node scripts/discord-register-root-updater-commands.mjs   # global /root channel|categories|help
+# Root Economy bot (separate Discord application):
+#   wrangler secret put DISCORD_ECONOMY_BOT_TOKEN
+#   node scripts/discord-register-root-economy-commands.mjs
+#   POST /v1/discord/economy/interactions
+#   node scripts/discord-broadcast-update.mjs --category blocknotes --file …   # ops fan-out
+#   POST /api/internal/discord-updates-broadcast  { category, content, embeds? }  X-RR-Push-Admin-Key
+# Migration: 0075_root_updates_discord_guild_config.sql
+# Primary Global Updater / version-release channel (this guild only — not multi-server fan-out):
+DISCORD_ANNOUNCEMENTS_CHANNEL_ID = "1512245745166581821"
+DISCORD_GLOBAL_RELEASES_CHANNEL_ID = "1512245745166581821"
 DISCORD_ROOTS_BUY_CHANNEL_ID = "1505853241915736154"
 # Internal custodial wallet encryption (AES-256-GCM). deploy.ps1 uploads INTERNAL_WALLET_ENC_KEY_B64
 # Failsafe: application code never DELETEs `internal_solana_wallets` (encrypted keys) — even on DELETE /v1/me / inactive purge.

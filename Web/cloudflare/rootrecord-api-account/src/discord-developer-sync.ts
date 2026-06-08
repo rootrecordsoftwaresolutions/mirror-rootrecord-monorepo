@@ -87,6 +87,11 @@ const HASHTAG_TO_SCOPE: ReadonlyArray<readonly [string, string]> = [
   ["#account-hub", "account_hub"],
   ["#token-manager", "token_manager"],
   ["#kilauea-alerts", "kilauea"],
+  ["#blocknotes", "blocknotes"],
+  ["#root-goals", "root_goals"],
+  ["#root-farms", "root_farms"],
+  ["#solana-tools", "solana"],
+  ["#visiting-hawaii", "visiting_hawaii"],
   ["#all", "all"],
 ];
 
@@ -101,6 +106,11 @@ const NAME_PATTERNS_CI: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bk[iī]lauea(?:[\s-]?alerts?)?\b/gi, "kilauea"],
   [/\baccount[\s-]?hub\b/gi, "account_hub"],
   [/\btoken[\s-]?manager\b/gi, "token_manager"],
+  [/\bblock[\s-]?notes\b/gi, "blocknotes"],
+  [/\broot[\s-]?goals\b/gi, "root_goals"],
+  [/\broot[\s-]?farms\b/gi, "root_farms"],
+  [/\bvisiting[\s-]?hawaii\b/gi, "visiting_hawaii"],
+  [/\bsolana[\s-]?tools\b/gi, "solana"],
 ];
 const NAME_PATTERNS_SHORTCODE: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bWM\b/g, "weather"],

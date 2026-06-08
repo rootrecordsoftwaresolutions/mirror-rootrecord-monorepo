@@ -19,8 +19,7 @@ export const REGISTERED_APPS = [
     androidPackage: "com.rootrecord.weathermanager",
     appId: "rootrecord_weather_manager_android",
     // RootRecord beta testing Google group (required for Play internal testing access).
-    playStoreUrl: "https://groups.google.com/u/1/g/rootrecordtesting",
-    // Public distribution page used by the Weather Manager README.
+    playStoreUrl: "https://play.google.com/store/apps/details?id=com.rootrecord.weathermanager",
     distUrl: "https://github.com/RootRecord/rootrecord-weather-manager-mobile",
     webOpenUrl: "https://weather.rootrecord.info/",
   },
@@ -34,7 +33,7 @@ export const REGISTERED_APPS = [
     androidScheme: "businessmanager://open",
     androidPackage: "com.rootrecord.businessmanager",
     appId: "rootrecord_business_manager_android",
-    playStoreUrl: "https://groups.google.com/u/1/g/rootrecordtesting",
+    playStoreUrl: "https://play.google.com/store/apps/details?id=com.rootrecord.businessmanager",
     webOpenUrl: "https://business.rootrecord.info/",
   },
   {
@@ -47,7 +46,7 @@ export const REGISTERED_APPS = [
     androidScheme: "kilauea-alerts://alerts",
     androidPackage: "com.rootrecord.kilauea",
     appId: "rootrecord_kilauea_alerts_android",
-    playStoreUrl: "https://groups.google.com/u/1/g/rootrecordtesting",
+    playStoreUrl: "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea",
     webOpenUrl: "https://kilauea.rootrecord.info/",
   },
   {

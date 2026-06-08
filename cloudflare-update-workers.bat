@@ -10,7 +10,7 @@ rem   cloudflare-update-workers.bat <name>           - deploy ONE worker
 rem   cloudflare-update-workers.bat <name> nopause   - same, no pause (for calling scripts)
 rem
 rem Valid <name> values:
-rem   weather  business  account  token  kilauea    - per-product API shard
+rem   weather  business  account  token  kilauea  blocknotes  goals  - per-product API shard
 rem   license                                        - rootrecord-license
 rem   app-build                                      - rootrecord-app-build
 rem
@@ -51,7 +51,7 @@ call npm ci
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[2/4] API shards (weather/business/account/token/kilauea)"
+set "STEP=[2/4] API shards (weather/business/account/token/kilauea/blocknotes/goals)"
 echo %STEP%
 pushd "Web\cloudflare"
 if errorlevel 1 goto FAIL
@@ -104,12 +104,14 @@ if /I "%ONLY%"=="business"  set "TARGET=Web\cloudflare\rootrecord-api-business"
 if /I "%ONLY%"=="account"   set "TARGET=Web\cloudflare\rootrecord-api-account"
 if /I "%ONLY%"=="token"     set "TARGET=Web\cloudflare\rootrecord-api-token"
 if /I "%ONLY%"=="kilauea"   set "TARGET=Web\cloudflare\rootrecord-api-kilauea"
+if /I "%ONLY%"=="blocknotes" set "TARGET=Web\cloudflare\rootrecord-api-blocknotes"
+if /I "%ONLY%"=="goals" set "TARGET=Web\cloudflare\rootrecord-api-goals"
 if /I "%ONLY%"=="license"   set "TARGET=Web\cloudflare\rootrecord-license"
 if /I "%ONLY%"=="app-build" set "TARGET=Web\cloudflare\rootrecord-app-build"
 
 if "%TARGET%"=="" (
   echo Unknown worker: %ONLY%
-  echo Valid: weather business account token kilauea license app-build
+  echo Valid: weather business account token kilauea blocknotes goals license app-build
   if not "%NOPAUSE%"=="1" pause
   endlocal
   exit /b 1

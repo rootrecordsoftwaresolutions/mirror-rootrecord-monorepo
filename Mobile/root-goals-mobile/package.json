@@ -1,0 +1,22 @@
+{
+  "name": "rootrecord-root-goals-android",
+  "version": "1.0.9",
+  "private": true,
+  "description": "Android (Capacitor) wrapper for Root Goals. Web source lives at Web/apps/root-goals-web.",
+  "scripts": {
+    "build:web": "pnpm -C ../../Web/apps/root-goals-web run build",
+    "cap:sync": "pnpm run build:web && pnpm exec cap sync",
+    "cap:init:android": "pnpm exec cap add android",
+    "android:open": "pnpm exec cap open android",
+    "android:build": "pnpm run cap:sync",
+    "android:assemble:debug": "pnpm run cap:sync && cd android && .\\gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

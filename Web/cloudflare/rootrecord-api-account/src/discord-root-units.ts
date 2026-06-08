@@ -1007,7 +1007,7 @@ async function handleSendBulk(
         ? "linked members who have the chosen server role"
         : `linked members with message activity in the last **${activeLookbackDays(env)}** days`;
   return interactionResponse(4, {
-    content: `Split **${fmtRoots(totalUnits)} ROOTS** among **${m.toLocaleString()}** ${cohort} (${fmtRoots(minShare)}â€“${fmtRoots(maxShare)} ROOTS each). Your new balance: **${fmtRoots(newBal)} ROOTS**.`,
+    content: `Split **${fmtRoots(totalUnits)} ROOTS** among **${m.toLocaleString()}** ${cohort} (${fmtRoots(minShare)}-${fmtRoots(maxShare)} ROOTS each). Your new balance: **${fmtRoots(newBal)} ROOTS**.`,
   });
 }
 
@@ -1228,7 +1228,7 @@ async function handleFaucetDeposit(
   amount: number,
 ): Promise<Response> {
   if (amount < MIN_SEND || amount > MAX_SEND) {
-    return interactionResponse(4, { content: `Deposit **0.00000001**â€“**${formatRootsAtomicLocale(MAX_SEND)}** Roots (atomic ledger units).` });
+    return interactionResponse(4, { content: `Deposit **0.00000001**-**${formatRootsAtomicLocale(MAX_SEND)}** Roots (atomic ledger units).` });
   }
   const now = new Date().toISOString();
   await ensureBalanceRow(db, fromUid, now);
@@ -1277,7 +1277,7 @@ async function handleDiceCreate(
     });
   }
   if (units < MIN_SEND || units > MAX_SEND) {
-    return interactionResponse(4, { content: `Amount must be **0.00000001**â€“**${formatRootsAtomicLocale(MAX_SEND)}** Roots.` });
+    return interactionResponse(4, { content: `Amount must be **0.00000001**-**${formatRootsAtomicLocale(MAX_SEND)}** Roots.` });
   }
   if (opponentId === challengerId) {
     return interactionResponse(4, { content: "Pick someone else as your opponent." });
@@ -4348,6 +4348,10 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
 
   const opts = (Array.isArray(data.options) ? data.options : []) as Array<Record<string, unknown>>;
 
+  if (name === "root") {
+    return interactionResponse(4, { flags: 64 });
+  }
+
   if (name === "bal") {
     return handleBal(env.DB, fromDiscordId, env);
   }
@@ -4575,7 +4579,87 @@ async function handleApplicationCommand(body: Record<string, unknown>, env: Disc
   return interactionResponse(4, { content: "Unknown command." });
 }
 
-export async function handleDiscordInteractions(
+/** `/root bal` — linked RootRecord users on any server. */
+export async function handleRootSlashBalResponse(env: DiscordRootUnitsEnv, fromDiscordId: string): Promise<Response> {
+  if (!fromDiscordId) {
+    return interactionResponse(4, { content: "Could not read your Discord user id.", flags: 64 });
+  }
+  const res = await handleBal(env.DB, fromDiscordId, env);
+  try {
+    const payload = (await res.json()) as { type?: number; data?: { content?: string; flags?: number; embeds?: unknown[] } };
+    if (payload.data) payload.data.flags = 64;
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
+  } catch {
+    return res;
+  }
+}
+
+/** `/root send user` — ROOTS peer transfer (linked accounts only). */
+export async function handleRootSlashSendUserResponse(
+  env: DiscordRootUnitsEnv,
+  body: Record<string, unknown>,
+  fromDiscordId: string,
+  innerOptions: Array<Record<string, unknown>>,
+): Promise<Response> {
+  const interactionId = String(body.id || "").trim();
+  if (!interactionId) {
+    return interactionResponse(4, { content: "Missing interaction id.", flags: 64 });
+  }
+  if (!fromDiscordId) {
+    return interactionResponse(4, { content: "Could not read your Discord user id.", flags: 64 });
+  }
+
+  const fromUid = await earnUserIdForDiscord(env.DB, fromDiscordId);
+  if (!fromUid) {
+    return interactionResponse(4, {
+      content: `Link your Discord to RootRecord at **${DISCORD_VERIFY_URL}** to send ROOTS.`,
+      flags: 64,
+    });
+  }
+
+  const toDiscordId = optSnowflake(innerOptions, "member");
+  const amountRaw = optNumber(innerOptions, "amount");
+  if (!toDiscordId || amountRaw == null) {
+    return interactionResponse(4, {
+      content: "Use **`/root send user`**: **member** and **amount** (decimal ROOTS, e.g. `0.01`).",
+      flags: 64,
+    });
+  }
+  if (toDiscordId === fromDiscordId) {
+    return interactionResponse(4, { content: "You cannot send ROOTS to yourself.", flags: 64 });
+  }
+
+  const failedDisplayUnits = ledgerFromWholeRoots(amountRaw) ?? 0;
+  const toUid = await earnUserIdForDiscord(env.DB, toDiscordId);
+  if (!toUid) {
+    const hasVerifiedRole = await discordUserHasVerifiedRole(env, toDiscordId);
+    return interactionResponse(4, {
+      content: hasVerifiedRole
+        ? verifiedButUnlinkedRecipientSendFailedContent(toDiscordId, sendFailedAmountText(failedDisplayUnits, "ROOTS"))
+        : unlinkedRecipientSendFailedContent(toDiscordId, failedDisplayUnits, "ROOTS"),
+      flags: 64,
+    });
+  }
+
+  const units = ledgerFromWholeRoots(amountRaw);
+  if (units == null || units < MIN_SEND) {
+    return interactionResponse(4, { content: "Amount must be at least **0.00000001** ROOTS.", flags: 64 });
+  }
+  if (units > MAX_SEND) {
+    return interactionResponse(4, {
+      content: `Max **${formatRootsAtomicLocale(MAX_SEND)}** ROOTS per send.`,
+      flags: 64,
+    });
+  }
+
+  const res = await handleSendExecute(env.DB, fromDiscordId, toDiscordId, fromUid, toUid, units, interactionId);
+  return res;
+}
+
+export async function handleDiscordEconomyCommandInteractions(
   request: Request,
   env: DiscordRootUnitsEnv,
   ctx?: ExecutionContext,
@@ -4592,7 +4676,7 @@ export async function handleDiscordInteractions(
   if (!verifyDiscordRequest(rawBody, request.headers, pk)) {
     const hasSig = Boolean(request.headers.get("x-signature-ed25519") || request.headers.get("X-Signature-Ed25519"));
     console.error(
-      "discord_interaction_verify_fail",
+      "discord_economy_interaction_verify_fail",
       JSON.stringify({ has_sig: hasSig, body_len: rawBody.length, pk_len: pk.length }),
     );
     return new Response("invalid request signature", { status: 401 });
@@ -4609,7 +4693,6 @@ export async function handleDiscordInteractions(
   if (t === 1) {
     return interactionResponse(1);
   }
-  // APPLICATION_COMMAND_AUTOCOMPLETE â€” must ACK with callback type 8 (not a channel message).
   if (t === 4) {
     return new Response(JSON.stringify({ type: 8, data: { choices: [] } }), {
       status: 200,
@@ -4645,15 +4728,13 @@ export async function handleDiscordInteractions(
         return await handleApplicationCommand(body, env);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error("discord_root_units_cmd", msg.slice(0, 400));
+        console.error("discord_economy_cmd", msg.slice(0, 400));
         return interactionResponse(4, {
           content: "Something went wrong processing that command. Try again in a moment.",
         });
       }
     };
 
-    // Discord requires an initial response in ~3s. D1 work can exceed that â€” defer (type 5), then PATCH @original.
-    // Only `interactionToken` is required to PATCH; `applicationId` falls back to env.DISCORD_CLIENT_ID.
     if (ctx?.waitUntil && interactionToken) {
       const appIdForPatch = applicationId || String(env.DISCORD_CLIENT_ID || "").trim();
       ctx.waitUntil(
@@ -4695,7 +4776,7 @@ export async function handleDiscordInteractions(
             }
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            console.error("discord_root_units_deferred", msg.slice(0, 400));
+            console.error("discord_economy_deferred", msg.slice(0, 400));
             await patchDeferredInteractionMessage(appIdForPatch, interactionToken, {
               content: "Something went wrong processing that command. Try again in a moment.",
             });
@@ -4709,4 +4790,13 @@ export async function handleDiscordInteractions(
   }
 
   return interactionResponse(4, { content: "Unsupported interaction type." });
+}
+
+/** @deprecated Use handleDiscordUpdaterInteractions or handleDiscordEconomyInteractions. */
+export async function handleDiscordInteractions(
+  request: Request,
+  env: DiscordRootUnitsEnv,
+  ctx?: ExecutionContext,
+): Promise<Response> {
+  return handleDiscordEconomyCommandInteractions(request, env, ctx);
 }

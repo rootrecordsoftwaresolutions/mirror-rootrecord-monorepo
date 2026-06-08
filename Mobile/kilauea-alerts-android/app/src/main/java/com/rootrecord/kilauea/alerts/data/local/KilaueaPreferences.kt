@@ -183,6 +183,19 @@ class KilaueaPreferences @Inject constructor(
         ds.edit { it[WELCOME_TUTORIAL_COMPLETE] = v }
     }
 
+    suspend fun incrementAdActionCount(): Int {
+        var next = 0
+        ds.edit {
+            next = (it[AD_ACTION_COUNT] ?: 0) + 1
+            it[AD_ACTION_COUNT] = next
+        }
+        return next
+    }
+
+    suspend fun resetAdActionCount() {
+        ds.edit { it[AD_ACTION_COUNT] = 0 }
+    }
+
     /** Atomically increment and return the new app-open count. */
     suspend fun incrementAppOpenCount(): Int {
         var next = 0
@@ -277,6 +290,7 @@ class KilaueaPreferences @Inject constructor(
         private val AUTH_PRO_UNLOCKED = booleanPreferencesKey("auth_pro_unlocked")
         private val WELCOME_TUTORIAL_COMPLETE = booleanPreferencesKey("welcome_tutorial_complete")
         private val APP_OPEN_COUNT = intPreferencesKey("app_open_count")
+        private val AD_ACTION_COUNT = intPreferencesKey("ad_action_count")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
         private val FONT_SCALE = floatPreferencesKey("font_scale")
 

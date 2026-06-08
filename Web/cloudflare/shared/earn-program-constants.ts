@@ -29,8 +29,8 @@ export const FIRST_APP_OPEN_UNITS = 5_000_000;
 export const PRO_REDEMPTION_UNIT_COST = 100_000;
 export const PRO_REDEMPTION_DAYS = 30;
 
-/** 10,000,000 atomic max per transfer (= 0.1 whole Roots). */
-export const MAX_ROOT_UNITS_PER_TRANSFER = 10_000_000;
+/** 1,000,000,000 atomic max per transfer (= 10 whole Roots). */
+export const MAX_ROOT_UNITS_PER_TRANSFER = 1_000_000_000;
 
 /** Included so clients can format atomic values as whole Roots. */
 export const ROOTS_ATOMIC_PER_WHOLE_INT = ROOTS_ATOMIC_PER_WHOLE;

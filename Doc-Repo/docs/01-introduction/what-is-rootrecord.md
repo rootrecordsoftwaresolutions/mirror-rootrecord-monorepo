@@ -4,7 +4,7 @@
 
 ## In one paragraph
 
-RootRecord builds productivity and utility software—notably **Business Manager** (operations, time, money, clients) and **Weather Manager** (hazard-aware weather and alerts)—plus **mobile Solana wallet-adjacent tools** (**Token Manager**) and a central **Account Hub** for profile, subscription, and cross-app entry points. The public **rootrecord.info** site explains the lineup, hosts legal pages, and links to account flows that talk to Cloudflare-based APIs.
+RootRecord builds productivity and utility software—notably **Business Manager** (operations, time, money, clients) and **Weather Manager** (hazard-aware weather and alerts)—plus **mobile Solana wallet-adjacent tools** (**Token Manager**), **Block Notes** (Minecraft companion), **Root Goals**, and a central **Account Hub** for profile, subscription, and cross-app entry points. The public **rootrecord.info** site explains the lineup, hosts legal pages, and links to account flows that talk to Cloudflare-based APIs.
 
 ## What RootRecord is *not*
 

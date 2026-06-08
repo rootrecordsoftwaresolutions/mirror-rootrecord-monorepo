@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { api, getToken, RR_APP_ID } from "./lib/api";
@@ -18,8 +18,23 @@ import { AccountSettings, BusinessSettings, ProgramSettings, About, Feedback } f
 import DeveloperMessages from "./components/modules/DeveloperMessages";
 import ProPaywall from "./components/ProPaywall";
 import UpsellModal from "./components/UpsellModal";
+import { recordNativeAdAction } from "./lib/nativeAds";
 
 const IS_NATIVE = typeof window !== "undefined" && Boolean(window?.Capacitor?.isNativePlatform?.());
+
+/** Native Android: count navigations toward interstitial ads (free users only; native enforces Pro). */
+function NativeAdActionRecorder() {
+  const loc = useLocation();
+  const lastPath = useRef(null);
+  useEffect(() => {
+    if (!IS_NATIVE) return;
+    if (lastPath.current !== null && lastPath.current !== loc.pathname) {
+      recordNativeAdAction();
+    }
+    lastPath.current = loc.pathname;
+  }, [loc.pathname]);
+  return null;
+}
 
 function EarnUsageHeartbeat() {
   const { user, guest } = useAuth();
@@ -99,6 +114,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <NativeAdActionRecorder />
         <EarnUsageHeartbeat />
         <AppRoutes />
       </BrowserRouter>

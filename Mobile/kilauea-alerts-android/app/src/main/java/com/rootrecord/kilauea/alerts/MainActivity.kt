@@ -35,6 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +60,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.messaging.FirebaseMessaging
+import com.rootrecord.kilauea.alerts.ads.KilaueaAdManager
 import com.rootrecord.kilauea.alerts.ui.KilaueaNavRoutes
 import com.rootrecord.kilauea.alerts.ui.components.AdMobBanner
 import com.rootrecord.kilauea.alerts.ui.screens.AiAnalysisScreen
@@ -87,9 +91,11 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var prefs: KilaueaPreferences
     @Inject lateinit var authRepo: RootRecordAuthRepository
+    @Inject lateinit var adManager: KilaueaAdManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        adManager.setActivity(this)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -142,9 +148,17 @@ class MainActivity : ComponentActivity() {
                     initialTab = intent?.getStringExtra(EXTRA_OPEN_TAB),
                     openSituation = intent?.getBooleanExtra(EXTRA_OPEN_SITUATION, false) == true,
                     showBannerAds = !proUnlocked,
+                    onRecordAdAction = {
+                        lifecycleScope.launch { adManager.recordAction() }
+                    },
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+        adManager.setActivity(null)
+        super.onDestroy()
     }
 
     companion object {
@@ -157,7 +171,12 @@ class MainActivity : ComponentActivity() {
 private data class TabSpec(val route: String, val labelRes: Int, val icon: ImageVector)
 
 @Composable
-private fun KilaueaApp(initialTab: String?, openSituation: Boolean, showBannerAds: Boolean) {
+private fun KilaueaApp(
+    initialTab: String?,
+    openSituation: Boolean,
+    showBannerAds: Boolean,
+    onRecordAdAction: () -> Unit = {},
+) {
     val navController = rememberNavController()
     LaunchedEffect(initialTab) {
         if (initialTab == MainActivity.TAB_ALERTS) {
@@ -198,6 +217,17 @@ private fun KilaueaApp(initialTab: String?, openSituation: Boolean, showBannerAd
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val current = navBackStackEntry?.destination
+    val currentRoute = current?.route
+    var lastAdActionRoute by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(currentRoute) {
+        if (currentRoute != null && currentRoute != lastAdActionRoute) {
+            if (lastAdActionRoute != null) {
+                onRecordAdAction()
+            }
+            lastAdActionRoute = currentRoute
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(

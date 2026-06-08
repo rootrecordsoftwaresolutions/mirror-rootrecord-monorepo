@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Root Goals</string>
+    <string name="title_activity_main">Root Goals</string>
+    <string name="package_name">com.rootrecord.rootgoals</string>
+    <string name="custom_url_scheme">com.rootrecord.rootgoals</string>
+</resources>

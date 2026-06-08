@@ -22,6 +22,83 @@ function Invoke-Git {
   if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') failed ($LASTEXITCODE)" }
 }
 
+function Read-GitConfigUser {
+  param([string] $ConfigPath)
+  if (-not (Test-Path -LiteralPath $ConfigPath)) { return $null }
+  $section = ""
+  $name = ""
+  $email = ""
+  foreach ($raw in Get-Content -LiteralPath $ConfigPath) {
+    $line = $raw.Trim()
+    if ($line -match '^\[(.+)\]$') { $section = $Matches[1].Trim().ToLower(); continue }
+    if ($section -ne "user") { continue }
+    if ($line -match '^name\s*=\s*(.+)$') { $name = $Matches[1].Trim() }
+    if ($line -match '^email\s*=\s*(.+)$') { $email = $Matches[1].Trim() }
+  }
+  if ($name -and $email) { return @{ Name = $name; Email = $email } }
+  return $null
+}
+
+function Get-CommitIdentity {
+  $name = [string]$env:GIT_AUTHOR_NAME
+  $email = [string]$env:GIT_AUTHOR_EMAIL
+  if (-not $name) { $name = [string]$env:GIT_COMMIT_USER_NAME }
+  if (-not $email) { $email = [string]$env:GIT_COMMIT_USER_EMAIL }
+
+  if (-not $name -or -not $email) {
+    $localName = (& $git config --local user.name 2>$null | Out-String).Trim()
+    $localEmail = (& $git config --local user.email 2>$null | Out-String).Trim()
+    if ($localName -and $localEmail) {
+      $name = $localName
+      $email = $localEmail
+    }
+  }
+
+  if (-not $name -or -not $email) {
+    foreach ($cfgPath in @(
+      (Join-Path $repoRoot ".gitconfig"),
+      (Join-Path $repoRoot "Web\main\.gitconfig")
+    )) {
+      $parsed = Read-GitConfigUser $cfgPath
+      if ($parsed) {
+        $name = $parsed.Name
+        $email = $parsed.Email
+        break
+      }
+    }
+  }
+
+  if (-not $name -or -not $email) {
+    $last = (& $git log -1 --format="%an|%ae" 2>$null | Out-String).Trim()
+    if ($last -match '^(.+)\|(.+)$') {
+      $name = $Matches[1].Trim()
+      $email = $Matches[2].Trim()
+    }
+  }
+
+  if (-not $name -or -not $email) {
+    throw @"
+Git author identity is not configured for this repo.
+Set GIT_AUTHOR_NAME and GIT_AUTHOR_EMAIL for this session, or add [user] name/email to .gitconfig at the repo root.
+(Does not modify global git config.)
+"@
+  }
+
+  return @{ Name = $name; Email = $email }
+}
+
+function Invoke-GitCommit {
+  param(
+    [string] $Message,
+    [hashtable] $Identity
+  )
+  Invoke-Git -GitArgs @(
+    "-c", "user.name=$($Identity.Name)",
+    "-c", "user.email=$($Identity.Email)",
+    "commit", "-m", $Message
+  )
+}
+
 function Test-ProjectRoot {
   param([string] $Dir)
   if (-not (Test-Path -LiteralPath $Dir)) { return $false }
@@ -135,6 +212,8 @@ Write-Host "================================" -ForegroundColor Cyan
 Write-Host "Repo: $repoRoot"
 Write-Host ""
 
+$commitIdentity = Get-CommitIdentity
+
 $projectRoots = @(Get-MonoRepoProjectRoots)
 Write-Host "Known project roots ($($projectRoots.Count)):" -ForegroundColor DarkGray
 foreach ($p in $projectRoots) { Write-Host "  - $p" }
@@ -155,7 +234,7 @@ if ($nested.Count -gt 0) {
       & $git diff --cached --quiet 2>$null
       if ($LASTEXITCODE -ne 0) {
         $msg = if ($CommitMessageParts.Count -gt 0) { $CommitMessageParts -join " " } else { "chore: sync workspace" }
-        Invoke-Git -GitArgs @("commit", "-m", $msg)
+        Invoke-GitCommit -Message $msg -Identity $commitIdentity
         Write-Host "    committed." -ForegroundColor Green
       } else {
         Write-Host "    nothing to commit." -ForegroundColor DarkGray
@@ -179,18 +258,17 @@ Write-Host ""
 Write-Host "Staging all tracked + untracked files (git add -A)..." -ForegroundColor Cyan
 Invoke-Git -GitArgs @("add", "-A")
 
+$secretPattern = '(^|/)(credentials\.env|\.env)$|(^|/)\.deploy-jwt$|\.(jks|p12)$|\.keystore$|firebase-adminsdk.*\.json$|service[-_]?account.*\.json$|(^|/)local\.properties$'
 $stagedSecrets = @(& $git diff --cached --name-only 2>$null | Where-Object {
-  (
-    $_ -match "(^|/)(credentials\.env|\.env)$" -and $_ -notmatch "\.example"
-  ) -or (
-    $_ -match "(^|/)\.deploy-jwt$|\.(jks|p12)$|\.keystore$|firebase-adminsdk.*\.json$|service[-_]?account.*\.json$|(^|/)local\.properties$"
-  )
+  ($_ -match $secretPattern -and $_ -notmatch "\.example") 
 })
 if ($stagedSecrets.Count -gt 0) {
   Write-Host ""
-  Write-Host "ERROR: Refusing to commit - secrets staged:" -ForegroundColor Red
-  foreach ($s in $stagedSecrets) { Write-Host "  $s" -ForegroundColor Red }
-  exit 1
+  Write-Host "Unstaging secret / local-only paths (will not commit):" -ForegroundColor Yellow
+  foreach ($s in $stagedSecrets) {
+    Write-Host "  $s" -ForegroundColor Yellow
+    Invoke-Git -GitArgs @("reset", "HEAD", "--", $s)
+  }
 }
 
 & $git diff --cached --quiet 2>$null
@@ -206,7 +284,8 @@ $commitMsg = if ($CommitMessageParts.Count -gt 0) {
 }
 
 Write-Host "Committing: $commitMsg" -ForegroundColor Cyan
-Invoke-Git -GitArgs @("commit", "-m", $commitMsg)
+Write-Host "Author: $($commitIdentity.Name) <$($commitIdentity.Email)>" -ForegroundColor DarkGray
+Invoke-GitCommit -Message $commitMsg -Identity $commitIdentity
 
 Write-Host ""
 Write-Host "Pushing to origin..." -ForegroundColor Cyan

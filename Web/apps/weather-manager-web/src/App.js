@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AuthGate from './pages/AuthGate';
 import Home from './pages/Home';
@@ -20,6 +20,7 @@ import { notifyAppSessionStart, ROOTRECORD_ACCOUNT_API_ORIGIN } from './lib/acco
 import { safeSessionStorage } from './lib/storage';
 import useAccess from './lib/useAccess';
 import { refreshSessionAccess } from './lib/tierAccess';
+import { recordNativeAdAction } from './lib/nativeAds';
 
 const IS_NATIVE = typeof window !== 'undefined' && Boolean(window?.Capacitor?.isNativePlatform?.());
 
@@ -28,6 +29,20 @@ const IS_NATIVE = typeof window !== 'undefined' && Boolean(window?.Capacitor?.is
  * production builds unless explicitly disabled (REACT_APP_ENABLE_PUSH=0).
  * Requires google-services.json in the Android project.
  */
+/** Native Android: count navigations toward interstitial ads (free users only; native enforces Pro). */
+function NativeAdActionRecorder() {
+  const location = useLocation();
+  const lastPath = useRef(null);
+  useEffect(() => {
+    if (!IS_NATIVE) return;
+    if (lastPath.current !== null && lastPath.current !== location.pathname) {
+      recordNativeAdAction();
+    }
+    lastPath.current = location.pathname;
+  }, [location.pathname]);
+  return null;
+}
+
 const ENABLE_NATIVE_PUSH =
   process.env.REACT_APP_ENABLE_PUSH === '1' ||
   (process.env.NODE_ENV === 'production' && process.env.REACT_APP_ENABLE_PUSH !== '0');
@@ -199,6 +214,7 @@ export default function App() {
     <div
       className={`weather-web-main min-h-[100dvh] bg-app text-white pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 pt-[var(--rr-native-ad-banner-height,env(safe-area-inset-top,0px))] ${isAuthRoute ? '' : 'lg:pl-56'}`}
     >
+      <NativeAdActionRecorder />
       <GuestBanner />
       <Routes>
         <Route

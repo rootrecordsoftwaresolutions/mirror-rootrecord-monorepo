@@ -10,6 +10,9 @@ RootRecord’s **shipping surface** today spans Android-first mobile apps, optio
 | **Weather Manager** | Weather, alerts, environmental awareness | Homeowner, site operator, weather-aware professional |
 | **Token Manager** | Mobile Solana wallet UX (non-custodial; Phantom-style flows) | Solana user |
 | **Account Hub** | Account, subscription entry points, security, app shortcuts | Any returning RootRecord customer |
+| **Root Goals** | Guest-first goal planning, Grok AI plans, Actions/Suggestions, public share | Anyone setting personal or project goals |
+| **Block Notes** | Offline-first Minecraft notes, coords, maps, build plans; optional Realm cloud | Survival/technical players, SMP members |
+| **RootRecord Realm** | Web hub + Paper plugin — account linking, stats, featured SMP | RootRecord SMP players |
 | **rootrecord.info** | Marketing, legal, account portal shell | Prospects + signed-in users |
 
 ## Shared platform services
@@ -26,6 +29,9 @@ These products share **conceptual** building blocks:
 - Weather + alerts architecture at user level → [weather-manager.md](weather-manager.md)
 - Wallet UX and Solana **mobile** scope → [token-manager.md](token-manager.md)
 - Cross-app **account** mental model → [account-hub.md](account-hub.md)
+- Goal planning + AI plans (Release 0) → [root-goals.md](root-goals.md)
+- Minecraft notes + coords + maps → [blocknotes.md](blocknotes.md)
+- SMP linking, McMMO, playtime, plugin deploy → [minecraft-realm.md](minecraft-realm.md)
 - Public **website** behavior → [marketing-website.md](marketing-website.md)
 
 ## Versioning reality

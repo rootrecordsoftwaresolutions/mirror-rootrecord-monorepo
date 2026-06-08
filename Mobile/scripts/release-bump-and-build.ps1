@@ -8,7 +8,7 @@
 # copies whatever is there into the Android assets.
 #
 # Usage:
-#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-bump-and-build.ps1 -App weather|business|account|token|kilauea
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-bump-and-build.ps1 -App weather|business|account|token|kilauea|blocknotes
 #
 # This script edits:
 #   - Mobile\<app>\android\app\build.gradle  (versionCode + versionName)
@@ -19,7 +19,7 @@
 #   - Mobile\builds\<subfolder>\RootRecord-<Product>-<version>.aab
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("weather","business","account","token","kilauea")]
+    [ValidateSet("weather","business","account","token","kilauea","blocknotes")]
     [string]$App
 )
 
@@ -38,6 +38,7 @@ $config = @{
     account  = @{ native = $false; mobileDir = "account-hub-app";         webDir = "Web\apps\account-hub-web";      subfolder = "account-hub";      baseName = "RootRecord-AccountHub"      }
     token    = @{ native = $false; mobileDir = "token-manager-app";       webDir = "Web\apps\token-manager-web";    subfolder = "token-manager";    baseName = "RootRecord-TokenManager"    }
     kilauea  = @{ native = $true;  mobileDir = "kilauea-alerts-android";  webDir = "";                              subfolder = "kilauea-alerts";   baseName = "RootRecord-Kilauea-Alerts"  }
+    blocknotes = @{ native = $true; mobileDir = "blocknotes-android";     webDir = "";                              subfolder = "blocknotes";       baseName = "RootRecord-BlockNotes"      }
 }
 $cfg = $config[$App]
 

@@ -58,6 +58,8 @@ Short definitions so search and assistants can anchor terms to RootRecord withou
 | **RootRecord Weather** | **Weather Manager** — client apps and the primary API delivering forecasts, NOAA-style alerts, and hazard-aware environmental data for operators and homeowners; paired with optional cloud sync via [api.rootrecord.info](https://api.rootrecord.info). |
 | **RootRecord Business** | **Business Manager** — Android-first operations: time, money, clients, scheduling, and reporting backed by the primary Worker API. |
 | **Solana Tools** | The public browser experience at [solana.rootrecord.info](https://solana.rootrecord.info), shipped from [`RootRecord/solana-rootrecord-site`](https://github.com/RootRecord/solana-rootrecord-site). |
+| **Block Notes** | Native Android Minecraft companion — offline notes, coords, maps; optional Realm cloud via `rootrecord-api-blocknotes`. |
+| **RootRecord Realm** | Web hub at [rootrecord.info/realm/](https://rootrecord.info/realm/) plus Paper plugin linking players to Root Record accounts. |
 
 ---
 
@@ -107,13 +109,16 @@ flowchart LR
 
 ### 2. Products — apps users install
 
-Covers **Business Manager**, **Weather Manager**, **Token Manager**, **Account Hub**, and the marketing site that sells and hosts account flows.
+Covers **Business Manager**, **Weather Manager**, **Token Manager**, **Account Hub**, **Block Notes**, **Root Goals**, **Realm**, and the marketing site that sells and hosts account flows.
 
 - [Product family overview](docs/02-products/overview.md)
 - [Business Manager](docs/02-products/business-manager.md)
 - [Weather Manager](docs/02-products/weather-manager.md)
 - [Token Manager (mobile)](docs/02-products/token-manager.md)
 - [Account Hub](docs/02-products/account-hub.md)
+- [Block Notes (Android)](docs/02-products/blocknotes.md)
+- [Minecraft Realm & plugins](docs/02-products/minecraft-realm.md)
+- [Root Goals](docs/02-products/root-goals.md)
 - [Marketing website](docs/02-products/marketing-website.md) — live site: [rootrecord.info](https://rootrecord.info)
 
 ### 3. Platform — APIs, Workers, data
@@ -176,6 +181,7 @@ Branch conventions (`main`, `weather-work`, `business-work`), `pnpm` vs `npm ci`
 - [Workspace layout (Mobile + Web)](docs/06-development/workspace-layout.md)
 - [Repos & branches](docs/06-development/repos-and-branches.md)
 - [Mobile build & release](docs/06-development/build-and-release-mobile.md)
+- [Minecraft plugin build](docs/06-development/build-minecraft-plugins.md)
 - [Web Workers & Pages deploy](docs/06-development/build-and-deploy-web.md)
 
 ### 8. Operations — crons & telemetry

@@ -19,11 +19,13 @@ import {
   type TransactionalEmailEnv,
 } from "../../shared/send-transactional-email";
 import { readUserAccountAccessFlags } from "./accounts";
+import { readDiscordLink } from "./discord-account-link";
 import {
   consumeChallenge,
   hasRecentAccountVerification,
   markEmailVerified,
   markRecentAccountVerification,
+  readAccountSecurity,
   sendAccountChangeChallenge,
   sendEmailVerificationChallenge,
   sendPasswordResetChallenge,
@@ -103,10 +105,22 @@ async function revokeAllSessions(db: D1Database, accountId: string): Promise<voi
   }
 }
 
+export function accountNotVerifiedResponse(): Response {
+  return json(
+    {
+      detail: "Verify your account by email or Discord before making this change.",
+      code: "account_not_verified",
+      account_not_verified: true,
+    },
+    403,
+  );
+}
+
 export function accountVerificationRequiredResponse(): Response {
   return json(
     {
-      detail: "Confirm your account by email or Discord before making this change.",
+      detail:
+        "Confirm this change with a fresh email code or Discord re-verification. Open Account → Sensitive changes (valid 15 minutes).",
       code: "verification_required",
       verification_required: true,
     },
@@ -114,13 +128,32 @@ export function accountVerificationRequiredResponse(): Response {
   );
 }
 
-export async function requireRecentAccountVerification(db: D1Database, accountId: string): Promise<Response | null> {
+export async function isPortalAccountVerified(db: D1Database, accountId: string): Promise<boolean> {
   try {
+    const security = await readAccountSecurity(db, accountId);
+    if (security.email_verified) return true;
+    const discord = await readDiscordLink(db, accountId).catch(() => ({ linked: false }));
+    return Boolean(discord?.linked);
+  } catch {
+    return false;
+  }
+}
+
+/** One-time account proof (email or Discord) plus a recent confirmation challenge. */
+export async function requireSensitiveAccountAction(db: D1Database, accountId: string): Promise<Response | null> {
+  try {
+    if (!(await isPortalAccountVerified(db, accountId))) {
+      return accountNotVerifiedResponse();
+    }
     if (await hasRecentAccountVerification(db, accountId)) return null;
   } catch {
     /* fail closed for account-changing operations */
   }
   return accountVerificationRequiredResponse();
+}
+
+export async function requireRecentAccountVerification(db: D1Database, accountId: string): Promise<Response | null> {
+  return requireSensitiveAccountAction(db, accountId);
 }
 
 async function revokeSessionById(db: D1Database, accountId: string, sessionId: string): Promise<boolean> {

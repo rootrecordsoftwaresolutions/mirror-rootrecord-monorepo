@@ -265,6 +265,18 @@ function passwordCandidatesForVerify(password: string): string[] {
   return out.length ? out : [password];
 }
 
+/** Modern rows: 16-byte salt + 32-byte hash as base64url (see LICENSE_PBKDF2_ITERATIONS). */
+function looksLikeCanonicalCredentialRow(storedHash: string, saltRaw: string): boolean {
+  const hashBytes = tryB64urlToBytes(storedHash);
+  const saltBytes = tryB64urlToBytes(saltRaw);
+  return hashBytes != null && hashBytes.byteLength === 32 && saltBytes != null && saltBytes.byteLength === 16;
+}
+
+async function tryCanonicalMatch(tryPw: string, saltBytes: Uint8Array, storedHash: string): Promise<boolean> {
+  const raw = await tryDeriveRaw(tryPw, saltBytes, LICENSE_PBKDF2_ITERATIONS, "SHA-256", 256, "utf8");
+  return raw != null && storedEqualsStoredHash(storedHash, raw);
+}
+
 export async function verifyLicenseAccountPassword(
   password: string,
   saltRaw: string,
@@ -277,25 +289,45 @@ export async function verifyLicenseAccountPassword(
   const salts = saltVariants(saltStr);
   if (!salts.length) return { ok: false };
 
+  const canonicalRow = looksLikeCanonicalCredentialRow(storedHash, saltStr);
   let matchedSalt: Uint8Array | null = null;
   let matchedPassword = "";
 
-  const tryMatch = async (tryPw: string, saltBytes: Uint8Array): Promise<boolean> => {
+  outer: for (const tryPw of passwordCandidatesForVerify(password)) {
+    for (const saltBytes of salts) {
+      if (await tryCanonicalMatch(tryPw, saltBytes, storedHash)) {
+        matchedSalt = saltBytes;
+        matchedPassword = tryPw;
+        break outer;
+      }
+    }
+  }
+
+  if (!matchedSalt && canonicalRow) {
+    return { ok: false };
+  }
+
+  const legacyBudget = { left: 28 };
+
+  const tryMatchLegacy = async (tryPw: string, saltBytes: Uint8Array): Promise<boolean> => {
     for (const pwEnc of PASSWORD_MATERIAL_ENCODINGS) {
       for (const iter of PBKDF2_ITERATIONS_SHA256) {
         for (const bits of OUTPUT_BITS_SHA256_SHA1) {
+          if (legacyBudget.left-- <= 0) return false;
           const raw = await tryDeriveRaw(tryPw, saltBytes, iter, "SHA-256", bits, pwEnc);
           if (raw && storedEqualsStoredHash(storedHash, raw)) return true;
         }
       }
       for (const iter of PBKDF2_ITERATIONS_SHA1) {
         for (const bits of OUTPUT_BITS_SHA256_SHA1) {
+          if (legacyBudget.left-- <= 0) return false;
           const raw = await tryDeriveRaw(tryPw, saltBytes, iter, "SHA-1", bits, pwEnc);
           if (raw && storedEqualsStoredHash(storedHash, raw)) return true;
         }
       }
       for (const iter of PBKDF2_ITERATIONS_SHA512) {
         for (const bits of OUTPUT_BITS_SHA512) {
+          if (legacyBudget.left-- <= 0) return false;
           const raw = await tryDeriveRaw(tryPw, saltBytes, iter, "SHA-512", bits, pwEnc);
           if (raw && storedEqualsStoredHash(storedHash, raw)) return true;
         }
@@ -304,12 +336,15 @@ export async function verifyLicenseAccountPassword(
     return false;
   };
 
-  outer: for (const tryPw of passwordCandidatesForVerify(password)) {
-    for (const saltBytes of salts) {
-      if (await tryMatch(tryPw, saltBytes)) {
-        matchedSalt = saltBytes;
-        matchedPassword = tryPw;
-        break outer;
+  if (!matchedSalt) {
+    outerLegacy: for (const tryPw of passwordCandidatesForVerify(password)) {
+      for (const saltBytes of salts) {
+        if (await tryMatchLegacy(tryPw, saltBytes)) {
+          matchedSalt = saltBytes;
+          matchedPassword = tryPw;
+          break outerLegacy;
+        }
+        if (legacyBudget.left <= 0) break outerLegacy;
       }
     }
   }

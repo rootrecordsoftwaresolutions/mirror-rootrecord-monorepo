@@ -19,8 +19,8 @@ android {
         applicationId = "com.rootrecord.kilauea"
         minSdk = 24
         targetSdk = 35
-        versionCode = 44
-        versionName = "1.0.44"
+        versionCode = 45
+        versionName = "1.0.45"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val props = Properties()
@@ -32,6 +32,11 @@ android {
             "String",
             "ADMOB_BANNER_AD_UNIT_ID",
             "\"ca-app-pub-8245496571119619/7991546983\"",
+        )
+        buildConfigField(
+            "String",
+            "ADMOB_INTERSTITIAL_AD_UNIT_ID",
+            "\"ca-app-pub-8245496571119619/4317875333\"",
         )
     }
 
@@ -66,6 +71,11 @@ android {
                 "String",
                 "ADMOB_BANNER_AD_UNIT_ID",
                 "\"ca-app-pub-3940256099942544/6300978111\"",
+            )
+            buildConfigField(
+                "String",
+                "ADMOB_INTERSTITIAL_AD_UNIT_ID",
+                "\"ca-app-pub-3940256099942544/1033173712\"",
             )
         }
     }

@@ -1,6 +1,10 @@
 /** Default account API (no trailing slash). */
 export const DEFAULT_ROOTRECORD_API_ACCOUNT_BASE = "https://rootrecord-api-account.rootrecord.workers.dev";
 
+/** Default blocknotes API (Realm social + RootStat Minecraft). */
+export const DEFAULT_ROOTRECORD_API_BLOCKNOTES_BASE =
+  "https://rootrecord-api-blocknotes.rootrecord.workers.dev";
+
 /** Pages `/api/*` tails that must hit the account Worker (not legacy primary). */
 export function isAccountShardApiTail(tail: string): boolean {
   const t = tail.replace(/^\/+/, "");
@@ -11,6 +15,33 @@ export function isAccountShardApiTail(tail: string): boolean {
   if (t === "partnership" || t.startsWith("partnership/")) return true;
   if (t === "visiting-hawaii" || t.startsWith("visiting-hawaii/")) return true;
   return false;
+}
+
+/** Pages `/api/*` tails that must hit the blocknotes Worker (Realm Minecraft / RootStat). */
+export function isBlocknotesShardApiTail(tail: string): boolean {
+  const t = tail.replace(/^\/+/, "");
+  if (t === "realm/minecraft" || t.startsWith("realm/minecraft/")) return true;
+  if (t === "blocknotes/server" || t.startsWith("blocknotes/server/")) return true;
+  return false;
+}
+
+export function blocknotesApiBaseFromEnv(env: {
+  ROOTRECORD_API_BLOCKNOTES_BASE?: string;
+}): string {
+  let b = String(env.ROOTRECORD_API_BLOCKNOTES_BASE || "")
+    .trim()
+    .replace(/\/+$/, "");
+  if (!b) return DEFAULT_ROOTRECORD_API_BLOCKNOTES_BASE;
+  if (!/^https?:\/\//i.test(b)) {
+    b = `https://${b}`;
+  }
+  try {
+    const u = new URL(b);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return DEFAULT_ROOTRECORD_API_BLOCKNOTES_BASE;
+    return u.origin;
+  } catch {
+    return DEFAULT_ROOTRECORD_API_BLOCKNOTES_BASE;
+  }
 }
 
 /** Pages `/v1/*` tails that must hit the account Worker (Discord link, portal `/v1/me`, etc.). */

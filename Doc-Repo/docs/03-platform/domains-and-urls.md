@@ -7,6 +7,11 @@ Canonical endpoints you can rely on when explaining RootRecord to users or wirin
 | **Marketing site** | `https://rootrecord.info` | Cloudflare Pages (`Web/main/`) |
 | **Primary API** | `https://api.rootrecord.info` | Worker `rootrecord-primary` |
 | **Solana Tools (public)** | `https://solana.rootrecord.info` | Next.js app from **`RootRecord/solana-rootrecord-site`** only |
+| **Block Notes (marketing)** | `https://rootrecord.info/blocknotes` | Product page on Pages |
+| **RootRecord Realm** | `https://rootrecord.info/realm/` | SMP hub, verify flow, player stats |
+| **Realm verify** | `https://rootrecord.info/realm/verify` | Link Minecraft account after `/rootstat link` |
+| **Realm plugin jars** | `https://rootrecord.info/realm/plugins/` | Published Paper plugin downloads |
+| **Block Notes API shard** | `https://rootrecord-api-blocknotes.rootrecord.workers.dev/` | Worker; may be proxied via Pages later |
 
 ## Deep links & app schemes
 

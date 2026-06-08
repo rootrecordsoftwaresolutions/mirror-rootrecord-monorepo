@@ -3,6 +3,7 @@ import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTran
 
 import { json } from "./cors";
 import { sessionFromRequest, type AuthEnv } from "./primary-auth";
+import { requireSensitiveAccountAction } from "./me-account-routes";
 import { loadKeypairForAccount, type InternalWalletEnv } from "./solana-internal-wallet";
 import { TREASURY_WALLET_PUBKEY } from "./treasury-account";
 
@@ -632,6 +633,9 @@ export async function handleRootsSolSwapV1(
   }
 
   if (method !== "POST") return json({ ok: false, detail: "Method not allowed." }, 405);
+
+  const gate = await requireSensitiveAccountAction(env.DB, sess.accountId);
+  if (gate) return gate;
 
   try {
     return json({ ok: true, ...(await executeRootsSolSwapForAccount(env, sess.accountId, sess.email, inputLamports, slippageBps, { all: useAll })) });

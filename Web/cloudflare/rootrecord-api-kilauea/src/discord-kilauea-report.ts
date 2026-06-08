@@ -18,6 +18,11 @@ import {
   slimEarthquakeContextForAi,
   type EarthquakeActivitySummary,
 } from "./kilauea-earthquake-stats";
+import {
+  fetchOfficialKilaueaXUpdates,
+  filterKilaueaRelevantOfficialXPosts,
+  KILAUEA_BRIEF_SCOPE_INSTRUCTION,
+} from "./kilauea-official-x";
 
 export type KilaueaReportEnv = {
   DB: D1Database;
@@ -50,14 +55,6 @@ const HAWAII_BBOX = {
   minlongitude: -161.0,
   maxlongitude: -154.5,
 };
-const OFFICIAL_KILAUEA_X_SOURCES = [
-  "USGSVolcanoes",
-  "USGS_Quakes",
-  "NWSHonolulu",
-  "NWS_PTWC",
-  "Hawaii_EMA",
-  "CivilDefenseHI",
-];
 const KILAUEA_ANDROID_APP_ID = "rootrecord_kilauea_alerts_android";
 
 function memberRoleSet(member: Record<string, unknown> | undefined): Set<string> {
@@ -228,6 +225,7 @@ async function callGrokAnalysis(
         role: "system",
         content:
           `${instruction} Synthesize all feeds into one professional brief — never repeat the same HVO/USGS notice wording in multiple sections. ` +
+          `${KILAUEA_BRIEF_SCOPE_INSTRUCTION} ` +
           "Use plain text with markdown bold section labels. Include complete detail in each section (full NWS alert summaries, full official social text, full seismic windows). " +
           "Under **Seismic activity — recent**, include the M1.0+ count requirements description line before the bullet counts. " +
           "Do not append per-section source attribution (e.g. 'Source: NWS…', 'USGS rolling windows'); the brief header disclaimer is sufficient. " +
@@ -320,75 +318,7 @@ async function kilaueaFetchJson(url: string): Promise<Record<string, unknown>> {
 }
 
 async function collectOfficialKilaueaXUpdates(env: KilaueaReportEnv): Promise<Record<string, unknown>> {
-  const bearer = String(env.GROK_X_BEARER_TOKEN || "").trim();
-  const accounts = OFFICIAL_KILAUEA_X_SOURCES;
-  if (!bearer) {
-    return {
-      configured: false,
-      source: "X.com official-source recent search",
-      accounts,
-      posts: [],
-      note: "GROK_X_BEARER_TOKEN is not configured; official X updates were not scanned.",
-    };
-  }
-
-  const query =
-    `(${accounts.map((name) => `from:${name}`).join(" OR ")}) ` +
-    `(Kilauea OR Kīlauea OR Hawaii OR Hawaiʻi OR "Big Island" OR volcano OR lava OR earthquake OR tsunami OR advisory OR warning OR watch) -is:retweet`;
-  const url = new URL("https://api.twitter.com/2/tweets/search/recent");
-  url.searchParams.set("query", query);
-  url.searchParams.set("max_results", "20");
-  url.searchParams.set("tweet.fields", "created_at,public_metrics,lang");
-  url.searchParams.set("expansions", "author_id");
-  url.searchParams.set("user.fields", "name,username,verified");
-
-  try {
-    const res = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${bearer}`,
-        "User-Agent": "RootRecordKilaueaDiscord/1.0 (official X scan)",
-      },
-    });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    const includes = data.includes as Record<string, unknown> | undefined;
-    const rawUsers = Array.isArray(includes?.users) ? includes.users as Array<Record<string, unknown>> : [];
-    const users = new Map<string, Record<string, unknown>>();
-    for (const user of rawUsers) users.set(String(user.id || ""), user);
-    const tweets = Array.isArray(data.data) ? data.data as Array<Record<string, unknown>> : [];
-    return {
-      configured: true,
-      ok: res.ok,
-      status: res.status,
-      source: "X.com official-source recent search",
-      accounts,
-      query,
-      posts: tweets.map((tweet) => {
-        const author = users.get(String(tweet.author_id || "")) || {};
-        const username = String(author.username || "");
-        const id = String(tweet.id || "");
-        return {
-          id,
-          account: username ? `@${username}` : tweet.author_id || null,
-          name: author.name || null,
-          created_at: tweet.created_at || null,
-          text: truncateText(tweet.text, 500),
-          url: username && id ? `https://x.com/${username}/status/${id}` : null,
-          metrics: tweet.public_metrics || null,
-        };
-      }),
-      error: res.ok ? null : data,
-    };
-  } catch (e) {
-    return {
-      configured: true,
-      ok: false,
-      source: "X.com official-source recent search",
-      accounts,
-      query,
-      posts: [],
-      error: e instanceof Error ? e.message : String(e),
-    };
-  }
+  return fetchOfficialKilaueaXUpdates(env);
 }
 
 function activeHourlyPeriod(periods: Array<Record<string, unknown>>): Record<string, unknown> {
@@ -831,7 +761,7 @@ function formatVolcanoActivityText(headline: string, synopsis: string): string {
 
 function mergeFullOfficialSocialIntoReport(report: string, context: Record<string, unknown>): string {
   const officialX = (context.official_x_updates as Record<string, unknown> | undefined) || {};
-  const posts = recordArray(officialX.posts);
+  const posts = filterKilaueaRelevantOfficialXPosts(recordArray(officialX.posts));
   const social = formatOfficialSocialSection(posts, { maxPosts: 6, maxChars: 500 });
   if (!social) return report;
   return [stripOfficialSocialSection(report), social].filter(Boolean).join("\n\n");
@@ -870,7 +800,7 @@ function buildOfficialKilaueaReport(context: Record<string, unknown>, _ai: Recor
   const weather = (context.weather as Record<string, unknown> | undefined) || {};
   const weatherText = formatNwsWeather(weather);
   const officialX = (context.official_x_updates as Record<string, unknown> | undefined) || {};
-  const xPosts = recordArray(officialX.posts).slice(0, 6);
+  const xPosts = filterKilaueaRelevantOfficialXPosts(recordArray(officialX.posts)).slice(0, 6);
   const prior = (context.previous_report as Record<string, unknown> | undefined) || null;
 
   const status = volcanoStatusLine(volcano, newestNotice, latestVona);
@@ -1098,9 +1028,10 @@ export async function generateKilaueaManualReport(
     env,
     "Kīlauea Hazards Brief",
     "Write a single cohesive Kīlauea/Big Island hazards brief. Cross-check USGS/HVO volcano notices, NWS alerts, summit weather, Hawaiʻi earthquakes, tsunami flags, and official agency X posts. " +
+      `${KILAUEA_BRIEF_SCOPE_INSTRUCTION} ` +
       "State alert/aviation level once, summarize eruptive activity in at most three sentences (volcano activity only — no weather), then present earthquake_activity recent rolling windows and calendar totals separately. " +
       "Copy earthquake_activity.count_description verbatim under **Seismic activity — recent** before listing counts. Calendar year totals are historical context, not current activity. " +
-      "Use earthquake_activity only — do not cite old events from prior calendar years as current. Skip empty official social posts. " +
+      "Use earthquake_activity only — do not cite old events from prior calendar years as current. Skip empty or off-topic official social posts. " +
       "Note what changed versus previous_report when present. Do not invent measurements or give evacuation orders.",
     slimEarthquakeContextForAi(context),
   );
@@ -1123,7 +1054,10 @@ export async function generateKilaueaManualReport(
     "Kīlauea AI report generated.";
   content = mergeFullActivityIntoReport(content, context);
   content = mergeFullOfficialSocialIntoReport(content, context);
-  const posted = await postKilaueaReportContent(env, content, guildId ? { guildId } : undefined);
+  const posted = await postKilaueaReportContent(env, content, {
+    ...(guildId ? { guildId } : {}),
+    sourceId: reportId,
+  });
   if (posted) {
     await env.DB.prepare(`UPDATE kilauea_ai_analyses SET discord_posted_at = ? WHERE id = ?`)
       .bind(new Date().toISOString(), reportId)

@@ -11,8 +11,12 @@ Most Android apps ship a **React (CRA) frontend** as the same SPA on the web: `p
 | Account Hub | `rootrecord-account-web` | `account.rootrecord.info` |
 | Token Manager | `rootrecord-token-web` | `token.rootrecord.info` |
 | Kīlauea Alerts (web) | `rootrecord-kilauea-web` | `kilauea.rootrecord.info` |
+| Root Goals | `rootrecord-goals-web` | `goals.rootrecord.info` |
+| Realm (BlockNotes profiles) | `rootrecord-realm-web` | `realm.rootrecord.info` |
 
 Domains are suggestions only; use whatever fits DNS and branding.
+
+**Root Goals DNS:** run `Web/scripts/setup-goals-pages-dns.ps1` once (grey-cloud CNAME + Pages custom domain), same pattern as Root Farms.
 
 ## One-time (per project)
 
@@ -31,6 +35,7 @@ pnpm run pages:deploy:business
 pnpm run pages:deploy:account
 pnpm run pages:deploy:token
 pnpm run pages:deploy:kilauea
+pnpm run pages:deploy:goals
 ```
 
 Or from an app frontend folder: `pnpm run pages:deploy` (builds if `build/index.html` is missing). After a local build: `pnpm run pages:deploy:only`.

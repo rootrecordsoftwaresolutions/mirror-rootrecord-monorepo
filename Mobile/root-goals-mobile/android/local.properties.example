@@ -1,0 +1,8 @@
+# Copy to local.properties (gitignored). Matches other RootRecord Capacitor apps on this PC.
+sdk.dir=C\:\\Android\\Sdk
+#
+# Release signing (create upload-release.jks once — see ../README.md):
+# storePassword=CHANGE_ME
+# keyPassword=CHANGE_ME
+# keyAlias=upload
+# storeFile=upload-release.jks

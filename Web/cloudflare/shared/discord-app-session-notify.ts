@@ -9,6 +9,8 @@ type ExecutionContext = { waitUntil: (promise: Promise<unknown>) => void };
 
 const MAX_APP_ID_LEN = 96;
 const MAX_GUEST_ID_LEN = 128;
+/** Shared dev channel for app session-start posts (RootMC bot must have Send Messages). */
+const DEFAULT_APP_SESSION_CHANNEL_ID = "1506162141223194754";
 
 /** Human labels for Discord session-start posts (unique per app). */
 export const APP_SESSION_LABELS: Record<string, string> = {
@@ -23,12 +25,16 @@ export const APP_SESSION_LABELS: Record<string, string> = {
   rootrecord_account_hub_web: "Account Hub (Web)",
   rootrecord_kilauea_alerts_android: "Kīlauea Alerts (Android)",
   rootrecord_kilauea_alerts_web: "Kīlauea Alerts (Web)",
+  rootrecord_goals_android: "Root Goals (Android)",
+  rootrecord_goals_web: "Root Goals (Web)",
+  rootrecord_blocknotes_android: "Block Notes (Android)",
   rootrecord_portal: "RootRecord portal",
   root_farms_android: "Root Units Idle Farmer (Android)",
 };
 
 const APP_SESSION_LINKS: Record<string, string> = {
   rootrecord_kilauea_alerts_android: "https://play.google.com/store/apps/details?id=com.rootrecord.kilauea",
+  rootrecord_goals_android: "https://play.google.com/store/apps/details?id=com.rootrecord.rootgoals",
 };
 
 function appLabel(appId: string): string {
@@ -44,10 +50,7 @@ function isDiscordWebhookUrl(url: string): boolean {
   return /(?:discord\.com|discordapp\.com)\/api\/webhooks\//i.test(url.trim());
 }
 
-async function postDiscordWebhook(webhookUrl: string, markdownBody: string): Promise<void> {
-  const url = webhookUrl.trim();
-  if (!url || !isDiscordWebhookUrl(url)) return;
-  const max = 1900;
+function markdownChunks(markdownBody: string, max = 1900): string[] {
   let s = markdownBody.replace(/\r\n/g, "\n");
   const chunks: string[] = [];
   while (s.length > 0) {
@@ -60,14 +63,65 @@ async function postDiscordWebhook(webhookUrl: string, markdownBody: string): Pro
     chunks.push(s.slice(0, cut).trimEnd());
     s = s.slice(cut).trimStart();
   }
-  for (const chunk of chunks) {
+  return chunks;
+}
+
+async function postDiscordWebhook(webhookUrl: string, markdownBody: string): Promise<boolean> {
+  const url = webhookUrl.trim();
+  if (!url || !isDiscordWebhookUrl(url)) return false;
+  let ok = true;
+  for (const chunk of markdownChunks(markdownBody)) {
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: chunk }),
     });
-    if (!r.ok) break;
+    if (!r.ok) {
+      ok = false;
+      break;
+    }
   }
+  return ok;
+}
+
+function appSessionBotToken(env: AppSessionDiscordEnv): string {
+  return String(env.DISCORD_ROOTMC_BOT_TOKEN || env.DISCORD_BOT_TOKEN || "")
+    .replace(/^bot\s+/i, "")
+    .trim();
+}
+
+async function postDiscordBotChannelMessage(env: AppSessionDiscordEnv, markdownBody: string): Promise<boolean> {
+  const channelId = String(env.DISCORD_APP_SESSION_CHANNEL_ID || DEFAULT_APP_SESSION_CHANNEL_ID).trim();
+  const token = appSessionBotToken(env);
+  if (!/^\d{10,}$/.test(channelId) || token.length < 40) return false;
+  let ok = true;
+  for (const chunk of markdownChunks(markdownBody)) {
+    const res = await fetch(`https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": "RootRecord/app-session",
+      },
+      body: JSON.stringify({ content: chunk }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.warn("app_session_discord_bot", res.status, text.slice(0, 400));
+      ok = false;
+      break;
+    }
+  }
+  return ok;
+}
+
+/** Webhook when configured; otherwise RootMC bot → app session channel (same as other RootRecord apps). */
+async function deliverSessionMarkdown(env: AppSessionDiscordEnv, markdownBody: string): Promise<boolean> {
+  const webhook = String(env.DISCORD_APP_SESSION_WEBHOOK_URL || "").trim();
+  if (webhook && isDiscordWebhookUrl(webhook)) {
+    return postDiscordWebhook(webhook, markdownBody);
+  }
+  return postDiscordBotChannelMessage(env, markdownBody);
 }
 
 export function parseAppIdFromAuthRequest(
@@ -167,6 +221,9 @@ function sessionMarkdown(params: { appId: string; mode: string; identityLines: s
 export type AppSessionDiscordEnv = {
   DB: D1Database;
   DISCORD_APP_SESSION_WEBHOOK_URL?: string;
+  DISCORD_APP_SESSION_CHANNEL_ID?: string;
+  DISCORD_ROOTMC_BOT_TOKEN?: string;
+  DISCORD_BOT_TOKEN?: string;
 };
 
 export async function notifyDiscordAppSessionForAccount(
@@ -179,9 +236,6 @@ export async function notifyDiscordAppSessionForAccount(
     guestId?: string;
   },
 ): Promise<boolean> {
-  const webhook = String(env.DISCORD_APP_SESSION_WEBHOOK_URL || "").trim();
-  if (!webhook || !isDiscordWebhookUrl(webhook)) return false;
-
   const appId = validAppId(params.appId) ? params.appId : "rootrecord_portal";
   const betaTester = params.mode === "beta_tester";
   const identityLines = await resolveIdentityForAccount(
@@ -191,8 +245,7 @@ export async function notifyDiscordAppSessionForAccount(
     String(params.guestId || "").trim(),
     betaTester,
   );
-  await postDiscordWebhook(webhook, sessionMarkdown({ appId, mode: params.mode, identityLines }));
-  return true;
+  return deliverSessionMarkdown(env, sessionMarkdown({ appId, mode: params.mode, identityLines }));
 }
 
 export function scheduleDiscordAppSessionForAccount(
@@ -221,8 +274,6 @@ export async function notifyDiscordGuestAppSession(
     guestId?: string;
   },
 ): Promise<boolean> {
-  const webhook = String(env.DISCORD_APP_SESSION_WEBHOOK_URL || "").trim();
-  if (!webhook || !isDiscordWebhookUrl(webhook)) return false;
   const appId = validAppId(params.appId) ? params.appId : "rootrecord_portal";
   const guestId = String(params.guestId || "").trim();
   const lines: string[] = [];
@@ -230,8 +281,7 @@ export async function notifyDiscordGuestAppSession(
     lines.push(`**Mode:** Beta Tester (no rootrecord.info sign-in — progress not saved to your account)`);
   }
   if (guestId) lines.push(`**Guest device id:** \`${guestId.slice(0, 36)}\`${guestId.length > 36 ? "…" : ""}`);
-  await postDiscordWebhook(webhook, sessionMarkdown({ appId, mode: params.mode, identityLines: lines }));
-  return true;
+  return deliverSessionMarkdown(env, sessionMarkdown({ appId, mode: params.mode, identityLines: lines }));
 }
 
 /** Call after successful auth login/signup on any API Worker shard. */

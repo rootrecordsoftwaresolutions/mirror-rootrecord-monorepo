@@ -1,0 +1,8 @@
+# Copy to local.properties (gitignored).
+#
+# java.version — bytecode target for plugin jars (match Paper / start_paper.bat: Java 25).
+# org.gradle.java.home — JVM that runs Gradle (JDK 17 or 21). Do NOT point at JDK 25.
+# JDK 25 for compilation is resolved via org.gradle.java.installations.paths in gradle.properties.
+
+# org.gradle.java.home=C:/Program Files/Eclipse Adoptium/jdk-21.0.6.7-hotspot
+java.version=25

@@ -1,0 +1,9 @@
+# Shared RootRecord cloud credentials for ALL plugins (RootStat, BlockNotes, …)
+# File: plugins/RootRecord/cloud.yml
+#
+# Register at https://rootrecord.info/realm/servers then paste below.
+
+cloud:
+  api-base: "https://rootrecord.info"
+  server-id: ""
+  server-secret: ""
