@@ -242,8 +242,7 @@ foreach ($grokSecretName in @(
   "GROK_X_V1_CONSUMER_KEY",
   "GROK_X_V1_CONSUMER_KEY_SECRET",
   "GROK_X_V2_CLIENT_ID",
-  "GROK_X_V2_CLIENT_SECRET",
-  "GROK_API_BEARER_TOKEN"
+  "GROK_X_V2_CLIENT_SECRET"
 )) {
   $grokSecretValue = [string](Get-Item -Path "Env:$grokSecretName" -ErrorAction SilentlyContinue).Value
   if ($shardLeaf -eq 'rootrecord-api-account' -and $grokSecretValue.Trim().Length -ge 12) {
@@ -252,13 +251,25 @@ foreach ($grokSecretName in @(
   }
 }
 
-$grokChatAliases = @("XAI_API_KEY", "X_AI_API_KEY", "GROK_API_KEY")
-foreach ($aliasName in $grokChatAliases) {
-  $aliasValue = [string](Get-Item -Path "Env:$aliasName" -ErrorAction SilentlyContinue).Value
-  if ($shardLeaf -eq 'rootrecord-api-account' -and $aliasValue.Trim().Length -ge 12) {
-    $aliasValue.Trim() | npx wrangler secret put GROK_API_BEARER_TOKEN
-    Write-Host "Uploaded GROK_API_BEARER_TOKEN from $aliasName."
-    break
+if ($shardLeaf -eq 'rootrecord-api-account') {
+  $grokChat = [string]$env:GROK_API_BEARER_TOKEN
+  if (-not $grokChat) { $grokChat = [string]$env:GROK_API_KEY }
+  foreach ($aliasName in @("XAI_API_KEY", "X_AI_API_KEY")) {
+    if ($grokChat.Trim().Length -ge 12) { break }
+    $aliasValue = [string](Get-Item -Path "Env:$aliasName" -ErrorAction SilentlyContinue).Value
+    if ($aliasValue.Trim().Length -ge 12) {
+      $grokChat = $aliasValue
+      Write-Host "Using $aliasName for Grok chat bearer upload."
+      break
+    }
+  }
+  if ($grokChat.Trim().Length -ge 12 -and $grokChat.Trim().StartsWith("xai-")) {
+    $grokChat.Trim() | npx wrangler secret put GROK_API_BEARER_TOKEN
+    Write-Host "Uploaded GROK_API_BEARER_TOKEN (console.x.ai chat — not GROK_X_* social keys)."
+  } else {
+    Write-Warning "No valid Grok chat key (xai-...) in credentials.env for account-api."
+    npx wrangler secret delete GROK_API_BEARER_TOKEN 2>$null
+    Write-Host "Removed stale GROK_API_BEARER_TOKEN from account-api (must not reuse GROK_X_BEARER_TOKEN)."
   }
 }
 

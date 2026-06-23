@@ -2,8 +2,8 @@
  * Block Notes + Realm + Doc-Repo update → Discord.
  *
  * Usage:
- *   node scripts/discord-post-blocknotes-realm-announcement.mjs --channel 1512245745166581821
- *   node scripts/discord-post-blocknotes-realm-announcement.mjs --dry-run
+ *   node scripts/discord-post-rootmc-realm-announcement.mjs --channel 1512245745166581821
+ *   node scripts/discord-post-rootmc-realm-announcement.mjs --dry-run
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -58,7 +58,7 @@ const dryRun = process.argv.includes("--dry-run");
 const channelId = arg("--channel") || DEFAULT_CHANNEL;
 
 if (!dryRun && !/^\d{10,}$/.test(channelId)) {
-  console.error("Usage: node scripts/discord-post-blocknotes-realm-announcement.mjs [--channel ID] [--dry-run]");
+  console.error("Usage: node scripts/discord-post-rootmc-realm-announcement.mjs [--channel ID] [--dry-run]");
   process.exit(1);
 }
 
@@ -87,11 +87,11 @@ const leadEmbed = {
   title: "Block Notes + Realm — platform update",
   description:
     "Doc-Repo now documents Block Notes, Realm, and the unified Minecraft plugin.\n\n" +
-    "**Android v1.0.17** · **Paper plugin 1.1.0-SNAPSHOT** · Realm hub at rootrecord.info/realm/",
+    "**Android** · **Paper plugins** · Hub at rootmc.net",
   color: 0x2d6a4f,
   fields: [
-    { name: "Block Notes", value: "https://rootrecord.info/blocknotes", inline: true },
-    { name: "Realm", value: "https://rootrecord.info/realm/", inline: true },
+    { name: "RootMC site", value: "https://rootmc.net", inline: true },
+    { name: "RootMC API", value: "https://api.rootmc.net", inline: true },
     { name: "Documentation", value: "https://github.com/RootRecord/Doc-Repo", inline: false },
   ],
   footer: { text: "Root Record Software Solutions" },
@@ -118,7 +118,7 @@ async function post(payload) {
       headers: {
         Authorization: `Bot ${token}`,
         "Content-Type": "application/json; charset=utf-8",
-        "User-Agent": "RootRecord/doc-repo-blocknotes-announcement",
+        "User-Agent": "RootRecord/doc-repo-rootmc-announcement",
       },
       body: JSON.stringify({ ...payload, allowed_mentions: { parse: [] } }),
     },

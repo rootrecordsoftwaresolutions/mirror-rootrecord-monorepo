@@ -1,0 +1,223 @@
+# RootMC Help — plugins/RootRecord/roothelp.yml
+
+discord:
+  invite-url: "https://discord.gg/rFFQYrNaqS"
+  guild-name: "RootMC Discord"
+  verify-url: "https://rootmc.net/verify"
+  wiki-commands-url: "https://rootmc.net/wiki/player/#commands"
+
+# Optional override; leave blank to use server.map-url from plugins/RootRecord/rootmc.yml
+map:
+  base-url: ""
+
+commands:
+  lines-per-page: 10
+
+messages:
+  prefix: "&8[&2RootMC Help&8]&r "
+  rules-header: "&7Server rules:"
+  rules-footer: "&7Full guide: &bhttps://rootmc.net/wiki/player/"
+  cmds-header: "&7Commands &8(&f{page}&7/&f{pages}&7) &8— &7click a command or page number"
+  cmds-empty: "&eNo commands configured."
+  cmds-page-invalid: "&ePage &f{page}&e is out of range (&f1&7–&f{pages}&e)."
+  discord-header: "&7RootMC Discord & link status"
+  discord-invite: "&7Join the community:"
+  discord-mc-unlinked: "&7Minecraft: &eNot linked &8— &7use &f/link"
+  discord-mc-linked: "&7Minecraft: &aLinked &7(&f{account}&7)"
+  discord-discord-unlinked: "&7Discord: &eNot linked &8— &7open verify and use &fLink with Discord"
+  discord-discord-linked: "&7Discord: &aLinked &7as &f{user}"
+  discord-both-linked: "&aYour game and Discord profiles are linked to RootRecord."
+  discord-stats: "&7Public stats:"
+  discord-no-cloud: "&cRootRecord cloud credentials missing — ask staff."
+  discord-fetch-fail: "&cCould not load link status: &f{error}"
+  map-header: "&7RootMC live map &8— &7click to open in your browser:"
+  map-unconfigured: "&cLive map unavailable — ask staff to check server.map-url in rootmc.yml."
+  feedback-usage: "&7Usage: &f/feedback <message>&7 — bugs, suggestions, or praise for staff."
+  feedback-sent: "&aThanks — your feedback was sent to staff."
+  feedback-too-long: "&eFeedback is limited to &f{max}&e characters."
+  feedback-no-cloud: "&cFeedback is unavailable — cloud credentials missing. Tell staff."
+  feedback-fail: "&cCould not send feedback: &f{error}"
+
+rules:
+  - "&fBe respectful &7— no harassment, slurs, or targeted toxicity."
+  - "&fNo cheating &7— x-ray, dupes, macros, or unfair client mods."
+  - "&fNo griefing claimed land &7— wilderness is open; respect Towny towns."
+  - "&fTowns are overworld only &7— nether/end are wild resource worlds."
+  - "&fEconomy is player-driven &7— earn &fG &7via gold, shops, and trade."
+  - "&fShop prices have a cap &7— &f10% &7above rolling market average."
+  - "&fNo command cheats &7— &f/heal&7, &f/feed&7, &f/repair&7, &f/top&7, portable crafting, and &f/jump &7are staff-only."
+  - "&fLink optional but recommended &7— &f/link &7for stats, app, Discord perks."
+
+command-list:
+  - section: "RootMC — link, waypoints, vault"
+    items:
+      - cmd: "/link"
+        desc: "Start RootRecord account link"
+        permission: rootstat.link
+      - cmd: "/waypoint [label]"
+        desc: "Save waypoint (syncs to app)"
+        permission: rootmc.waypoint
+      - cmd: "/note <text>"
+        desc: "Save location note (syncs to app)"
+        permission: rootmc.note
+      - cmd: "/vault"
+        desc: "Claim pending vault / app purchases"
+        permission: rootmc.vault
+      - cmd: "/value [item]"
+        desc: "Market value of items you carry, or lookup one item"
+      - cmd: "/map"
+        desc: "Open live BlueMap at your location"
+        permission: rootstat.map
+  - section: "Stats — /rootstat"
+    items:
+      - cmd: "/rootstat"
+        desc: "Link status + public stats URL"
+        permission: rootstat.status
+      - cmd: "/rootstat shops"
+        desc: "Root Shops web URL for this server"
+      - cmd: "/rootstat sync"
+        desc: "Force cloud sync (operator)"
+        permission: rootstat.sync
+      - cmd: "/rootstat reload"
+        desc: "Reload RootMC config (operator)"
+        permission: rootstat.reload
+  - section: "Shops — /buy, /rootshops (/rshops)"
+    items:
+      - cmd: "/buy <item> [amount]"
+        desc: "Buy from cheapest in-stock player chest shop"
+      - cmd: "/rootshops create <price>"
+        desc: "Legacy — hold item and click chest instead"
+      - cmd: "Click chest (hold item)"
+        desc: "Deposit stock, sign appears, type price in chat"
+      - cmd: "Right-click shop sign"
+        desc: "Owner: change price or remove shop"
+      - cmd: "Shift-click shop chest"
+        desc: "Owner: open chest to restock"
+      - cmd: "/rootshops remove"
+        desc: "Remove shop on target chest"
+      - cmd: "/rootshops avg <item>"
+        desc: "Rolling average + price cap for item"
+      - cmd: "/value"
+        desc: "Market value of held items + inventory"
+      - cmd: "Right-click shop chest"
+        desc: "Quote + confirm purchase"
+  - section: "Help — /rules, /cmds, /discord, /feedback"
+    items:
+      - cmd: "/rules"
+        desc: "Server rules"
+      - cmd: "/cmds [page]"
+        desc: "Paginated command list (alias /commands)"
+      - cmd: "/discord"
+        desc: "Discord invite + link game & Discord profile"
+      - cmd: "/announcer [on|off|status]"
+        desc: "Toggle rotating RootMC announcement messages"
+      - cmd: "/explore [on|off|status]"
+        desc: "Toggle biome and nearby-structure exploration hints"
+      - cmd: "/feedback <message>"
+        desc: "Send bugs, ideas, or praise to staff (Discord)"
+  - section: "Root Essentials (economy, homes, utility)"
+    items:
+      - cmd: "/balance (/bal)"
+        desc: "Check your G balance"
+      - cmd: "/pay <player> <amount>"
+        desc: "Send gold to another player"
+      - cmd: "/paytoggle"
+        desc: "Toggle whether others can /pay you"
+      - cmd: "/baltop [count]"
+        desc: "Top G balances (server leaderboard)"
+      - cmd: "/mint hand | /mint all"
+        desc: "Convert gold nuggets/ingots/blocks into spendable G (1 ingot = 1 G)"
+      - cmd: "/sell hand | /sell all | /sell blocks"
+        desc: "Sell at chest-shop rolling average (fallback: worth.yml)"
+      - cmd: "/buy <item> [qty]"
+        desc: "Buy from cheapest in-stock chest shop (rootmc-shops)"
+      - cmd: "/spawn"
+        desc: "Teleport to server spawn"
+      - cmd: "/home | /sethome | /delhome | /renamehome | /homes"
+        desc: "Home teleport / set / remove / rename / list"
+      - cmd: "/tpa | /tpahere | /tpaccept | /tpdeny | /back"
+        desc: "Player teleports — click Accept/Deny in chat"
+      - cmd: "/show hand"
+        desc: "Show your held item to the server (hover for details)"
+      - cmd: "/msg <player> <text> | /reply (/r) | /me <action>"
+        desc: "Private messages and emotes"
+      - cmd: "/ignore <player> | /unignore <player>"
+        desc: "Block a player's chat and /msg"
+      - cmd: "/mail | /mail send | /mail read | /mail clear"
+        desc: "Offline mail"
+      - cmd: "/kit starter | /kit list"
+        desc: "Claim or list available kits"
+      - cmd: "/ptime [day|night|reset] | /tpauto"
+        desc: "Personal client time; auto-accept TPA"
+      - cmd: "/worth | /near | /afk | /ping | /getpos"
+        desc: "Utility commands"
+      - cmd: "/nick | /hat"
+        desc: "Donor cosmetics (Pro+)"
+        permission: essentials.nick
+      - cmd: "/warp | /warps"
+        desc: "Server warps"
+      - cmd: "/trash (/disposal) | /clearinventory"
+        desc: "Drop items or clear inventory"
+  - section: "Root-Loans — personal credit"
+    items:
+      - cmd: "/loan take <amount>"
+        desc: "Borrow G (credit limit grows with playtime)"
+        permission: rootloans.use
+      - cmd: "/loan info"
+        desc: "Balance, interest, and repayment status"
+        permission: rootloans.use
+      - cmd: "/loan repay <amount|all>"
+        desc: "Repay from balance or gold ore"
+        permission: rootloans.use
+      - cmd: "/loan list"
+        desc: "All active loans (staff)"
+        permission: rootloans.list
+  - section: "Root-Contracts — escrow jobs"
+    items:
+      - cmd: "/contract offer <player> <amount> <terms...>"
+        desc: "Offer G escrow to another player for a job"
+        permission: rootcontracts.use
+      - cmd: "/contract accept <id>"
+        desc: "Accept an open contract offer"
+        permission: rootcontracts.use
+      - cmd: "/contract complete <id>"
+        desc: "Client releases escrow to worker"
+        permission: rootcontracts.use
+      - cmd: "/contract cancel <id>"
+        desc: "Cancel pending contract (refunds client)"
+        permission: rootcontracts.use
+      - cmd: "/contract list"
+        desc: "Your open and active contracts"
+        permission: rootcontracts.use
+  - section: "Towny (overworld towns)"
+    items:
+      - cmd: "/town new <name>"
+        desc: "Found a town (400 G, overworld only)"
+      - cmd: "/town claim"
+        desc: "Claim chunk you stand in"
+      - cmd: "/town deposit <amount>"
+        desc: "Add G to town bank"
+      - cmd: "/plot claim"
+        desc: "Personal plot in town"
+      - cmd: "/blueprint save"
+        desc: "Save your Towny plot as .schem (Pro/Lifetime)"
+        permission: rootblueprints.use
+      - cmd: "/blueprint save confirm"
+        desc: "Confirm plot capture and download link"
+        permission: rootblueprints.use
+      - cmd: "/towny map"
+        desc: "Town border map"
+      - cmd: "/town invite <player>"
+        desc: "Invite a resident"
+  - section: "mcMMO (skills)"
+    items:
+      - cmd: "/mcstats (/stats)"
+        desc: "Your skill levels and XP"
+      - cmd: "/mctop [skill]"
+        desc: "Server skill leaderboard"
+      - cmd: "/inspect"
+        desc: "Inspect another player's mcMMO stats"
+      - cmd: "/mcability"
+        desc: "Toggle super-ability mode"
+      - cmd: "/party create|join|leave"
+        desc: "mcMMO party for shared XP"

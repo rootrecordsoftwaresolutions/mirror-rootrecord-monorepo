@@ -1,0 +1,22 @@
+# RootMC Blueprints — plugins/RootRecord/root-blueprints.yml
+
+enabled: true
+confirm-timeout-seconds: 300
+
+messages:
+  prefix: "&8[&9Blueprints&8]&r "
+  disabled: "&cBlueprints are disabled on this server."
+  no-towny: "&cTowny is required for plot blueprints."
+  not-in-town: "&cStand in a claimed Towny plot to save a blueprint."
+  no-access: "&cYou may only save your own plot, or any plot if you are the town mayor."
+  not-linked: "&cLink your Minecraft account first: &f/link"
+  not-eligible: "&cPlot blueprints require a RootRecord Pro or Lifetime membership."
+  no-cloud: "&cCloud upload is unavailable — ask staff to check server credentials."
+  pending: "&eSaving &f{town}&e plot &f{plot_x},{plot_z}&e — stand where you want the paste anchor."
+  pending-hint: "&7Run &f/blueprint save confirm&7 within &f{seconds}s&7 to capture bedrock→sky and upload."
+  pending-expired: "&eNo pending save — run &f/blueprint save&7 first."
+  capture-start: "&7Capturing chunk and uploading…"
+  capture-fail: "&cBlueprint failed: &f{error}"
+  capture-done: "&aBlueprint ready: &f{file}"
+  download-hint: "&7Click to download your &f.schem&7 file:"
+  usage: "&7Usage: &f/blueprint save&7 then &f/blueprint save confirm"

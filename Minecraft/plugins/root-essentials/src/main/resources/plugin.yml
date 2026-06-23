@@ -1,0 +1,126 @@
+name: Root-Essentials
+version: '${version}'
+main: com.rootrecord.minecraft.rootessentials.RootEssentialsPlugin
+api-version: '26.1'
+description: RootMC in-house EssentialsX replacement (player commands)
+author: Root Record
+website: https://rootmc.net
+softdepend: [LuckPerms, RootMC-Shops, RootMC, Vault, Towny, TownyChat, Root-Admin, Root-Loans]
+loadbefore: [Towny, TownyChat]
+commands:
+  balance:
+    description: Show balance
+    aliases: [bal]
+  pay:
+    description: Pay another player
+  paytoggle:
+    description: Toggle accepting payments
+  baltop:
+    description: Balance leaderboard
+    aliases: [balancetop]
+  sell:
+    description: Sell items at market average
+  mint:
+    description: Convert gold items to spendable G
+  spawn:
+    description: Teleport to spawn
+  sethome:
+    description: Set a home
+  home:
+    description: Teleport home
+  delhome:
+    description: Delete a home
+  renamehome:
+    description: Rename a home
+  homes:
+    description: List your homes
+  tpa:
+    description: Request teleport to player
+  tpaccept:
+    description: Accept teleport request
+  tpdeny:
+    description: Deny teleport request
+  tpahere:
+    description: Request player teleport to you
+  back:
+    description: Return to previous location
+  msg:
+    description: Private message
+  reply:
+    description: Reply to last message
+    aliases: [r]
+  mail:
+    description: Read or send mail
+  me:
+    description: Emote action in chat
+  ignore:
+    description: Ignore a player
+  unignore:
+    description: Stop ignoring a player
+  kit:
+    description: Claim a kit
+  worth:
+    description: Item worth lookup
+  help:
+    description: Help pointer
+  list:
+    description: Online player list
+  motd:
+    description: Message of the day
+  rules:
+    description: Server rules summary
+  ping:
+    description: Show ping
+  compass:
+    description: Show facing direction
+  depth:
+    description: Show Y level
+  getpos:
+    description: Show coordinates
+  near:
+    description: Nearby players
+  afk:
+    description: Toggle AFK
+  nick:
+    description: Set nickname
+  hat:
+    description: Wear held item as hat
+  warp:
+    description: Teleport to warp
+  warps:
+    description: List warps
+  feed:
+    description: Restore hunger
+  heal:
+    description: Restore health
+  repair:
+    description: Repair held item
+  top:
+    description: Teleport to highest block
+  clear:
+    description: Clear inventory
+    aliases: [clearinventory]
+  trash:
+    description: Open trash inventory
+    aliases: [disposal]
+  suicide:
+    description: Kill yourself
+    aliases: [kill]
+  seen:
+    description: Last seen player
+  ptime:
+    description: Personal client time
+  more:
+    description: Fill held stack
+  workbench:
+    description: Open crafting table
+    aliases: [craft]
+  anvil:
+    description: Open anvil
+  jump:
+    description: Jump forward
+  tpauto:
+    description: Auto-accept teleport requests
+  show:
+    description: Show held item in chat
+    aliases: [showhand]

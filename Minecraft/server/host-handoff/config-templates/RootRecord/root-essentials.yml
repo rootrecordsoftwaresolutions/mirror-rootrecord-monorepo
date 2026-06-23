@@ -1,0 +1,31 @@
+# Root Essentials — plugins/RootRecord/root-essentials.yml
+# Leave mysql host/database/username/password empty to inherit Shockbyte creds from rootmc.yml.
+
+mysql:
+  host: ""
+  port: 3306
+  database: ""
+  username: ""
+  password: ""
+  table-prefix: "root_"
+  jdbc-params: "verifyServerCertificate=false&useSSL=false&useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC"
+
+economy:
+  starting-balance: 0
+  currency-symbol: "G"
+  worth:
+    GOLD_INGOT: 1.0
+    GOLD_NUGGET: 0.11
+    DIAMOND: 25.0
+    IRON_INGOT: 0.75
+    EMERALD: 15.0
+
+homes:
+  default-name: "home"
+  max:
+    default: 3
+    pro: 5
+    lifetime: 8
+
+spawn:
+  world: "world"

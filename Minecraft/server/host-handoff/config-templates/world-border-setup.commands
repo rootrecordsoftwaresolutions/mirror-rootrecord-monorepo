@@ -1,0 +1,8 @@
+# RootMC world border — ±5,000 blocks from spawn (10,000 diameter).
+# Root-Admin applies the same from plugins/RootRecord/root-admin.yml on startup.
+
+worldborder center 0 0
+worldborder set 10000
+worldborder warning distance 512
+worldborder warning time 15
+worldborder damage amount 0

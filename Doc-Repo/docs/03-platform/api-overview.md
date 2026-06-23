@@ -29,7 +29,7 @@ Several products call **dedicated Workers** instead of routing everything throug
 
 | Worker | Base URL (typical) | Product |
 |--------|-------------------|---------|
-| `rootrecord-api-blocknotes` | `https://rootrecord-api-blocknotes.rootrecord.workers.dev/` | Block Notes, Realm, Minecraft server heartbeat |
+| `rootmc-api` | `https://api.rootmc.net/` | RootMC / Block Notes Android, Minecraft server heartbeat, RootMC Discord bot |
 | `rootrecord-api-goals` | `https://api-goals.rootrecord.info/api` (or Workers dev URL) | Root Goals |
 | `rootrecord-api-kilauea` | Kīlauea-specific routes | Kīlauea Alerts |
 

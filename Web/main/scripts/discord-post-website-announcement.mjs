@@ -107,7 +107,7 @@ const embed = {
     { name: "Browse", value: "https://rootrecord.info/", inline: false },
     { name: "Products", value: "https://rootrecord.info/products", inline: true },
     { name: "Charts", value: "https://rootrecord.info/charts/", inline: true },
-    { name: "Realm (Minecraft)", value: "https://rootrecord.info/realm/", inline: true },
+    { name: "RootMC", value: "https://rootmc.net/", inline: true },
   ],
   footer: { text: "Root Record Software Solutions" },
 };

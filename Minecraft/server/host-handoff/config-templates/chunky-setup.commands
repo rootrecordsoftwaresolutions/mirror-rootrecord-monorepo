@@ -1,0 +1,21 @@
+# RootMC chunk pre-generation — ±5k world border (see root-admin.yml world-border.radius).
+# plugins/Chunky/config.yml — continue-on-restart: false
+#
+# Overworld at radius 5000 ≈ 400k chunks.
+# Monitor: /chunky progress
+
+chunky shape square
+chunky center 0 0
+chunky radius 5000
+chunky world world
+chunky start
+
+# Nether (625 = 5000 / 8):
+# chunky radius 625
+# chunky world world_nether
+# chunky start
+
+# End:
+# chunky radius 5000
+# chunky world world_the_end
+# chunky start

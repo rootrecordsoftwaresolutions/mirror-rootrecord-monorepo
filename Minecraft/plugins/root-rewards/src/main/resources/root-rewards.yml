@@ -1,0 +1,53 @@
+# Root-Rewards — plugins/RootRecord/root-rewards.yml
+# Playtime totals are read from RootMC MySQL when available (root_rootmc_playtime).
+
+mysql:
+  enabled: true
+  host: mysql.shockbyte.hil2.shockbyte.host
+  port: 3306
+  database: 75eedc3b19-rootmc
+  username: 75eedc3b19-rootmc-admin
+  password: ""
+  table-prefix: root_
+  jdbc-params: verifyServerCertificate=false&useSSL=false&useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC
+
+playtime:
+  check-interval-seconds: 60
+  # RootMC playtime table (prefix + rootmc_playtime)
+  use-rootmc-playtime: true
+  rootmc-playtime-table: rootmc_playtime
+
+vote:
+  gold-min: 1
+  gold-max: 20
+  cooldown-hours: 24
+  links:
+    - name: "Minecraft-MP"
+      url: "https://minecraft-mp.com/server/359724/vote/"
+    - name: "MinecraftServers.org"
+      url: "https://minecraftservers.org/vote/689134"
+    - name: "Minecraft Server List"
+      url: "https://minecraft-server-list.com/server/521165/vote/"
+    - name: "Minecraft.Buzz"
+      url: "https://minecraft.buzz/vote/21857"
+    - name: "TopMinecraftServers"
+      url: "https://topminecraftservers.org/vote/43816"
+    - name: "MineRank"
+      url: "https://www.minerank.com/rootmc-top-tier-economy-server/vote"
+    - name: "MinecraftList.org"
+      url: "https://minecraftlist.org/vote/34144"
+
+messages:
+  prefix: "&8[&6Root Rewards&8]&r "
+  no-permission: "&cYou do not have permission."
+  economy-missing: "&cEconomy is unavailable — ask staff."
+  playtime-grant: "&aPlaytime reward: &f+{gold} G&a (&7{milestone}&a)."
+  playtime-next: "&7Next milestone: &f{gold} G&7 at &f{time}&7 playtime (&f{remaining}&7 left)."
+  playtime-max: "&aYou have claimed all playtime milestones. Thank you for playing!"
+  playtime-status: "&7Playtime: &f{played}&7 · claimed through &f{tier_label}"
+  vote-grant: "&aThanks for voting on &f{service}&a! &f+{gold} G"
+  vote-cooldown: "&eYou already voted on &f{service}&e recently. Try again in &f{remaining}&e."
+  vote-no-votifier: "&eVote listener is not active — staff must install NuVotifier/VotifierPlus."
+  vote-links-header: "&7Vote for RootMC (&f+{gold_min}-{gold_max} G&7 per site, once per {hours}h):"
+  vote-link-line: "&8  &b{name}&7 — &f{url}"
+  reload-done: "&aRoot-Rewards config reloaded."

@@ -10,7 +10,7 @@ This page summarizes what lives under **`MonoRepo/`** when building RootRecord.
 | `business-manager-app/` | Business Manager — operations, finance, scheduling |
 | `token-manager-app/` | Token Manager — Solana mobile wallet UX |
 | `account-hub-app/` | Account Hub — account spine + subscriptions shortcuts |
-| `blocknotes-android/` | Block Notes — native Kotlin Minecraft companion |
+| `rootmc-android/` | RootMC (Block Notes) — native Kotlin Minecraft companion |
 | `root-goals-mobile/` | Root Goals — Android client |
 | `kilauea-alerts-android/` | Kīlauea Alerts — native Kotlin volcano alerts |
 
@@ -32,10 +32,12 @@ Solana Tools Next.js source is at **`solana-rootrecord-site/`** at the monorepo 
 
 | Path | Project |
 |------|---------|
-| `plugins/blocknotes/` | Unified Block Notes + RootStat Paper plugin |
-| `plugins/rootstat/` | Optional standalone linking plugin |
+| `plugins/rootmc/` | RootMC Paper plugin (linking, economy, McMMO, ingame capture, heartbeat) |
+| `plugins/rootmc-shops/` | Chest shops, `/buy`, price caps |
 | `plugins/rootrecord-common/` | Shared `plugins/RootRecord/` config helpers |
 | `server/` | Local Paper 26.1.2 dev server |
+
+Public wiki (commands + operator docs): **`Web/apps/rootmc-web/public/wiki/`** → [rootmc.net/wiki/](https://rootmc.net/wiki/)
 
 ## This documentation repo (`Doc-Repo/`)
 

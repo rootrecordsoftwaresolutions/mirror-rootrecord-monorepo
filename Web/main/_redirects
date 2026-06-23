@@ -20,11 +20,29 @@
 /roadmap.html /roadmap/ 308
 /roadmap /roadmap/ 308
 
-# Minecraft Realm hub (RootStat verification + server registration).
-/realm /realm/ 308
-/realm/verify /realm/verify/ 308
-/realm/servers /realm/servers/ 308
-# /realm/player and /realm/player/{uuid} → functions/realm/player*.ts (no _redirects — avoids redirect loops)
+# RootMC / Minecraft — migrated to rootmc.net (301).
+/blocknotes.html https://rootmc.net/ 301
+/blocknotes https://rootmc.net/ 301
+/rootmc.html https://rootmc.net/ 301
+/rootmc https://rootmc.net/ 301
+/realm https://rootmc.net/ 301
+/realm/ https://rootmc.net/ 301
+/realm/verify https://rootmc.net/verify/ 301
+/realm/verify/ https://rootmc.net/verify/ 301
+/realm/servers https://rootmc.net/servers/ 301
+/realm/servers/ https://rootmc.net/servers/ 301
+/realm/shops https://rootmc.net/shops/ 301
+/realm/shops.html https://rootmc.net/shops/ 301
+/realm/player https://rootmc.net/player/ 301
+/realm/player/ https://rootmc.net/player/ 301
+/realm/player/* https://rootmc.net/player/:splat 301
+/realm/wiki https://rootmc.net/wiki/ 301
+/realm/wiki/ https://rootmc.net/wiki/ 301
+/realm/wiki/player https://rootmc.net/wiki/player/ 301
+/realm/wiki/player/ https://rootmc.net/wiki/player/ 301
+/realm/wiki/dev https://rootmc.net/wiki/player/ 301
+/realm/wiki/dev/ https://rootmc.net/wiki/player/ 301
+/realm/plugins/* https://rootmc.net/plugins/:splat 301
 
 # Legacy Discord activity URLs → charts subtree.
 /discord-activity /charts/discord-activity/ 308

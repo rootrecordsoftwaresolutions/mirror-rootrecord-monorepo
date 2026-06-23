@@ -22,7 +22,9 @@ cd Minecraft
 
 Built plugins are copied to `server/plugins/` automatically on `:build`.
 
-RootRecord plugin configs live in **`plugins/RootRecord/`** (not per-plugin folders): `rootstat.yml`, `blocknotes.yml`, etc.
+RootRecord config lives in **`plugins/RootRecord/`** only (not `RootRecord/` at the server root): `cloud.yml`, `rootmc.yml`, `rootmc-shops.yml`, etc.
+
+Ship **`rootmc-*.jar`** and **`rootmc-shops-*.jar`** on RootMC hosts. See `config-templates/` and `ROOTMC-DAY1-CHECKLIST.md`.
 
 Bundled: **spark** (Paper profiler). Custom Root Record plugins go alongside it.
 

@@ -76,6 +76,7 @@ import { handleRootsCustodialDepositsRoute } from "./roots-custodial-deposits";
 import { handleRootsSolSwapV1 } from "./roots-sol-swap";
 import { handleRootsTransactionsV1 } from "./roots-transactions";
 import { handleRootsOnchainBuyMonitorRoute } from "./roots-onchain-buy-monitor";
+import { handleInternalGrokChatPost } from "./internal-grok-chat";
 
 // Weather/forecast/natural-disaster modules removed from this shard.
 // Live only on rootrecord-api-weather + rootrecord-api-kilauea (see ./weather.ts there).
@@ -1033,6 +1034,10 @@ export async function handleRequest(
 
   if (method === "POST" && sub === "/internal/discord-activity-daily-rebuild") {
     return handleDiscordActivityDailyRebuildPost(request, env);
+  }
+
+  if (method === "POST" && sub === "/internal/grok-chat") {
+    return handleInternalGrokChatPost(request, env);
   }
 
   if (method === "POST" && sub === "/internal/root-economy-discord-ping") {

@@ -56,9 +56,9 @@ Named **2026 ecosystem neighbors** (e.g. **Jupiter** price/Jupiter Wallet paths,
 
 | Piece | Role |
 |-------|------|
-| **Paper plugin (BlockNotes)** | Server heartbeat, player linking headers (`X-RootStat-Server-Id`), MySQL cache for McMMO/playtime |
+| **Paper plugin (RootMC)** | Server heartbeat, player linking headers (`X-RootStat-Server-Id`), MySQL cache for McMMO/playtime |
 | **MySQL** | Optional on-game-server DB shared with McMMO/Vault; plugin pushes aggregates to D1 via API |
-| **D1 (`rootrecord-api-blocknotes`)** | Linked players, Realm social, server registry, account snapshots |
+| **D1 (`rootmc-api`)** | Linked players, Realm social, server registry, account snapshots |
 
 ## Client stacks (integration boundary)
 

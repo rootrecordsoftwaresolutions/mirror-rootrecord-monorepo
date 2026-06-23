@@ -144,6 +144,11 @@ private fun applyYoutubeEmbed(webView: WebView, target: YoutubeEmbedTarget, base
 
 private fun resolveYoutubeEmbedTarget(loadUrl: String): YoutubeEmbedTarget {
     val trimmed = loadUrl.trim()
+    parseChannelLiveVideoIdToken(trimmed)?.let { channelId ->
+        val src =
+            "https://www.youtube.com/embed/live_stream?channel=$channelId&autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1"
+        return YoutubeEmbedTarget.Iframe(src)
+    }
     extractYoutubeVideoId(trimmed)?.let { id ->
         val src =
             "https://www.youtube.com/embed/$id?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1"
@@ -155,6 +160,13 @@ private fun resolveYoutubeEmbedTarget(loadUrl: String): YoutubeEmbedTarget {
     return YoutubeEmbedTarget.FullPage(trimmed)
 }
 
+private fun parseChannelLiveVideoIdToken(value: String): String? {
+    val raw = value.trim()
+    if (!raw.startsWith("live:", ignoreCase = true)) return null
+    val channelId = raw.substring(5).trim()
+    return channelId.takeIf { it.matches(Regex("""UC[\w-]{20,}""", RegexOption.IGNORE_CASE)) }
+}
+
 private fun extractYoutubeVideoId(url: String): String? {
     Regex("""[?&]v=([A-Za-z0-9_-]{6,})""").find(url)?.groupValues?.getOrNull(1)?.let { return it }
     Regex("""youtu\.be/([A-Za-z0-9_-]{6,})""").find(url)?.groupValues?.getOrNull(1)?.let { return it }
@@ -164,6 +176,9 @@ private fun extractYoutubeVideoId(url: String): String? {
 
 fun LiveFeedEmbedUrl(feed: com.rootrecord.kilauea.alerts.domain.LiveFeed): String {
     feed.embedUrl?.takeIf { it.isNotBlank() }?.let { return it }
+    parseChannelLiveVideoIdToken(feed.youtubeVideoId.orEmpty())?.let { channelId ->
+        return "https://www.youtube.com/embed/live_stream?channel=$channelId&autoplay=1&playsinline=1&rel=0&modestbranding=1"
+    }
     val vid = feed.youtubeVideoId?.trim().orEmpty()
     if (vid.isNotEmpty()) {
         return "https://www.youtube.com/embed/$vid?autoplay=1&playsinline=1&rel=0&modestbranding=1"

@@ -1,4 +1,5 @@
-# Realm (BlockNotes profiles) Pages: DNS grey-cloud CNAME + custom domain realm.rootrecord.info.
+# Legacy realm.rootrecord.info Pages (rootrecord-realm-web): DNS grey-cloud CNAME only.
+# Deploy is redirect-only to rootmc.net — see Web/apps/realm-web/README.md.
 # Optional credentials.env keys:
 #   REALM_PAGES_PROJECT   (default: rootrecord-realm-web)
 #   REALM_PAGES_SUBDOMAIN (default: realm)

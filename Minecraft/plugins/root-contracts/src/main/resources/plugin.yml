@@ -1,0 +1,24 @@
+name: Root-Contracts
+version: '${version}'
+main: com.rootrecord.minecraft.rootcontracts.RootContractsPlugin
+api-version: '26.1'
+description: RootMC player contracts — Gold escrow for jobs and trades.
+author: Root Record
+website: https://rootmc.net
+softdepend: [Root-Essentials, Vault]
+loadafter: [Root-Essentials]
+commands:
+  contract:
+    description: Offer, accept, complete, or cancel a Gold escrow contract
+    usage: /<command> <offer|accept|complete|cancel|list> ...
+  rootcontracts:
+    description: Admin reload for Root-Contracts
+    usage: /<command> reload
+    permission: rootcontracts.reload
+permissions:
+  rootcontracts.use:
+    description: Use /contract
+    default: true
+  rootcontracts.reload:
+    description: Reload root-contracts.yml
+    default: op

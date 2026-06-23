@@ -18,10 +18,10 @@ Short definitions for terms that appear across RootRecord docs and repos.
 | **Volcano alert codes (AccuWeather feed)** | Abbreviated types the Worker maps to readable labels—**VOW** (Volcano Warning), **VOWS** (Volcano Watch), **VOA** (Volcano Activity)—when those products appear in the aggregated alerts response. See [Kīlauea & volcano alerts](../10-deep-dives/kilauea-and-volcano-alerts.md). |
 | **Kīlauea / Hawaiʻi volcano context** | Educational overview of how volcanic notices can surface alongside other alerts in Weather Manager—same **`alerts`** bundle field—not a separate USGS-only integration. See [Kīlauea & volcano alerts](../10-deep-dives/kilauea-and-volcano-alerts.md). |
 | **Token Manager** | Mobile Solana-oriented app; pairs with external wallets; non-custodial by design for keys. |
-| **Block Notes** | Native Android Minecraft companion (`com.rootrecord.blocknotes`); offline Room storage with optional `rootrecord-api-blocknotes` sync. |
+| **Block Notes** | Native Android Minecraft companion (`com.rootrecord.rootmc`); offline Room storage with optional `rootmc-realm-api` sync. |
 | **RootRecord Realm** | Web hub at `/realm/` plus Paper plugin linking Minecraft UUIDs to Root Record accounts. |
-| **RootStat / BlockNotes plugin** | Paper plugin commands (`/rootstat`, `/blocknotes`); production ships unified **BlockNotes** jar only. |
-| **API shard** | Per-product Cloudflare Worker (e.g. `rootrecord-api-blocknotes`) with its own router and D1 bindings. |
+| **RootStat / RootMC plugin** | Paper plugin commands (`/rootstat`, `/rootmc`); production ships unified **RootMC** jar only. |
+| **API shard** | Per-product Cloudflare Worker (e.g. `rootmc-realm-api`) with its own router and D1 bindings. |
 | **Solana Tools site** | Public Next.js app in repo [**RootRecord/solana-rootrecord-site**](https://github.com/RootRecord/solana-rootrecord-site), deployed from that repo’s root. Live at [solana.rootrecord.info](https://solana.rootrecord.info). Not developed under arbitrary copies inside `Web/solana/`. |
 | **Pages** | Cloudflare Pages—static site hosting. **`Web/main/`** is the rootrecord.info marketing site. |
 | **Worker** | Cloudflare Worker—a serverless V8 isolate at the edge running the API routers. |

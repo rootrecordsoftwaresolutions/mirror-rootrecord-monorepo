@@ -16,14 +16,14 @@ flowchart TB
 
   subgraph cf [Cloudflare]
     API[api.rootrecord.info — primary Worker]
-    BNAPI[rootrecord-api-blocknotes]
+    BNAPI[api.rootmc.net — rootmc-api]
     LIC[rootrecord-license Worker]
     PAGES[Pages — static site]
     D1[(D1 SQLite)]
   end
 
   subgraph mc [Minecraft]
-    PAPER[Paper + BlockNotes plugin]
+    PAPER[Paper + RootMC plugin]
     MYSQL[(MySQL)]
   end
 

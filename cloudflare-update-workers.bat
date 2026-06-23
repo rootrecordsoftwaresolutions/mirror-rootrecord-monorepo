@@ -10,9 +10,11 @@ rem   cloudflare-update-workers.bat <name>           - deploy ONE worker
 rem   cloudflare-update-workers.bat <name> nopause   - same, no pause (for calling scripts)
 rem
 rem Valid <name> values:
-rem   weather  business  account  token  kilauea  blocknotes  goals  - per-product API shard
+rem   weather  business  account  token  kilauea  goals  - per-product API shard (RootRecord account)
+rem   rootmc  rootmc-api  - RootMC API on api.rootmc.net (RootMC Cloudflare account; Desktop\RootMC\.env)
 rem   license                                        - rootrecord-license
 rem   app-build                                      - rootrecord-app-build
+rem   minecraft-map                                  - rootrecord-minecraft-map (BlueMap HTTPS)
 rem
 rem Skipped intentionally (legacy / frozen):
 rem   rootrecord-primary       (phased out; shards still read its .deploy-jwt read-only)
@@ -43,7 +45,7 @@ set "ERR=0"
 rem Web\cloudflare\shared\password-verify.ts imports @noble/hashes/*; esbuild resolves those
 rem imports starting from the shared/ directory, so it needs its own node_modules.
 
-set "STEP=[1/4] shared (node_modules for Web\cloudflare\shared)"
+set "STEP=[1/5] shared (node_modules for Web\cloudflare\shared)"
 echo %STEP%
 pushd "Web\cloudflare\shared"
 if errorlevel 1 goto FAIL
@@ -51,7 +53,7 @@ call npm ci
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[2/4] API shards (weather/business/account/token/kilauea/blocknotes/goals)"
+set "STEP=[2/5] API shards (weather/business/account/token/kilauea/goals)"
 echo %STEP%
 pushd "Web\cloudflare"
 if errorlevel 1 goto FAIL
@@ -59,7 +61,7 @@ call powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy-api-shards.ps
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[3/4] rootrecord-license"
+set "STEP=[3/5] rootrecord-license"
 echo %STEP%
 pushd "Web\cloudflare\rootrecord-license"
 if errorlevel 1 goto FAIL
@@ -69,9 +71,19 @@ call powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy.ps1"
 if errorlevel 1 ( popd & goto FAIL )
 popd
 
-set "STEP=[4/4] rootrecord-app-build"
+set "STEP=[4/5] rootrecord-app-build"
 echo %STEP%
 pushd "Web\cloudflare\rootrecord-app-build"
+if errorlevel 1 goto FAIL
+call npm ci
+if errorlevel 1 ( popd & goto FAIL )
+call powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy.ps1"
+if errorlevel 1 ( popd & goto FAIL )
+popd
+
+set "STEP=[5/5] rootrecord-minecraft-map"
+echo %STEP%
+pushd "Web\cloudflare\rootrecord-minecraft-map"
 if errorlevel 1 goto FAIL
 call npm ci
 if errorlevel 1 ( popd & goto FAIL )
@@ -104,14 +116,16 @@ if /I "%ONLY%"=="business"  set "TARGET=Web\cloudflare\rootrecord-api-business"
 if /I "%ONLY%"=="account"   set "TARGET=Web\cloudflare\rootrecord-api-account"
 if /I "%ONLY%"=="token"     set "TARGET=Web\cloudflare\rootrecord-api-token"
 if /I "%ONLY%"=="kilauea"   set "TARGET=Web\cloudflare\rootrecord-api-kilauea"
-if /I "%ONLY%"=="blocknotes" set "TARGET=Web\cloudflare\rootrecord-api-blocknotes"
+if /I "%ONLY%"=="rootmc" set "TARGET=Web\cloudflare\rootmc-api"
+if /I "%ONLY%"=="rootmc-api" set "TARGET=Web\cloudflare\rootmc-api"
 if /I "%ONLY%"=="goals" set "TARGET=Web\cloudflare\rootrecord-api-goals"
 if /I "%ONLY%"=="license"   set "TARGET=Web\cloudflare\rootrecord-license"
 if /I "%ONLY%"=="app-build" set "TARGET=Web\cloudflare\rootrecord-app-build"
+if /I "%ONLY%"=="minecraft-map" set "TARGET=Web\cloudflare\rootrecord-minecraft-map"
 
 if "%TARGET%"=="" (
   echo Unknown worker: %ONLY%
-  echo Valid: weather business account token kilauea blocknotes goals license app-build
+  echo Valid: weather business account token kilauea rootmc rootmc-api goals license app-build minecraft-map
   if not "%NOPAUSE%"=="1" pause
   endlocal
   exit /b 1

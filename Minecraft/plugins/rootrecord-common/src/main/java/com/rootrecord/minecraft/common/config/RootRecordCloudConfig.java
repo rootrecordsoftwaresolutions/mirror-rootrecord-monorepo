@@ -36,7 +36,7 @@ public final class RootRecordCloudConfig {
         CloudSettings fromLegacy = fromFile(legacyRootStatConfig(plugin));
 
         return new CloudSettings(
-                firstNonBlank(fromPlugin.apiBase(), fromShared.apiBase(), fromLegacy.apiBase(), "https://rootrecord.info"),
+                firstNonBlank(fromPlugin.apiBase(), fromShared.apiBase(), fromLegacy.apiBase(), "https://api.rootmc.net"),
                 firstNonBlank(fromPlugin.serverId(), fromShared.serverId(), fromLegacy.serverId()),
                 firstNonBlank(fromPlugin.serverSecret(), fromShared.serverSecret(), fromLegacy.serverSecret()));
     }

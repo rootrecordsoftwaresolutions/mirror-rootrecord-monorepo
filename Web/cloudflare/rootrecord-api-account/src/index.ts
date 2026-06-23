@@ -66,19 +66,20 @@ export default {
       }
       return;
     }
-    if (c === "17 9 * * *" && shard === "account") {
-      const sk = String(env.STRIPE_SECRET_KEY || "").trim();
-      if (!sk.startsWith("sk_")) return;
-      const r = await reconcileStaleStripeSubscriptions({
-        db: env.DB,
-        stripeSecretKey: sk,
-        staleAfterDays: 32,
-        limit: 50,
-      });
-      console.log("stripe reconcile", JSON.stringify(r));
-      return;
-    }
     if (c === "* * * * *" && shard === "account") {
+      const when = new Date(event.scheduledTime || Date.now());
+      if (when.getUTCHours() === 9 && when.getUTCMinutes() === 17) {
+        const sk = String(env.STRIPE_SECRET_KEY || "").trim();
+        if (sk.startsWith("sk_")) {
+          const r = await reconcileStaleStripeSubscriptions({
+            db: env.DB,
+            stripeSecretKey: sk,
+            staleAfterDays: 32,
+            limit: 50,
+          });
+          console.log("stripe reconcile", JSON.stringify(r));
+        }
+      }
       // Root Economy "Internal circulation" Discord webhook disabled (was every :00/:45 UTC).
       // Re-enable: call runRootEconomyDiscordCron when utcMin is 0 or 45, or set ROOT_ECONOMY_DISCORD_CRON_ENABLED=1.
       const economyCronEnabled =

@@ -27,7 +27,7 @@ export const APP_SESSION_LABELS: Record<string, string> = {
   rootrecord_kilauea_alerts_web: "Kīlauea Alerts (Web)",
   rootrecord_goals_android: "Root Goals (Android)",
   rootrecord_goals_web: "Root Goals (Web)",
-  rootrecord_blocknotes_android: "Block Notes (Android)",
+  rootrecord_rootmc_android: "Block Notes (Android)",
   rootrecord_portal: "RootRecord portal",
   root_farms_android: "Root Units Idle Farmer (Android)",
 };

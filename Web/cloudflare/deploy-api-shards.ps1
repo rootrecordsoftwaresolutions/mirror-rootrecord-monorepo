@@ -8,7 +8,6 @@ $shards = @(
   "rootrecord-api-account",
   "rootrecord-api-token",
   "rootrecord-api-kilauea",
-  "rootrecord-api-blocknotes",
   "rootrecord-api-goals"
 )
 foreach ($name in $shards) {

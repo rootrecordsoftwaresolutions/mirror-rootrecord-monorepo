@@ -12,7 +12,7 @@ Most Android apps ship a **React (CRA) frontend** as the same SPA on the web: `p
 | Token Manager | `rootrecord-token-web` | `token.rootrecord.info` |
 | Kīlauea Alerts (web) | `rootrecord-kilauea-web` | `kilauea.rootrecord.info` |
 | Root Goals | `rootrecord-goals-web` | `goals.rootrecord.info` |
-| Realm (BlockNotes profiles) | `rootrecord-realm-web` | `realm.rootrecord.info` |
+| RootMC (legacy redirect) | `rootrecord-realm-web` | `realm.rootrecord.info` → **301 to [rootmc.net](https://rootmc.net/)** |
 
 Domains are suggestions only; use whatever fits DNS and branding.
 
@@ -36,6 +36,10 @@ pnpm run pages:deploy:account
 pnpm run pages:deploy:token
 pnpm run pages:deploy:kilauea
 pnpm run pages:deploy:goals
+# Legacy realm.rootrecord.info redirect (→ rootmc.net; no npm deps):
+cd Web\apps\realm-web && pnpm run pages:deploy
+# Canonical RootMC site: Web\apps\rootmc-web (rootmc.net)
+# or: cloudflare-update-pages.bat realm
 ```
 
 Or from an app frontend folder: `pnpm run pages:deploy` (builds if `build/index.html` is missing). After a local build: `pnpm run pages:deploy:only`.

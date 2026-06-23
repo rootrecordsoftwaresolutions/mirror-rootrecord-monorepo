@@ -1,10 +1,11 @@
-# Block Notes (Android)
+# RootMC (Block Notes Android)
 
-**Block Notes** (`com.rootrecord.blocknotes`) is Root Record’s native **Kotlin + Jetpack Compose** Minecraft companion: offline-first notes, coordinates, build plans, world maps, and optional cloud features when signed into a Root Record account.
+**RootMC** is the in-app display name for **Block Notes** (`com.rootrecord.rootmc`) — Root Record’s native **Kotlin + Jetpack Compose** Minecraft companion: offline-first notes, coordinates, build plans, world maps, RootMC server tab (stats, shops, stock market, vault), and optional cloud features when signed into a Root Record account.
 
-**Display name:** Block Notes  
-**Stable app id:** `rootrecord_blocknotes_android`  
-**Products page:** [rootrecord.info/blocknotes](https://rootrecord.info/blocknotes)
+**Display name (app):** RootMC · **Play listing name:** Block Notes  
+**Stable app id:** `rootrecord_rootmc_android`  
+**Site:** [rootmc.net](https://rootmc.net/)  
+**RootMC Discord:** https://discord.gg/rFFQYrNaqS (guild `1516108585740800042`)
 
 ## What problem it solves
 
@@ -17,12 +18,13 @@ Core notes and worlds live in **Room** on-device. Cloud routes are additive.
 
 ## How it talks to the cloud
 
-Production API shard: **`rootrecord-api-blocknotes`**
+Production API: **`rootmc-api`** on **`https://api.rootmc.net`**
 
 | Surface | URL |
 |---------|-----|
-| Worker (direct) | `https://rootrecord-api-blocknotes.rootrecord.workers.dev/` |
-| Custom domain (when attached) | Routes under `rootrecord.info` via Pages Functions proxy |
+| Worker (production) | `https://api.rootmc.net/` |
+| Web proxy | `https://rootmc.net/api/*` (Pages Functions) |
+| Source (monorepo) | `Web/cloudflare/rootmc-realm-api/` (bundled into `rootmc-api`) |
 
 Representative routes:
 
@@ -30,10 +32,13 @@ Representative routes:
 |--------------|---------|
 | `POST /api/feedback` | In-app feedback → Discord |
 | `GET/PUT /api/sync/snapshot` | Signed-in backup of worlds, notes, waypoints, areas |
-| `/api/blocknotes/realm/*` | Player profiles, friends, groups, group chat |
-| `/api/blocknotes/world-ai` | Grok world analysis reports (tier limits) |
-| `/api/blocknotes/server/*` | Featured SMP metadata + plugin heartbeat (server-authenticated) |
+| `/api/rootmc/realm/*` | Player profiles, friends, groups, group chat |
+| `/api/rootmc/world-ai` | Grok world analysis reports (tier limits) |
+| `/api/rootmc/server/*` | Featured SMP metadata + plugin heartbeat (server-authenticated) |
+| `GET /v1/mobile/config` | Featured SMP + reference version + RootMC Discord invite |
 | `/v1/auth/*`, `/v1/me` | Optional Root Record sign-in / membership |
+
+Mobile config returns `support_discord_guild_id` (`1516108585740800042`), `support_discord_invite_url` (`https://discord.gg/rFFQYrNaqS`), and optional `support_discord_channel_id`.
 
 Auth: Bearer token after Root Record sign-in; guest flows use `X-Guest-Id` where applicable.
 
@@ -46,15 +51,15 @@ Auth: Bearer token after Root Record sign-in; guest flows use `X-Guest-Id` where
 
 | Layer | Path |
 |-------|------|
-| Android app | `Mobile/blocknotes-android/` |
-| API Worker | `Web/cloudflare/rootrecord-api-blocknotes/` |
-| Marketing page | `Web/main/blocknotes.html` |
-| Staged releases | `Mobile/builds/blocknotes/` |
+| Android app | `Mobile/rootmc-android/` |
+| API Worker (deploy) | `Web/cloudflare/rootmc-api/` (source in `rootmc-realm-api/`) |
+| Marketing page | `Web/main/rootmc.html` |
+| Staged releases | `Mobile/builds/rootmc/` |
 
 ## Build & release
 
 ```powershell
-cd Mobile/blocknotes-android
+cd Mobile/rootmc-android
 .\gradlew.bat assembleDebug
 # Signed Play release:
 .\bump-and-build-release.bat
@@ -62,16 +67,19 @@ cd Mobile/blocknotes-android
 
 Requires **JDK 17**, Android SDK (`local.properties` → `sdk.dir`), and gitignored upload keystore for release.
 
-Current baseline in repo: **versionName 1.0.17** (versionCode 17) — verify `app/build.gradle.kts` before shipping.
+Current baseline in repo: **versionName 1.0.20** (versionCode 20) — verify `app/build.gradle.kts` before shipping.
 
-## Realm & SMP integration
+## Realm & RootMC integration
 
-Block Notes pairs with the **RootRecord Realm** hub ([rootrecord.info/realm/](https://rootrecord.info/realm/)) and the **BlockNotes Paper plugin** on the dedicated SMP. Players link in-game with `/rootstat link`, verify at [rootrecord.info/realm/verify](https://rootrecord.info/realm/verify), and view public stats at `/realm/player/{uuid}`.
+RootMC pairs with the **RootMC** site ([rootmc.net](https://rootmc.net/)) and **RootMC + rootmc-shops** on the dedicated SMP. Players link in-game with `/rootmc link`, verify at [rootmc.net/verify/](https://rootmc.net/verify/), and view public stats at `/player/{uuid}`.
 
-See [minecraft-realm.md](minecraft-realm.md) for server plugin and heartbeat details.
+**Wiki (all commands):** [rootmc.net/wiki/player/#commands](https://rootmc.net/wiki/player/#commands)
+
+See [minecraft-realm.md](minecraft-realm.md) for server plugins, economy, vault/stock market, and heartbeat details.
 
 ## Related reading
 
-- [minecraft-realm.md](minecraft-realm.md) — Paper plugin, linking, McMMO, playtime
+- [minecraft-realm.md](minecraft-realm.md) — RootMC server, plugins, linking, McMMO, shops, wiki
 - [../06-development/build-and-release-mobile.md](../06-development/build-and-release-mobile.md)
 - [../03-platform/api-overview.md](../03-platform/api-overview.md)
+- [RootMC wiki](https://rootmc.net/wiki/)

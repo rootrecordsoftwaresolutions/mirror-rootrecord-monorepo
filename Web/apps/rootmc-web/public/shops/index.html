@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shops — RootMC</title>
+  <meta name="description" content="Browse player shop listings and prices on RootMC.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <meta name="theme-color" content="#0a140a">
+  <link rel="stylesheet" href="/styles/rootmc.css">
+  <style>
+    .shops-wrap { max-width: 52rem; margin: 0 auto; padding: 2rem 0 3rem; }
+    .shops-grid { display: grid; gap: 0.75rem; margin-top: 0.75rem; }
+    .shop-row, .price-row {
+      border: 1px solid var(--rmc-line); border-radius: var(--rmc-r);
+      padding: 0.75rem 0.9rem; font-size: 0.92rem; background: var(--rmc-surface);
+    }
+    .shop-row strong, .price-row strong { display: block; color: var(--rmc-ink); }
+    .muted-small { color: var(--rmc-ink-muted); font-size: 0.88rem; }
+    .leader-row {
+      display: flex; justify-content: space-between; gap: 0.5rem;
+      padding: 0.45rem 0; border-bottom: 1px solid var(--rmc-line);
+    }
+    .shops-wrap h1 { font-family: var(--rmc-display); margin: 0.25rem 0; }
+    .shops-wrap h2 { font-family: var(--rmc-display); font-size: 1.15rem; margin: 0 0 0.35rem; }
+    .shops-error { color: var(--rmc-danger); }
+  </style>
+</head>
+<body>
+  <header class="rmc-header">
+    <div class="container rmc-header-inner">
+      <a class="rmc-brand" href="/"><img src="/favicon-180.png" alt="" width="36" height="36">RootMC</a>
+      <nav class="rmc-nav">
+        <a href="/">Home</a>
+        <a href="/player/">Players</a>
+        <a href="/market/">Stock market</a>
+        <a href="/shops/" aria-current="page">Shops</a>
+        <a href="/wiki/">Wiki</a>
+        <a href="https://map.rootmc.net" target="_blank" rel="noopener">Live map</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container shops-wrap">
+    <p class="wiki-breadcrumb"><a href="/">Home</a> / Shops</p>
+    <h1>Player shops</h1>
+    <p id="shops-subtitle" class="muted-small">Loading…</p>
+    <p id="shops-error" class="shops-error" hidden></p>
+
+    <section style="margin-top:1.5rem">
+      <h2>Average prices</h2>
+      <div id="price-list" class="shops-grid"></div>
+    </section>
+
+    <section style="margin-top:1.5rem">
+      <h2>Listings</h2>
+      <div id="listing-list" class="shops-grid"></div>
+    </section>
+
+    <section style="margin-top:1.5rem">
+      <h2>Richest players</h2>
+      <div id="leaderboard"></div>
+    </section>
+  </main>
+
+  <footer class="rmc-footer">
+    <div class="container"><p><a href="/market/">Stock market</a> · <a href="/">Home</a></p></div>
+  </footer>
+  <script src="/shops/shops.js" defer></script>
+</body>
+</html>

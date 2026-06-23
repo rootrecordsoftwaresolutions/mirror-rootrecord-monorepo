@@ -1,0 +1,43 @@
+# Root-Explore — plugins/RootRecord/root-explore.yml
+# Uses the server's own structure map (same data as /locate) — not third-party seed maps.
+
+enabled: true
+prefix: "&8[&bExplore&8]&r "
+
+biome-hints:
+  enabled: true
+  message: "&7Entering &f{biome}&7."
+
+structure-hints:
+  enabled: true
+  search-radius-blocks: 256
+  notify-within-blocks: 96
+  cooldown-minutes: 40
+  # One structure lookup per server tick (spread across online players).
+  overworld:
+    village: "&7You are nearing a &fvillage&7..."
+    trial_chambers: "&7You are nearing a &fTrial Chamber&7..."
+    mansion: "&7You are nearing a &fwoodland mansion&7..."
+    ancient_city: "&7You are nearing an &fancient city&7..."
+    stronghold: "&7You are nearing a &fstronghold&7..."
+    pillager_outpost: "&7You are nearing a &fpillager outpost&7..."
+    monument: "&7You are nearing an &focean monument&7..."
+    desert_pyramid: "&7You are nearing a &fdesert pyramid&7..."
+    jungle_temple: "&7You are nearing a &fjungle temple&7..."
+    swamp_hut: "&7You are nearing a &fswamp hut&7..."
+    trail_ruins: "&7You are nearing &ftrail ruins&7..."
+    shipwreck: "&7You are nearing a &fshipwreck&7..."
+  nether:
+    fortress: "&7You are nearing a &fnether fortress&7..."
+    bastion_remnant: "&7You are nearing a &fbastion&7..."
+  end:
+    end_city: "&7You are nearing an &fend city&7..."
+
+messages:
+  no-permission: "&cYou do not have permission."
+  players-only: "&cPlayers only."
+  toggle-on: "&aExploration hints enabled."
+  toggle-off: "&7Exploration hints disabled. Use &f/explore &7to turn them back on."
+  toggle-status-on: "&7Exploration hints: &aON"
+  toggle-status-off: "&7Exploration hints: &eOFF"
+  reload-done: "&aRoot-Explore reloaded."

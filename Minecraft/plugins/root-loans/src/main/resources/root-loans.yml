@@ -1,0 +1,45 @@
+# Root-Loans — plugins/RootRecord/root-loans.yml
+
+mysql:
+  enabled: true
+  host: ""
+  port: 3306
+  database: ""
+  username: ""
+  password: ""
+  table-prefix: "root_"
+  jdbc-params: "verifyServerCertificate=false&useSSL=false&useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC"
+
+loan:
+  enabled: true
+  interest-rate: 0.10
+  starting-max-loan: 50.0
+  max-loan-multiplier: 1.1
+  hard-cap: 500.0
+  max-takes-per-24h: 3
+  income-sweep-percent: 1.0
+  gold-ore-repayment: true
+
+messages:
+  prefix: "&8[&6Root Loans&8]&r "
+  no-permission: "&cYou do not have permission."
+  players-only: "&cPlayers only."
+  disabled: "&eLoans are disabled."
+  invalid-amount: "&eAmount must be greater than 0."
+  active-loan: "&cYou already have an active loan. Pay it off first."
+  rate-limited: "&cLoan limit reached (&f{max}&c per 24h). Next slot in &f{time}&c."
+  over-limit: "&cMaximum loan is &f{max} G&c."
+  take-success: "&aBorrowed &f{principal} G&a. You owe &f{owed} G&a (&7{interest}% interest&a)."
+  take-failed: "&cCould not create loan."
+  no-loan: "&7You have no active loan."
+  info-header: "&6Loan &7— owed &c{owed} G&7 | limit &f{max} G&7 | takes &f{takes}/{max_takes}&7 (24h)"
+  info-clear: "&aNo active loan. &7Borrowing limit: &f{max} G&7 | takes &f{takes}/{max_takes}&7 (24h)"
+  repay-success: "&aPaid &f{amount} G&a toward your loan. Remaining: &f{owed} G&a."
+  repay-none: "&eNothing to repay."
+  repay-insufficient: "&cInsufficient balance. Need &f{amount} G&c, you have &f{balance} G&c."
+  paid-off: "&aLoan paid in full! &7Next limit: &f{max} G&a."
+  income-sweep: "&7&f{amount} G &7applied to your loan (&f{owed} G &7remaining)."
+  ore-sweep: "&7Gold ore value (&f{amount} G&7) applied to your loan."
+  list-empty: "&7No active loans."
+  list-row: "&f{player}&7: &c{owed} G &7(principal &f{principal} G&7)"
+  reload-done: "&aRoot-Loans config reloaded."

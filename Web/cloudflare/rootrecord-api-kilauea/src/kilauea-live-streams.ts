@@ -16,19 +16,45 @@ export type KilaueaLiveStreamRow = {
   updated_at: string;
 };
 
+/** True when watch_url always resolves to the channel's current live broadcast (id changes each session). */
+export function isChannelLiveWatchUrl(watchUrl: string): boolean {
+  return /\/@[^/?#]+\/live\/?(?:[?#]|$)/i.test(String(watchUrl || "").trim());
+}
+
+const YOUTUBE_EMBED_QUERY = "autoplay=1&playsinline=1&rel=0&modestbranding=1";
+
+/** `live:UC…` in youtube_video_id — permanent iframe for the channel's current broadcast. */
+export function parseChannelLiveVideoIdToken(youtubeVideoId: string | null | undefined): string | null {
+  const raw = String(youtubeVideoId || "").trim();
+  if (!raw.toLowerCase().startsWith("live:")) return null;
+  const channelId = raw.slice(5).trim();
+  return /^UC[\w-]{20,}$/i.test(channelId) ? channelId : null;
+}
+
+export function embedUrlForChannelLive(channelId: string): string {
+  return `https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(channelId)}&${YOUTUBE_EMBED_QUERY}`;
+}
+
 /** YouTube iframe embed when we have a stable video id; otherwise the watch URL (e.g. @channel/live). */
 export function embedUrlForStream(row: {
   watch_url: string;
   youtube_video_id?: string | null;
 }): string {
-  const vid = String(row.youtube_video_id || "").trim();
-  if (vid) {
-    return `https://www.youtube.com/embed/${encodeURIComponent(vid)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
+  const channelLiveId = parseChannelLiveVideoIdToken(row.youtube_video_id);
+  if (channelLiveId) {
+    return embedUrlForChannelLive(channelLiveId);
   }
   const watch = String(row.watch_url || "").trim();
+  if (isChannelLiveWatchUrl(watch)) {
+    return watch;
+  }
+  const vid = String(row.youtube_video_id || "").trim();
+  if (vid) {
+    return `https://www.youtube.com/embed/${encodeURIComponent(vid)}?${YOUTUBE_EMBED_QUERY}`;
+  }
   const m = watch.match(/[?&]v=([^&]+)/);
   if (m?.[1]) {
-    return `https://www.youtube.com/embed/${encodeURIComponent(m[1])}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
+    return `https://www.youtube.com/embed/${encodeURIComponent(m[1])}?${YOUTUBE_EMBED_QUERY}`;
   }
   return watch;
 }

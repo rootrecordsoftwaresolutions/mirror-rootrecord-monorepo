@@ -58,8 +58,8 @@ Short definitions so search and assistants can anchor terms to RootRecord withou
 | **RootRecord Weather** | **Weather Manager** — client apps and the primary API delivering forecasts, NOAA-style alerts, and hazard-aware environmental data for operators and homeowners; paired with optional cloud sync via [api.rootrecord.info](https://api.rootrecord.info). |
 | **RootRecord Business** | **Business Manager** — Android-first operations: time, money, clients, scheduling, and reporting backed by the primary Worker API. |
 | **Solana Tools** | The public browser experience at [solana.rootrecord.info](https://solana.rootrecord.info), shipped from [`RootRecord/solana-rootrecord-site`](https://github.com/RootRecord/solana-rootrecord-site). |
-| **Block Notes** | Native Android Minecraft companion — offline notes, coords, maps; optional Realm cloud via `rootrecord-api-blocknotes`. |
-| **RootRecord Realm** | Web hub at [rootrecord.info/realm/](https://rootrecord.info/realm/) plus Paper plugin linking players to Root Record accounts. |
+| **Block Notes** | Native Android Minecraft companion — offline notes, coords, maps; optional Realm cloud via `rootmc-realm-api`. |
+| **RootMC** | Web hub at [rootmc.net](https://rootmc.net/) plus Paper plugin linking players to Root Record accounts. |
 
 ---
 
@@ -116,7 +116,7 @@ Covers **Business Manager**, **Weather Manager**, **Token Manager**, **Account H
 - [Weather Manager](docs/02-products/weather-manager.md)
 - [Token Manager (mobile)](docs/02-products/token-manager.md)
 - [Account Hub](docs/02-products/account-hub.md)
-- [Block Notes (Android)](docs/02-products/blocknotes.md)
+- [Block Notes (Android)](docs/02-products/rootmc.md)
 - [Minecraft Realm & plugins](docs/02-products/minecraft-realm.md)
 - [Root Goals](docs/02-products/root-goals.md)
 - [Marketing website](docs/02-products/marketing-website.md) — live site: [rootrecord.info](https://rootrecord.info)

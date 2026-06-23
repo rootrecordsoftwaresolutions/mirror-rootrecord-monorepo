@@ -1,0 +1,104 @@
+# Root Essentials — plugins/RootRecord/root-essentials.yml
+
+mysql:
+  host: ""
+  port: 3306
+  database: ""
+  username: ""
+  password: ""
+  table-prefix: "root_"
+  jdbc-params: "verifyServerCertificate=false&useSSL=false&useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC"
+
+economy:
+  starting-balance: 0
+  currency-symbol: "G"
+  # 1 G = 1 gold ingot. Mint converts physical gold → spendable balance.
+  # /sell and /worth prefer chest-shop rolling averages (RootMC) over static worth below.
+  # Optional migration path — loads Essentials legacy worth keys on top of inline map
+  worth-file: "plugins/Essentials/worth.yml"
+  worth:
+    GOLD_INGOT: 1.0
+    GOLD_NUGGET: 0.11
+    DIAMOND: 200.0
+    IRON_INGOT: 22.0
+    EMERALD: 15.0
+    COBBLESTONE: 1.0
+
+homes:
+  default-name: "home"
+  max:
+    default: 3
+    pro: 5
+    lifetime: 8
+
+spawn:
+  world: "world"
+
+teleport:
+  warmup-seconds: 3
+  combat-tag-seconds: 30
+
+newbie-kit: "starter"
+
+server:
+  motd:
+    - "&aWelcome to &fRootMC&a!"
+    - "&7Use &f/cmds &7for commands."
+  rules:
+    - "&fBe respectful &7— no harassment or toxicity."
+    - "&fNo cheating &7— x-ray, dupes, unfair mods."
+    - "&fFull rules: &f/rules &7(RootHelp)"
+
+kits:
+  starter:
+    delay-seconds: -1
+    items:
+      - "IRON_PICKAXE 1"
+      - "IRON_AXE 1"
+      - "IRON_SHOVEL 1"
+      - "IRON_HOE 1"
+      - "IRON_SWORD 1"
+      - "BAKED_POTATO 16"
+
+messages:
+  prefix: "&8[&2Root Essentials&8]&r "
+  no-permission: "&cYou do not have permission."
+  players-only: "&cPlayers only."
+  invalid-number: "&eInvalid number."
+  player-not-found: "&ePlayer not found: &f{player}"
+  muted: "&cYou are muted."
+
+  balance-self: "&7Balance: &f{balance}&7 {currency}"
+  balance-other: "&7{player}: &f{balance}&7 {currency}"
+  pay-self: "&cYou cannot pay yourself."
+  pay-invalid-amount: "&eAmount must be greater than 0."
+  pay-insufficient: "&cInsufficient balance. Need &f{amount}&c {currency}, you have &f{balance}&c."
+  pay-sent: "&aSent &f{amount}&a {currency} to &f{player}&a."
+  pay-received: "&aReceived &f{amount}&a {currency} from &f{player}&a."
+  pay-disabled: "&eThat player is not accepting payments."
+  paytoggle-on: "&aYou are now accepting payments."
+  paytoggle-off: "&eYou are no longer accepting payments."
+  msg-ignored: "&eThat player is ignoring you."
+  chat-muted: "&cGlobal chat is muted."
+
+  sell-empty-hand: "&eHold an item to use &f/sell hand&e."
+  sell-not-priced: "&eNo configured worth for &f{item}&e."
+  sell-nothing: "&eNo sellable items found."
+  sell-success: "&aSold &f{count}&a item(s) for &f{amount}&a {currency}."
+
+  mint-nothing: "&eNo mintable gold in your inventory."
+  mint-not-gold: "&eOnly gold nuggets, ingots, and blocks can be minted (&f{item}&e)."
+  mint-success: "&aMinted &f{count}&a gold item(s) into &f{amount}&a {currency}."
+
+  sethome-saved: "&aHome &f{name}&a set."
+  sethome-limit: "&eHome limit reached (&f{max}&e). Remove one with &f/delhome <name>&e."
+  home-missing: "&eHome &f{name}&e not found."
+  home-teleport: "&aTeleported to &f{name}&a."
+  delhome-done: "&aDeleted home &f{name}&a."
+  spawn-unavailable: "&cSpawn is not configured."
+  spawn-teleport: "&aTeleported to spawn."
+
+  teleport-warmup: "&7Teleporting in &f{seconds}&7s — stand still."
+  teleport-combat: "&cYou are in combat — cannot teleport."
+  teleport-cancelled-move: "&cTeleport cancelled — you moved."
+  teleport-failed: "&cTeleport failed."

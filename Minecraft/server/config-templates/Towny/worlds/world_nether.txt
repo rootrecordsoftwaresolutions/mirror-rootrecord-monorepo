@@ -1,0 +1,20 @@
+# RootMC nether — no towns/claims; wilderness building enabled.
+
+pvp=true
+claimable=false
+worldmobs=true
+wildernessmobs=true
+forcetownmobs=false
+firespread=true
+forcefirespread=false
+explosions=true
+forceexplosions=false
+endermanprotect=true
+disableplayertrample=false
+disablecreaturetrample=false
+
+unclaimedZoneBuild=true
+unclaimedZoneDestroy=true
+unclaimedZoneSwitch=true
+unclaimedZoneItemUse=true
+unclaimedZoneName=Wilderness

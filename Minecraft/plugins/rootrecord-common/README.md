@@ -8,9 +8,15 @@ All plugins read and write under **`plugins/RootRecord/`**:
 
 | File | Plugin |
 |------|--------|
-| `rootstat.yml` | RootStat |
-| `blocknotes.yml` | BlockNotes |
-| `downloaded-plugins.yml` | BlockNotes (auto-update state) |
+| `cloud.yml` | Shared API credentials (all RootRecord plugins) |
+| `rootmc.yml` | RootMC — linking, economy, McMMO, heartbeat |
+| `rootmc-shops.yml` | RootMC-Shops — price cap, messages |
+| `shops.yml` | RootMC-Shops — chest shop listings |
+| `roothelp.yml` | RootHelp — rules, command list |
+| `root-rewards.yml` | Root-Rewards — playtime milestones, vote links |
+| `root-loans.yml` | Root-Loans — interest, limits, income sweep |
+| `root-contracts.yml` | Root-Contracts — escrow job limits |
+| `root-announcer.yml` | Root-Announcer — rotating broadcast messages |
 
 ## New plugin
 

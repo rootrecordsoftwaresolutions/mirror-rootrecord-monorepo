@@ -1,0 +1,65 @@
+name: RootMC
+version: '${version}'
+main: com.rootrecord.minecraft.rootmc.RootMcPlugin
+api-version: '26.1'
+description: RootMC — account linking, McMMO sync, in-game capture, Root Shops economy, app heartbeat.
+author: Root Record
+website: https://rootmc.net
+softdepend: [PlaceholderAPI, Vault, ChestShop, QuickShop, RootMC-Shops, Towny, Root-Essentials]
+loadafter: [Vault, Root-Essentials, RootMC-Shops]
+commands:
+  rootmc:
+    description: RootMC command hub (legacy — prefer /link, /waypoint, /note, /vault)
+    usage: /<command> <waypoint|note|vault|link|value|map>
+    aliases: [rmc]
+  link:
+    description: Link your Minecraft account to RootRecord
+  waypoint:
+    description: Save an in-game waypoint (syncs to app)
+    aliases: [wp]
+  note:
+    description: Save a location note (syncs to app)
+  notes:
+    description: Info about synced notes
+  waypoints:
+    description: Info about synced waypoints
+  vault:
+    description: Claim pending vault / app purchases
+  value:
+    description: Market price for item in hand and carried inventory value
+    usage: /<command> [item]
+  rootstat:
+    description: RootMC account & stats — link, status, shops, sync
+    usage: /<command> [link|status|map|shops|sync|reload]
+    aliases: [rrlink, rootrecord, bn, rootmc, rootmcapp]
+permissions:
+  rootstat.reload:
+    description: Reload RootMC / RootRecord config
+    default: op
+  rootmc.reload:
+    description: Legacy alias for rootstat.reload
+    default: op
+  rootmc.waypoint:
+    description: Save in-game waypoints
+    default: true
+  rootmc.note:
+    description: Save in-game notes
+    default: true
+  rootmc.vault:
+    description: Claim vault purchases
+    default: true
+  rootmc.map:
+    description: Open live BlueMap (/rootmc map)
+    default: true
+  rootstat.link:
+    description: Start account linking (/link, /rootstat link)
+    default: true
+  rootstat.status:
+    description: View link status (/rootstat status)
+    default: true
+  rootstat.sync:
+    description: Force cloud sync (/rootstat sync)
+    default: op
+  rootstat.map:
+    description: Open live BlueMap (/rootstat map)
+    default: true

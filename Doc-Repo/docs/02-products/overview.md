@@ -30,7 +30,7 @@ These products share **conceptual** building blocks:
 - Wallet UX and Solana **mobile** scope → [token-manager.md](token-manager.md)
 - Cross-app **account** mental model → [account-hub.md](account-hub.md)
 - Goal planning + AI plans (Release 0) → [root-goals.md](root-goals.md)
-- Minecraft notes + coords + maps → [blocknotes.md](blocknotes.md)
+- Minecraft notes + coords + maps → [rootmc.md](rootmc.md)
 - SMP linking, McMMO, playtime, plugin deploy → [minecraft-realm.md](minecraft-realm.md)
 - Public **website** behavior → [marketing-website.md](marketing-website.md)
 

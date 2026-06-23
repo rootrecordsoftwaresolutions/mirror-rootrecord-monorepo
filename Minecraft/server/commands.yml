@@ -10,6 +10,17 @@
 
 command-block-overrides: []
 ignore-vanilla-permissions: false
+commands:
+  gamemode:
+    enabled: false
+  gmc:
+    enabled: false
+  gms:
+    enabled: false
+  gma:
+    enabled: false
+  gmsp:
+    enabled: false
 aliases:
   icanhasbukkit:
   - version $1-

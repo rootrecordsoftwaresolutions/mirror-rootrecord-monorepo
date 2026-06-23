@@ -31,7 +31,19 @@ class LiveFeedsRepository @Inject constructor(
         // Pre–D1 builds cached USGS portal links; ignore so we refetch YouTube embed URLs.
         if (isLegacyPortalCatalog(cat)) return null
         if (cat.feeds.none { it.id == "lava_watchers" }) return null
-        if (cat.feeds.any { it.id == "lava_watchers" && it.youtubeVideoId.isNullOrBlank() }) return null
+        // Refetch after API stopped pinning a stale per-session YouTube video id.
+        if (cat.feeds.any { it.id == "lava_watchers" && it.youtubeVideoId == STALE_LAVA_WATCHERS_VIDEO_ID }) {
+            return null
+        }
+        // Refetch after API switched from full-page @/live to channel iframe embed.
+        if (cat.feeds.any {
+                it.id == "lava_watchers" &&
+                    (it.embedUrl?.contains("/@LavaWatchers/live", ignoreCase = true) == true ||
+                        it.youtubeVideoId.isNullOrBlank())
+            }
+        ) {
+            return null
+        }
         return cat
     }
 
@@ -109,15 +121,20 @@ class LiveFeedsRepository @Inject constructor(
         }
 
     companion object {
+        private const val STALE_LAVA_WATCHERS_VIDEO_ID = "yalZ2sXN_5k"
+        private const val LAVA_WATCHERS_CHANNEL_LIVE_TOKEN = "live:UC-I69toJP1JJGUSID_xwmLw"
+        private const val LAVA_WATCHERS_CHANNEL_EMBED =
+            "https://www.youtube.com/embed/live_stream?channel=UC-I69toJP1JJGUSID_xwmLw&autoplay=1&playsinline=1&rel=0&modestbranding=1"
+
         /** Offline fallback — matches D1 seed in `0036_kilauea_live_streams.sql`. */
         fun defaultStreams(): List<LiveFeed> = listOf(
             LiveFeed(
                 id = "lava_watchers",
                 title = "Lava Watchers",
                 description = "Featured content provider — independent Kīlauea livestream and commentary.",
-                youtubeVideoId = "yalZ2sXN_5k",
+                youtubeVideoId = LAVA_WATCHERS_CHANNEL_LIVE_TOKEN,
                 watchUrl = "https://www.youtube.com/@LavaWatchers/live",
-                embedUrl = "https://www.youtube.com/embed/yalZ2sXN_5k?autoplay=1&playsinline=1&rel=0&modestbranding=1",
+                embedUrl = LAVA_WATCHERS_CHANNEL_EMBED,
             ),
             LiveFeed(
                 id = "usgs_v1",

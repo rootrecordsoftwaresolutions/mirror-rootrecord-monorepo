@@ -12,25 +12,31 @@ Paper plugin workspace: **`Minecraft/`** in the MonoRepo (not a separate GitHub 
 
 Copy `local.properties.example` → `local.properties` and set `java.version=25`. Do **not** set `org.gradle.java.home` to JDK 25.
 
-## Build BlockNotes (production)
+## Build all production plugins
 
 ```powershell
 cd Minecraft
-.\build-with-server-jdk.bat :plugins:blocknotes:build
+.\build-with-server-jdk.bat publishPlugins
 ```
 
-Artifacts:
+Artifacts land in:
 
-- `Minecraft/out/blocknotes-1.1.0-SNAPSHOT.jar`
-- `Minecraft/server/plugins/blocknotes-1.1.0-SNAPSHOT.jar` (deploy task)
+- `Minecraft/out/` — local staging
+- `Minecraft/server/host-handoff/plugins/` — zip for Shockbyte (see `server/host-handoff/README.md`)
+- `Minecraft/server/plugins/` — local Paper test server
+- `Web/apps/rootmc-web/public/plugins/` + `manifest.json` — deploy rootmc-web Pages for `https://rootmc.net/plugins/`
 
-## Publish for live server auto-update
+Do **not** upload `blocknotes-*.jar` or `plugin-template-*.jar` — retired; `publishPlugins` prunes them.
 
-1. Copy jar to `Web/main/realm/plugins/blocknotes-1.1.0-SNAPSHOT.jar`
-2. Ensure `Web/main/realm/plugins/manifest.json` version matches `build.gradle.kts`
-3. Deploy **rootrecord.info** Pages so heartbeat `plugin_updates` URL serves the new file
+## Build single plugin
 
-API constant mirror: `Web/cloudflare/rootrecord-api-blocknotes/src/blocknotes-server.ts` → `PLUGIN_RELEASES`.
+```powershell
+.\build-with-server-jdk.bat :plugins:rootmc:build
+```
+
+Public wiki (commands, operator docs): `Web/main/realm/wiki/` → `/realm/wiki/` after Pages deploy.
+
+API constant mirror: `Web/cloudflare/rootmc-realm-api/src/rootmc-server.ts` → `PLUGIN_RELEASES` (keep in sync with `manifest.json`).
 
 ## Server restart
 
@@ -47,8 +53,8 @@ Or restart the process manager wrapping Paper.
 
 | Path | Role |
 |------|------|
-| `plugins/blocknotes/` | Unified companion plugin source |
-| `plugins/rootstat/` | Optional standalone linking plugin |
+| `plugins/rootmc/` | RootMC plugin — link, stats, economy, ingame capture |
+| `plugins/rootmc-shops/` | Player shops, `/buy`, Vault gold, price cap |
 | `plugins/rootrecord-common/` | Shared config paths + cloud.yml helpers |
 | `plugin-template/` | Scaffold for new plugins |
 

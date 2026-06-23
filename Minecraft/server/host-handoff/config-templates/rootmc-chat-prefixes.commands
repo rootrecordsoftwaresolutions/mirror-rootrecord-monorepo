@@ -1,0 +1,8 @@
+# RootMC chat rank badges — run on live console after LuckPerms is connected.
+# Replaces bare &7 default prefix; pairs with Towny ChatConfig {permprefix}.
+
+lp group default meta setprefix 10 "&8[&7Explorer&8]&r "
+lp group pro meta setprefix 40 "&8[&bPro&8]&r "
+lp group lifetime meta setprefix 50 "&8[&6Lifetime&8]&r "
+lp group admin meta setprefix 100 "&8[&cStaff&8]&r "
+lp sync

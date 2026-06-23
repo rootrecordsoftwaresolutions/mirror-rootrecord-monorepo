@@ -9,10 +9,9 @@ compatibility_date = "2024-11-01"
 # Solana web3 + SPL use Buffer in some paths; required for treasury→custodial txs in this Worker.
 compatibility_flags = ["nodejs_compat"]
 
-# Cron: every minute Discord guild channels → D1 stats + announcements feed (see `src/index.ts`).
-# Account-wide Cloudflare limit: 5 cron triggers — keep a single schedule here; `45 8` cleanup stays on `rootrecord-primary` until retired.
+# Account-wide Cloudflare limit: 5 cron triggers — `17 9` Stripe reconcile runs inside `* * * * *` at 09:17 UTC.
 [triggers]
-crons = ["* * * * *", "45 8 * * *", "17 9 * * *"]
+crons = ["* * * * *", "45 8 * * *"]
 
 [[d1_databases]]
 binding = "DB"

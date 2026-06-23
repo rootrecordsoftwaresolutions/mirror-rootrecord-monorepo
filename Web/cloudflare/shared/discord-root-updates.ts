@@ -13,7 +13,7 @@ export const ROOT_UPDATE_CATEGORIES = [
   { id: "bm", label: "Business Manager", appScope: "bm" },
   { id: "token_manager", label: "Token Manager", appScope: "token_manager" },
   { id: "account_hub", label: "Account Hub app updates", appScope: "account_hub" },
-  { id: "blocknotes", label: "Block Notes", appScope: "blocknotes" },
+  { id: "rootmc", label: "Block Notes", appScope: "rootmc" },
   { id: "root_goals", label: "Root Goals", appScope: "root_goals" },
   { id: "root_farms", label: "Root Farms", appScope: "root_farms" },
   { id: "solana", label: "Solana Tools (solana.rootrecord.info)", appScope: "solana" },

@@ -1,0 +1,10 @@
+/market    /market/index.html   200
+/shops     /shops/index.html    200
+/verify    /verify/index.html   200
+/servers   /servers/index.html  200
+/player    /player/index.html   200
+/player/*  /player/index.html   200
+/wiki/dev    /wiki/player/    301
+/wiki/dev/*  /wiki/player/    301
+/wiki      /wiki/index.html     200
+/wiki/*    /wiki/:splat         200

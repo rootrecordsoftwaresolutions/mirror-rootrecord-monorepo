@@ -1,0 +1,27 @@
+name: Root-Loans
+version: '${version}'
+main: com.rootrecord.minecraft.rootloans.RootLoansPlugin
+api-version: '26.1'
+description: RootMC personal loans — income sweep and gold-ore repayment.
+author: Root Record
+website: https://rootmc.net
+softdepend: [Root-Essentials, Vault]
+loadafter: [Root-Essentials]
+commands:
+  loan:
+    description: Borrow, view, or repay a personal loan
+    usage: /<command> <take|info|repay|list> [amount]
+  rootloans:
+    description: Admin reload for Root-Loans
+    usage: /<command> reload
+    permission: rootloans.reload
+permissions:
+  rootloans.use:
+    description: Use /loan take, info, and repay
+    default: true
+  rootloans.list:
+    description: View all active loans
+    default: op
+  rootloans.reload:
+    description: Reload root-loans.yml
+    default: op

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Players — RootMC</title>
+  <meta name="description" content="Search RootMC players by username and view public stats — McMMO, playtime, and net worth.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <meta name="theme-color" content="#0a140a">
+  <link rel="canonical" href="https://rootmc.net/player/">
+  <link rel="stylesheet" href="/styles/rootmc.css">
+</head>
+<body>
+  <header class="rmc-header">
+    <div class="container rmc-header-inner">
+      <a class="rmc-brand" href="/"><img src="/favicon-180.png" alt="" width="36" height="36">RootMC</a>
+      <nav class="rmc-nav" aria-label="Main">
+        <a href="/">Home</a>
+        <a href="/player/" aria-current="page">Players</a>
+        <a href="/market/">Stock market</a>
+        <a href="/shops/">Shops</a>
+        <a href="/wiki/">Wiki</a>
+        <a href="https://map.rootmc.net" target="_blank" rel="noopener">Live map</a>
+        <a href="/verify/" class="rmc-nav-cta">Link account</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container player-main">
+    <header class="player-hero">
+      <p class="market-badge">Community</p>
+      <h1>Find a player</h1>
+      <p class="rmc-muted">Search by Minecraft username. Open a profile for McMMO skills, playtime, and net worth.</p>
+    </header>
+
+    <section class="rmc-card player-search-card">
+      <form id="search-form" class="player-search-form" role="search">
+        <label class="player-search-label" for="search-q">Player name</label>
+        <div class="player-search-row">
+          <input id="search-q" type="search" name="q" placeholder="e.g. Steve" autocomplete="off" minlength="2" maxlength="16">
+          <button type="submit" class="rmc-btn rmc-btn-primary">Search</button>
+        </div>
+      </form>
+      <p id="search-status" class="rmc-muted player-search-hint" hidden></p>
+      <ul id="search-results" class="player-results" hidden></ul>
+    </section>
+
+    <p id="page-status" class="player-page-status" role="status" hidden></p>
+
+    <section id="panel-loading" class="rmc-card" hidden>
+      <p class="rmc-muted" style="margin:0">Loading player…</p>
+    </section>
+
+    <section id="panel-profile" class="rmc-card player-profile" hidden>
+      <div class="player-profile-head">
+        <img id="avatar" src="/favicon-180.png" alt="" width="80" height="80" class="player-avatar">
+        <div>
+          <h2 id="player-name" style="margin:0">Player</h2>
+          <p id="verified-badge" class="player-badge">—</p>
+          <p class="player-uuid rmc-muted" id="player-uuid"></p>
+        </div>
+      </div>
+      <p id="player-bio" class="rmc-muted" hidden style="margin-top:1rem"></p>
+
+      <div class="player-stat-block">
+        <h3>McMMO</h3>
+        <p id="mcmmo-empty" class="rmc-muted">No skill stats yet.</p>
+        <div id="mcmmo-panel" hidden>
+          <p>Power level: <strong id="mcmmo-power">—</strong></p>
+          <p class="rmc-muted" style="margin:0.25rem 0 0;font-size:0.88rem">Updated <span id="mcmmo-synced">—</span></p>
+          <div id="mcmmo-skills" class="player-mcmmo-grid"></div>
+        </div>
+      </div>
+
+      <div class="player-stat-block">
+        <h3>Playtime</h3>
+        <p id="playtime-empty" class="rmc-muted">No playtime recorded yet.</p>
+        <div id="playtime-panel" hidden>
+          <p>Time played: <strong id="playtime-total">—</strong></p>
+          <p class="rmc-muted" style="font-size:0.88rem">First join: <span id="playtime-first">—</span> · Last login: <span id="playtime-last">—</span></p>
+        </div>
+      </div>
+
+      <div class="player-stat-block">
+        <h3>Net worth</h3>
+        <p id="networth-empty" class="rmc-muted">No economy info yet.</p>
+        <div id="networth-panel" hidden>
+          <p>Total: <strong id="networth-total">—</strong> gold</p>
+          <p class="rmc-muted" style="font-size:0.88rem">Balance <span id="networth-balance">—</span> · Inventory <span id="networth-inventory">—</span> · Shop stock <span id="networth-shop-stock">—</span></p>
+          <p class="rmc-muted" style="font-size:0.88rem">Updated <span id="networth-synced">—</span></p>
+        </div>
+      </div>
+
+      <div class="player-stat-block" id="worlds-block" hidden>
+        <h3>Shared worlds</h3>
+        <ul id="world-list" class="player-world-list rmc-muted"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rmc-footer">
+    <div class="container">
+      <p><a href="/">RootMC home</a> · <a href="/wiki/player/#stats">About public stats</a></p>
+    </div>
+  </footer>
+  <script src="/player/player.js" defer></script>
+</body>
+</html>

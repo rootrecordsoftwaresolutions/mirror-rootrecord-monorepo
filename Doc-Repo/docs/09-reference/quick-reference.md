@@ -8,9 +8,8 @@ One-page lookup for URLs, source repos, and integration touchpoints. For narrati
 |---------|-----|------|
 | Marketing + legal + account shell | [rootrecord.info](https://rootrecord.info) | Cloudflare Pages (`Web/main/`) |
 | Primary API | [api.rootrecord.info](https://api.rootrecord.info) | Worker `rootrecord-primary` (auth, weather, business, earn, Solana routes, crons) |
-| Block Notes API shard | [rootrecord-api-blocknotes.rootrecord.workers.dev](https://rootrecord-api-blocknotes.rootrecord.workers.dev/) | Realm, sync, World AI, server heartbeat |
-| RootRecord Realm | [rootrecord.info/realm/](https://rootrecord.info/realm/) | Player linking, stats, SMP hub |
-| Block Notes product page | [rootrecord.info/blocknotes](https://rootrecord.info/blocknotes) | Marketing + app links |
+| RootMC site | [rootmc.net](https://rootmc.net/) | SMP hub, verify, shops, market, wiki |
+| RootMC API | [api.rootmc.net](https://api.rootmc.net/) | RootMC Discord bot, Minecraft sync, Block Notes cloud |
 | Solana Tools (browser) | [solana.rootrecord.info](https://solana.rootrecord.info) | Next.js app ([solana-rootrecord-site](https://github.com/RootRecord/solana-rootrecord-site)) |
 | Doc Repo (this knowledge base) | [github.com/RootRecord/Doc-Repo](https://github.com/RootRecord/Doc-Repo) | Markdown only—safe to index |
 

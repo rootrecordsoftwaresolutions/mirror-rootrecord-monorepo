@@ -106,7 +106,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <a href="#kilauea">Kilauea Alerts</a>
             <a href="#roots">Roots &amp; token tools</a>
             <a href="#farms">Root Farms</a>
-            <a href="#blocknotes">BlockNotes</a>
             <a href="#root-goals">Root Goals</a>
             <a href="#visiting-hawaii">Visiting Hawaiʻi</a>
             <a href="#website">Website &amp; charts</a>
@@ -120,7 +119,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <p class="roadmap-lane-lead">Shared sign-in, billing, API workers, and cross-app services on <strong style="color:var(--ink)">rootrecord.info</strong>.</p>
               </div>
               <ul class="roadmap-list">
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>Per-product API shards</strong><p>Seven dedicated <code>rootrecord-api-*</code> workers: account, business, weather, Kilauea, token, blocknotes, and goals.</p></div></li>
+                <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>Per-product API shards</strong><p>Dedicated <code>rootrecord-api-*</code> workers: account, business, weather, Kilauea, token, and goals.</p></div></li>
                 <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>Account hub &amp; billing</strong><p>Sign-in, subscription status, Stripe billing, and My Apps on the web.</p></div></li>
                 <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>Web SSO for product dashboards</strong><p>Member web apps at product subdomains with shared RootRecord sessions.</p></div></li>
                 <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>Shard cutover for web &amp; crons</strong><p>Product web apps, Discord/Global Updater, and scheduled jobs run on dedicated shards. Primary has no crons in repo; rootrecord.info auth, earn, and farms routes proxy to the account shard.</p></div></li>
@@ -205,23 +204,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               </ul>
             </section>
 
-            <section class="roadmap-lane" id="blocknotes" data-testid="roadmap-lane-blocknotes">
-              <div class="roadmap-lane-head">
-                <div class="section-kicker">Gaming</div>
-                <h2 class="section-title">Block<em>Notes</em></h2>
-                <p class="roadmap-lane-lead">Native Minecraft companion notes &mdash; coordinates, worlds, timelines, and build plans. <a href="/blocknotes.html">Product page</a></p>
-              </div>
-              <ul class="roadmap-list">
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>Offline notes &amp; worlds</strong><p>Markdown editor, tags, trash, timeline, search, gallery, templates, and bundled reference data on Android.</p></div></li>
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>World map &amp; coordinates</strong><p>Grid, live Dynmap/BlueMap, and Chunkbase modes; home-screen widget for quick coord capture.</p></div></li>
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-shipped">Shipped</span><div><strong>BlockNotes API shard</strong><p>Feedback, membership sync, and Grok world AI reports on <code>rootrecord-api-blocknotes</code>.</p></div></li>
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-progress">In progress</span><div><strong>Google Play listing</strong><p>Release builds and store assets; public install when listing is approved.</p></div></li>
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-planned">Planned</span><div><strong>Voice notes &amp; sketch canvas</strong><p>Richer capture beyond markdown text.</p></div></li>
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-planned">Planned</span><div><strong>Camera/OCR &amp; Drive backup</strong><p>Photo capture with text extraction and optional Google Drive export.</p></div></li>
-                <li class="roadmap-item"><span class="roadmap-status roadmap-status-explore">Exploring</span><div><strong>Expanded widgets &amp; Realm ties</strong><p>More home-screen surfaces and optional multiplayer server integrations.</p></div></li>
-              </ul>
-            </section>
-
             <section class="roadmap-lane" id="root-goals" data-testid="roadmap-lane-root-goals">
               <div class="roadmap-lane-head">
                 <div class="section-kicker">Personal growth</div>
@@ -289,7 +271,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <a class="brand" href="/"><img class="brand-mark" src="/favicon-180.png" alt="RootRecord logo" width="32" height="32">RootRecord</a>
             <p>Multi-device solutions - your grounding roots for productivity.</p>
           </div>
-          <div class="footer-col"><h4>Products</h4><ul><li><a href="/visiting-hawaii.html">Visiting Hawaiʻi</a></li><li><a href="/root-goals.html">Root Goals</a></li><li><a href="/blocknotes.html">BlockNotes</a></li><li><a href="/rootrecord-business-manager.html">Business Manager</a></li><li><a href="/rootrecord-weather-manager.html">Weather Manager</a></li><li><a href="/kilauea-alerts.html">Kilauea Alerts</a></li><li><a href="/pricing.html">Pricing</a></li></ul></div>
+          <div class="footer-col"><h4>Products</h4><ul><li><a href="/visiting-hawaii.html">Visiting Hawaiʻi</a></li><li><a href="/root-goals.html">Root Goals</a></li><li><a href="/rootrecord-business-manager.html">Business Manager</a></li><li><a href="/rootrecord-weather-manager.html">Weather Manager</a></li><li><a href="/kilauea-alerts.html">Kilauea Alerts</a></li><li><a href="/pricing.html">Pricing</a></li></ul></div>
           <div class="footer-col"><h4>Company</h4><ul><li><a href="/about.html">About</a></li><li><a href="/roadmap/" aria-current="page">Roadmap</a></li><li><a href="/faq.html">FAQ</a></li><li><a href="/contact.html">Contact</a></li><li><a href="/account.html">Account</a></li><li><a href="/billing.html">Billing</a></li><li><a href="/root-units">Roots</a></li></ul></div>
           <div class="footer-col"><h4>Community</h4><ul><li><a href="https://discord.gg/uQ7kGFqtbG" target="_blank" rel="noopener">Discord</a></li><li><a href="https://x.com/RootRecord" target="_blank" rel="noopener">X (Twitter)</a></li><li><a href="/terms.html">Terms</a></li><li><a href="/privacy.html">Privacy</a></li><li><a href="https://github.com/RootRecord/Doc-Repo" target="_blank" rel="noopener">Developer Documentation</a></li></ul></div>
         </div>

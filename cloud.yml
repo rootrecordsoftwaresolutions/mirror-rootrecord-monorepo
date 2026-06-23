@@ -1,0 +1,9 @@
+# Shared RootRecord cloud credentials for ALL plugins (RootStat, BlockNotes, …)
+# File: plugins/RootRecord/cloud.yml
+#
+# Register at https://rootmc.net/servers then paste below.
+
+cloud:
+  api-base: "https://api.rootmc.net"
+  server-id: ""
+  server-secret: ""

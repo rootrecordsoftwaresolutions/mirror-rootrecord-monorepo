@@ -156,24 +156,24 @@ function Invoke-KilaueaAlertsNative {
 
 Invoke-KilaueaAlertsNative -Version (Get-GradleVersionName (Join-Path $MobileRoot "kilauea-alerts-android\app\build.gradle.kts"))
 
-function Invoke-BlockNotesNative {
+function Invoke-RootMcNative {
     param(
         [string]$Version = "0.1.0"
     )
-    $proj = Join-Path $MobileRoot "blocknotes-android"
+    $proj = Join-Path $MobileRoot "rootmc-android"
     if (-not (Test-Path -LiteralPath $proj)) {
-        Write-Host "Skip blocknotes (directory missing): $proj" -ForegroundColor Yellow
+        Write-Host "Skip rootmc-android (directory missing): $proj" -ForegroundColor Yellow
         return
     }
-    Write-Host "`n========== blocknotes (native Kotlin / $Version) ==========" -ForegroundColor Cyan
+    Write-Host "`n========== rootmc-android (native Kotlin / $Version) ==========" -ForegroundColor Cyan
     Push-Location $proj
     try {
-        Invoke-NoisyNative ".\gradlew.bat bundleRelease assembleRelease --no-daemon" "blocknotes-android gradle bundleRelease assembleRelease failed"
-        $dest = Join-Path $OutRoot "blocknotes"
+        Invoke-NoisyNative ".\gradlew.bat bundleRelease assembleRelease --no-daemon" "rootmc-android gradle bundleRelease assembleRelease failed"
+        $dest = Join-Path $OutRoot "rootmc"
         $stageScript = Join-Path $PSScriptRoot "stage-release-artifacts.ps1"
         $lines = & powershell -NoProfile -ExecutionPolicy Bypass -File $stageScript `
-            -AppDir $proj -DestDir $dest -BaseName "RootRecord-BlockNotes" -Version $Version -Native
-        if ($LASTEXITCODE -ne 0) { throw "stage-release-artifacts.ps1 failed for blocknotes" }
+            -AppDir $proj -DestDir $dest -BaseName "RootRecord-RootMC" -Version $Version -Native
+        if ($LASTEXITCODE -ne 0) { throw "stage-release-artifacts.ps1 failed for rootmc-android" }
         foreach ($line in $lines) {
             if ($line -match '^(APK|AAB)\|') { Write-Host "  $line" }
         }
@@ -183,6 +183,6 @@ function Invoke-BlockNotesNative {
     }
 }
 
-Invoke-BlockNotesNative -Version (Get-GradleVersionName (Join-Path $MobileRoot "blocknotes-android\app\build.gradle.kts"))
+Invoke-RootMcNative -Version (Get-GradleVersionName (Join-Path $MobileRoot "rootmc-android\app\build.gradle.kts"))
 
 Write-Host "`nAll builds finished. Output root: $OutRoot" -ForegroundColor Green

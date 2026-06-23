@@ -1,0 +1,19 @@
+name: Root-Explore
+version: '${version}'
+main: com.rootrecord.minecraft.rootexplore.RootExplorePlugin
+api-version: '26.1'
+description: RootMC exploration hints — biomes and nearby structures (server-accurate)
+author: Root Record
+website: https://rootmc.net
+commands:
+  explore:
+    description: Toggle exploration hints (biomes and nearby structures)
+    usage: /<command> [on|off|status]
+    aliases: [explorehints, hints]
+permissions:
+  rootexplore.hints:
+    description: Receive exploration hint messages
+    default: true
+  rootexplore.reload:
+    description: Reload root-explore.yml
+    default: op
