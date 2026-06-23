@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock market — RootMC</title>
+  <meta name="description" content="Browse chest shop prices, stock counts, and price trends on RootMC.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600&family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <meta name="theme-color" content="#0a140a">
+  <link rel="canonical" href="https://rootmc.net/market/">
+  <link rel="stylesheet" href="/styles/rootmc.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js" defer></script>
+</head>
+<body>
+  <header class="rmc-header">
+    <div class="container rmc-header-inner">
+      <a class="rmc-brand" href="/"><img src="/favicon-180.png" alt="" width="36" height="36">RootMC</a>
+      <nav class="rmc-nav" aria-label="Main">
+        <a href="/">Home</a>
+        <a href="/player/">Players</a>
+        <a href="/market/" aria-current="page">Stock market</a>
+        <a href="/shops/">Shops</a>
+        <a href="/wiki/">Wiki</a>
+        <a href="https://map.rootmc.net" target="_blank" rel="noopener">Live map</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container market-main">
+    <header class="market-hero">
+      <p class="market-badge">Player shops</p>
+      <h1>Stock market</h1>
+      <p class="rmc-muted">Live prices from player chest shops. Updates every few minutes while the server is online.</p>
+    </header>
+
+    <p id="market-error" class="market-error" hidden></p>
+
+    <section class="rmc-card market-filters">
+      <div class="market-filters-primary">
+        <label class="market-filter">
+          <span>Search</span>
+          <input id="f-q" type="search" placeholder="e.g. oak log" autocomplete="off">
+        </label>
+        <label class="market-filter">
+          <span>Sort by</span>
+          <select id="f-sort">
+            <option value="quantity_desc">Most in stock</option>
+            <option value="quantity_asc">Least in stock</option>
+            <option value="shops_desc">Most shops</option>
+            <option value="shops_asc">Fewest shops</option>
+            <option value="price_asc">Lowest price</option>
+            <option value="price_desc">Highest price</option>
+            <option value="market_avg_desc">Highest average</option>
+            <option value="market_avg_asc">Lowest average</option>
+            <option value="buy_price_desc">Best buy price</option>
+            <option value="buy_capacity_desc">Most buy demand</option>
+            <option value="name_asc">Name A–Z</option>
+            <option value="name_desc">Name Z–A</option>
+          </select>
+        </label>
+        <label class="market-filter market-filter-check">
+          <input id="f-in-stock" type="checkbox">
+          <span>In stock only</span>
+        </label>
+      </div>
+      <div class="market-filters-advanced">
+        <label class="market-filter"><span>Min price (gold)</span><input id="f-min-price" type="number" min="0" step="0.01"></label>
+        <label class="market-filter"><span>Max price (gold)</span><input id="f-max-price" type="number" min="0" step="0.01"></label>
+        <label class="market-filter"><span>Min amount</span><input id="f-min-qty" type="number" min="0" step="1"></label>
+        <label class="market-filter"><span>Max amount</span><input id="f-max-qty" type="number" min="0" step="1"></label>
+        <label class="market-filter"><span>Min shops</span><input id="f-min-shops" type="number" min="1" step="1"></label>
+      </div>
+      <div class="market-filters-actions">
+        <button type="button" class="rmc-btn rmc-btn-secondary" id="f-clear">Reset</button>
+        <span class="rmc-muted" id="market-total">Loading…</span>
+      </div>
+    </section>
+
+    <div class="market-layout">
+      <section class="rmc-card">
+        <div id="market-loading" class="rmc-muted">Loading prices…</div>
+        <div id="market-empty" class="rmc-muted" hidden>No listings yet. Sell items from a chest shop in-game, then check back in a few minutes.</div>
+        <div class="market-table-wrap" id="market-table-wrap" hidden>
+          <table class="market-table" aria-label="Shop items">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Sell stock</th>
+                <th>Sell shops</th>
+                <th>Low sell</th>
+                <th>High sell</th>
+                <th>Buy demand</th>
+                <th>Buy shops</th>
+                <th>Best buy</th>
+                <th>Average</th>
+              </tr>
+            </thead>
+            <tbody id="market-tbody"></tbody>
+          </table>
+        </div>
+        <div class="market-pagination" id="market-pagination" hidden>
+          <button type="button" class="rmc-btn rmc-btn-secondary" id="page-prev">Previous</button>
+          <span class="rmc-muted" id="page-label"></span>
+          <button type="button" class="rmc-btn rmc-btn-secondary" id="page-next">Next</button>
+        </div>
+      </section>
+
+      <aside class="rmc-card" id="market-detail">
+        <p class="rmc-muted">Tap a row to see how its price has changed over time.</p>
+      </aside>
+    </div>
+
+    <section class="rmc-card market-chart-card" id="market-chart" hidden aria-label="Price chart">
+      <p class="rmc-muted">Select an item to view its price chart.</p>
+    </section>
+  </main>
+
+  <footer class="rmc-footer">
+    <div class="container">
+      <p><a href="/">RootMC home</a> · <a href="/wiki/player/#economy">How the economy works</a></p>
+    </div>
+  </footer>
+  <script src="/market/market.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Link account — RootMC</title>
+  <meta name="description" content="Link your Minecraft player to RootMC using a code from /rootmc link in-game.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <meta name="theme-color" content="#0a140a">
+  <link rel="canonical" href="https://rootmc.net/verify/">
+  <link rel="stylesheet" href="/styles/rootmc.css">
+</head>
+<body>
+  <header class="rmc-header">
+    <div class="container rmc-header-inner">
+      <a class="rmc-brand" href="/"><img src="/favicon-180.png" alt="" width="36" height="36">RootMC</a>
+      <nav class="rmc-nav" aria-label="Main">
+        <a href="/">Home</a>
+        <a href="/player/">Players</a>
+        <a href="/market/">Stock market</a>
+        <a href="/shops/">Shops</a>
+        <a href="/wiki/">Wiki</a>
+        <a href="https://map.rootmc.net" target="_blank" rel="noopener">Live map</a>
+        <a href="/verify/" class="rmc-nav-cta" aria-current="page">Link account</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container verify-main">
+    <header class="verify-hero">
+      <p class="market-badge">Account</p>
+      <h1>Link your player</h1>
+      <p class="rmc-muted">Run <strong>/rootmc link</strong> in-game, enter your code below, then link with Discord. No sign-up required.</p>
+    </header>
+
+    <p id="status" class="verify-status" role="status" hidden></p>
+
+    <section id="panel-loading" class="rmc-card verify-card">
+      <p class="rmc-muted" style="margin:0">Loading…</p>
+    </section>
+
+    <section id="panel-success" class="rmc-card verify-card" hidden>
+      <h2 style="margin-top:0">You're linked</h2>
+      <p class="rmc-muted" id="success-detail"></p>
+      <div class="verify-actions">
+        <a class="rmc-btn rmc-btn-primary" href="https://discord.gg/rFFQYrNaqS" target="_blank" rel="noopener">Open RootMC Discord</a>
+        <a class="rmc-btn rmc-btn-secondary" href="/">Back to home</a>
+      </div>
+    </section>
+
+    <section id="panel-verify" class="rmc-card verify-card">
+      <h2 style="margin-top:0">Verification code</h2>
+      <p class="rmc-muted" id="code-preview">Enter the 6-character code from /rootmc link in-game.</p>
+      <form id="form-verify" class="verify-form">
+        <label class="verify-field">
+          <span>Code</span>
+          <input type="text" name="code" id="input-code" maxlength="6" pattern="[A-Za-z0-9]{6}" required autocomplete="one-time-code" placeholder="ABC123">
+        </label>
+        <div class="verify-actions">
+          <button type="button" class="rmc-btn rmc-btn-primary" id="btn-discord" disabled>Link with Discord</button>
+          <button type="submit" class="rmc-btn rmc-btn-secondary" id="btn-complete" disabled>Minecraft only</button>
+        </div>
+      </form>
+      <p class="rmc-muted verify-note">Discord linking sets your server nickname to your in-game name and grants the linked-player role.</p>
+      <p style="margin:1rem 0 0">
+        <button type="button" class="rmc-btn rmc-btn-secondary" id="btn-show-advanced" style="font-size:0.88rem">Sign in with email (optional)</button>
+      </p>
+    </section>
+
+    <section id="panel-advanced" class="rmc-card verify-card" hidden>
+      <h2 style="margin-top:0">Sign in (optional)</h2>
+      <p class="rmc-muted">Optional — link this Minecraft player to an existing email login used elsewhere.</p>
+      <form id="form-login" class="verify-form">
+        <label class="verify-field">
+          <span>Email</span>
+          <input type="email" name="email" required autocomplete="username">
+        </label>
+        <label class="verify-field">
+          <span>Password</span>
+          <input type="password" name="password" required autocomplete="current-password">
+        </label>
+        <div class="verify-actions">
+          <button type="submit" class="rmc-btn rmc-btn-primary">Sign in, then link</button>
+          <button type="button" class="rmc-btn rmc-btn-secondary" id="btn-back-verify">Back</button>
+          <button type="button" class="rmc-btn rmc-btn-secondary" id="btn-logout">Sign out</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="rmc-footer">
+    <div class="container">
+      <p><a href="/">RootMC home</a> · <a href="/wiki/player/#linking">How linking works</a></p>
+    </div>
+  </footer>
+  <script src="/verify/verify.js" defer></script>
+</body>
+</html>
