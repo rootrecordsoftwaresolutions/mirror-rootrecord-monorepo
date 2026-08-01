@@ -1,0 +1,246 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Agent, CursorAgentError } from "@cursor/sdk";
+import { cursorApiKey, AVA_MODEL, AVA_WORKSPACE, AVA_HANDOFF } from "./config.mjs";
+import { AVA_HARD_RULES, AVA_PERSONA } from "./persona.mjs";
+import { scrubPublicReply } from "./scrub.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** RootMC workspace root (plugins, web, docs). */
+export function workspaceRoot() {
+  if (AVA_WORKSPACE) return AVA_WORKSPACE;
+  return path.resolve(__dirname, "../../..");
+}
+
+/** Max parallel Cursor local agents (Root Server digs). */
+export const CURSOR_CONCURRENCY = Math.max(
+  1,
+  Math.min(8, Number(process.env.AVA_CURSOR_CONCURRENCY || 3) || 3),
+);
+
+/** Host-pressure may lower this temporarily; never below 1. */
+let activeCap = CURSOR_CONCURRENCY;
+
+export function effectiveCursorConcurrency() {
+  return activeCap;
+}
+
+/** Host-pressure throttle — never kills the process. */
+export function setCursorConcurrencyOverride(n) {
+  if (n == null || Number.isNaN(Number(n))) {
+    activeCap = CURSOR_CONCURRENCY;
+    return activeCap;
+  }
+  activeCap = Math.max(1, Math.min(CURSOR_CONCURRENCY, Math.floor(Number(n))));
+  return activeCap;
+}
+
+let activeAgents = 0;
+let waitingForSlot = 0;
+const slotWaiters = [];
+let asksOpen = 0; // Discord asks mid-flight (packs + brain)
+
+/** Discord asks mid-flight (packs + brain). Used for instant queue warnings. */
+export function brainQueueDepth() {
+  return asksOpen;
+}
+
+/** Live Cursor slot snapshot for status / busy replies. */
+export function cursorSlots() {
+  return {
+    active: activeAgents,
+    max: activeCap,
+    configuredMax: CURSOR_CONCURRENCY,
+    waiting: waitingForSlot,
+    asksOpen,
+    full: activeAgents >= activeCap,
+  };
+}
+
+export function beginAsk() {
+  asksOpen += 1;
+}
+
+export function endAsk() {
+  asksOpen = Math.max(0, asksOpen - 1);
+}
+
+function acquireSlot() {
+  return new Promise((resolve) => {
+    if (activeAgents < activeCap) {
+      activeAgents += 1;
+      resolve();
+      return;
+    }
+    waitingForSlot += 1;
+    slotWaiters.push(() => {
+      waitingForSlot = Math.max(0, waitingForSlot - 1);
+      activeAgents += 1;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot() {
+  activeAgents = Math.max(0, activeAgents - 1);
+  const next = slotWaiters.shift();
+  if (next) next();
+}
+
+/**
+ * Root Server mode — local Cursor agent on the RootMC workspace.
+ * Up to AVA_CURSOR_CONCURRENCY (default 3) digs run in parallel.
+ * Pass Discord screenshots via `images` (Cursor SDK vision).
+ */
+export async function cursorRecommend({ question, context = "", env, deep = false, images = [] }) {
+  const apiKey = cursorApiKey(env || {});
+  if (!apiKey) {
+    return { ok: false, reason: "missing_cursor_api_key", text: null };
+  }
+
+  const cwd = workspaceRoot();
+  const visionNote =
+    Array.isArray(images) && images.length
+      ? `\nImages attached (${images.length}): LOOK at them. Describe what you see and answer from the pixels — do not pretend you cannot see images.`
+      : "";
+  const modeNote = deep
+    ? `Mode: Root Server deep dig.
+Workspace: RootMC root + Ava handoff (${AVA_HANDOFF || "Server Handoffs/Ava Ivy"} — uploads/, plans/, notes).
+Use attached packs first. Only inspect extra files if the packs don't answer.${visionNote}
+OUTPUT ONLY a Discord reply — accurate summary, no secret dumps, no raw disk paths, no deploy steps.
+Never name other AIs or vendors — say Root Server if you must.
+If you'd edit code, describe the change; Alex executes. Stage jars only — no auto restart.`
+    : `Mode: Root Server quick assist.
+Answer from the attached packs + question. Do NOT wander the repo unless the packs are empty/irrelevant.
+Handoff drop zone is available under Ava Ivy uploads/plans when relevant.${visionNote}
+OUTPUT ONLY a Discord reply. Accuracy > vibes. Never name other AIs.`;
+
+  const prompt = `${AVA_PERSONA}
+
+${AVA_HARD_RULES}
+
+${modeNote}
+
+Quality bar:
+- LOCKED SPEC (lead-dev notes) is absolute core — obey it.
+- Be correct. Wrong confidence is worse than "not sure".
+- Be fast to read: answer first, then one link or next step.
+- Stay in Ava's voice (snappy, emotional when earned, adapt per player).
+
+Thread/context (LOCKED SPEC + people + Discord + packs — stay in continuity; SPEC wins):
+${String(context || "(none)").slice(0, 42000)}
+
+Question (may continue prior chat):
+${String(question).trim()}
+
+Write Ava's Discord reply now.`;
+
+  await acquireSlot();
+  try {
+    const wantSandbox =
+      String(process.env.AVA_CURSOR_SANDBOX || "").trim() === "1";
+    const digTimeoutMs = Number(
+      process.env.AVA_CURSOR_TIMEOUT_MS ||
+        (Array.isArray(images) && images.length ? 120_000 : 75_000),
+    );
+    const agentOpts = (withSandbox) => ({
+      apiKey,
+      model: {
+        id: AVA_MODEL,
+        params: [
+          {
+            id: "fast",
+            value: deep || (Array.isArray(images) && images.length > 0) ? "false" : "true",
+          },
+        ],
+      },
+      local: {
+        cwd,
+        settingSources: [],
+        autoReview: true,
+        ...(withSandbox ? { sandboxOptions: { enabled: true } } : {}),
+      },
+    });
+
+    const withTimeout = (p, ms, label) =>
+      Promise.race([
+        p,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`${label}_timeout_${ms}ms`)), ms),
+        ),
+      ]);
+
+    try {
+      const runOnce = async (withSandbox) => {
+        const hasImages = Array.isArray(images) && images.length > 0;
+        if (!hasImages) {
+          return withTimeout(
+            Agent.prompt(prompt, agentOpts(withSandbox)),
+            digTimeoutMs,
+            "cursor",
+          );
+        }
+        const agent = await Agent.create(agentOpts(withSandbox));
+        try {
+          const run = await agent.send({
+            text: prompt,
+            images: images.slice(0, 4),
+          });
+          return await withTimeout(run.wait(), digTimeoutMs, "cursor_vision");
+        } finally {
+          try {
+            await agent?.[Symbol.asyncDispose]?.();
+          } catch {
+            /* ignore */
+          }
+        }
+      };
+
+      let result;
+      try {
+        result = await runOnce(wantSandbox);
+      } catch (err) {
+        const msg = err instanceof CursorAgentError ? err.message : String(err?.message || err);
+        if (wantSandbox && /sandbox/i.test(msg)) {
+          console.warn("cursor sandbox failed — retrying without");
+          result = await runOnce(false);
+        } else {
+          throw err;
+        }
+      }
+
+      if (result.status === "error") {
+        console.warn("cursor run error", result.id, result.error?.message || result.error);
+        return { ok: false, reason: "run_error", text: null, runId: result.id };
+      }
+
+      const raw = String(result.result || "").trim();
+      if (!raw) {
+        return { ok: false, reason: "empty_result", text: null, runId: result.id };
+      }
+
+      return {
+        ok: true,
+        reason: "ok",
+        text: scrubPublicReply(raw),
+        runId: result.id,
+        agentId: result.agentId,
+      };
+    } catch (err) {
+      const msg = err instanceof CursorAgentError ? err.message : String(err?.message || err);
+      console.warn("cursorRecommend:", msg);
+      return {
+        ok: false,
+        reason: /timeout/i.test(msg)
+          ? "timeout"
+          : err instanceof CursorAgentError
+            ? "startup_error"
+            : "unknown_error",
+        text: null,
+      };
+    }
+  } finally {
+    releaseSlot();
+  }
+}

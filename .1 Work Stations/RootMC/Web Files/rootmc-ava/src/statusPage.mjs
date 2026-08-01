@@ -1,0 +1,239 @@
+/** Local ops status page for Ava Ivy — served at http://127.0.0.1:8787/ */
+export function statusPageHtml() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ava Ivy — status</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0c1210;
+      --bg1: #14201a;
+      --ink: #e8f2ea;
+      --muted: #8aa394;
+      --live: #3dcf7a;
+      --break: #e0a84a;
+      --hush: #7a8790;
+      --down: #e25b5b;
+      --line: rgba(232, 242, 234, 0.12);
+      --accent: #6ee7a8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #1a3a2a 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #243018 0%, transparent 50%),
+        linear-gradient(165deg, var(--bg0), var(--bg1));
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2.25rem 1.25rem 3rem;
+    }
+    .brand {
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      letter-spacing: -0.03em;
+      margin: 0 0 0.35rem;
+    }
+    .sub {
+      color: var(--muted);
+      margin: 0 0 1.75rem;
+      font-size: 0.95rem;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.25);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .dot {
+      width: 0.65rem;
+      height: 0.65rem;
+      border-radius: 50%;
+      background: var(--down);
+      box-shadow: 0 0 0 3px rgba(226, 91, 91, 0.25);
+    }
+    .dot.live { background: var(--live); box-shadow: 0 0 0 3px rgba(61, 207, 122, 0.28); animation: pulse 1.6s ease-in-out infinite; }
+    .dot.break { background: var(--break); box-shadow: 0 0 0 3px rgba(224, 168, 74, 0.28); }
+    .dot.hush { background: var(--hush); box-shadow: none; }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.75; }
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+      margin: 1.35rem 0 1.5rem;
+    }
+    @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+    .cell {
+      border-top: 1px solid var(--line);
+      padding: 0.85rem 0 0.35rem;
+    }
+    .cell label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.3rem;
+    }
+    .cell strong {
+      font-size: 1.05rem;
+      font-weight: 600;
+      word-break: break-word;
+    }
+    .log {
+      border-top: 1px solid var(--line);
+      padding-top: 1rem;
+    }
+    .log h2 {
+      font-family: Syne, sans-serif;
+      font-size: 1rem;
+      margin: 0 0 0.65rem;
+      font-weight: 700;
+    }
+    .log ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 280px;
+      overflow: auto;
+    }
+    .log li {
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+    .log li span { color: var(--ink); }
+    footer {
+      margin-top: 1.75rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="brand">Ava Ivy</p>
+    <p class="sub">Local status · RootMC lead-dev bot</p>
+    <div class="pill"><span class="dot" id="dot"></span><span id="state">checking…</span></div>
+    <div class="grid" id="grid"></div>
+    <section class="log">
+      <h2>Recent</h2>
+      <ul id="events"></ul>
+    </section>
+    <footer>
+      Auto-refresh every 2s · <a href="/api/status">/api/status</a> · <a href="/health">/health</a>
+    </footer>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function ago(ms) {
+      if (!ms) return "—";
+      const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+      if (s < 60) return s + "s ago";
+      if (s < 3600) return Math.floor(s / 60) + "m ago";
+      return Math.floor(s / 3600) + "h ago";
+    }
+    function cells(rows) {
+      return rows.map(([k, v]) =>
+        '<div class="cell"><label>' + k + '</label><strong>' + v + '</strong></div>'
+      ).join("");
+    }
+    async function tick() {
+      try {
+        const res = await fetch("/api/status", { cache: "no-store" });
+        const d = await res.json();
+        const hb = d.heartbeat || {};
+        const age = d.heartbeatAgeMs;
+        // Break/hush poll is 60s; allow slack so we don't flash "poller offline"
+        const stale = age == null || age > 90000;
+        const hushed = Boolean(d.hushed || hb.hushed);
+        const onBreak = Boolean(hb.onBreak);
+        const live = Boolean(hb.live) && !stale;
+        const dig =
+          Number(hb.queueDepth || 0) > 0 || Number(hb.cursorAgents || 0) > 0;
+
+        let label = "offline";
+        let cls = "";
+        if (stale || !hb.updatedAt) { label = "poller offline"; cls = ""; }
+        else if (hushed) { label = "hushed"; cls = "hush"; }
+        else if (onBreak) { label = "on break"; cls = "break"; }
+        else if (dig) { label = "digging · live"; cls = "live"; }
+        else if (live) { label = "live · hot"; cls = "live"; }
+        else { label = "starting…"; cls = "break"; }
+
+        $("dot").className = "dot " + cls;
+        $("state").textContent = label;
+
+        $("grid").innerHTML = cells([
+          ["Mode", hb.mode || (onBreak ? "break" : live ? "hot" : "—")],
+          ["Poll", (hb.pollMs != null ? (hb.pollMs / 1000) + "s" : "—")],
+          ["Agents", (hb.cursorAgents != null
+            ? (hb.cursorAgents + "/" + (hb.cursorMax || 3))
+            : "—")
+            + (hb.cursorWaiting ? (" · +" + hb.cursorWaiting + " wait") : "")],
+          ["Asks open", String(hb.queueDepth ?? "—")],
+          ["Transport", hb.transport || (hb.gateway ? "gateway" : "poller")],
+          ["Reactions", hb.reactions
+            ? (hb.reactions.total||0) + " (good " + (hb.reactions.good||0) + " / bad " + (hb.reactions.bad||0) + ")"
+            : "—"],
+          ["Last activity", ago(hb.lastActivityAt)],
+          ["Heartbeat", ago(hb.updatedAt)],
+          ["Last ask", hb.lastAsk || "—"],
+          ["Cursor key", d.cursor ? "yes" : "missing"],
+          ["Model", d.cursorModel || "—"],
+          ["Channels", String(hb.watchCount ?? "—")],
+          ["PID", String(hb.pid ?? "—")],
+          ["Degraded", d.degraded ? "yes" : "no"],
+          ["Child restarts", String(d.liveness?.childRestartsTotal ?? "—")],
+          ["Gateway", hb.gatewayStats
+            ? ((hb.gatewayStats.connected ? "up" : "down")
+              + " · rc " + (hb.gatewayStats.reconnectCount || 0)
+              + (hb.gatewayStats.joinWelcomes ? " · joins on" : " · joins off"))
+            : (hb.gateway ? "yes" : "—")],
+          ["CPU now", d.hostMetrics?.current
+            ? (d.hostMetrics.current.cpu_avg_pct ?? d.hostMetrics.current.cpu ?? "—") + "%"
+            : "—"],
+          ["CPU 1h", d.hostMetricsTimeframes?.last_hour
+            ? d.hostMetricsTimeframes.last_hour.cpu_avg_pct + "%"
+            : "—"],
+        ]);
+
+        $("events").innerHTML = (d.events || []).map((line) => {
+          const parts = line.split("\\t");
+          const ts = parts[0] || "";
+          const msg = parts.slice(1).join("\\t") || line;
+          return "<li>" + ts.slice(11, 19) + " · <span>" + msg.replace(/</g, "&lt;") + "</span></li>";
+        }).join("") || "<li>no events yet</li>";
+      } catch (e) {
+        $("dot").className = "dot";
+        $("state").textContent = "HTTP down";
+      }
+    }
+    tick();
+    setInterval(tick, 2000);
+  </script>
+</body>
+</html>`;
+}
