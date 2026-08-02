@@ -121,7 +121,7 @@ function resolveTarget(which) {
  * @param {{ allow?: boolean, target?: string }} [opts] target: claims | towny
  * @returns {Promise<{ ok: boolean, reason?: string, output?: string, target?: string }>}
  */
-export async function guardedRcon(command, { allow = false, target = "claims" } = {}) {
+export async function guardedRcon(command, { allow = false, target = "claims", avaSelfRespect = false } = {}) {
   if (isEmergencyStopped()) {
     return { ok: false, reason: "emergency_stop" };
   }
@@ -150,10 +150,21 @@ export async function guardedRcon(command, { allow = false, target = "claims" } 
   const safeAssist =
     /^list\b/i.test(cmd) ||
     /^(tell|msg|w|whisper)\s+[A-Za-z0-9_]{1,16}\s+\S/i.test(cmd);
+  // Alex lock 2026-08-02 — Ava self-respect slap (damage + surface tp + 13-block fill)
+  const selfRespect =
+    avaSelfRespect === true &&
+    (/^damage\s+[A-Za-z0-9_]{1,16}\s+/i.test(cmd) ||
+      /^execute\s+as\s+[A-Za-z0-9_]{1,16}\s+at\s+[A-Za-z0-9_]{1,16}\s+positioned\s+over\s+world_surface\s+run\s+tp\s+/i.test(
+        cmd,
+      ) ||
+      /^execute\s+as\s+[A-Za-z0-9_]{1,16}\s+at\s+[A-Za-z0-9_]{1,16}\s+run\s+fill\s+.+\bminecraft:cobblestone\b/i.test(
+        cmd,
+      ));
   if (
     !staffRestart &&
     !safeAssist &&
-    /^(ban|kick|pardon|whitelist|gamemode|give|xp|effect|fill|setblock|summon)\b/i.test(
+    !selfRespect &&
+    /^(ban|kick|pardon|whitelist|gamemode|give|xp|effect|fill|setblock|summon|damage)\b/i.test(
       cmd,
     )
   ) {

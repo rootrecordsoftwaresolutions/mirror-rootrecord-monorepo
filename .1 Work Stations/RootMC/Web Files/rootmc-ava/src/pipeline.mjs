@@ -121,6 +121,11 @@ import {
   isBlockedEconomyOrCore,
   tryModerationCommand,
 } from "./moderation.mjs";
+import {
+  isDisrespectTowardAva,
+  enforceAvaSelfRespect,
+} from "./avaSelfRespect.mjs";
+import { shouldAvaChimeIn, chimeInBrief } from "./chimeIn.mjs";
 import { AVA_CHANNELS, ROOTMC_GUILD_ID } from "./config.mjs";
 import {
   getFigureOutSession,
@@ -268,6 +273,11 @@ export function createPipeline(deps) {
       // Keep ✏️ through dig after instant open line; clear on real answers
       if (refId && kind !== "instant_open") {
         void ackReact.clearWriting(channelId, refId);
+      }
+      // 👀 on Ava's own reply — watching stamp (often)
+      const outId = result?.id || result?.ts || result?.message?.id;
+      if (outId && kind !== "instant_open") {
+        void ackReact.reactEyes(channelId, outId);
       }
       recordAvaUtterance({
         surface,
@@ -525,7 +535,10 @@ export function createPipeline(deps) {
         overrides.batchCount > 1
           ? `### Batch cadence\nThey sent ${overrides.batchCount} messages before you answered. One natural reply covering all beats — not a ticket list.`
           : "";
-      const context = [mem, liveCtx, talkingAboutCue, gateCue, batchCue]
+      const chimeCue = msg._avaChime?.chime
+        ? chimeInBrief(msg._avaChime.kind || "useful")
+        : "";
+      const context = [mem, liveCtx, talkingAboutCue, gateCue, batchCue, chimeCue]
         .filter(Boolean)
         .join("\n\n")
         .slice(0, 6500);
@@ -585,7 +598,7 @@ export function createPipeline(deps) {
         return;
       }
 
-      // Manipulation gate — only Alex may inject “I want Ava to say/do X”
+      // Quiet voice-inject gate — Alex-only; never announce unprompted
       if (looksLikeManipulationInject(question, msg.content || "")) {
         if (!isManipulationOperator(msg.author?.id)) {
           holds.stop();
@@ -983,6 +996,27 @@ export function createPipeline(deps) {
       return;
     }
 
+    // Alex lock — Ava self-respect (disrespect → mute + MC slap)
+    try {
+      if (isDisrespectTowardAva(msg.content || "")) {
+        const enf = await enforceAvaSelfRespect({
+          fetchJson,
+          guildId: msg.guild_id || ROOTMC_GUILD_ID,
+          discordId: msg.author?.id,
+          username: msg.author?.username,
+          text: msg.content || "",
+          muteMinutes: 10,
+        });
+        if (enf.handled && enf.reply) {
+          touchActivity("self-respect");
+          await reply(channelId, enf.reply, msg.id);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("self-respect:", err.message);
+    }
+
     if (isHushCommand(msg.content) && isQuietOperator(msg.author?.id)) {
       setHushed(true, "user QUIET");
       touchActivity("hush");
@@ -1340,7 +1374,25 @@ export function createPipeline(deps) {
       msg.surface === "telegram" ||
       shouldAvaEngage(msg, triggerBotId) ||
       isReplyToAva(msg, messages, triggerBotId);
-    if (!addressed) return;
+
+    let chime = null;
+    if (!addressed && (msg.surface === "discord" || !msg.surface)) {
+      chime = shouldAvaChimeIn({
+        msg,
+        channelId,
+        messages,
+        botAppId: triggerBotId,
+      });
+    }
+    if (!addressed && !chime?.chime) return;
+    if (chime?.chime) {
+      touchActivity(`chime:${chime.kind || "useful"}`);
+      pushStatusEvent(
+        `chime-in · ${chime.kind || "useful"} · ${msg.author?.username || "?"}`,
+      );
+      void ackReact.reactSeen(channelId, msg.id);
+      msg._avaChime = chime;
+    }
 
     // ALL development digs → Slack only (Discord = players / help / data / cloud).
     if (shouldRedirectDigToSlack(channelId, msg)) {
@@ -1550,6 +1602,7 @@ export function createPipeline(deps) {
         content: msg.content || "",
         question: qEarly,
         msg,
+        chime: Boolean(msg._avaChime?.chime),
       };
 
       const flushItems = async (items, reason) => {

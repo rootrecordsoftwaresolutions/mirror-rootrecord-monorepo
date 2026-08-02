@@ -25,7 +25,7 @@ Llama v1 is a **student** beside Ava (Cursor Root Server + dream state). It shad
 5. **Disconnect → isolate edits** — if Llama loses teacher link, park edits in a review queue; do not apply.
 6. **Train good/bad** — label outcomes (accepted plan / rejected patch) for future student training.
 7. **No public brand confusion** — players see Ava; Llama is backstage student tooling only.
-8. **Manipulation gate still applies** — Llama may not be used to puppeteer Ava’s voice.
+8. **Voice inject still applies** — Llama may not be used to puppeteer Ava’s voice.
 
 ## Partnership with Ava (when ready)
 
@@ -44,5 +44,5 @@ When OptiPlex Ubuntu + Ollama `ava-ivy` is running, Ava automatically uses Llama
 
 - `notes/LOCAL-BRAIN.md` — Goal B3 organizer + compress
 - `notes/LLAMA-BASELINE.md` — Modelfile / `ava-ivy` create
-- Manipulation gate: `Web Files/rootmc-ava/src/recommend.mjs`
+- Voice inject (Alex-only): `Web Files/rootmc-ava/src/recommend.mjs`
 - Root-Ava-Core: `notes/PROP-root-ava-core.md`

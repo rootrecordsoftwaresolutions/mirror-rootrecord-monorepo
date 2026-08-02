@@ -10,6 +10,7 @@ import {
   moodFromPower,
   summarizeMorningSolar,
   ECO_NICKNAMES,
+  isEcoOffCircuit,
 } from "./ecoflow.mjs";
 import { gatherSolarBrief, loadSolarProfile } from "./solarProfile.mjs";
 import { gatherGovernanceBrief, getCouncil, listOpenPolls } from "./governanceClient.mjs";
@@ -218,16 +219,18 @@ export async function buildOpsPowerStatusReply({
   const per = snap?.perSn || {};
   let solarTotal = 0;
   for (const [sn, v] of Object.entries(per)) {
+    const off = v?.offCircuit || isEcoOffCircuit(sn);
     if (!v?.ok) {
       lines.push(`• ${snLabel(sn, snap)}: FAIL ${v?.message || "?"}`);
       continue;
     }
-    if (v.solarW != null) solarTotal += Number(v.solarW) || 0;
+    if (!off && v.solarW != null) solarTotal += Number(v.solarW) || 0;
     const bits = [
       v.soc != null ? `SOC **${v.soc}%**` : null,
       v.inW != null ? `in ${fmtW(v.inW)}` : null,
       v.outW != null ? `out ${fmtW(v.outW)}` : null,
       v.solarW != null ? `solar ${fmtW(v.solarW)}` : null,
+      off ? "**off-circuit** (not host load · can disconnect)" : null,
     ].filter(Boolean);
     lines.push(`• **${snLabel(sn, snap)}**: ${bits.join(" - ") || "ok"}`);
   }

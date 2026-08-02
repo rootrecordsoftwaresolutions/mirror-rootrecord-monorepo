@@ -312,7 +312,9 @@ export function summarizeMorningSolar(opts = {}) {
       if (earliest == null || t < earliest) earliest = t;
       if (latest == null || t > latest) latest = t;
       const cur = minuteMap.get(t) || { solar: 0 };
-      if (Number.isFinite(Number(r.solarW))) cur.solar += Number(r.solarW);
+      if (Number.isFinite(Number(r.solarW)) && !isEcoOffCircuit(sn)) {
+        cur.solar += Number(r.solarW);
+      }
       minuteMap.set(t, cur);
     }
     perSn[sn] = {
@@ -348,12 +350,22 @@ export function summarizeMorningSolar(opts = {}) {
 
 /** Friendly nicknames (cucumbers / shackas) → SN for ops talk. */
 export const ECO_NICKNAMES = {
-  cucumbers: "R331ZAB5SG6S2858", // Delta 2 primary
-  shackas: "R621ZA16XH6K1155", // River 2 Pro
+  cucumbers: "R331ZAB5SG6S2858", // Delta 2 primary — on host circuit
+  shackas: "R621ZA16XH6K1155", // River 2 Pro — on host circuit
   "delta-2-a": "R331ZAB5SG6S2858",
   "delta-2-b": "R331ZAB5SG755642",
   "river-2-pro": "R621ZA16XH6K1155",
 };
+
+/**
+ * Delta 2-B is NOT on the host solar circuit (Alex 2026-08-02).
+ * It will not run out for Root Server load — can disconnect; exclude from site bank / site solar totals.
+ */
+export const ECO_OFF_CIRCUIT_SNS = new Set(["R331ZAB5SG755642"]);
+
+export function isEcoOffCircuit(sn) {
+  return ECO_OFF_CIRCUIT_SNS.has(String(sn || "").trim());
+}
 
 function writeJson(file, obj) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -450,6 +462,7 @@ export async function refreshEcoFlow() {
   }
 
   const perSn = {};
+  const onCircuitSocs = [];
   for (const sn of sns) {
     try {
       const q = await ecoflowGet("/iot-open/sign/device/quota/all", { sn });
@@ -462,16 +475,19 @@ export async function refreshEcoFlow() {
         const data = q.json.data;
         const soc = pickSoc(data);
         const power = pickPowerWatts(data);
-        perSn[sn] = { ok: true, soc, ...power };
-        if (soc != null) batteryPct = soc;
+        const off = isEcoOffCircuit(sn);
+        perSn[sn] = { ok: true, soc, ...power, offCircuit: off };
+        if (soc != null && !off) onCircuitSocs.push(Number(soc));
         appendHistory(sn, {
           soc,
           ...power,
+          offCircuit: off,
           keys: Object.keys(data).slice(0, 24),
         });
         appendMinuteTotals(sn, { soc, ...power });
         noteParts.push(
           `${sn} quota ok` +
+            (off ? " [off-circuit]" : "") +
             (soc != null ? ` soc=${soc}%` : "") +
             (power.outW != null ? ` out=${power.outW}W` : ""),
         );
@@ -479,13 +495,23 @@ export async function refreshEcoFlow() {
         perSn[sn] = {
           ok: false,
           message: q.json?.message || q.text?.slice(0, 100),
+          offCircuit: isEcoOffCircuit(sn),
         };
         noteParts.push(`${sn} quota ${q.status}`);
       }
     } catch (err) {
-      perSn[sn] = { ok: false, message: err.message };
+      perSn[sn] = {
+        ok: false,
+        message: err.message,
+        offCircuit: isEcoOffCircuit(sn),
+      };
       noteParts.push(`${sn} err`);
     }
+  }
+  if (onCircuitSocs.length) {
+    batteryPct = Math.round(
+      onCircuitSocs.reduce((a, b) => a + b, 0) / onCircuitSocs.length,
+    );
   }
 
   return saveEcoSnapshot({
@@ -495,6 +521,7 @@ export async function refreshEcoFlow() {
     perSn,
     sns,
     nicknames: ECO_NICKNAMES,
+    offCircuitSns: [...ECO_OFF_CIRCUIT_SNS],
     buckets: ecoBucketsRoot(),
     baseUrl: baseUrl(),
     note: noteParts.join(" · "),

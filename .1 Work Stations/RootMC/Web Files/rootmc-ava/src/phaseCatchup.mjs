@@ -39,6 +39,7 @@ const PRIORITY_CHANNELS = () =>
     AVA_CHANNELS.avaHome,
     AVA_CHANNELS.ingameChat,
     AVA_CHANNELS.memesMedia,
+    AVA_CHANNELS.randomFacts,
   ].filter(Boolean);
 
 function addressesAva(msg, avaId) {
@@ -78,9 +79,13 @@ async function softAckRecent(fetchJson, { avaId, channelIds, limit = 12 } = {}) 
       const hasTimer = (m.reactions || []).some(
         (r) => r.emoji?.name === "⏱️" || r.emoji?.name === "⏰",
       );
-      if (hasTimer) continue;
+      const hasEyes = (m.reactions || []).some(
+        (r) => r.emoji?.name === "👀" || r.emoji?.name === "eyes",
+      );
+      if (hasTimer && hasEyes) continue;
       try {
-        await reactor.reactStored(channelId, m.id);
+        if (!hasEyes && hasTimer) await reactor.reactEyes(channelId, m.id);
+        else await reactor.reactStored(channelId, m.id);
         reacted++;
         await new Promise((r) => setTimeout(r, 250));
       } catch {

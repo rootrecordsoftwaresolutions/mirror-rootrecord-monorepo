@@ -177,6 +177,7 @@ export const DEFAULT_WATCH_CHANNELS = [
   "1516389376198840421", // #memes-and-media
   "1532929974154166522", // #development (staff pointer → Slack)
   "1520665313631408251", // #updates — ops status + staff pings (she posts here; must listen too)
+  "1531432703675596942", // #random-facts — watch + reply; unsolicited spam stays OFF
 ];
 
 /** Named channel fallbacks (aligned with rootmc-discord-channels). */

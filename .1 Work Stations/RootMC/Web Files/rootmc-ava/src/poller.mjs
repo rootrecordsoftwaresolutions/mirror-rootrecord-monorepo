@@ -56,6 +56,10 @@ import { makeFetchJson, postMessage } from "./discordApi.mjs";
 import { allowsUnsolicitedPost } from "./channelPolicy.mjs";
 import { createPipeline, pipelineBusyCount } from "./pipeline.mjs";
 import { startGateway } from "./gateway.mjs";
+import {
+  listGuildWatchChannelIds,
+  mergeWatchIds,
+} from "./guildChannelWatch.mjs";
 import { startSlackGateway, isSlackChannelId } from "./slackGateway.mjs";
 import { startSlackRestPoller } from "./slackRestPoller.mjs";
 import {
@@ -422,14 +426,29 @@ function snowflakeTime(id) {
 
 async function channelTargets() {
   const out = new Set(watch);
+  // Full-guild text + active threads (~4s awareness)
+  try {
+    if (
+      !channelTargets._lastFullSync ||
+      Date.now() - channelTargets._lastFullSync > 5 * 60_000
+    ) {
+      const ids = await listGuildWatchChannelIds(fetchJson);
+      const { added } = mergeWatchIds(watch, ids, gatewayHandle);
+      channelTargets._lastFullSync = Date.now();
+      if (added.length) {
+        console.log(`guild watch expand · +${added.length} → ${watch.length}`);
+        pushStatusEvent(`guild watch · ${watch.length} channels`);
+      }
+    }
+  } catch (err) {
+    console.warn("guild watch sync:", err.message);
+  }
   if (watch.includes(AVA_CHANNELS.proposals)) {
     try {
       const active = await fetchJson(`/guilds/${ROOTMC_GUILD_ID}/threads/active`);
       for (const t of active?.threads || []) {
         if (t.parent_id === AVA_CHANNELS.proposals) {
           out.add(t.id);
-          // Gateway filters by channel_id (= thread id for forum posts).
-          // Keep gateway watch in sync or Ava goes deaf in #proposals threads.
           if (!watch.includes(t.id)) {
             watch.push(t.id);
             gatewayHandle?.addWatch?.(t.id);
@@ -440,6 +459,7 @@ async function channelTargets() {
       console.warn("active threads:", err.message);
     }
   }
+  for (const id of watch) out.add(id);
   return [...out];
 }
 

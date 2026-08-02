@@ -13,6 +13,7 @@ import { loadPlayerProfile } from "./playerProfiles.mjs";
 import { isSoftChat, isReactOnlyAck, classifyIntent } from "./classify.mjs";
 import { isTrulyTrusted } from "./overloadSafeMode.mjs";
 import { isOpsPowerStatusAsk } from "./opsPowerStatus.mjs";
+import { AVA_CHANNELS } from "./config.mjs";
 
 const BATCH_SIZE = 3;
 const FLUSH_MS_TRUSTED = 40_000;
@@ -29,6 +30,30 @@ function isInnerOperator(authorId) {
   if (melee.includes(id)) return true;
   const telegramDefaults = ["6644482344"];
   if (telegramDefaults.includes(id)) return true;
+  return false;
+}
+
+/** #admins — staff lane; never sit on a batch timer when Ava is addressed. */
+function isAdminsChannel(channelId) {
+  const id = String(channelId || "").trim();
+  return id === AVA_CHANNELS.admins || id === "1516121832493678612";
+}
+
+/** Staff / operators get immediate replies (no 40–70s cadence hold). */
+export function shouldImmediateDiscordReply({ authorId, channelId } = {}) {
+  if (isInnerOperator(authorId)) return true;
+  if (isAdminsChannel(channelId)) return true;
+  const known = personByAuthorId(authorId);
+  if (
+    known &&
+    (known.roles || []).some((r) =>
+      ["admin", "owner", "operator", "staff", "emergency-stop", "assistant-dev"].includes(
+        r,
+      ),
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -168,6 +193,21 @@ export function enqueueDiscordBatch(item, { onFlushTimeout } = {}) {
   const surface = String(item.surface || "discord").toLowerCase();
   if (surface !== "discord" && surface !== "discord-dm") {
     return { action: "flush", items: [item], reason: "not_discord" };
+  }
+
+  // Admins / inner ops / staff — reply now while Ava is hot (no batch hold).
+  if (
+    shouldImmediateDiscordReply({
+      authorId: item.authorId,
+      channelId: item.channelId,
+    }) ||
+    item.chime
+  ) {
+    return {
+      action: "flush",
+      items: [item],
+      reason: item.chime ? "chime_immediate" : "admin_immediate",
+    };
   }
 
   const key = batchKey(surface, item.channelId, item.authorId);

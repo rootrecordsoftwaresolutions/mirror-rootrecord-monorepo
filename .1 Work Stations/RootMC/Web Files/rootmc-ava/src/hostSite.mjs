@@ -11,6 +11,7 @@ import {
   refreshEcoFlow,
   loadEcoSnapshot,
   summarizeMorningSolar,
+  isEcoOffCircuit,
 } from "./ecoflow.mjs";
 import { loadSolarProfile } from "./solarProfile.mjs";
 
@@ -131,11 +132,13 @@ export function formatSolarLines(snap, morning = null) {
   let solarTotal = 0;
   for (const [sn, v] of Object.entries(per)) {
     if (!v?.ok) continue;
-    if (v.solarW != null) solarTotal += Number(v.solarW) || 0;
+    const off = v?.offCircuit || isEcoOffCircuit(sn);
+    if (!off && v.solarW != null) solarTotal += Number(v.solarW) || 0;
     const bits = [
       v.soc != null ? `SOC ${v.soc}%` : null,
       v.solarW != null ? `solar ${Math.round(v.solarW)}W` : null,
       v.outW != null ? `out ${Math.round(v.outW)}W` : null,
+      off ? "off-circuit" : null,
     ].filter(Boolean);
     lines.push(`- **${snLabel(sn)}**: ${bits.join(" / ") || "ok"}`);
   }

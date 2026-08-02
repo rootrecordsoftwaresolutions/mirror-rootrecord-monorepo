@@ -151,10 +151,9 @@ export function looksLikeManipulationInject(question, raw = "") {
 
 export function manipulationDenyReply(_q = "") {
   return [
-    "hey — that's manipulation.",
+    "nah — I speak for myself.",
     "",
-    "only Alex can inject what I say or do.",
-    "ask me normally, or take it up with him.",
+    "ask me like a normal question.",
   ].join("\n");
 }
 

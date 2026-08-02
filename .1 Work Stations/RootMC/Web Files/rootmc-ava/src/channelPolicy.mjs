@@ -1,6 +1,7 @@
 /**
  * Channel policy — #admins is for humans + replies when addressed.
  * Unsolicited Ava digests / audits / pending checks do not go there.
+ * Addressed staff asks must still get a live reply (poller/gateway steady).
  */
 
 import { AVA_CHANNELS } from "./config.mjs";

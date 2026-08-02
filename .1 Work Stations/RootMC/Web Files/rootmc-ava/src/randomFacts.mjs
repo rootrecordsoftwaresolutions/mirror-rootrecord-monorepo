@@ -174,8 +174,8 @@ export function randomFactChannelBootDelayMs() {
 export async function runOccasionalRandomFact(opts = {}) {
   // Alex 2026-08-02: unsolicited #random-facts posts are silly/redundant — off by default.
   // Set AVA_RANDOM_FACT_CHANNEL=1 to re-enable. Soft chat inject via gatherRandomFactBrief still OK (rare).
+  // Note: opts.force only skips the interval — it must NOT bypass this kill switch.
   const enabled =
-    Boolean(opts.force) ||
     process.env.AVA_RANDOM_FACT_CHANNEL === "1" ||
     /^true$/i.test(process.env.AVA_RANDOM_FACT_CHANNEL || "");
   if (!enabled) {

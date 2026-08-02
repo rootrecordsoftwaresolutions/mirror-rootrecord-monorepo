@@ -37,7 +37,6 @@ const text = [
   ``,
   `SHIPPED TODAY`,
   `• Wave 0: Telegram brief + Slack all-channels ops blast + Discord pointer`,
-  `• Manipulation gate live (Alex-only inject)`,
   `• Llama v1 student docs + Root-Ava-Core PROP (forum + #voting)`,
   `• Website ~$100 USD PROP (forum + #voting) — no spend until pass`,
   `• Official parity checklist (do not kick Official)`,

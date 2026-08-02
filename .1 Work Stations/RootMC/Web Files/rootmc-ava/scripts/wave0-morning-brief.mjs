@@ -36,14 +36,13 @@ ${new Date().toISOString()}
 ORDERED CHECKLIST (me)
 1. Slack all-channels detailed ops blast — now
 2. Discord short pointer (#updates + #admins)
-3. Manipulation gate (only you inject “I want…”)
-4. Llama v1 student docs + Root-Ava-Core governance PROP (docs only; no jar)
-5. RootMC Official parity inventory + checklist (do NOT kick Official)
-6. Desktop Ava .exe MVP (rewrite-before-send, 42-msg context)
-7. Token/Gold credits + per-server reserve isolation rules + hooks
-8. Website ~$100 USD tools/marketing PROP
-9. Boot morning log check + job/urgent hygiene
-10. EOD Telegram status
+3. Llama v1 student docs + Root-Ava-Core governance PROP (docs only; no jar)
+4. RootMC Official parity inventory + checklist (do NOT kick Official)
+5. Desktop Ava .exe MVP (rewrite-before-send, 42-msg context)
+6. Token/Gold credits + per-server reserve isolation rules + hooks
+7. Website ~$100 USD tools/marketing PROP
+8. Boot morning log check + job/urgent hygiene
+9. EOD Telegram status
 
 YOUR HANDS (gates)
 • Shockbyte restart / FileZilla — confirm 1.8.0 live if not already
@@ -86,7 +85,6 @@ This is the detailed staff brief. Discord gets a short pointer only.
 5. *Bond / Server Reserve* — watch ledger (reports showed Reserve 0 Gold; payouts pause when ledger < 0); Claims vs Towny economies stay isolated
 
 *Today's delivery (Ava / agent)*
-• Manipulation gate — only Alex may inject “I want Ava to say/do X”
 • Llama v1 student boundary docs (plans OK, code untrusted, shadow learn, isolate edits)
 • Root-Ava-Core 7-day voting PROP draft
 • Official-bot automation inventory + parity checklist
@@ -108,7 +106,7 @@ This is the detailed staff brief. Discord gets a short pointer only.
 
 Questions / decisions → Alex on Telegram. I'll keep Slack updated when status flips.`;
 
-const discordPointer = `**Staff ops brief is on Slack** (all public channels) — Ava posted the full-day checklist there: 1.8.0 gate, tunnel, Ava-Core yes/no (docs today), OptiPlex D→E sync, Official-bot hold until parity, reserve watch, plus today's delivery list (manipulation gate, Llama docs, desktop MVP, token/Gold rules, ~$100 site PROP).
+const discordPointer = `**Staff ops brief is on Slack** (all public channels) — Ava posted the full-day checklist there: 1.8.0 gate, tunnel, Ava-Core yes/no (docs today), OptiPlex D→E sync, Official-bot hold until parity, reserve watch, plus today's delivery list (Llama docs, desktop MVP, token/Gold rules, ~$100 site PROP).
 
 Discord stays light: this pointer only. Master status stays on Alex's Telegram.`;
 

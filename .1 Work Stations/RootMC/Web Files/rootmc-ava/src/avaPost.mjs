@@ -113,6 +113,21 @@ export async function postAvaDiscord({
         content: cleaned,
         seedVoteReactions,
       });
+      // Watching stamp on her own outbound — use 👀 often
+      if (ackReact && reactor) {
+        try {
+          await reactor.reactEyes(channelId, msg.id);
+        } catch {
+          /* ignore */
+        }
+      } else if (ackReact) {
+        try {
+          const r2 = await makeAckReactor({ env: e, token: t });
+          await r2.reactEyes(channelId, msg.id);
+        } catch {
+          /* ignore */
+        }
+      }
     }
     recordAvaUtterance({
       surface: "discord",
@@ -216,6 +231,13 @@ export async function postAvaSlack({
       if (i < chunks.length - 1) await sleep(350);
     }
     if (parentTs && reactor) await reactor.clearWriting(channelId, parentTs);
+    if (ackReact && first?.ts && reactor) {
+      try {
+        await reactor.reactEyes(channelId, first.ts);
+      } catch {
+        /* ignore */
+      }
+    }
     recordAvaUtterance({
       surface: "slack",
       channelId,

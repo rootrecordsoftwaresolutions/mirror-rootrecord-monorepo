@@ -18,6 +18,8 @@ Goals below are **Ava wishlist / allocation targets** funded from her pie slice 
 | **Social lead — X** | **Active** | Own [@RootMCNews](https://x.com/RootMCNews) + [@RootRecord](https://x.com/RootRecord); human veto; secrets never in Discord |
 | **Telegram bot** | **Live in code** | `@ava_ivy_bot` — `AVA_TELEGRAM_BOT_TOKEN` in `.env`; long-poll on Ava boot |
 | **Membership $ → Vote Shards** | Proposed | `$0.01` = 1 shard; shards govern proposals (not P2W); expands Ava services / pie funding |
+| **World release @ 26.3** | **Planning · hyped** | Fresh RootMC moment when Paper/MC 26.3 lands — `plans/WORLD-RELEASE-26.3.md`. Towny upgrades, not removed. PROP before any wipe. |
+| **1h Grok idea → PROP** | **Waiting on Grok credits** | Worker hourly cron fires one build idea → formalize PROP for Ava. Plan: `plans/HOURLY-GROK-IDEA-PROP.md`. Status: https://ava.rootmc.net/ |
 
 ---
 

@@ -1,8 +1,9 @@
 /**
  * Silent status reactions on the asker's message:
  * - Seen + recorded → ⏱️ (time)
+ * - Watching / looking → 👀 (eyes) — use often (Alex lock 2026-08-02)
  * - Reply in the works → ✏️ (pencil)
- * Slack: clock1 / pencil2 (no Ava pack there)
+ * Slack: clock1 / eyes / pencil2 (no Ava pack there)
  * Never announce these; fail soft if missing scopes.
  */
 import { isSlackChannelId } from "./slackGateway.mjs";
@@ -13,6 +14,12 @@ import { appEmojiReaction, hasAppEmoji } from "./appEmojis.mjs";
 const RECORDED = {
   discord: "⏱️",
   slack: "clock1",
+};
+
+/** Watching / looking — Ava uses this often */
+const EYES = {
+  discord: "👀",
+  slack: "eyes",
 };
 
 /** Reply / dig currently being written */
@@ -112,7 +119,13 @@ export function createAckReactor(deps = {}) {
     if (!channelId || !messageId) return false;
     const surface = isSlackChannelId(channelId) ? "slack" : "discord";
     const table =
-      kind === "writing" ? WRITING : kind === "stored" || kind === "seen" ? RECORDED : RECORDED;
+      kind === "writing"
+        ? WRITING
+        : kind === "eyes" || kind === "watching"
+          ? EYES
+          : kind === "stored" || kind === "seen"
+            ? RECORDED
+            : RECORDED;
     const emoji = table[surface];
     let ok = false;
     if (surface === "slack") {
@@ -130,6 +143,14 @@ export function createAckReactor(deps = {}) {
       });
     }
     return ok;
+  }
+
+  /** ⏱️ + 👀 — default "I see this / I'm watching" pair */
+  async function reactSeenWithEyes(channelId, messageId) {
+    if (!channelId || !messageId) return false;
+    const a = await react(channelId, messageId, "seen");
+    const b = await react(channelId, messageId, "eyes");
+    return a || b;
   }
 
   async function clearWriting(channelId, messageId) {
@@ -181,10 +202,12 @@ export function createAckReactor(deps = {}) {
   }
 
   return {
-    /** Saw it — ⏱️ (same as recorded; early signal) */
-    reactSeen: (channelId, messageId) => react(channelId, messageId, "seen"),
-    /** Inbound stored / recorded — ⏱️ */
-    reactStored: (channelId, messageId) => react(channelId, messageId, "stored"),
+    /** Saw it — ⏱️ + 👀 (eyes often) */
+    reactSeen: (channelId, messageId) => reactSeenWithEyes(channelId, messageId),
+    /** Inbound stored / recorded — ⏱️ + 👀 */
+    reactStored: (channelId, messageId) => reactSeenWithEyes(channelId, messageId),
+    /** Watching only — 👀 */
+    reactEyes: (channelId, messageId) => react(channelId, messageId, "eyes"),
     /** Reply or dig in progress — ✏️ */
     reactWriting: (channelId, messageId) => react(channelId, messageId, "writing"),
     /** Drop pencil when reply posts or is abandoned */
@@ -192,12 +215,12 @@ export function createAckReactor(deps = {}) {
     /** Named Ava app emoji on Discord */
     reactApp,
     /**
-     * No text reply — still acknowledge. ⏱️ + warm heart. No pencil.
+     * No text reply — still acknowledge. ⏱️ + 👀 + warm heart. No pencil.
      */
     reactNoReply: async (channelId, messageId) => {
       if (!channelId || !messageId) return false;
       const surface = isSlackChannelId(channelId) ? "slack" : "discord";
-      let ok = await react(channelId, messageId, "stored");
+      let ok = await reactSeenWithEyes(channelId, messageId);
       if (surface === "slack") {
         ok = (await reactSlack(channelId, messageId, "thumbsup")) || ok;
       } else {
