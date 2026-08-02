@@ -104,31 +104,36 @@ export function buildFinanceSuggestions({ snap, ledger } = {}) {
   } else {
     if ((snap.usdAvailable || 0) < 0) {
       const bal = explainStripeBalance(snap);
-      let severity = "warn";
-      let text = `Stripe available ${formatUsd(snap.usdAvailable)} (pending ${formatUsd(snap.usdPending)}).`;
-
-      if (bal?.pendingCoversDeficit) {
-        severity = bal.isTrivialNegative ? "info" : "warn";
-        text = `Stripe available ${formatUsd(snap.usdAvailable)} — pending ${formatUsd(snap.usdPending)} covers it (fee/payout timing; not a tooling error).`;
-        if (bal.feesInRecent > 0) {
-          text += ` Recent Stripe fees ~${formatUsd(bal.feesInRecent)} in snapshot.`;
-        }
+      // Penny-level fee timing with pending cover — healthy Stripe state; skip review noise.
+      if (bal?.isTrivialNegative && bal?.pendingCoversDeficit) {
+        /* no suggestion — not a tooling error, not operator action */
       } else {
-        text += " Review payouts/disputes in Stripe.";
-        if (bal?.disputeCount) {
-          text += ` ${bal.disputeCount} dispute/refund-like tx in recent window.`;
-        }
-        if (bal?.lastPayoutAmount) {
-          text += ` Last payout ${formatUsd(bal.lastPayoutAmount)}.`;
-        }
-      }
+        let severity = "warn";
+        let text = `Stripe available ${formatUsd(snap.usdAvailable)} (pending ${formatUsd(snap.usdPending)}).`;
 
-      suggestions.push({
-        severity,
-        code: "negative_balance",
-        text,
-        selfFixable: false,
-      });
+        if (bal?.pendingCoversDeficit) {
+          severity = "warn";
+          text = `Stripe available ${formatUsd(snap.usdAvailable)} — pending ${formatUsd(snap.usdPending)} covers it (fee/payout timing; not a tooling error).`;
+          if (bal.feesInRecent > 0) {
+            text += ` Recent Stripe fees ~${formatUsd(bal.feesInRecent)} in snapshot.`;
+          }
+        } else {
+          text += " Review payouts/disputes in Stripe.";
+          if (bal?.disputeCount) {
+            text += ` ${bal.disputeCount} dispute/refund-like tx in recent window.`;
+          }
+          if (bal?.lastPayoutAmount) {
+            text += ` Last payout ${formatUsd(bal.lastPayoutAmount)}.`;
+          }
+        }
+
+        suggestions.push({
+          severity,
+          code: "negative_balance",
+          text,
+          selfFixable: false,
+        });
+      }
     }
     if ((snap.income30dUsd || 0) === 0) {
       suggestions.push({

@@ -5,6 +5,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { cursorApiKey } from "./config.mjs";
 import { cursorSelfFix } from "./cursorBrain.mjs";
 import { createJob, markImplementing, markDone, markStaged } from "./jobQueue.mjs";
@@ -85,6 +86,14 @@ export function isSelfFixableAsk(text = "", classified = null) {
   return false;
 }
 
+function briefFingerprint(brief = "") {
+  return crypto
+    .createHash("sha256")
+    .update(String(brief || "").trim().toLowerCase())
+    .digest("hex")
+    .slice(0, 20);
+}
+
 export function enqueueSelfFix({
   brief,
   channelId = null,
@@ -94,6 +103,16 @@ export function enqueueSelfFix({
   source = "ask",
 } = {}) {
   const q = loadQueue();
+  const fp = briefFingerprint(brief);
+  const dup = q.items.find(
+    (i) =>
+      (i.status === "queued" || i.status === "running") &&
+      briefFingerprint(i.brief) === fp,
+  );
+  if (dup) {
+    appendAction("selfFix.enqueue_skip", { reason: "duplicate", id: dup.id });
+    return dup;
+  }
   const item = {
     id: `sfx-${Date.now().toString(36)}`,
     brief: String(brief || "").slice(0, 2000),

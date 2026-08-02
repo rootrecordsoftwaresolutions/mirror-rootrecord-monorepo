@@ -5,7 +5,8 @@
 import { loadEnv } from "../src/config.mjs";
 import { refreshStripeSnapshot, formatStripeIncomePlain } from "../src/stripeFinance.mjs";
 import { formatOpsLedgerPlain, loadOpsLedger } from "../src/opsFinanceLedger.mjs";
-import { runFinanceReview } from "../src/financeReview.mjs";
+import { runFinanceReview, buildFinanceSuggestions } from "../src/financeReview.mjs";
+import { explainStripeBalance } from "../src/stripeFinance.mjs";
 import { tryHandleFinanceCommand } from "../src/playerFinance.mjs";
 
 const env = await loadEnv();
@@ -46,3 +47,32 @@ console.log("--- review ---", {
   reason: review.reason,
   suggestions: review.suggestions?.length,
 });
+
+// Unit-style guard: trivial negative + pending cover must not self-fix or warn-loop.
+const mockSnap = {
+  ok: true,
+  usdAvailable: -0.02,
+  usdPending: 13.49,
+  income30dUsd: 20,
+  recent: [
+    { type: "stripe_fee", amount: -0.07, description: "Billing - Usage Fee" },
+    { type: "payout", amount: -4.71, description: "" },
+  ],
+};
+const bal = explainStripeBalance(mockSnap);
+const mockSuggestions = buildFinanceSuggestions({ snap: mockSnap });
+const neg = mockSuggestions.find((s) => s.code === "negative_balance");
+console.log("--- balance explain ---", bal);
+console.log("--- negative guard ---", {
+  healthyTiming: bal?.healthyTiming,
+  negativeSuggestion: neg?.text || null,
+  selfFixable: neg?.selfFixable ?? null,
+});
+if (!bal?.healthyTiming) {
+  console.error("FAIL: expected healthyTiming for -$0.02 / $13.49 pending");
+  process.exitCode = 1;
+}
+if (neg) {
+  console.error("FAIL: trivial negative should not produce a review suggestion");
+  process.exitCode = 1;
+}

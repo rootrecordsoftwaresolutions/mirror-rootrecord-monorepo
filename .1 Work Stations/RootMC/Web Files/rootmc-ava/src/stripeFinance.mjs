@@ -217,15 +217,21 @@ export function explainStripeBalance(snap) {
   }
 
   const deficit = avail < 0 ? Math.abs(avail) : 0;
+  const feesRounded = Math.round(feesInRecent * 100) / 100;
+  const pendingCoversDeficit = avail < 0 && pending >= deficit;
+  const isTrivialNegative = avail < 0 && deficit <= 1;
   return {
     avail,
     pending,
     deficit,
-    feesInRecent: Math.round(feesInRecent * 100) / 100,
+    feesInRecent: feesRounded,
     disputeCount,
     lastPayoutAmount: lastPayout ? Number(lastPayout.amount) || 0 : null,
-    pendingCoversDeficit: avail < 0 && pending >= deficit,
-    isTrivialNegative: avail < 0 && deficit <= 1,
+    pendingCoversDeficit,
+    isTrivialNegative,
+    isFeeTiming:
+      avail < 0 && pendingCoversDeficit && (isTrivialNegative || deficit <= feesRounded),
+    healthyTiming: isTrivialNegative && pendingCoversDeficit && disputeCount === 0,
   };
 }
 
