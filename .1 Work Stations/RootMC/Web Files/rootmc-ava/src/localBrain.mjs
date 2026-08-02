@@ -110,8 +110,13 @@ export function gatherOrganizerPacks({ question = "" } = {}) {
   const eco = path.join(WORKSPACE_ROOT, "emergent-repo", "ECOSYSTEM.md");
   const layout = path.join(AVA_HANDOFF, "notes", "LINUX-E-SSD-LAYOUT.md");
   const localBrainDoc = path.join(AVA_HANDOFF, "notes", "LOCAL-BRAIN.md");
+  const interestsDoc = path.join(
+    AVA_HANDOFF,
+    "notes",
+    "INTERESTS-OFFGRID-GARDEN-POWER.md",
+  );
 
-  for (const file of [goals, surfaceMd, eco, layout, localBrainDoc]) {
+  for (const file of [goals, surfaceMd, eco, layout, localBrainDoc, interestsDoc]) {
     try {
       if (!fs.existsSync(file)) continue;
       const raw = fs.readFileSync(file, "utf8");

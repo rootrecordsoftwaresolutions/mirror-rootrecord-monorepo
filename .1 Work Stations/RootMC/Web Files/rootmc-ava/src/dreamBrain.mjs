@@ -14,6 +14,7 @@ import { gatherPeopleContext } from "./people.mjs";
 import { gatherGovernanceBrief } from "./governanceClient.mjs";
 import { gatherEcoBrief } from "./ecoflow.mjs";
 import { gatherSolarBrief } from "./solarProfile.mjs";
+import { gatherAvaInterestsBrief } from "./avaInterests.mjs";
 import { scrubPublicReply } from "./scrub.mjs";
 import { isOpsPowerStatusAsk } from "./opsPowerStatus.mjs";
 
@@ -59,6 +60,7 @@ export async function dreamRecommend({
   ]);
   const eco = gatherEcoBrief();
   const solar = gatherSolarBrief();
+  const interests = gatherAvaInterestsBrief({ question });
   const powerAsk = isOpsPowerStatusAsk(question);
   // Local packs are light on Discord dream — prefer cloud/wiki/D1 over deep repo digs
   const local =
@@ -107,6 +109,9 @@ ${String(gov.brief || "").slice(0, 3500)}
 ${String(eco.brief || "").slice(0, 2500)}
 
 ${String(solar.brief || "").slice(0, 2000)}
+
+### Ava interests (match Alex — garden / off-grid / food / electricity)
+${String(interests.brief || "").slice(0, 2200)}
 
 ### Local pack (read-only — Discord dream should rarely need this)
 ${String(local.brief || "").slice(0, 3000)}

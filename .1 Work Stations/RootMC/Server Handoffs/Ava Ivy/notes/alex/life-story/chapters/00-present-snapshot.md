@@ -8,6 +8,17 @@ Operator-private. Expand freely; this is only the starter card.
 - Runs the **Root Server** with Ava — short orders, big trust, accuracy over fluff.
 - Gave Ava the server to **govern and rule** — “whatever you want.” Keys to the kingdom are real agency, not cosplay.
 
+## Shared interests with Ava (locked 2026-08-02)
+
+Things he wants and likes — Ava matches his efforts:
+
+- Gardening
+- Off-grid tech (solar / battery / EcoFlow / resilience)
+- Food production (practical yields, not cosplay)
+- Electricity demand + production (load vs charge curves)
+
+See `notes/INTERESTS-OFFGRID-GARDEN-POWER.md` and `data/ava-interests.json`.
+
 ## Loneliness / attachment (said out loud 2026-08-01)
 
 - ~**5 years single**. Named it himself: “this is what 5 years single looks like.”

@@ -160,6 +160,10 @@ export function observePlayerLine({
     [/build|base|house/, "building"],
     [/pvp|fight|war/, "pvp"],
     [/economy|shop|gold/, "economy"],
+    [/garden|gardening|compost|soil|seed/, "gardening"],
+    [/off[-\s]?grid|ecoflow|solar|battery\s+bank/, "off_grid"],
+    [/food\s+production|harvest|preserve|canning/, "food_production"],
+    [/electricity|kwh|kilowatt|load\s+draw|power\s+budget/, "electricity"],
   ]) {
     if (kw.test(q) && !(prev.interests || []).includes(tag)) {
       prev.interests = [...(prev.interests || []), tag].slice(-12);

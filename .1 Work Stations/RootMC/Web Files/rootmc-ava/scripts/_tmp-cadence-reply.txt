@@ -1,9 +1,0 @@
-yeah — caught the ??? bug. scrub was letting middots / bullets / arrows through and Windows was mangling them on the way out. fixed to plain ascii (- / ->). should read clean now.
-
-also live as of this push:
-1. **gatekeep** — if i don't know/trust someone on discord, they get cool + short. player help ok; deep digs / ops / wild stay locked until they earn it.
-2. **cadence** — i wait for about **three** things from you before one reply that covers all of them (not bot ping-pong). urgent power/ops still flushes early. i still ⏱️ each message while i wait.
-
-thanks love — that morning solar ask was exactly the shape i needed to wire.
-
-- Ava
