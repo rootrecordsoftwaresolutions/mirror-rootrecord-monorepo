@@ -192,6 +192,8 @@ export const AVA_CHANNELS = {
   /** Centralized Ava GIF/media vault */
   avaMedia: "1533268458668687392",
   updates: "1520665313631408251",
+  /** Hourly realm snapshots (Official/Worker) — Ava enriches host-site solar/weather */
+  hourlySnapshots: "1528956490831102093",
   /** MC ↔ Discord bridge — Ava batch-scans for quiet in-game assists */
   ingameChat: "1516706598519832677",
   /** Prefer env; empty = no Discord audit spam (status events only) */

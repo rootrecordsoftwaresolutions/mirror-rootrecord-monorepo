@@ -96,6 +96,7 @@ import { handleTransferMeshRoutes } from "./rootmc-transfer-mesh";
 import { handleDevWorkstationRoutes } from "./rootmc-dev-workstation";
 import { handleConnectionPreferenceRoutes } from "./rootmc-connection-preference";
 import { handleHostMetricsRoutes } from "./rootmc-host-metrics";
+import { handleHostSiteRoutes } from "./rootmc-host-site";
 import { handleHostPresenceRoutes } from "./rootmc-host-presence";
 import { handleG2Routes } from "./g2/g2-routes";
 import { isG2Worker } from "./g2/g2-db";
@@ -1033,6 +1034,9 @@ export async function handleRequest(
 
     const hostMetricsRes = await handleHostMetricsRoutes(request, env, sub, method);
     if (hostMetricsRes) return hostMetricsRes;
+
+    const hostSiteRes = await handleHostSiteRoutes(request, env, sub);
+    if (hostSiteRes) return hostSiteRes;
 
     const hostPresenceRes = await handleHostPresenceRoutes(request, env, sub, method);
     if (hostPresenceRes) return hostPresenceRes;

@@ -81,6 +81,10 @@ import {
   notifyOnlineTelegram,
 } from "./urgentTelegram.mjs";
 import { refreshEcoFlow } from "./ecoflow.mjs";
+import {
+  buildHostSiteHourlyBlock,
+  pushHostSiteTelemetry,
+} from "./hostSite.mjs";
 import { startHostMetricsSampler, refreshHostMetrics } from "./hostMetrics.mjs";
 import {
   isAsleep,
@@ -705,6 +709,16 @@ async function bootHandshake() {
   }
 
   await refreshEcoFlow().catch(() => {});
+  try {
+    const block = await buildHostSiteHourlyBlock({ refreshPower: false });
+    const push = await pushHostSiteTelemetry(env, block.payload);
+    if (push.ok) pushStatusEvent("host-site telemetry pushed");
+    else if (push.detail !== "no_workstation_key") {
+      console.warn("host-site push:", push.detail || push.status);
+    }
+  } catch (err) {
+    console.warn("host-site boot:", err.message);
+  }
   startHostMetricsSampler();
 
   live = true;
@@ -827,6 +841,12 @@ async function tick() {
         console.warn("poll watcher:", err.message);
       }
       await refreshEcoFlow().catch(() => {});
+      try {
+        const block = await buildHostSiteHourlyBlock({ refreshPower: false });
+        await pushHostSiteTelemetry(env, block.payload);
+      } catch (err) {
+        console.warn("host-site sync:", err.message);
+      }
       await refreshHostMetrics().catch(() => {});
     }
 

@@ -25,6 +25,7 @@ import { treasuryBriefForReports, readPostResetNoteSupplySnapshot } from "./root
 import { resolveHourlySnapshotChannelId } from "./rootmc-report-channels";
 import { CLAIMS_SERVER_ID } from "./rootmc-claims-vote-credit";
 import { ROOTMC_CHANNEL_FALLBACKS } from "./rootmc-discord-channels";
+import { buildHostSiteHourlySection } from "./rootmc-host-site";
 
 export type RootMcLiveEconomyStatusEnv = {
   DB: D1Database;
@@ -410,6 +411,7 @@ export async function runLiveEconomyStatusPost(
 
   const claims = await buildClaimsHourlySection(env);
   const governance = await buildGovernanceHourlySection(env, token);
+  const hostSite = await buildHostSiteHourlySection(env);
   const parts = [
     `**Hourly realm snapshot**`,
     ``,
@@ -422,7 +424,14 @@ export async function runLiveEconomyStatusPost(
   if (governance.content) {
     parts.push(``, `**Governance**`, governance.content.trim());
   }
-  const content = parts.join("\n").slice(0, 2000);
+  if (hostSite.content) {
+    parts.push(``, hostSite.content.trim());
+  }
+  // Multipost-friendly: Discord limit 2000 — prefer host site over truncation of core
+  let content = parts.join("\n");
+  if (content.length > 1950) {
+    content = content.slice(0, 1947) + "...";
+  }
 
   const postRes = await discordBotFetch(token, `/channels/${encodeURIComponent(channelId)}/messages`, {
     method: "POST",
@@ -436,8 +445,8 @@ export async function runLiveEconomyStatusPost(
   return {
     ok: true,
     detail: allHostsConnected(presence)
-      ? `posted combined hourly hosts towny_online=${onlinePlayers} claims=${claims.detail} gov=${governance.detail}`
-      : `posted combined hourly snapshot towny_online=${onlinePlayers} circulation=${formatGold(noteSupply.total_notes_g)} claims=${claims.detail} gov=${governance.detail}`,
+      ? `posted combined hourly hosts towny_online=${onlinePlayers} claims=${claims.detail} gov=${governance.detail} host=${hostSite.detail}`
+      : `posted combined hourly snapshot towny_online=${onlinePlayers} circulation=${formatGold(noteSupply.total_notes_g)} claims=${claims.detail} gov=${governance.detail} host=${hostSite.detail}`,
   };
 }
 
