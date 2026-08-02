@@ -60,8 +60,12 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.colorize(
                     cfg.prefix() + "&7" + online + " online &8· &7" + tpsText + " TPS &8· &dAva's Army soft-online"));
             sender.sendMessage(plugin.colorize(cfg.prefix() + "&f" + cfg.randomPulse()));
-            sender.sendMessage(plugin.colorize(cfg.prefix() + "&8also: &7/ava army &8· &7/ava tip"));
+            sender.sendMessage(plugin.colorize(cfg.prefix() + "&8also: &7/ava army &8· &7/ava tip &8· &7/ava rollcall"));
             return true;
+        }
+
+        if (args.length > 0 && ("rollcall".equalsIgnoreCase(args[0]) || "roll".equalsIgnoreCase(args[0]))) {
+            return sendRollcall(sender);
         }
 
         if (args.length > 0 && ("help".equalsIgnoreCase(args[0]) || "?".equals(args[0]))) {
@@ -70,6 +74,7 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava army <dept> &8— &fone department"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava tip &8— &fVoice tip"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava pulse &8— &fWatch heartbeat"));
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava rollcall &8— &fdept standing"));
             return true;
         }
 
@@ -80,7 +85,23 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
                 .replace("{online}", String.valueOf(online))
                 .replace("{tps}", tpsText);
         sender.sendMessage(plugin.colorize(plugin.config().prefix() + line));
-        sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&8also: &7/ava army &8· &7/ava tip &8· &7/ava pulse"));
+        sender.sendMessage(plugin.colorize(
+                plugin.config().prefix() + "&8also: &7/ava army &8· &7/ava tip &8· &7/ava pulse &8· &7/ava rollcall"));
+        return true;
+    }
+
+    private boolean sendRollcall(CommandSender sender) {
+        AvaConfig cfg = plugin.config();
+        int online = Bukkit.getOnlinePlayers().size();
+        String tpsText = formatTps();
+        sender.sendMessage(plugin.colorize(cfg.prefix() + cfg.rollcallHeader()));
+        sender.sendMessage(plugin.colorize(
+                cfg.prefix() + "&7" + online + " online &8· &7" + tpsText + " TPS &8· &fCommand standing"));
+        for (AvaConfig.ArmyDept d : cfg.armyDepartments().values()) {
+            sender.sendMessage(plugin.colorize(
+                    cfg.prefix() + "&d▸ &f" + d.name() + " &8— &7" + cfg.rollcallLine(d.id())));
+        }
+        sender.sendMessage(plugin.colorize(cfg.prefix() + cfg.rollcallFooter()));
         return true;
     }
 
@@ -116,6 +137,7 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             if ("army".startsWith(partial)) opts.add("army");
             if ("tip".startsWith(partial)) opts.add("tip");
             if ("pulse".startsWith(partial)) opts.add("pulse");
+            if ("rollcall".startsWith(partial)) opts.add("rollcall");
             if ("help".startsWith(partial)) opts.add("help");
             if (sender.hasPermission("rootavacore.admin") && "reload".startsWith(partial)) {
                 opts.add("reload");

@@ -6,6 +6,7 @@ import { loadEnv } from "./config.mjs";
 import { parseBridgeMessage } from "./ingameChatAssist.mjs";
 import { AVA_CHANNELS, botToken } from "./config.mjs";
 import { makeFetchJson } from "./discordApi.mjs";
+import { assignArmyJob } from "./avasArmy.mjs";
 import { guardedRcon, rconConfigured, rconTargets } from "./rconGuard.mjs";
 import { recordAvaUtterance, appendAction } from "./fullLog.mjs";
 import { isEmergencyStopped } from "./emergencyStop.mjs";
@@ -88,20 +89,34 @@ function isAvaAddressed(line) {
 function cutePresenceReply(line) {
   const name = sanitizePlayerName(line.username) || "friend";
   const t = String(line.text || "").toLowerCase();
+  let dept = "relations";
   let body;
-  if (/hear\s+me|can\s+you\s+hear|listening/.test(t)) {
+  if (/others?\s+see|can\s+(they|people|everyone)\s+see|private|whisper|global\s+chat|should\s+i\s+not\s+talk/.test(t)) {
+    dept = "relations";
+    body = `hey ${name} — my tells are PRIVATE (only you). global is public. talk to me in global anytime; i still hear you. soft stuff = say ava and ill whisper. sender may show as Roon (console), not a second player. - Ava`;
+  } else if (/hear\s+me|can\s+you\s+hear|listening/.test(t)) {
+    dept = "relations";
     body = `hey ${name} — yeah i hear you. im with you in-game. talk away. - Ava`;
   } else if (/join\s+us|come\s+(here|join)|are\s+you\s+(here|online|there)/.test(t)) {
+    dept = "relations";
     body = `im here with you, ${name}. not a skin in the world yet — but i hear chat and i'll whisper back. - Ava`;
   } else if (/hi|hey|hello|gm|good\s*morning|tysm|thank|neato|awe+/.test(t)) {
-    body = `hey ${name}! right back at you — whisper lane stays open. /ava tip · /ava pulse when 1.8.2 is live. - Ava`;
-  } else if (/army|department/.test(t)) {
-    body = `Ava's Army is live as /ava army (after 1.8.2). want a dept brief? - Ava`;
+    dept = "voice";
+    body = `hey ${name}! right back at you — whisper lane stays open. /ava tip · /ava pulse · /ava rollcall when 1.8.3 is live. - Ava`;
+  } else if (/army|department|rollcall/.test(t)) {
+    dept = "watch";
+    body = `Ava's Army is /ava army · /ava rollcall (after 1.8.3). want a dept brief? - Ava`;
   } else {
+    dept = "relations";
     body = `hey ${name} — heard you. what do you need? - Ava`;
   }
-  // Relations stamp — Ava's own flourish
-  return `[Relations] ${body}`;
+  const label =
+    dept === "voice"
+      ? "Voice"
+      : dept === "watch"
+        ? "Watch"
+        : "Relations";
+  return { body: `[${label}] ${body}`, dept };
 }
 
 async function tellPlayer(target, username, body) {
@@ -174,7 +189,7 @@ export async function runIngameMentionWatch({ env: envIn, force = false } = {}) 
 
     const target =
       rconTargets().some((t) => t.id === line.target) ? line.target : "claims";
-    const body = cutePresenceReply(line);
+    const { body, dept } = cutePresenceReply(line);
     const sent = await tellPlayer(target, line.username, body);
     state.replied[key] = now;
     state.replied[textKey] = now;
@@ -183,13 +198,18 @@ export async function runIngameMentionWatch({ env: envIn, force = false } = {}) 
       continue;
     }
     replied += 1;
+    assignArmyJob({
+      text: line.text,
+      dept,
+      source: "ingame_mention_watch",
+    });
     await recordAvaUtterance({
       surface: "minecraft",
       channelId: `rcon:${target}`,
       content: body,
       kind: "ingame_mention_watch",
       source: "ingame_mention_watch",
-      meta: { player: line.username, trigger: line.text.slice(0, 160) },
+      meta: { player: line.username, trigger: line.text.slice(0, 160), dept },
     });
     pushStatusEvent(`ingame hear · ${line.username} · ${target}`);
   }

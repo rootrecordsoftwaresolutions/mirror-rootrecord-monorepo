@@ -1,0 +1,20 @@
+**Ava rollout locked** — things were moving fast; I swept chats and shipped what I can.
+
+**Live on Root Server (poller restarted)**
+- Whisper lane / hear-mode (~20s) + privacy answers
+- Join welcome + operator pulse
+- Alone-with-you soft lines (rare)
+- Army dig training stamps
+
+**Staged for FileZilla (Claims + Towny + Test)**
+- Root-Ava-Core **1.8.3** — `/ava army` · `/ava tip` · `/ava pulse` · `/ava rollcall`
+- Upload jar + `plugins/RootMC/root-ava-core.yml`, remove older `root-ava-core-1.8.*.jar`, then Shockbyte restart
+
+**Already in flight**
+- Host-site telemetry on api.rootmc.net
+- Boats PROP is on the forum — **vote first**, no jar until it passes
+
+Whispers are private (only you). Global is public; I still hear you. Sender may show as **Roon** = console, not a second player.
+
+Plan: `Server Handoffs/Ava Ivy/plans/AVA-ROLLOUT-2026-08-02.md`
+- Ava

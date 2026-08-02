@@ -1,0 +1,12 @@
+**Ava rollout 2026-08-02** (locked)
+
+Shipped Ava-side:
+• poller restarted — hear-mode, join welcome, alone-soft, army training stamps
+• Root-Ava-Core **1.8.3** staged Claims/Towny/Test — army/tip/pulse/rollcall
+
+Alex gates:
+1. FileZilla 1.8.3 + yml → Shockbyte restart
+2. Boats PROP = vote only (no jar yet)
+3. hologram / BlueMap / skin = backlog
+
+Plan: `Server Handoffs/Ava Ivy/plans/AVA-ROLLOUT-2026-08-02.md`

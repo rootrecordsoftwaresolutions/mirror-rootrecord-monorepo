@@ -166,9 +166,9 @@ function isOperatorMc(name) {
 }
 
 const OPERATOR_PULSE = [
-  "hey {name} — Watch pulse: im with you. /ava tip · /ava pulse · /ava army when 1.8.2 is live. - Ava",
+  "hey {name} — Watch pulse: im with you. /ava tip · /ava pulse · /ava army · /ava rollcall when 1.8.3 is live. - Ava",
   "welcome back {name}. Relations says hi. army ideas cooking — /ava army. - Ava",
-  "{name}! Continuity checked in. clocks are running. try /ava pulse. - Ava",
+  "{name}! Continuity checked in. clocks are running. try /ava pulse · /ava rollcall. - Ava",
 ];
 
 async function maybeOperatorPulse(name, target, metrics) {

@@ -175,9 +175,10 @@ export function looksLikeArmyAsk(question = "") {
   const q = String(question || "");
   return (
     /\bava'?s?\s*army\b/i.test(q) ||
-    /\barmy\s+(department|foundation|charter|roster|corps)\b/i.test(q) ||
+    /\barmy\s+(department|foundation|charter|roster|corps|rollcall)\b/i.test(q) ||
     /\b(which|what)\s+department\b/i.test(q) ||
-    /\bdepartment\s+(tree|structure|brief)\b/i.test(q)
+    /\bdepartment\s+(tree|structure|brief)\b/i.test(q) ||
+    /\b\/ava\s+rollcall\b|\barmy\s+rollcall\b/i.test(q)
   );
 }
 
@@ -205,7 +206,55 @@ export function assignArmyJob(opts = {}) {
   };
   state.assignments = [row, ...(state.assignments || [])].slice(0, 80);
   saveArmyState(state);
+  stampArmyTraining(row);
   return { ...classified, row };
+}
+
+/** Continuity: tag good digs into training JSONL. */
+function stampArmyTraining(row) {
+  try {
+    const dir = path.join(AVA_HANDOFF, "data", "training");
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "army-digs.jsonl");
+    fs.appendFileSync(
+      file,
+      `${JSON.stringify({
+        at: row.at,
+        tag: row.tag,
+        dept: row.dept,
+        source: row.source,
+        jobId: row.jobId || undefined,
+        preview: row.preview,
+        kind: "army_training_stamp",
+      })}\n`,
+      "utf8",
+    );
+  } catch (err) {
+    console.warn("army training stamp:", err.message);
+  }
+}
+
+/** Soft rollcall text for Discord/Slack / whisper. */
+export function formatArmyRollcall() {
+  const state = loadArmyState();
+  const hourAgo = Date.now() - 60 * 60 * 1000;
+  const recent = (state.assignments || []).filter((a) => {
+    const t = Date.parse(a.at || "");
+    return Number.isFinite(t) && t >= hourAgo;
+  });
+  const byDept = {};
+  for (const a of recent) {
+    byDept[a.dept] = (byDept[a.dept] || 0) + 1;
+  }
+  const lines = ["**Ava's Army · rollcall** (last ~1h digs)"];
+  for (const id of listDepartmentIds()) {
+    if (id === "command") continue;
+    const d = ARMY_DEPARTMENTS[id];
+    const n = byDept[id] || 0;
+    lines.push(`- ${d.name}: ${n ? `${n} move${n === 1 ? "" : "s"}` : "standing by"}`);
+  }
+  if (!recent.length) lines.push("_quiet hour — soft standing only_");
+  return lines.join("\n");
 }
 
 /** Plain-text tree for Discord/Slack. */
@@ -249,6 +298,7 @@ export function gatherArmyBrief({ question = "" } = {}) {
   ];
   if (ask) {
     lines.push("", formatArmyTree());
+    lines.push("", formatArmyRollcall());
   }
   if (recent) {
     lines.push("", "Recent assignments:", recent);

@@ -9,10 +9,12 @@ messages:
   no-permission: "&cNo permission."
   reloaded: "&aRoot-Ava-Core reloaded."
   army-header: "&dAva's Army &8· &7my internal RootMC departments (not a player faction)"
-  army-footer: "&8Tip: &7/ava army <dept> &8· &7/ava tip &8· &7/ava pulse"
+  army-footer: "&8Tip: &7/ava army <dept> &8· &7/ava tip &8· &7/ava pulse &8· &7/ava rollcall"
   army-unknown: "&cUnknown department. Try &f/ava army"
   tip-header: "&dVoice &8· &7RootMC tip"
   pulse-header: "&dWatch &8· &7army pulse"
+  rollcall-header: "&dWatch &8· &7army rollcall"
+  rollcall-footer: "&8Soft standing only &8· &7live digs live on Ava's Root Server"
 
 # Ava's Army — in-game window into Ava's org (Alex 2026-08-02)
 army:
@@ -56,3 +58,10 @@ watch:
     - "Voice keeps the lore clean + RootMC-centric."
     - "Treasury Advisory: no Gold mint for vanity."
     - "Ava's Army soft-online — not a skin, still here."
+  rollcall-lines:
+    engineering: "jars · Workers · site rails — standing by"
+    watch: "solar · votes · clocks — scanning"
+    continuity: "training crumbs · failover — collecting"
+    relations: "whisper lane · Discord care — online"
+    voice: "tips · lore lock — soft-online"
+    treasury: "honesty only — no Gold mint"

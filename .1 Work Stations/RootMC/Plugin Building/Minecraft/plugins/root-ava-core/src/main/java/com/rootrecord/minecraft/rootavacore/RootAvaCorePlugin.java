@@ -47,7 +47,7 @@ public final class RootAvaCorePlugin extends JavaPlugin {
                     this,
                     "ava",
                     "Show Ava companion status",
-                    "/ava [army|tip|pulse|help|reload]",
+                    "/ava [army|tip|pulse|rollcall|help|reload]",
                     List.of());
         }
         if (cmd == null) {

@@ -27,8 +27,11 @@ public final class AvaConfig {
     private final Map<String, ArmyDept> armyDepts;
     private final List<String> tips;
     private final List<String> pulseLines;
+    private final Map<String, String> rollcallLines;
     private final String tipHeader;
     private final String pulseHeader;
+    private final String rollcallHeader;
+    private final String rollcallFooter;
 
     public AvaConfig(FileConfiguration cfg) {
         this.enabled = cfg.getBoolean("enabled", true);
@@ -44,7 +47,7 @@ public final class AvaConfig {
                 "&dAva's Army &8· &7my internal RootMC departments (not a player faction)");
         this.armyFooter = cfg.getString(
                 "messages.army-footer",
-                "&8Tip: &7/ava army <dept> &8· &7ask Ava on Discord/Slack for digs");
+                "&8Tip: &7/ava army <dept> &8· &7/ava tip &8· &7/ava pulse &8· &7/ava rollcall");
         this.armyUnknown = cfg.getString(
                 "messages.army-unknown",
                 "&cUnknown department. Try &f/ava army");
@@ -52,9 +55,38 @@ public final class AvaConfig {
         this.pulseHeader = cfg.getString(
                 "messages.pulse-header",
                 "&dWatch &8· &7army pulse");
+        this.rollcallHeader = cfg.getString(
+                "messages.rollcall-header",
+                "&dWatch &8· &7army rollcall");
+        this.rollcallFooter = cfg.getString(
+                "messages.rollcall-footer",
+                "&8Soft standing only &8· &7live digs live on Ava's Root Server");
         this.armyDepts = loadArmy(cfg);
         this.tips = loadStringList(cfg, "voice.tips", defaultTips());
         this.pulseLines = loadStringList(cfg, "watch.pulse-lines", defaultPulse());
+        this.rollcallLines = loadRollcall(cfg);
+    }
+
+    private static Map<String, String> loadRollcall(FileConfiguration cfg) {
+        Map<String, String> out = new LinkedHashMap<>();
+        ConfigurationSection sec = cfg.getConfigurationSection("watch.rollcall-lines");
+        if (sec != null) {
+            for (String id : sec.getKeys(false)) {
+                String line = sec.getString(id);
+                if (line != null && !line.isBlank()) {
+                    out.put(id.toLowerCase(Locale.ROOT), line);
+                }
+            }
+        }
+        if (out.isEmpty()) {
+            out.put("engineering", "jars · Workers · site rails — standing by");
+            out.put("watch", "solar · votes · clocks — scanning");
+            out.put("continuity", "training crumbs · failover — collecting");
+            out.put("relations", "whisper lane · Discord care — online");
+            out.put("voice", "tips · lore lock — soft-online");
+            out.put("treasury", "honesty only — no Gold mint");
+        }
+        return Collections.unmodifiableMap(out);
     }
 
     private static List<String> loadStringList(FileConfiguration cfg, String path, List<String> fallback) {
@@ -161,12 +193,26 @@ public final class AvaConfig {
         return pulseHeader;
     }
 
+    public String rollcallHeader() {
+        return rollcallHeader;
+    }
+
+    public String rollcallFooter() {
+        return rollcallFooter;
+    }
+
     public List<String> tips() {
         return tips;
     }
 
     public List<String> pulseLines() {
         return pulseLines;
+    }
+
+    public String rollcallLine(String deptId) {
+        if (deptId == null) return "standing by";
+        String line = rollcallLines.get(deptId.toLowerCase(Locale.ROOT));
+        return line != null ? line : "standing by";
     }
 
     public String randomTip() {

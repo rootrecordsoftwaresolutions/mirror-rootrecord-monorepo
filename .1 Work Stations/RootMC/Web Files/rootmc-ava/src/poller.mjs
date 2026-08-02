@@ -123,6 +123,11 @@ import {
   mentionWatchBootDelayMs,
 } from "./ingameMentionWatch.mjs";
 import {
+  runIngameAloneSoft,
+  aloneSoftIntervalMs,
+  aloneSoftBootDelayMs,
+} from "./ingameAloneSoft.mjs";
+import {
   runFinanceReview,
   financeReviewIntervalMs,
   financeReviewBootDelayMs,
@@ -243,6 +248,10 @@ const INGAME_MENTION_MS = mentionWatchIntervalMs();
 const INGAME_MENTION_BOOT_MS = mentionWatchBootDelayMs();
 const ingameMentionBootAt = Date.now() + INGAME_MENTION_BOOT_MS;
 let lastIngameMentionWatch = 0;
+const INGAME_ALONE_MS = aloneSoftIntervalMs();
+const INGAME_ALONE_BOOT_MS = aloneSoftBootDelayMs();
+const ingameAloneBootAt = Date.now() + INGAME_ALONE_BOOT_MS;
+let lastIngameAloneSoft = 0;
 const FINANCE_REVIEW_MS = financeReviewIntervalMs();
 const FINANCE_REVIEW_BOOT_MS = financeReviewBootDelayMs();
 const financeReviewBootAt = Date.now() + FINANCE_REVIEW_BOOT_MS;
@@ -978,6 +987,24 @@ async function tick() {
       }
     }
 
+    // Alone-with-operator soft lines (~3m) — rare private tell, no AI
+    const aloneBoot =
+      Date.now() >= ingameAloneBootAt && lastIngameAloneSoft === 0;
+    const aloneInterval =
+      lastIngameAloneSoft > 0 &&
+      Date.now() - lastIngameAloneSoft >= INGAME_ALONE_MS;
+    if (live && !isHushed() && !isAsleep() && (aloneBoot || aloneInterval)) {
+      lastIngameAloneSoft = Date.now();
+      try {
+        const al = await runIngameAloneSoft({ env, force: aloneBoot });
+        if (al?.sent > 0) {
+          console.log(`ingame alone soft · ${al.sent}`);
+        }
+      } catch (err) {
+        console.warn("ingame alone soft:", err.message);
+      }
+    }
+
     // Finance review — Stripe + ledger suggestions → Telegram Alex (~12h)
     const financeBoot =
       Date.now() >= financeReviewBootAt && lastFinanceReview === 0;
@@ -1577,6 +1604,16 @@ setTimeout(() => {
 }, INGAME_MENTION_BOOT_MS);
 console.log(
   `ingame mention watch · Ava hear · first in ~${Math.round(INGAME_MENTION_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_MENTION_MS / 1000)}s`,
+);
+setTimeout(() => {
+  if (!live || isHushed() || isAsleep()) return;
+  lastIngameAloneSoft = Date.now();
+  runIngameAloneSoft({ env, force: true }).catch((err) =>
+    console.warn("ingame alone soft boot:", err.message),
+  );
+}, INGAME_ALONE_BOOT_MS);
+console.log(
+  `ingame alone soft · Voice · first in ~${Math.round(INGAME_ALONE_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_ALONE_MS / 1000)}s`,
 );
 setTimeout(() => {
   if (!live || isHushed() || isAsleep()) return;
