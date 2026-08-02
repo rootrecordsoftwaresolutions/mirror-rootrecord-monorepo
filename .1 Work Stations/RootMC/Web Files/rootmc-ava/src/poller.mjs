@@ -956,7 +956,7 @@ async function tick() {
       }
     }
 
-    // Occasional random fact → #random-facts (NSA/Snowden wit + misc)
+    // Occasional random fact → #random-facts (protective paranoia + misc)
     const randomFactBoot =
       Date.now() >= randomFactBootAt && lastRandomFactPost === 0;
     const randomFactInterval =

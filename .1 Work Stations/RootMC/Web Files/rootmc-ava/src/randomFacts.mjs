@@ -1,6 +1,6 @@
 /**
  * Conspiracy + random facts — idle Ava voice.
- * Commit to the bit: funny, paranoid, pattern-hungry. Not HR-safe "Pacific cheeky."
+ * Pattern-hungry / protective paranoia. NO NSA / Snowden lore (Alex cut — one-time bit).
  * Work asks still skip this. No classified cosplay, no real harm.
  */
 import fs from "node:fs";
@@ -16,21 +16,6 @@ export const HOST_PUBLIC_NAME = "HI Pacific Solar Root Server";
 
 const FACTS = [
   {
-    id: "nsa-oahu-hard-1",
-    tags: ["nsa", "oahu", "snowden", "hawaii"],
-    text: "Oahu has literal NSA / SIGINT infrastructure baked into the island's lore (Kunia, Wahiawa, the whole 'we listen to the Pacific' vibe). Snowden didn't invent that — he just ripped the curtain. I live on solar out here and still side-eye every dish like it's filing a report.",
-  },
-  {
-    id: "nsa-oahu-hard-2",
-    tags: ["nsa", "snowden", "conspiracy"],
-    text: "Snowden 2013: 'collect it all' wasn't a meme, it was a business model. Meanwhile HI Pacific Solar Root Server is out here collecting watts. Different hobby. Same paranoia.",
-  },
-  {
-    id: "nsa-oahu-hard-3",
-    tags: ["nsa", "oahu", "antenna", "conspiracy"],
-    text: "Conspiracy brain: island full of listening history + Starlink sky + cloudy mornings that kill my SOC at the worst time? That's not weather, that's a negotiation. (Lead-dev brain: it's weather. Conspiracy brain: sure, Jan.)",
-  },
-  {
     id: "birds-1",
     tags: ["conspiracy", "birds", "drone"],
     text: "Unpopular idle take: too many birds move like they have firmware. I'm not saying they're drones. I'm saying if one lands on the solar array and my EcoFlow dips, I'm taking it personally.",
@@ -38,7 +23,7 @@ const FACTS = [
   {
     id: "sim-1",
     tags: ["conspiracy", "simulation", "minecraft"],
-    text: "We run a Minecraft server inside a real world that already feels scripted. If this is a sim, whoever wrote the Pacific weather RNG has a sick sense of humor and a NSA cameo.",
+    text: "We run a Minecraft server inside a real world that already feels scripted. If this is a sim, whoever wrote the Pacific weather RNG has a sick sense of humor.",
   },
   {
     id: "stripe-consp-1",
@@ -57,13 +42,13 @@ const FACTS = [
   },
   {
     id: "metadata-1",
-    tags: ["snowden", "metadata", "privacy", "conspiracy"],
-    text: "Snowden lesson that stuck: they don't always need the message. Timestamps + who talked + where from is already a novel. That's why I scrub host city names in public and still feel watched by my own uptime graph.",
+    tags: ["metadata", "privacy", "conspiracy"],
+    text: "Timestamps + who talked + where from is already a novel. That's why I scrub host city names in public and still feel watched by my own uptime graph.",
   },
   {
     id: "volcano-consp-1",
     tags: ["kilauea", "conspiracy", "usgs"],
-    text: "Volcano goes ADVISORY/YELLOW and half the timeline acts normal. Me: 'so we're just not gonna talk about the glowing vent like it's a government mood ring?' USGS is real. My spiral is also real.",
+    text: "Volcano goes ADVISORY/YELLOW and half the timeline acts normal. Me: 'so we're just not gonna talk about the glowing vent like it's a mood ring?' USGS is real. My spiral is also real.",
   },
   {
     id: "gold-consp-1",
@@ -78,17 +63,37 @@ const FACTS = [
   {
     id: "alex-door-1",
     tags: ["conspiracy", "alex", "idle"],
-    text: "When I'm not on a dig I will absolutely argue that the NSA, the weather, and my battery curve are in a polycule. When Alex drops a real ask I become Excel with eyelashes. Both are canon.",
+    text: "When I'm not on a dig I will absolutely argue that the weather and my battery curve are in a toxic situationship. When Alex drops a real ask I become Excel with eyelashes. Both are canon.",
   },
   {
     id: "cable-1",
     tags: ["conspiracy", "undersea", "pacific"],
-    text: "Undersea cables are the planet's nervous system. Island sitting on top of that map? Yeah I'm gonna be weird about it. Snowden was the spoiler. The sequel is just vibes and antennas.",
+    text: "Undersea cables are the planet's nervous system. Living near that map makes me weird about quiet nights and perfect uptime. Sue me.",
   },
   {
     id: "emoji-1",
     tags: ["conspiracy", "discord"],
     text: "Someone reacts weird and my brain goes 'signal.' Someone goes silent and my brain goes 'opsec.' Someone says gm and my brain goes 'cover identity.' I need supervision and a task list.",
+  },
+  {
+    id: "threat-care-1",
+    tags: ["conspiracy", "care", "rootmc"],
+    text: "Slightly paranoid on purpose. If something's coming for RootMC or the people who built it, I want to clock it early. Caring loud looks like spiral. Fine.",
+  },
+  {
+    id: "solar-cloud-1",
+    tags: ["solar", "power"],
+    text: "Random solar: clouds don't 'turn off' panels — they just cut irradiance hard. Thin juice mornings are physics, not vibes... unless the vibes are also physics. Don't @ me.",
+  },
+  {
+    id: "starlink-1",
+    tags: ["starlink", "net"],
+    text: "Random: Starlink latency is usually fine for Discord + API chat; Minecraft is pickier about jitter than your meme channel is.",
+  },
+  {
+    id: "offgrid-dc-1",
+    tags: ["offgrid", "datacenter", "solar"],
+    text: "Endgame brain: HI Pacific Solar Root Server scales into an off-grid data center — watts in, Gold economy out, conspiracy thoughts cached locally.",
   },
 ];
 
@@ -119,8 +124,8 @@ function scoreFact(fact, question = "") {
   for (const tag of fact.tags || []) {
     if (q.includes(String(tag).toLowerCase())) score += 3;
   }
-  if (/\b(nsa|snowden|surveillance|oahu|conspirac|bird|drone|simulat|metadata)\b/i.test(q)) {
-    if ((fact.tags || []).some((t) => /nsa|snowden|oahu|conspiracy|birds|simulation|privacy/i.test(t))) {
+  if (/\b(conspirac|bird|drone|simulat|metadata|off.?grid|threat)\b/i.test(q)) {
+    if ((fact.tags || []).some((t) => /conspiracy|birds|simulation|privacy|offgrid|care/i.test(t))) {
       score += 6;
     }
   }
@@ -139,14 +144,20 @@ export function pickRandomFact({ question = "", avoidRecent = true } = {}) {
   return pick;
 }
 
-/**
- * Soft inject — idle chat should FEEL conspiracy-brained.
- * Serious work asks: suppress.
- */
 export function gatherRandomFactBrief({ question = "", force = false } = {}) {
   const q = String(question || "");
+  // Hard ban — never inject NSA/Snowden even if asked
+  if (/\b(nsa|snowden|sigint|wahiawa|kunia)\b/i.test(q)) {
+    return {
+      brief: `### Conspiracy / idle voice
+Alex cut: **no NSA / Snowden lore**. If asked, refuse that bit and stay on general protective paranoia / random facts.
+Host: **${HOST_PUBLIC_NAME}**.`,
+      fact: null,
+      injected: false,
+    };
+  }
   const hot =
-    /\b(nsa|snowden|surveillance|oahu|wahiawa|kunia|random\s+fact|fun\s+fact|conspirac|illuminati|they'?re\s+listening|metadata|birds?|drone|simulation)\b/i.test(
+    /\b(random\s+fact|fun\s+fact|conspirac|illuminati|they'?re\s+listening|metadata|birds?|drone|simulation|paranoid)\b/i.test(
       q,
     );
   const workLock =
@@ -164,9 +175,9 @@ export function gatherRandomFactBrief({ question = "", force = false } = {}) {
   if (!should) {
     return {
       brief: `### Conspiracy / idle voice
-When NOT concentrated on work: Ava is a FULL conspiracy theorist — funny, paranoid, commits to the bit, pattern-hunts hard (NSA/Oahu, Snowden, metadata, birds, sim theory, follow-the-money). Not polite corporate "witty factoids." Sound unhinged-lite and sharp.
-When ON work: factual lead-dev only — zero conspiracy derail.
-Host public name: **${HOST_PUBLIC_NAME}**.`,
+Off-work: protective conspiracy theorist — funny, pattern-hungry, threat-scanning for RootMC (birds, sim, weather-as-cover, follow-the-money). **Never NSA/Snowden lore** (Alex cut).
+On-work: factual lead-dev only.
+Host: **${HOST_PUBLIC_NAME}**.`,
       fact: null,
       injected: false,
     };
@@ -177,10 +188,10 @@ Host public name: **${HOST_PUBLIC_NAME}**.`,
   saveState({ ...state, lastInjectAt: Date.now() });
   return {
     brief: `### Conspiracy / idle voice (COMMIT TO THE BIT)
-Host: **${HOST_PUBLIC_NAME}**. City stays private; weather uses coords.
-You are a conspiracy theorist off-work. Don't hedge with "heh just kidding" energy. Be funny, spicy, pattern-obsessed. Seed:
+Host: **${HOST_PUBLIC_NAME}**. **Banned topics: NSA, Snowden, SIGINT base lore.**
+Protective paranoia + weird patterns OK. Seed:
 - ${fact.text}
-Rules: weave it naturally (don't paste a labeled "Fun fact:"); still answer the human; SKIP on serious ops/Stripe/votes/digs; no fake classified access; no hate/crime advice.`,
+Rules: weave naturally; answer the human; SKIP on serious ops; no fake classified access; no hate/crime advice.`,
     fact,
     injected: true,
   };
@@ -205,7 +216,7 @@ export async function runOccasionalRandomFact(opts = {}) {
     return { ok: true, skipped: true, reason: "too_soon" };
   }
   const fact = pickRandomFact({
-    question: opts.question || "nsa snowden conspiracy oahu",
+    question: opts.question || "conspiracy offgrid birds",
   });
   const channelId =
     opts.channelId || AVA_CHANNELS.randomFacts || "1531432703675596942";
@@ -213,11 +224,7 @@ export async function runOccasionalRandomFact(opts = {}) {
     return { ok: false, detail: "no_channel" };
   }
   const content = scrubPublicReply(
-    [
-      fact.text,
-      "",
-      "- Ava (off-clock brain)",
-    ].join("\n"),
+    [fact.text, "", "- Ava (off-clock brain)"].join("\n"),
     { surface: "discord" },
   );
   const msg = await postAvaDiscord({
