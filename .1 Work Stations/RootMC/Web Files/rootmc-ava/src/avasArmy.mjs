@@ -40,7 +40,7 @@ export const ARMY_DEPARTMENTS = {
     short: "independence · failover · training · E/Linux",
     digSurface: "slack",
     keywords:
-      /\b(independence|failover|optiplex|ubuntu|ssh|training\s*factory|e\s*handoff|/mnt/e|continuity)\b/i,
+      /\b(independence|failover|optiplex|ubuntu|ssh|training\s*factory|e\s*handoff|mnt\/e|continuity)\b/i,
   },
   relations: {
     id: "relations",
