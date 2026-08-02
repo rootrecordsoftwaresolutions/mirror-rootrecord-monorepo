@@ -36,8 +36,13 @@ import { gatherFinanceBrief } from "./financeBrief.mjs";
 import { isSelfFixableAsk } from "./selfFix.mjs";
 import { isAsleep } from "./sleepMode.mjs";
 import { isCloudDark } from "./cloudDark.mjs";
+import {
+  isOpsPowerStatusAsk,
+  buildOpsPowerStatusReply,
+} from "./opsPowerStatus.mjs";
 
 export { flushPendingLessons } from "./localBrain.mjs";
+export { isOpsPowerStatusAsk } from "./opsPowerStatus.mjs";
 
 export { scrubPublicReply } from "./scrub.mjs";
 export { stripForbiddenMentions } from "./scrub.mjs";
@@ -277,22 +282,41 @@ export async function recommend({
   const surfaceNorm = String(surface || "discord").toLowerCase();
   const discordDream =
     surfaceNorm === "discord" || surfaceNorm === "discord-dm";
+  const cursorUp = Boolean(cursorApiKey(env || {}));
+
+  // Cursor-online exception: live EcoFlow + council voting shares on Discord.
+  // Read-only telemetry — not a jar dig. Bypasses dream-only + cloud-dark mute.
+  if (isOpsPowerStatusAsk(q) && cursorUp && !forceDream) {
+    try {
+      const powerReply = await buildOpsPowerStatusReply({ authorId });
+      if (powerReply?.trim()) {
+        return scrubPublicReply(powerReply, {
+          surface,
+          allowCustomerDetails: customerOk,
+        });
+      }
+    } catch (err) {
+      console.warn("opsPowerStatus:", err?.message || err);
+    }
+  }
+
   // Locked: Discord is always dream state. Slack / on-device = Root Server digs.
   const useDream =
     forceDream ||
     forceDreamBrain(env || {}) ||
     asleep ||
     discordDream ||
-    !cursorApiKey(env || {});
+    !cursorUp;
 
   // Grok / dream unpaid or unreachable — silence Discord + Telegram auto-replies.
+  // (Ops power-status already handled above when Cursor is online.)
   if (
     isCloudDark() &&
     (discordDream ||
       surfaceNorm === "telegram" ||
       forceDream ||
       asleep ||
-      (useDream && !cursorApiKey(env || {})))
+      (useDream && !cursorUp))
   ) {
     return "";
   }

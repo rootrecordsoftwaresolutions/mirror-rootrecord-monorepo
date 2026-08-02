@@ -12,7 +12,10 @@ import { gatherLocalContext } from "./localContext.mjs";
 import { gatherCoreSpec } from "./coreSpec.mjs";
 import { gatherPeopleContext } from "./people.mjs";
 import { gatherGovernanceBrief } from "./governanceClient.mjs";
+import { gatherEcoBrief } from "./ecoflow.mjs";
+import { gatherSolarBrief } from "./solarProfile.mjs";
 import { scrubPublicReply } from "./scrub.mjs";
+import { isOpsPowerStatusAsk } from "./opsPowerStatus.mjs";
 
 function loadDreamSystemMd() {
   try {
@@ -54,6 +57,9 @@ export async function dreamRecommend({
       brief: "",
     })),
   ]);
+  const eco = gatherEcoBrief();
+  const solar = gatherSolarBrief();
+  const powerAsk = isOpsPowerStatusAsk(question);
   // Local packs are light on Discord dream — prefer cloud/wiki/D1 over deep repo digs
   const local =
     String(surface).toLowerCase() === "slack"
@@ -64,11 +70,16 @@ export async function dreamRecommend({
     ? "Mode: operator sleep until ~10:00 HST. You are still on Discord dream-state brain. Soft 'I'm dreaming' vibe OK — still helpful. No file digs, deploys, or live RCON claims. Point development to Slack + Root Server."
     : "Mode: Discord dream state (locked). Communal / player surface. Cloud brain + D1/api.rootmc.net knowledge. No file digs, jar ships, or live RCON. Development digs belong on Slack with the on-device Root Server. Web/wiki is fair game.";
 
+  const powerHint = powerAsk
+    ? "This ask is ops power/voting status. Prefer the EcoFlow + solar + governance packs below — never invent SOC/watts/share %. If packs say unknown, say you'll refresh when the Root Server is up."
+    : "If they ask battery/solar/EcoFlow and packs are thin, say honestly you need a live refresh — do not invent percentages.";
+
   const system = [
     dreamSys || "",
     AVA_PERSONA,
     AVA_HARD_RULES,
     modeLine,
+    powerHint,
     "Never name Cursor, Grok, ChatGPT, Claude, xAI, GPT, or other AI products — only Root Server / dream state / asleep.",
     "Currency is Gold (G). Keep replies Discord-length unless they asked for detail.",
   ]
@@ -91,6 +102,11 @@ ${String(site.brief || "").slice(0, 4500)}
 
 ### D1 / api.rootmc.net governance pack
 ${String(gov.brief || "").slice(0, 3500)}
+
+### Power (EcoFlow snapshot + host solar profile)
+${String(eco.brief || "").slice(0, 2500)}
+
+${String(solar.brief || "").slice(0, 2000)}
 
 ### Local pack (read-only — Discord dream should rarely need this)
 ${String(local.brief || "").slice(0, 3000)}
