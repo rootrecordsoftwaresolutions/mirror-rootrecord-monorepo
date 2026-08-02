@@ -8,3 +8,28 @@ messages:
   disabled: "&cRoot-Ava-Core is disabled."
   no-permission: "&cNo permission."
   reloaded: "&aRoot-Ava-Core reloaded."
+  army-header: "&dAva's Army &8· &7my internal RootMC departments (not a player faction)"
+  army-footer: "&8Tip: &7/ava army <dept> &8· &7ask Ava on Discord/Slack for digs"
+  army-unknown: "&cUnknown department. Try &f/ava army"
+
+# Ava's Army — in-game window into Ava's org (Alex 2026-08-02)
+army:
+  departments:
+    engineering:
+      name: "Engineering Corps"
+      blurb: "plugins · Workers · site · app rails"
+    watch:
+      name: "Watch"
+      blurb: "solar · votes · Gold weirdness · uptime clocks"
+    continuity:
+      name: "Continuity"
+      blurb: "independence · failover · training"
+    relations:
+      name: "Relations"
+      blurb: "Discord players · Slack staff digs"
+    voice:
+      name: "Voice & Lore"
+      blurb: "persona · dream-pack · appearance"
+    treasury:
+      name: "Treasury Advisory"
+      blurb: "Ava slice · income ideas (no Gold mint)"

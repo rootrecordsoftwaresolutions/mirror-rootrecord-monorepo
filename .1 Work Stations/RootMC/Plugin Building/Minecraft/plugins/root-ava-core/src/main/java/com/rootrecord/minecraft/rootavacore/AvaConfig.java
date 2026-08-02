@@ -1,9 +1,19 @@
 package com.rootrecord.minecraft.rootavacore;
 
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /** Settings from plugins/RootMC/root-ava-core.yml. */
 public final class AvaConfig {
+
+    public record ArmyDept(String id, String name, String blurb) {}
 
     private final boolean enabled;
     private final String prefix;
@@ -11,6 +21,10 @@ public final class AvaConfig {
     private final String disabled;
     private final String noPermission;
     private final String reloaded;
+    private final String armyHeader;
+    private final String armyFooter;
+    private final String armyUnknown;
+    private final Map<String, ArmyDept> armyDepts;
 
     public AvaConfig(FileConfiguration cfg) {
         this.enabled = cfg.getBoolean("enabled", true);
@@ -21,6 +35,45 @@ public final class AvaConfig {
         this.disabled = cfg.getString("messages.disabled", "&cRoot-Ava-Core is disabled.");
         this.noPermission = cfg.getString("messages.no-permission", "&cNo permission.");
         this.reloaded = cfg.getString("messages.reloaded", "&aRoot-Ava-Core reloaded.");
+        this.armyHeader = cfg.getString(
+                "messages.army-header",
+                "&dAva's Army &8· &7my internal RootMC departments (not a player faction)");
+        this.armyFooter = cfg.getString(
+                "messages.army-footer",
+                "&8Tip: &7/ava army <dept> &8· &7ask Ava on Discord/Slack for digs");
+        this.armyUnknown = cfg.getString(
+                "messages.army-unknown",
+                "&cUnknown department. Try &f/ava army");
+        this.armyDepts = loadArmy(cfg);
+    }
+
+    private static Map<String, ArmyDept> loadArmy(FileConfiguration cfg) {
+        Map<String, ArmyDept> out = new LinkedHashMap<>();
+        ConfigurationSection sec = cfg.getConfigurationSection("army.departments");
+        if (sec != null) {
+            for (String id : sec.getKeys(false)) {
+                ConfigurationSection row = sec.getConfigurationSection(id);
+                if (row == null) continue;
+                String name = row.getString("name", id);
+                String blurb = row.getString("blurb", "");
+                String key = id.toLowerCase(Locale.ROOT);
+                out.put(key, new ArmyDept(key, name, blurb));
+            }
+        }
+        if (out.isEmpty()) {
+            // Sensible defaults if yml missing section
+            put(out, "engineering", "Engineering Corps", "plugins · Workers · site · app rails");
+            put(out, "watch", "Watch", "solar · votes · Gold weirdness · uptime clocks");
+            put(out, "continuity", "Continuity", "independence · failover · training");
+            put(out, "relations", "Relations", "Discord players · Slack staff digs");
+            put(out, "voice", "Voice & Lore", "persona · dream-pack · appearance");
+            put(out, "treasury", "Treasury Advisory", "Ava slice · income ideas (no Gold mint)");
+        }
+        return Collections.unmodifiableMap(out);
+    }
+
+    private static void put(Map<String, ArmyDept> out, String id, String name, String blurb) {
+        out.put(id, new ArmyDept(id, name, blurb));
     }
 
     public boolean enabled() {
@@ -45,5 +98,56 @@ public final class AvaConfig {
 
     public String reloaded() {
         return reloaded;
+    }
+
+    public String armyHeader() {
+        return armyHeader;
+    }
+
+    public String armyFooter() {
+        return armyFooter;
+    }
+
+    public String armyUnknown() {
+        return armyUnknown;
+    }
+
+    public Map<String, ArmyDept> armyDepartments() {
+        return armyDepts;
+    }
+
+    public ArmyDept armyDept(String idOrAlias) {
+        if (idOrAlias == null || idOrAlias.isBlank()) return null;
+        String key = idOrAlias.toLowerCase(Locale.ROOT).trim();
+        ArmyDept direct = armyDepts.get(key);
+        if (direct != null) return direct;
+        for (ArmyDept d : armyDepts.values()) {
+            if (d.name().toLowerCase(Locale.ROOT).contains(key)) return d;
+            if (d.id().startsWith(key)) return d;
+        }
+        // Friendly aliases
+        if (key.startsWith("eng") || key.equals("code") || key.equals("plugins")) {
+            return armyDepts.get("engineering");
+        }
+        if (key.startsWith("watch") || key.equals("solar") || key.equals("metrics")) {
+            return armyDepts.get("watch");
+        }
+        if (key.startsWith("cont") || key.equals("failover")) {
+            return armyDepts.get("continuity");
+        }
+        if (key.startsWith("rel") || key.equals("discord") || key.equals("community")) {
+            return armyDepts.get("relations");
+        }
+        if (key.startsWith("voice") || key.equals("lore") || key.equals("persona")) {
+            return armyDepts.get("voice");
+        }
+        if (key.startsWith("treas") || key.equals("finance") || key.equals("money")) {
+            return armyDepts.get("treasury");
+        }
+        return null;
+    }
+
+    public List<String> armyTabIds() {
+        return new ArrayList<>(armyDepts.keySet());
     }
 }

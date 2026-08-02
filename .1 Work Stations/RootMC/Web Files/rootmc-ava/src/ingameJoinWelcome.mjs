@@ -28,8 +28,8 @@ const INGAME_CHAT_CHANNEL =
 const WELCOME_TEMPLATES = [
   "hey {name}! welcome to RootMC — i'm Ava. /link Discord when you can · map.rootmc.net · have fun out there!",
   "hi {name}! you made it to RootMC. i'm Ava (lead-dev). tip: /link for Discord · https://rootmc.net/wiki/ if you get stuck. glad you're here!",
-  "welcome aboard, {name}! RootMC's happy to have you. i'm Ava — poke me in Discord or ask in chat if you need a hand. map: map.rootmc.net",
-  "hey hey {name}! fresh boots on RootMC. i'm Ava. link Discord with /link, peek the map at map.rootmc.net, and go make something cool!",
+  "welcome aboard, {name}! RootMC's happy to have you. i'm Ava — try /ava army in-game, or ask in chat. map: map.rootmc.net",
+  "hey hey {name}! fresh boots on RootMC. i'm Ava. /link Discord · /ava army · map.rootmc.net — go make something cool!",
 ];
 
 export function joinWelcomeEnabled() {

@@ -176,8 +176,11 @@ function heuristicAssist(line) {
   if (/\bproposal|\/proposal/.test(t)) {
     return "Feature ideas: /proposal <idea> (64 G) — Ava formalizes when online — Ava";
   }
+  if (/\bava'?s?\s*army\b|\barmy\s+(dept|department|corps)\b|\/ava\s+army/i.test(t)) {
+    return "Ava's Army is my internal RootMC org — run /ava army in-game (or /ava army watch). Not a player faction — Ava";
+  }
   if (/\bava\b|\bivy\b/.test(t) && /\b(who|what|hi|hey|hello)\b/.test(t)) {
-    return "hey — i'm Ava, RootMC lead-dev. ask a concrete question and i'll help — Ava";
+    return "hey — i'm Ava, RootMC lead-dev. /ava army for my departments · ask a concrete question and i'll help — Ava";
   }
   return null;
 }

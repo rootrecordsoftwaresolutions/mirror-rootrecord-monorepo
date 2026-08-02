@@ -6,9 +6,11 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 public final class AvaCommand implements CommandExecutor, TabCompleter {
 
@@ -39,6 +41,17 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args.length > 0 && "army".equalsIgnoreCase(args[0])) {
+            return sendArmy(sender, args.length > 1 ? args[1] : null);
+        }
+
+        if (args.length > 0 && ("help".equalsIgnoreCase(args[0]) || "?".equals(args[0]))) {
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava &8— &fstatus"));
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava army &8— &fAva's Army departments"));
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava army <dept> &8— &fone department"));
+            return true;
+        }
+
         int online = Bukkit.getOnlinePlayers().size();
         String tpsText = formatTps();
         String line = plugin.config().statusLine()
@@ -46,16 +59,51 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
                 .replace("{online}", String.valueOf(online))
                 .replace("{tps}", tpsText);
         sender.sendMessage(plugin.colorize(plugin.config().prefix() + line));
+        sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&8also: &7/ava army &8· &7/ava help"));
+        return true;
+    }
+
+    private boolean sendArmy(CommandSender sender, String deptArg) {
+        AvaConfig cfg = plugin.config();
+        if (deptArg != null && !deptArg.isBlank()) {
+            AvaConfig.ArmyDept dept = cfg.armyDept(deptArg);
+            if (dept == null) {
+                sender.sendMessage(plugin.colorize(cfg.prefix() + cfg.armyUnknown()));
+                return true;
+            }
+            sender.sendMessage(plugin.colorize(cfg.prefix() + "&d" + dept.name()));
+            sender.sendMessage(plugin.colorize(cfg.prefix() + "&7" + dept.blurb()));
+            sender.sendMessage(plugin.colorize(cfg.prefix() + "&8id: &f" + dept.id() + " &8· tag &farmy:" + dept.id()));
+            return true;
+        }
+
+        sender.sendMessage(plugin.colorize(cfg.prefix() + cfg.armyHeader()));
+        sender.sendMessage(plugin.colorize(cfg.prefix() + "&7Ava Ivy &8— &fCommand"));
+        for (AvaConfig.ArmyDept d : cfg.armyDepartments().values()) {
+            sender.sendMessage(plugin.colorize(
+                    cfg.prefix() + "&d▸ &f" + d.name() + " &8— &7" + d.blurb()));
+        }
+        sender.sendMessage(plugin.colorize(cfg.prefix() + cfg.armyFooter()));
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1 && sender.hasPermission("rootavacore.admin")) {
+        if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
-            if ("reload".startsWith(partial)) {
-                return List.of("reload");
+            List<String> opts = new ArrayList<>();
+            if ("army".startsWith(partial)) opts.add("army");
+            if ("help".startsWith(partial)) opts.add("help");
+            if (sender.hasPermission("rootavacore.admin") && "reload".startsWith(partial)) {
+                opts.add("reload");
             }
+            return opts;
+        }
+        if (args.length == 2 && "army".equalsIgnoreCase(args[0])) {
+            String partial = args[1].toLowerCase(Locale.ROOT);
+            return plugin.config().armyTabIds().stream()
+                    .filter(id -> id.startsWith(partial))
+                    .collect(Collectors.toList());
         }
         return Collections.emptyList();
     }
