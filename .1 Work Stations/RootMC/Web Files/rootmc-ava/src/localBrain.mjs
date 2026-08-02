@@ -215,7 +215,7 @@ function parseLocalResponse(raw) {
   return { reply, knows, confidence, routeHint, shouldEscalate };
 }
 
-async function ollamaChat({ system, user, env }) {
+async function ollamaChat({ system, user, env, numPredict = 700 }) {
   const model = ollamaModel(env);
   const res = await fetch(`${ollamaBaseUrl(env)}/api/chat`, {
     method: "POST",
@@ -223,10 +223,10 @@ async function ollamaChat({ system, user, env }) {
     body: JSON.stringify({
       model,
       stream: false,
-      options: { temperature: 0.35, num_predict: 700 },
+      options: { temperature: 0.2, num_predict: numPredict },
       messages: [
         { role: "system", content: system.slice(0, 24000) },
-        { role: "user", content: user.slice(0, 16000) },
+        { role: "user", content: user.slice(0, 28000) },
       ],
     }),
     signal: AbortSignal.timeout(90_000),
@@ -244,6 +244,119 @@ async function ollamaChat({ system, user, env }) {
   const reply = data?.message?.content?.trim();
   if (!reply) return { ok: false, reason: "ollama_empty", text: null };
   return { ok: true, reason: "ok", text: reply, model };
+}
+
+/**
+ * Ava Llama context compressor — when Ollama is up, shrink packed context for
+ * Root Server / dream digs so teachers burn fewer tokens.
+ * Never invents facts; never includes secrets / customer PII.
+ *
+ * @returns {Promise<{ ok: boolean, packed: string, compressed: boolean, reason?: string, ratio?: number }>}
+ */
+export async function compressPacksForAsk({
+  question = "",
+  packed = "",
+  env = {},
+  maxOut = 9000,
+  minIn = 10000,
+} = {}) {
+  const full = String(packed || "");
+  const q = String(question || "").trim();
+  if (!full || !q) {
+    return { ok: true, packed: full, compressed: false, reason: "empty" };
+  }
+  if (full.length < minIn) {
+    return {
+      ok: true,
+      packed: full,
+      compressed: false,
+      reason: "below_threshold",
+      ratio: 1,
+    };
+  }
+
+  const use = await shouldUseLocalBrain(env);
+  if (!use) {
+    return {
+      ok: true,
+      packed: full,
+      compressed: false,
+      reason: "ollama_down",
+      ratio: 1,
+    };
+  }
+
+  const system = [
+    "You are **Ava Llama** — Ava Ivy's local context organizer (Ollama student).",
+    "Your only job: compress the packs so Ava's Root Server dig uses fewer tokens.",
+    "Keep ONLY what is needed to answer the ask: hard rules that apply, facts, IDs, URLs, status, asker-relevant notes.",
+    "Drop lore fluff, unrelated people dossiers, duplicate sections, noise.",
+    "Never invent facts. Never include secrets, tokens, passwords, .env values, emails, Stripe customer ids, phone numbers, or card data.",
+    "Output plain markdown brief sections. No KNOWS/ROUTE/REPLY framing.",
+    `Target length: under ~${maxOut} characters. Prefer shorter.`,
+  ].join("\n");
+
+  const user = `Ask:
+${q.slice(0, 2000)}
+
+### Packs to compress (${full.length} chars)
+${full.slice(0, 26000)}`;
+
+  const local = await ollamaChat({
+    system,
+    user,
+    env,
+    numPredict: Math.min(2200, Math.ceil(maxOut / 2)),
+  });
+
+  if (!local.ok || !local.text) {
+    appendAction("localBrain.compress", {
+      ok: false,
+      reason: local.reason || "fail",
+      inChars: full.length,
+    });
+    return {
+      ok: false,
+      packed: full,
+      compressed: false,
+      reason: local.reason || "compress_fail",
+      ratio: 1,
+    };
+  }
+
+  let out = scrubSecrets(local.text).slice(0, maxOut);
+  // Soft safety: if compressor returned almost nothing, keep original
+  if (out.length < 400) {
+    appendAction("localBrain.compress", {
+      ok: false,
+      reason: "too_short",
+      inChars: full.length,
+      outChars: out.length,
+    });
+    return {
+      ok: false,
+      packed: full,
+      compressed: false,
+      reason: "too_short",
+      ratio: 1,
+    };
+  }
+
+  const header = `### Ava Llama compressed context (${full.length}→${out.length} chars)\n_Student compressor — verify against LOCKED SPEC if unsure._\n\n`;
+  const packedOut = (header + out).slice(0, maxOut + 400);
+  appendAction("localBrain.compress", {
+    ok: true,
+    inChars: full.length,
+    outChars: packedOut.length,
+    model: local.model || ollamaModel(env),
+  });
+  return {
+    ok: true,
+    packed: packedOut,
+    compressed: true,
+    reason: "ok",
+    ratio: Math.round((packedOut.length / full.length) * 1000) / 1000,
+  };
 }
 
 /**
@@ -422,10 +535,24 @@ ${packs}`;
   // Escalate: Cursor if online, else dream
   const coreOnline = cursorOnline(env) || dreamOnline(env);
 
+  // Soft ceiling for escalate packs too
   if (cursorOnline(env)) {
+    let escalateCtx = [context, packs.slice(0, 6000)].filter(Boolean).join("\n\n");
+    try {
+      const c = await compressPacksForAsk({
+        question: q,
+        packed: escalateCtx,
+        env: env || {},
+        maxOut: 7000,
+        minIn: 8000,
+      });
+      if (c.compressed) escalateCtx = c.packed;
+    } catch {
+      /* keep original */
+    }
     const cursor = await cursorRecommend({
       question: q,
-      context: [context, packs.slice(0, 6000)].filter(Boolean).join("\n\n"),
+      context: escalateCtx,
       env,
       deep: deep || forceEscalate,
       images,

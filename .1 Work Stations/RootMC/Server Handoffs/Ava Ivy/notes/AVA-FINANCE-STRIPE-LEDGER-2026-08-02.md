@@ -32,4 +32,8 @@
 - Other players never see your personal accounts  
 - **Customer details** (emails, names, Stripe cus_/invoices, who bought what) — **Alex-only DMs only**; never public channels  
 
+## Modules
+- `src/privacy.mjs` · `src/financeAccounts.mjs` · `src/stripeFinance.mjs`  
+- `src/opsFinanceLedger.mjs` · `src/playerFinance.mjs` · `src/financeBrief.mjs` · `src/financeReview.mjs`  
+
 — Ava

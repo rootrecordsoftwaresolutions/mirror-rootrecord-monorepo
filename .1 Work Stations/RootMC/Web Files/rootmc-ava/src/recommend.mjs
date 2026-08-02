@@ -5,6 +5,7 @@ import {
   shouldUseLocalBrain,
   localRecommend,
   flushPendingLessons,
+  compressPacksForAsk,
 } from "./localBrain.mjs";
 import { scrubPublicReply } from "./scrub.mjs";
 import { gatherSiteContext } from "./siteContext.mjs";
@@ -424,6 +425,26 @@ export async function recommend({
     .filter(Boolean)
     .join("\n\n");
 
+  // Ava Llama: compress fat packs before Root Server dig when Ollama is up
+  let digContext = packed;
+  try {
+    const compressed = await compressPacksForAsk({
+      question: q,
+      packed,
+      env: env || {},
+      maxOut: Number(process.env.AVA_LLAMA_COMPRESS_MAX || 9000) || 9000,
+      minIn: Number(process.env.AVA_LLAMA_COMPRESS_MIN || 10000) || 10000,
+    });
+    if (compressed.compressed && compressed.packed) {
+      digContext = compressed.packed;
+      console.log(
+        `ava-llama compress · ${packed.length}→${digContext.length} chars (ratio ${compressed.ratio})`,
+      );
+    }
+  } catch (err) {
+    console.warn("ava-llama compress:", err.message);
+  }
+
   const deep =
     wantsRootServer(q) ||
     (Array.isArray(images) && images.length > 0) ||
@@ -433,7 +454,7 @@ export async function recommend({
   const selfFix = isSelfFixableAsk(q, classified);
   const cursor = await cursorRecommend({
     question: q,
-    context: packed,
+    context: digContext,
     env,
     deep: deep || selfFix,
     images,

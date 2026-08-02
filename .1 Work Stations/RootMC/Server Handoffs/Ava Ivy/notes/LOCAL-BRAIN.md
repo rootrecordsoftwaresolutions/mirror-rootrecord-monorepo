@@ -20,12 +20,25 @@ Set `AVA_OLLAMA_MODEL=ava-ivy`. Docs: `notes/LLAMA-BASELINE.md`.
 
 | Brain | Job |
 |-------|-----|
-| **Ollama (local)** | Classify intent, recall small packs, route, draft short plans, keep goals tidy |
+| **Ollama / Ava Llama (local)** | Classify + answer small asks; **compress fat packs** before Root Server digs (token saver); shadow-learn |
 | **Cursor Root Server** | Real digs when local does not know **and Cursor is online** |
 | **Dream (Grok under hood)** | Escalation when Cursor offline; Discord communal always |
 | **Ava Node** | Owns jobs, proposals, training logs, which brain to call |
 
-Discord stays **dream-locked**. Local organizer runs on **Slack / on-device** only.
+Discord stays **dream-locked**. Local organizer runs on **Slack / on-device** (and compresses for Slack digs). When Ollama is up, `compressPacksForAsk` shrinks context before Cursor.
+
+## Context compress (token saver)
+
+```
+fat packs (persona + people + finance + site + …)
+  → Ava Llama compress (if Ollama up && packs > ~10k chars)
+      → slim brief for Root Server dig
+  → else send packs as-is
+```
+
+Env: `AVA_LLAMA_COMPRESS_MIN` (default 10000), `AVA_LLAMA_COMPRESS_MAX` (default 9000 out).
+
+Never invents; never includes secrets/customer PII.
 
 ## Self-learn loop
 

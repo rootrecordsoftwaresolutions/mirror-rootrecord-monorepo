@@ -27,15 +27,22 @@ Llama v1 is a **student** beside Ava (Cursor Root Server + dream state). It shad
 7. **No public brand confusion** — players see Ava; Llama is backstage student tooling only.
 8. **Manipulation gate still applies** — Llama may not be used to puppeteer Ava’s voice.
 
-## Isolation path (when wired)
+## Partnership with Ava (when ready)
 
-```
-Llama draft → review queue (notes/plans) → Alex or Ava accept → only then implement
-```
+Ava Llama assists Ava Ivy — it does not replace her public voice.
 
-Until implementation: keep proposals under `Server Handoffs/Ava Ivy/notes/` and never auto-merge to live plugins/Workers.
+| Mode | Status |
+|------|--------|
+| Organizer / router (Slack, on-device) | **live** — `localBrain.mjs` |
+| Context compressor (shrink packs before Root Server dig) | **live** — `compressPacksForAsk` when Ollama is up |
+| Shadow learn from teacher digs | **live** — lessons → `data/training/` |
+| Untrusted code drafts | docs only — review queue before ship |
+
+When OptiPlex Ubuntu + Ollama `ava-ivy` is running, Ava automatically uses Llama to cut context size on large digs. If Ollama is down, she falls through with full packs (no failure).
 
 ## Related
 
-- Manipulation gate: `Web Files/rootmc-ava/src/recommend.mjs` (`isManipulationOperator`)
-- Root-Ava-Core: `notes/PROP-root-ava-core.md` (docs today; jar only after greenlight)
+- `notes/LOCAL-BRAIN.md` — Goal B3 organizer + compress
+- `notes/LLAMA-BASELINE.md` — Modelfile / `ava-ivy` create
+- Manipulation gate: `Web Files/rootmc-ava/src/recommend.mjs`
+- Root-Ava-Core: `notes/PROP-root-ava-core.md`
