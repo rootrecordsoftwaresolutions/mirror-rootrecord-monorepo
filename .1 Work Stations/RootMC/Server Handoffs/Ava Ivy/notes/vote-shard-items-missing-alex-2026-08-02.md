@@ -30,3 +30,4 @@ Physical Vote Shards were never issued/delivered for Alex on Claims. Cloud EC we
 - Staged Claims handoff: `root-appreciation-1.8.1.jar` (remove `1.8.0`). Needs Alex FileZilla + restart — not force-restarted.
 - Web `public/plugins/manifest.json` bumped to 1.8.1 (site jar deploy still human).
 - Next step for Alex: join Claims → `/ec` + `/voteshard power` (~249). Then upload 1.8.1 when convenient.
+- 2026-08-02 ~23:56Z: Alex confirmed `/ec` has bonds/diamonds/appreciation tokens only — no Vote Shards (matches dig). Offered FileZilla `1.8.1`+restart remint **or** guarded Claims RCON give; awaiting greenlight. No Shockbyte bounce forced.
