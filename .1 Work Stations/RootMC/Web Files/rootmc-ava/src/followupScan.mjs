@@ -60,21 +60,27 @@ export function followupScanBootDelayMs() {
 
 function maxPerPass() {
   return Math.min(
-    12,
+    24,
     Math.max(1, Number(process.env.AVA_FOLLOWUP_MAX || 5) || 5),
   );
 }
 
-function discordLookback() {
+function discordLookback(override) {
+  if (Number.isFinite(override) && override > 0) {
+    return Math.min(100, Math.max(15, Math.floor(override)));
+  }
   return Math.min(
-    80,
+    100,
     Math.max(15, Number(process.env.AVA_FOLLOWUP_DISCORD_LIMIT || 40) || 40),
   );
 }
 
-function slackLookback() {
+function slackLookback(override) {
+  if (Number.isFinite(override) && override > 0) {
+    return Math.min(100, Math.max(15, Math.floor(override)));
+  }
   return Math.min(
-    80,
+    100,
     Math.max(15, Number(process.env.AVA_FOLLOWUP_SLACK_LIMIT || 40) || 40),
   );
 }
@@ -172,9 +178,9 @@ function slackAddressesAva(text, botId) {
   return refersToAva(text, botId) && String(text || "").includes(`<@${botId}>`);
 }
 
-async function scanDiscord(fetchJson, { avaId, channelIds, state }) {
+async function scanDiscord(fetchJson, { avaId, channelIds, state, lookback } = {}) {
   const open = [];
-  const limit = discordLookback();
+  const limit = discordLookback(lookback);
 
   for (const channelId of channelIds) {
     let msgs;
@@ -266,7 +272,7 @@ async function scanDiscord(fetchJson, { avaId, channelIds, state }) {
   return open;
 }
 
-async function scanSlack(token, { botId, state }) {
+async function scanSlack(token, { botId, state, lookback } = {}) {
   const open = [];
   if (!token || !botId) return open;
 
@@ -284,7 +290,7 @@ async function scanSlack(token, { botId, state }) {
     cursor = data.response_metadata?.next_cursor || "";
   } while (cursor);
 
-  const limit = String(slackLookback());
+  const limit = String(slackLookback(lookback));
 
   for (const ch of channels) {
     const hist = await slackForm(token, "conversations.history", {
@@ -415,6 +421,9 @@ async function craftReply(ask, env) {
  *   slackBotId?: string,
  *   discordChannelIds?: string[],
  *   force?: boolean,
+ *   maxPerPass?: number,
+ *   discordLookback?: number,
+ *   slackLookback?: number,
  * }} opts
  */
 export async function runFollowupScan(opts = {}) {
@@ -438,6 +447,8 @@ export async function runFollowupScan(opts = {}) {
   const discordChannels =
     opts.discordChannelIds ||
     watchChannels(env).filter((id) => !/^[CGD][A-Z0-9]+$/i.test(id));
+  const dLook = opts.discordLookback;
+  const sLook = opts.slackLookback;
 
   const open = [];
   if (opts.fetchJson) {
@@ -447,6 +458,7 @@ export async function runFollowupScan(opts = {}) {
           avaId,
           channelIds: discordChannels,
           state,
+          lookback: dLook,
         })),
       );
     } catch (err) {
@@ -455,7 +467,13 @@ export async function runFollowupScan(opts = {}) {
   }
   if (slackToken) {
     try {
-      open.push(...(await scanSlack(slackToken, { botId: slackBotId, state })));
+      open.push(
+        ...(await scanSlack(slackToken, {
+          botId: slackBotId,
+          state,
+          lookback: sLook,
+        })),
+      );
     } catch (err) {
       console.warn("followup slack scan:", err.message);
     }
@@ -473,11 +491,15 @@ export async function runFollowupScan(opts = {}) {
   const batch = unique
     .filter((a) => !safeOn || isTrulyTrusted(a.authorId))
     .slice(0, opts.maxPerPass || maxPerPass());
+  const held = safeOn
+    ? unique.filter((a) => !isTrulyTrusted(a.authorId)).length
+    : Math.max(0, unique.length - (opts.maxPerPass || maxPerPass()));
   const results = [];
   if (safeOn && unique.length && !batch.length) {
     return {
       scanned: true,
       reason: "safe_mode",
+      open: unique.length,
       replied: 0,
       held: unique.length,
     };
@@ -586,6 +608,7 @@ export async function runFollowupScan(opts = {}) {
     scanned: true,
     open: unique.length,
     replied: results.filter((r) => r.ok).length,
+    held,
     results,
   };
 }

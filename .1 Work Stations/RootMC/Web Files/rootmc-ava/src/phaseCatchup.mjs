@@ -4,8 +4,9 @@
  *
  *   import { runPhaseCatchup } from "./phaseCatchup.mjs";
  *   await runPhaseCatchup({ label: "phase-1" });
+ *   await runPhaseCatchup({ label: "channel-scan-all", allChannels: true });
  *
- * CLI: node scripts/phase-catchup.mjs [label]
+ * CLI: node scripts/phase-catchup.mjs [label] [--all]
  */
 import {
   loadEnv,
@@ -36,6 +37,9 @@ const PRIORITY_CHANNELS = () =>
     AVA_CHANNELS.proposals,
     AVA_CHANNELS.admins,
     AVA_CHANNELS.avaHome,
+    AVA_CHANNELS.ingameChat,
+    AVA_CHANNELS.hourlySnapshots,
+    AVA_CHANNELS.memesMedia,
   ].filter(Boolean);
 
 function addressesAva(msg, avaId) {
@@ -55,12 +59,14 @@ function addressesAva(msg, avaId) {
 async function softAckRecent(fetchJson, { avaId, channelIds, limit = 12 } = {}) {
   const reactor = createAckReactor({ fetchJson });
   let reacted = 0;
+  let scannedChannels = 0;
   for (const channelId of channelIds) {
     let msgs = [];
     try {
       msgs = await fetchJson(
-        `/channels/${channelId}/messages?limit=${Math.min(25, limit)}`,
+        `/channels/${channelId}/messages?limit=${Math.min(100, Math.max(5, limit))}`,
       );
+      scannedChannels += 1;
     } catch (err) {
       console.warn("phaseCatchup list", channelId, err.message);
       continue;
@@ -83,14 +89,28 @@ async function softAckRecent(fetchJson, { avaId, channelIds, limit = 12 } = {}) 
       }
     }
   }
-  return reacted;
+  return { reacted, scannedChannels };
 }
 
 /**
- * @param {{ label?: string, force?: boolean, maxPerPass?: number, queues?: boolean }} opts
+ * @param {{
+ *   label?: string,
+ *   force?: boolean,
+ *   maxPerPass?: number,
+ *   queues?: boolean,
+ *   allChannels?: boolean,
+ *   softAckLimit?: number,
+ *   discordLookback?: number,
+ *   slackLookback?: number,
+ * }} opts
  */
 export async function runPhaseCatchup(opts = {}) {
   const label = String(opts.label || "phase").slice(0, 80);
+  const allChannels =
+    opts.allChannels === true ||
+    /^channel-scan-all$/i.test(label) ||
+    /\b--all\b/i.test(label);
+
   storePaths();
   const env = await loadEnv();
   const token = botToken(env);
@@ -102,18 +122,34 @@ export async function runPhaseCatchup(opts = {}) {
   const watch = watchChannels(env).filter((id) => !/^[CGD][A-Z0-9]+$/i.test(id));
   const priority = [...new Set([...PRIORITY_CHANNELS(), ...watch])];
 
-  const reacted = await softAckRecent(fetchJson, {
+  const channelIds = allChannels ? priority : priority.slice(0, 12);
+  const softLimit = allChannels
+    ? Number(opts.softAckLimit || 25) || 25
+    : Number(opts.softAckLimit || 15) || 15;
+  const maxPerPass = allChannels
+    ? Number(opts.maxPerPass || 20) || 20
+    : Number(opts.maxPerPass || 12) || 12;
+  const discordLookback = allChannels
+    ? Number(opts.discordLookback || 60) || 60
+    : opts.discordLookback;
+  const slackLookback = allChannels
+    ? Number(opts.slackLookback || 60) || 60
+    : opts.slackLookback;
+
+  const soft = await softAckRecent(fetchJson, {
     avaId,
-    channelIds: priority.slice(0, 12),
-    limit: 15,
+    channelIds,
+    limit: softLimit,
   });
 
   const followup = await runFollowupScan({
     env,
     fetchJson,
     force: opts.force !== false,
-    maxPerPass: opts.maxPerPass || 12,
-    discordChannelIds: priority,
+    maxPerPass,
+    discordChannelIds: channelIds,
+    discordLookback,
+    slackLookback,
     slackToken: slackBotToken(env),
   });
 
@@ -139,18 +175,22 @@ export async function runPhaseCatchup(opts = {}) {
   const summary = {
     ok: true,
     label,
-    reacted,
+    allChannels,
+    channelCount: channelIds.length,
+    softAckChannels: soft.scannedChannels,
+    reacted: soft.reacted,
     followup: {
       scanned: followup?.scanned,
       reason: followup?.reason,
-      open: followup?.open,
+      open: followup?.open ?? followup?.unique,
       replied: followup?.replied,
+      held: followup?.held,
     },
     proposals,
     feedback,
   };
   pushStatusEvent(
-    `phase catchup · ${label} · react ${reacted} · replied ${followup?.replied ?? 0}`,
+    `phase catchup · ${label} · ch ${channelIds.length} · react ${soft.reacted} · replied ${followup?.replied ?? 0}`,
   );
   console.log("phaseCatchup", JSON.stringify(summary));
   return summary;
