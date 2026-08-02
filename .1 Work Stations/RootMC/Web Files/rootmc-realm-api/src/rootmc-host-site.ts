@@ -169,7 +169,7 @@ export async function buildHostSiteHourlySection(
 
   const siteLabel =
     str((site as Record<string, unknown>).label) ||
-    "Root Server host (Starlink / solar)";
+    "HI Pacific Solar Root Server";
   const content = [
     `**Host site** - ${siteLabel}`,
     `**Solar / EcoFlow**`,

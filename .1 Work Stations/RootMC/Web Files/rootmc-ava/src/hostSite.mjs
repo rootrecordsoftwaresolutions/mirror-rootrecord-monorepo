@@ -17,8 +17,8 @@ import { loadSolarProfile } from "./solarProfile.mjs";
 const NWS_UA = "RootMC Ava (rootmc.net; host-site hourly)";
 const DEFAULT_SITE = {
   id: "host-site-primary-v1",
-  label: "Root Server host (Starlink / solar)",
-  locale: "Host site",
+  label: "HI Pacific Solar Root Server",
+  locale: "HI Pacific",
   lat: 19.5558,
   lon: -155.1069,
   tz_offset_hours: -10,
@@ -210,7 +210,7 @@ export async function buildHostSiteHourlyBlock({ refreshPower = true } = {}) {
     ...site,
     id: site.id || DEFAULT_SITE.id,
     label: site.label || DEFAULT_SITE.label,
-    locale: "Host site",
+    locale: "HI Pacific",
   };
   const publicWeather =
     weather && typeof weather === "object"

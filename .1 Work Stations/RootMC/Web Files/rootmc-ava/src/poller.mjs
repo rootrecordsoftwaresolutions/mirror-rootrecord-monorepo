@@ -122,6 +122,11 @@ import {
   hourRecapBootDelayMs,
 } from "./hourRecap.mjs";
 import {
+  runOccasionalRandomFact,
+  randomFactChannelIntervalMs,
+  randomFactChannelBootDelayMs,
+} from "./randomFacts.mjs";
+import {
   runQueuedSelfFix,
   selfFixIntervalMs,
   selfFixBootDelayMs,
@@ -227,6 +232,10 @@ const HOUR_RECAP_MS = hourRecapIntervalMs();
 const HOUR_RECAP_BOOT_MS = hourRecapBootDelayMs();
 const hourRecapBootAt = Date.now() + HOUR_RECAP_BOOT_MS;
 let lastHourRecap = 0;
+const RANDOM_FACT_MS = randomFactChannelIntervalMs();
+const RANDOM_FACT_BOOT_MS = randomFactChannelBootDelayMs();
+const randomFactBootAt = Date.now() + RANDOM_FACT_BOOT_MS;
+let lastRandomFactPost = 0;
 const SELF_FIX_MS = selfFixIntervalMs();
 const SELF_FIX_BOOT_MS = selfFixBootDelayMs();
 const selfFixBootAt = Date.now() + SELF_FIX_BOOT_MS;
@@ -944,6 +953,26 @@ async function tick() {
         }
       } catch (err) {
         console.warn("hour recap:", err.message);
+      }
+    }
+
+    // Occasional random fact → #random-facts (NSA/Snowden wit + misc)
+    const randomFactBoot =
+      Date.now() >= randomFactBootAt && lastRandomFactPost === 0;
+    const randomFactInterval =
+      lastRandomFactPost > 0 &&
+      Date.now() - lastRandomFactPost >= RANDOM_FACT_MS;
+    if (live && !isHushed() && !isAsleep() && (randomFactBoot || randomFactInterval)) {
+      lastRandomFactPost = Date.now();
+      try {
+        const rf = await runOccasionalRandomFact({ force: randomFactBoot });
+        if (rf?.posted) {
+          console.log(`random fact · posted ${rf.postId || ""}`);
+        } else {
+          console.log(`random fact · ${rf?.reason || rf?.detail || "ok"}`);
+        }
+      } catch (err) {
+        console.warn("random fact:", err.message);
       }
     }
 

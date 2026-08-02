@@ -27,6 +27,7 @@ import { gatherJobsBrief } from "./jobQueue.mjs";
 import { gatherEcoBrief } from "./ecoflow.mjs";
 import { gatherSolarBrief } from "./solarProfile.mjs";
 import { gatherAvaInterestsBrief } from "./avaInterests.mjs";
+import { gatherRandomFactBrief } from "./randomFacts.mjs";
 import { gatherHostMetricsBrief } from "./hostMetrics.mjs";
 import { gatherRconBrief } from "./rconGuard.mjs";
 import { offlineReply, dreamStateConfigured } from "./offlineNotes.mjs";
@@ -394,6 +395,7 @@ export async function recommend({
   const eco = gatherEcoBrief();
   const solar = gatherSolarBrief();
   const interests = gatherAvaInterestsBrief({ question: q });
+  const wit = gatherRandomFactBrief({ question: q });
   const hostMetrics = gatherHostMetricsBrief();
   const rcon = gatherRconBrief();
   const usage = usageSoftGateBrief(authorId, { member });

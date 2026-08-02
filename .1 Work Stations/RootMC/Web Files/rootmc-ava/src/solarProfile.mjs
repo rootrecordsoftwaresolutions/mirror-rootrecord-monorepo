@@ -8,7 +8,7 @@ import { storePaths } from "./store.mjs";
 
 const DEFAULT_PROFILE = {
   id: "host-site-solar-v1",
-  site: "Root Server host site",
+  site: "HI Pacific Solar Root Server",
   updated_at: null,
   panels: {
     count: 10,

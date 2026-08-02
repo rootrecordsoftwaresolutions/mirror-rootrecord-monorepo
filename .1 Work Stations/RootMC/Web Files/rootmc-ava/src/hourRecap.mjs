@@ -111,7 +111,7 @@ export function buildHourRecapText({
 
   lines.push("");
   lines.push(
-    "_Auto-posted each hour when live. Ask anytime for a fresh dig. Host locale stays private._",
+    "_Auto-posted each hour when live. Ask anytime for a fresh dig. Host public name: HI Pacific Solar Root Server._",
   );
   lines.push("");
   lines.push("- Ava");

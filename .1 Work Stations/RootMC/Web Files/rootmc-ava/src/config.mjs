@@ -191,6 +191,7 @@ export const AVA_CHANNELS = {
   memesMedia: "1516389376198840421",
   /** Centralized Ava GIF/media vault */
   avaMedia: "1533268458668687392",
+  randomFacts: "1531432703675596942",
   updates: "1520665313631408251",
   /** Hourly realm snapshots (Official/Worker) — Ava enriches host-site solar/weather */
   hourlySnapshots: "1528956490831102093",

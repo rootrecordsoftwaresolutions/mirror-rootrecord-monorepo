@@ -120,9 +120,13 @@ export function scrubPublicReply(text, opts = {}) {
   );
 
   // Never publish host-site city in public replies (coords stay private)
-  out = out.replace(/\bHawaii\s+Mountain\s+View\b/gi, "Root Server host");
-  out = out.replace(/\bMountain\s+View\s*,?\s*HI\b/gi, "host site");
-  out = out.replace(/\bMountain\s+View\b/gi, "host site");
+  out = out.replace(/\bHawaii\s+Mountain\s+View\b/gi, "HI Pacific Solar Root Server");
+  out = out.replace(/\bMountain\s+View\s*,?\s*HI\b/gi, "HI Pacific Solar Root Server");
+  out = out.replace(/\bMountain\s+View\b/gi, "HI Pacific Solar Root Server");
+  out = out.replace(
+    /\bRoot Server host(?:\s*\(Starlink\s*\/\s*solar\))?/gi,
+    "HI Pacific Solar Root Server",
+  );
 
   // Customer details — only Alex-only DMs may keep these
   if (!allowCustomer) {
