@@ -217,33 +217,43 @@ function parseLocalResponse(raw) {
 
 async function ollamaChat({ system, user, env, numPredict = 700 }) {
   const model = ollamaModel(env);
-  const res = await fetch(`${ollamaBaseUrl(env)}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      stream: false,
-      options: { temperature: 0.2, num_predict: numPredict },
-      messages: [
-        { role: "system", content: system.slice(0, 24000) },
-        { role: "user", content: user.slice(0, 28000) },
-      ],
-    }),
-    signal: AbortSignal.timeout(90_000),
-  });
-  const body = await res.text();
-  if (!res.ok) {
-    return { ok: false, reason: `ollama_${res.status}`, text: null };
-  }
-  let data;
   try {
-    data = JSON.parse(body);
-  } catch {
-    return { ok: false, reason: "ollama_bad_json", text: null };
+    const res = await fetch(`${ollamaBaseUrl(env)}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        options: { temperature: 0.2, num_predict: numPredict },
+        messages: [
+          { role: "system", content: system.slice(0, 24000) },
+          { role: "user", content: user.slice(0, 28000) },
+        ],
+      }),
+      signal: AbortSignal.timeout(
+        Number(process.env.AVA_OLLAMA_TIMEOUT_MS || 45_000) || 45_000,
+      ),
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      return { ok: false, reason: `ollama_${res.status}`, text: null };
+    }
+    let data;
+    try {
+      data = JSON.parse(body);
+    } catch {
+      return { ok: false, reason: "ollama_bad_json", text: null };
+    }
+    const reply = data?.message?.content?.trim();
+    if (!reply) return { ok: false, reason: "ollama_empty", text: null };
+    return { ok: true, reason: "ok", text: reply, model };
+  } catch (err) {
+    const msg = String(err?.message || err || "");
+    if (/abort|timeout/i.test(msg) || err?.name === "TimeoutError") {
+      return { ok: false, reason: "ollama_timeout", text: null };
+    }
+    return { ok: false, reason: "ollama_error", text: null };
   }
-  const reply = data?.message?.content?.trim();
-  if (!reply) return { ok: false, reason: "ollama_empty", text: null };
-  return { ok: true, reason: "ok", text: reply, model };
 }
 
 /**
