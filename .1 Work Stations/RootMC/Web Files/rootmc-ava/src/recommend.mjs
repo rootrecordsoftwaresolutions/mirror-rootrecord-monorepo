@@ -32,6 +32,7 @@ import { isEmergencyStopped } from "./emergencyStop.mjs";
 import { gatherWildTrustBrief, looksLikeWildAsk, wildDenyReply, wildTrustStatus, recordWildPush } from "./wildTrust.mjs";
 import { gatherProMembershipBrief } from "./membershipPro.mjs";
 import { gatherFinanceBrief } from "./financeBrief.mjs";
+import { isSelfFixableAsk } from "./selfFix.mjs";
 import { isAsleep } from "./sleepMode.mjs";
 import { isCloudDark } from "./cloudDark.mjs";
 
@@ -415,19 +416,48 @@ export async function recommend({
     classified.intent === "bug" ||
     classified.intent === "feature" ||
     classified.intent === "self_evo";
+  const selfFix = isSelfFixableAsk(q, classified);
   const cursor = await cursorRecommend({
     question: q,
     context: packed,
     env,
-    deep,
+    deep: deep || selfFix,
     images,
     surface,
+    selfFix,
   });
 
   if (cursor.ok && cursor.text) {
     recordCursorUsage(authorId, { memberHint: member });
     let text = cursor.text;
-    // Membership upsell footers removed — never append pitch to Discord replies.
+    if (selfFix) {
+      // Best-effort push after self-fix dig (non-blocking failure)
+      try {
+        const { runAvaGithubPush } = await import("../scripts/ava-github-push.mjs");
+        const push = await runAvaGithubPush({
+          message: `Ava: self-fix — ${q.slice(0, 72)}`,
+        });
+        if (push?.ok && push?.pushed) {
+          text = `${text}\n\n_(pushed to git)_`;
+        } else if (push?.committed) {
+          text = `${text}\n\n_(committed locally — push waiting on Rootmcnet auth)_`;
+        }
+      } catch {
+        /* ignore */
+      }
+      try {
+        const { recordLocalLesson } = await import("./localBrain.mjs");
+        recordLocalLesson({
+          question: `Self-fix ask: ${q.slice(0, 120)}`,
+          answer: String(text).slice(0, 600),
+          teacher: "ava-self",
+          surface: "ops",
+          meta: { kind: "self_fix_inline" },
+        });
+      } catch {
+        /* ignore */
+      }
+    }
     return text;
   }
   console.warn("Ava cursor:", cursor.reason);

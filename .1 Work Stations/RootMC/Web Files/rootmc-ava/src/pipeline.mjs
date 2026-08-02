@@ -92,6 +92,7 @@ import {
   markStaged,
   markAwaitingRestart,
   markFailed,
+  markDone,
   updateJobPlan,
 } from "./jobQueue.mjs";
 import {
@@ -766,11 +767,17 @@ export function createPipeline(deps) {
         if (digAssign || deferred) {
           markImplementing(jobId, "open commitment — deliver before idle");
         } else if (classified.intent === "bug" || classified.intent === "self_evo") {
-          markAwaitingRestart(
-            jobId,
-            "dig complete — stage jars via handoff; no auto restart",
-            { fetchJson },
-          );
+          // Ava-owned self-fix digs are done when recommend returns (files written)
+          const { isSelfFixableAsk } = await import("./selfFix.mjs");
+          if (isSelfFixableAsk(question, classified)) {
+            markDone(jobId, "self-fix dig applied (Ava-owned stack)");
+          } else {
+            markAwaitingRestart(
+              jobId,
+              "dig complete — stage jars via handoff; no auto restart",
+              { fetchJson },
+            );
+          }
         } else if (classified.intent === "feature") {
           markStaged(
             jobId,

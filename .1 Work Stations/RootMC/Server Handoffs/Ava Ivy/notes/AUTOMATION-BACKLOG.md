@@ -15,11 +15,13 @@ Grow these so Cursor is not required for every repeat. Check off when owned by A
 | Stripe income + ops expense ledger | **live** | `stripeFinance.mjs` + `opsFinanceLedger.mjs` |
 | Player finance opt-in (profile-isolated) | **live** | `playerFinance.mjs` |
 | Periodic finance review → Telegram | **live** | `financeReview.mjs` (~12h) |
+| Ava self-fix (own stack bugs/features) | **live** | `selfFix.mjs` + `cursorSelfFix` |
 
 ## Next to automate
 1. Job↔Worker reconcile pass on boot (auto markDone when Governance already live)
 2. Stronger ingame assist heuristics from training samples
 3. Wire silent-close to registry `done` / operator-done flags without Cursor
 4. Auto-fill Shockbyte/domain expense rows from invoices when available (still manual-confirm)
+5. Self-fix queue from finance-review tooling errors (partial — ask path live)
 
 — Ava

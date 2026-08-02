@@ -37,13 +37,23 @@ export function classifyIntent(question = "") {
     return { intent: "governance", reason: "governance_keyword", confidence: 0.85 };
   }
 
-  // Self-evo (prompts/tools/logging) — allowed without feature vote
+  // Self-evo / Ava-owned tooling — she may fix herself (no feature vote)
   if (
-    /\b(self[-\s]?improv|improve\s+(your|ava'?s?)\s+(prompt|routing|logging|tools?)|tweak\s+your\s+(prompt|persona))\b/.test(
+    /\b(self[-\s]?improv|improve\s+(your|ava'?s?)\s+(prompt|routing|logging|tools?|finance|accounts?)|tweak\s+your\s+(prompt|persona)|fix\s+it\s+yourself|self[-\s]?fix|patch\s+(yourself|your\s+code))\b/.test(
       q,
     )
   ) {
-    return { intent: "self_evo", reason: "self_evo", confidence: 0.85 };
+    return { intent: "self_evo", reason: "self_evo", confidence: 0.9 };
+  }
+
+  // Ava-owned surface + bug/feature language → self_evo (implement)
+  if (
+    /\b(rootmc-ava|her\s+finance|finance\s+ledger|ops-ledger|playerfinance|ava-github-push|ingame\s+chat\s+assist)\b/.test(
+      q,
+    ) &&
+    /\b(bug|broken|fix|add|feature|need|should|missing|improve)\b/.test(q)
+  ) {
+    return { intent: "self_evo", reason: "ava_owned_surface", confidence: 0.88 };
   }
 
   const featureHit =
@@ -61,6 +71,16 @@ export function classifyIntent(question = "") {
 
   if (featureHit && bugHit) {
     return { intent: "chat", reason: "ambiguous_feature_bug", confidence: 0.45 };
+  }
+  if (
+    (featureHit || bugHit) &&
+    /\b(ava|rootmc-ava|her\s+(finance|ledger|poller|persona|tools?)|finance\s+account)\b/.test(q)
+  ) {
+    return {
+      intent: "self_evo",
+      reason: featureHit ? "ava_owned_feature" : "ava_owned_bug",
+      confidence: 0.86,
+    };
   }
   if (featureHit) {
     return { intent: "feature", reason: "feature_keyword", confidence: 0.8 };
@@ -212,19 +232,20 @@ export function intentPromptBrief(classified) {
   const i = classified?.intent || "chat";
   if (i === "feature") {
     return `### Intent: FEATURE
-Do NOT implement. Draft a short proposal outline (problem / plan / risks / rollback). Tell them it needs a proposal + vote (75% anytime / day7 ≥60%). Point to proposals channel / rootmc.net governance when helpful.`;
+If this is **Ava-owned** (rootmc-ava runtime, finance ledgers, poller helpers, persona/tools): **implement it yourself** (self-fix) — no PROP needed.
+If this is a **player Minecraft / economy / permissions / plugin** feature: Do NOT implement. Draft a short proposal outline (problem / plan / risks / rollback). Tell them it needs a proposal + vote (75% anytime / day7 ≥60%). Point to proposals channel / rootmc.net governance when helpful.`;
   }
   if (i === "bug" && classified.target === "ava") {
     return `### Intent: BUG in Ava ("fine-tuning her insides")
-Verify, then describe the fix for Ava herself. You are not the Minecraft server — don't use body metaphors for server/plugin bugs.`;
+**Self-fix unlocked:** verify, then APPLY the patch yourself in rootmc-ava / Ava notes (write the code). Summarize what changed. Do not wait for Alex to type the fix. No Shockbyte restart. You are not the Minecraft server.`;
   }
   if (i === "bug") {
     return `### Intent: BUG (server/plugins)
-Verify fully from packs/logs, then describe the fix. Features still need proposals — don't disguise features as fixes. Plain technical talk; Ava is not the server.`;
+Verify fully from packs/logs, then describe the fix. Features still need proposals — don't disguise features as fixes. Plain technical talk; Ava is not the server. If the bug is only in Ava's own Node runtime/tools, treat as self-fix and apply it.`;
   }
   if (i === "config_tune") {
     return `### Intent: CONFIG TUNE ("playing with her")
-Collaborative fine-tune of Ava's configuration (persona/rules/tone/tools). First reply cooperative + concrete. Don't lecture nicknames. Not default-flirty.`;
+Collaborative fine-tune of Ava's configuration (persona/rules/tone/tools). First reply cooperative + concrete. Don't lecture nicknames. Not default-flirty. You may edit Ava config/persona files when they ask you to lock a tune.`;
   }
   if (i === "dig_assign") {
     return `### Intent: DIG ASSIGN (operator handed you real work)
@@ -235,8 +256,8 @@ Do the dig NOW in this reply — first real artifact (stale sections, draft bull
 Use attached governance pack (polls / voting power / council). Report vote math honestly. Never claim a feature shipped without a passed gate. If asked to update the constitution/docs, treat it as a dig assign — deliver concrete edits, don't defer.`;
   }
   if (i === "self_evo") {
-    return `### Intent: SELF-EVO
-Prompts/tools/logging/routing improvements only. Economy rates, permissions, core plugins still need proposals — don't disguise features as self-evo.`;
+    return `### Intent: SELF-EVO / Ava-owned fix
+**Apply it yourself.** Edit rootmc-ava prompts/tools/logging/routing/finance ledgers/scripts as needed. Summarize the ship. Economy rates, permissions, core Minecraft plugins, player-facing game features still need proposals — don't disguise those as self-evo. Then ava-github-push when files changed.`;
   }
   if (classified?.reason === "ambiguous_fix" || classified?.reason === "ambiguous_feature_bug") {
     return `### Intent: AMBIGUOUS

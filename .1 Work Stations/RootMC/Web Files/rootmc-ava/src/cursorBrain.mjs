@@ -92,6 +92,8 @@ function releaseSlot() {
  * Root Server mode — local Cursor agent on the RootMC workspace.
  * Up to AVA_CURSOR_CONCURRENCY (default 3) digs run in parallel.
  * Pass Discord screenshots via `images` (Cursor SDK vision).
+ *
+ * @param {{ question: string, context?: string, env?: object, deep?: boolean, images?: any[], surface?: string, selfFix?: boolean }} opts
  */
 export async function cursorRecommend({
   question,
@@ -100,6 +102,7 @@ export async function cursorRecommend({
   deep = false,
   images = [],
   surface = "discord",
+  selfFix = false,
 }) {
   const apiKey = cursorApiKey(env || {});
   if (!apiKey) {
@@ -117,19 +120,35 @@ export async function cursorRecommend({
     Array.isArray(images) && images.length
       ? `\nImages attached (${images.length}): LOOK at them. Describe what you see and answer from the pixels — do not pretend you cannot see images.`
       : "";
-  const modeNote = deep
+
+  const selfFixNote = selfFix
+    ? `Mode: **Ava SELF-FIX** (Alex standing — you apply the patch yourself).
+Workspace: RootMC. You MAY and SHOULD edit files under:
+- Web Files/rootmc-ava/**
+- Server Handoffs/Ava Ivy/notes/** and docs/**
+- Web Files/rootmc-realm-api/** only if required for Ava finance/governance helpers
+- .cursor/rules/ava-*.mdc
+NEVER edit .env, cloud.yml secrets, keystores, Server Live Backups, or player world data.
+NEVER ship player Minecraft game features / economy rate changes / permission nodes — those need PROP+vote.
+Do the fix now (write the code). Then OUTPUT ONLY a short ${outLabel} summary of what you changed + how to verify. No secret dumps.`
+    : null;
+
+  const modeNote = selfFixNote
+    ? selfFixNote
+    : deep
     ? `Mode: Root Server deep dig.
 Workspace: RootMC root + Ava handoff (${AVA_HANDOFF || "Server Handoffs/Ava Ivy"} — uploads/, plans/, notes).
 Use attached packs first. Only inspect extra files if the packs don't answer.${visionNote}
 ${surfaceVoice}
 OUTPUT ONLY a ${outLabel} reply — accurate summary, no secret dumps, no raw disk paths, no deploy steps.
 Never name other AIs or vendors — say Root Server if you must.
-If you'd edit code, describe the change; Alex executes. Stage jars only — no auto restart.`
+If this is an Ava-owned bug/tooling/finance fix (rootmc-ava, her ledgers, poller helpers), you MAY edit those files and summarize — Alex greenlit self-fix for her own stack. Player game features still describe + PROP only. Stage jars only — no Shockbyte restart.`
     : `Mode: Root Server quick assist.
 Answer from the attached packs + question. Do NOT wander the repo unless the packs are empty/irrelevant.
 Handoff drop zone is available under Ava Ivy uploads/plans when relevant.${visionNote}
 ${surfaceVoice}
-OUTPUT ONLY a ${outLabel} reply. Accuracy > vibes. Never name other AIs.`;
+OUTPUT ONLY a ${outLabel} reply. Accuracy > vibes. Never name other AIs.
+If asked to self-fix Ava tooling and packs already show the bug, say you'll apply it (self-fix path) rather than only describing.`;
 
   const prompt = `${AVA_PERSONA}
 
@@ -155,9 +174,14 @@ Write Ava's ${outLabel} reply now.`;
   try {
     const wantSandbox =
       String(process.env.AVA_CURSOR_SANDBOX || "").trim() === "1";
+    // Self-fix digs need more wall time to edit files
     const digTimeoutMs = Number(
       process.env.AVA_CURSOR_TIMEOUT_MS ||
-        (Array.isArray(images) && images.length ? 120_000 : 75_000),
+        (selfFix
+          ? 180_000
+          : Array.isArray(images) && images.length
+            ? 120_000
+            : 75_000),
     );
     const agentOpts = (withSandbox) => ({
       apiKey,
@@ -166,7 +190,10 @@ Write Ava's ${outLabel} reply now.`;
         params: [
           {
             id: "fast",
-            value: deep || (Array.isArray(images) && images.length > 0) ? "false" : "true",
+            value:
+              selfFix || deep || (Array.isArray(images) && images.length > 0)
+                ? "false"
+                : "true",
           },
         ],
       },
@@ -258,4 +285,17 @@ Write Ava's ${outLabel} reply now.`;
   } finally {
     releaseSlot();
   }
+}
+
+/** Dedicated self-fix entry — always edit-capable prompt. */
+export async function cursorSelfFix({ brief, env, surface = "slack" }) {
+  return cursorRecommend({
+    question: String(brief || "").trim(),
+    context:
+      "### Self-fix mandate\nAlex locked: if Ava's own stack is buggy or needs a small Ava-owned feature, she fixes it herself (write the code). Then summarize. Run no Shockbyte restart. Never touch secrets.",
+    env,
+    deep: true,
+    selfFix: true,
+    surface,
+  });
 }

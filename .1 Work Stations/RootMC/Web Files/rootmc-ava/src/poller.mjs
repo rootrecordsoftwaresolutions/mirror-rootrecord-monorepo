@@ -113,6 +113,11 @@ import {
   financeReviewBootDelayMs,
 } from "./financeReview.mjs";
 import {
+  runQueuedSelfFix,
+  selfFixIntervalMs,
+  selfFixBootDelayMs,
+} from "./selfFix.mjs";
+import {
   chaseCommitments,
   commitmentChaseIntervalMs,
   commitmentChaseBootDelayMs,
@@ -209,6 +214,10 @@ const FINANCE_REVIEW_MS = financeReviewIntervalMs();
 const FINANCE_REVIEW_BOOT_MS = financeReviewBootDelayMs();
 const financeReviewBootAt = Date.now() + FINANCE_REVIEW_BOOT_MS;
 let lastFinanceReview = 0;
+const SELF_FIX_MS = selfFixIntervalMs();
+const SELF_FIX_BOOT_MS = selfFixBootDelayMs();
+const selfFixBootAt = Date.now() + SELF_FIX_BOOT_MS;
+let lastSelfFixDrain = 0;
 const COMMITMENT_CHASE_MS = commitmentChaseIntervalMs();
 const COMMITMENT_BOOT_MS = commitmentChaseBootDelayMs();
 const commitmentBootAt = Date.now() + COMMITMENT_BOOT_MS;
@@ -890,6 +899,23 @@ async function tick() {
       }
     }
 
+    // Drain Ava self-fix queue (her own stack bugs/features)
+    const selfFixBoot =
+      Date.now() >= selfFixBootAt && lastSelfFixDrain === 0;
+    const selfFixInterval =
+      lastSelfFixDrain > 0 && Date.now() - lastSelfFixDrain >= SELF_FIX_MS;
+    if (live && !isHushed() && !isAsleep() && (selfFixBoot || selfFixInterval)) {
+      lastSelfFixDrain = Date.now();
+      try {
+        const sf = await runQueuedSelfFix({ env, force: selfFixBoot });
+        if (sf?.ok && !sf?.skipped) {
+          console.log(`self-fix · ${sf.reason} · queue ${sf.queueId || "?"}`);
+        }
+      } catch (err) {
+        console.warn("self-fix:", err.message);
+      }
+    }
+
     // Incremental Discord+Slack dumps → text files + Telegram (new msgs only)
     const dumpBoot =
       Date.now() >= channelDumpBootAt && lastChannelDump === 0;
@@ -1402,6 +1428,16 @@ setTimeout(() => {
 }, FINANCE_REVIEW_BOOT_MS);
 console.log(
   `finance review · first in ~${Math.round(FINANCE_REVIEW_BOOT_MS / 1000)}s · then every ${Math.round(FINANCE_REVIEW_MS / 3600000)}h (Stripe + ledger → Telegram)`,
+);
+setTimeout(() => {
+  if (!live || isHushed() || isAsleep()) return;
+  lastSelfFixDrain = Date.now();
+  runQueuedSelfFix({ env, force: true }).catch((err) =>
+    console.warn("self-fix boot:", err.message),
+  );
+}, SELF_FIX_BOOT_MS);
+console.log(
+  `self-fix drain · first in ~${Math.round(SELF_FIX_BOOT_MS / 1000)}s · then every ${Math.round(SELF_FIX_MS / 60000)}m (Ava-owned stack)`,
 );
 console.log(
   `commitment chase · first in ~${Math.round(COMMITMENT_BOOT_MS / 1000)}s · then every ${Math.round(COMMITMENT_CHASE_MS / 1000)}s when open`,

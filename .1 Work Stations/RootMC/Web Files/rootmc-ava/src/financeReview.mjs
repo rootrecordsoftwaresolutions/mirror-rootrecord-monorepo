@@ -222,6 +222,22 @@ export async function runFinanceReview(opts = {}) {
   ledger.lastSuggestions = suggestions;
   saveOpsLedger(ledger);
 
+  // Tooling errors → Ava may self-fix (queue; poller drains)
+  try {
+    const { enqueueSelfFix } = await import("./selfFix.mjs");
+    for (const s of suggestions) {
+      if (s.severity !== "error") continue;
+      if (!/stripe|ledger|script|api|code|parse|crash/i.test(s.text || "")) continue;
+      enqueueSelfFix({
+        brief: `Finance review tooling error — investigate and fix Ava-owned code if needed: ${s.text}`,
+        source: "finance_review",
+        priority: "high",
+      });
+    }
+  } catch {
+    /* non-fatal */
+  }
+
   const text = formatReviewMessage({ snap, suggestions, sum });
   fs.writeFileSync(
     path.join(financeDir(), "last-review.txt"),
