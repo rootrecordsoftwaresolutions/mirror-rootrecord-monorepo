@@ -111,7 +111,7 @@ export function isQuietOperator(authorId) {
 
 /**
  * Alex-only — may inject “I want Ava to say/do X”.
- * Narrower than isQuietOperator (excludes Melee + non-Alex Slack).
+ * Quiet rule: never announce unprompted. Narrower than isQuietOperator.
  */
 export function isManipulationOperator(authorId) {
   const id = String(authorId || "");

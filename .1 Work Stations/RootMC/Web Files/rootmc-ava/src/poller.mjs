@@ -132,6 +132,11 @@ import {
   aloneSoftBootDelayMs,
 } from "./ingameAloneSoft.mjs";
 import {
+  runStaffVoteNag,
+  staffVoteNagIntervalMs,
+  staffVoteNagBootDelayMs,
+} from "./staffVoteNag.mjs";
+import {
   runFinanceReview,
   financeReviewIntervalMs,
   financeReviewBootDelayMs,
@@ -256,6 +261,10 @@ const INGAME_ALONE_MS = aloneSoftIntervalMs();
 const INGAME_ALONE_BOOT_MS = aloneSoftBootDelayMs();
 const ingameAloneBootAt = Date.now() + INGAME_ALONE_BOOT_MS;
 let lastIngameAloneSoft = 0;
+const STAFF_VOTE_NAG_MS = staffVoteNagIntervalMs();
+const STAFF_VOTE_NAG_BOOT_MS = staffVoteNagBootDelayMs();
+const staffVoteNagBootAt = Date.now() + STAFF_VOTE_NAG_BOOT_MS;
+let lastStaffVoteNag = 0;
 const FINANCE_REVIEW_MS = financeReviewIntervalMs();
 const FINANCE_REVIEW_BOOT_MS = financeReviewBootDelayMs();
 const financeReviewBootAt = Date.now() + FINANCE_REVIEW_BOOT_MS;
@@ -1025,6 +1034,28 @@ async function tick() {
       }
     }
 
+    // Staff listing-vote nag — Alex/Melee only, once / 24h if stale
+    const staffVoteBoot =
+      Date.now() >= staffVoteNagBootAt && lastStaffVoteNag === 0;
+    const staffVoteInterval =
+      lastStaffVoteNag > 0 &&
+      Date.now() - lastStaffVoteNag >= STAFF_VOTE_NAG_MS;
+    if (live && !isHushed() && !isAsleep() && (staffVoteBoot || staffVoteInterval)) {
+      lastStaffVoteNag = Date.now();
+      try {
+        const vn = await runStaffVoteNag({ env, force: false });
+        if (vn?.yelled?.length) {
+          console.log(
+            `staff vote nag · yelled ${vn.yelled.map((y) => y.id).join(",")}`,
+          );
+        } else {
+          console.log(`staff vote nag · ${vn?.reason || vn?.skipped || "ok"}`);
+        }
+      } catch (err) {
+        console.warn("staff vote nag:", err.message);
+      }
+    }
+
     // Finance review — Stripe + ledger suggestions → Telegram Alex (~12h)
     const financeBoot =
       Date.now() >= financeReviewBootAt && lastFinanceReview === 0;
@@ -1634,6 +1665,16 @@ setTimeout(() => {
 }, INGAME_ALONE_BOOT_MS);
 console.log(
   `ingame alone soft · Voice · first in ~${Math.round(INGAME_ALONE_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_ALONE_MS / 1000)}s`,
+);
+setTimeout(() => {
+  if (!live || isHushed() || isAsleep()) return;
+  lastStaffVoteNag = Date.now();
+  runStaffVoteNag({ env, force: false }).catch((err) =>
+    console.warn("staff vote nag boot:", err.message),
+  );
+}, STAFF_VOTE_NAG_BOOT_MS);
+console.log(
+  `staff vote nag · Alex/Melee · first in ~${Math.round(STAFF_VOTE_NAG_BOOT_MS / 1000)}s · check every ${Math.round(STAFF_VOTE_NAG_MS / 60000)}m · yell once/24h if stale`,
 );
 setTimeout(() => {
   if (!live || isHushed() || isAsleep()) return;
