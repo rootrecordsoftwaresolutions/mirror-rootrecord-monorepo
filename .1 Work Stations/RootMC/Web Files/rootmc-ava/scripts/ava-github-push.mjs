@@ -229,10 +229,17 @@ export async function runAvaGithubPush({
   }
 
   if (!push.ok) {
+    const detail = push.stderr || push.stdout;
+    const authHint = /not found|Authentication failed|could not read Username/i.test(
+      detail,
+    )
+      ? "Operator: gh auth login/switch as Rootmcnet (RootRecord token cannot see Rootmcnet repos). See notes/GITHUB-PUSH-AUTH-GATE-2026-08-02.md"
+      : null;
     const out = {
       ok: false,
       reason: "push_failed",
-      detail: push.stderr || push.stdout,
+      detail,
+      authHint,
       gitRoot,
       branch,
       committed: true,
