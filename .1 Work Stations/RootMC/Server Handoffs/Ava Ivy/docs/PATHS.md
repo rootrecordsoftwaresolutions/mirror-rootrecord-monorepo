@@ -2,19 +2,21 @@
 
 ## This handoff
 
-Windows (canonical today): `D:\.1 Work Stations\RootMC\Server Handoffs\Ava Ivy\`  
-Windows (E mirror / **Linux Cursor source**): `E:\.1 Work Stations\RootMC\Server Handoffs\Ava Ivy\`  
+Windows (**primary / Cursor source — E handoff**): `E:\.1 Work Stations\RootMC\Server Handoffs\Ava Ivy\`  
+Windows (D twin until cutover wipe): `D:\.1 Work Stations\RootMC\Server Handoffs\Ava Ivy\`  
 Linux mount (planned): `/mnt/e/.1 Work Stations/RootMC/Server Handoffs/Ava Ivy/`  
 Optional bind: `/srv/rootmc/Server Handoffs/Ava Ivy/`  
 Override anytime: `AVA_HANDOFF`.
 
-**Storage lock:** Cursor SSH reads **E:** Work Stations (RootMC + RootRecord + all projects). Caches/builders → **main SSD**.  
+**Storage lock:** Cursor opens **E:** Work Stations (RootMC + RootRecord + all projects). Caches/builders → **main SSD**.  
+Handoff note: `notes/workspace-context/SESSION-HANDOFF-2026-08-02-E.md`  
 See `notes/LINUX-E-SSD-LAYOUT.md` + `notes/workspace-context/MASTER-CONTEXT.md`.
 
 ## Runtime (code)
 
-Windows: `D:\.1 Work Stations\RootMC\Web Files\rootmc-ava\`  
-Linux: `/srv/rootmc/Web Files/rootmc-ava/`
+Windows (primary): `E:\.1 Work Stations\RootMC\Web Files\rootmc-ava\`  
+Windows (D twin): `D:\.1 Work Stations\RootMC\Web Files\rootmc-ava\`  
+Linux: `/mnt/e/.1 Work Stations/RootMC/Web Files/rootmc-ava/` (or `/srv/rootmc/…` bind)
 
 - Shortcut: `runtime\rootmc-ava-CODE.lnk`
 - Start poller: `runtime\start-ava.lnk`
@@ -35,7 +37,7 @@ RootMC `.env`:
 
 ## Related RootMC surfaces
 
-- Workspace root: `D:\.1 Work Stations\RootMC\` (Linux: `/srv/rootmc/`)
+- Workspace root: `E:\.1 Work Stations\RootMC\` (D twin still present; Linux: `/mnt/e/.1 Work Stations/RootMC/` or `/srv/rootmc/`)
 - Wiki (public): https://rootmc.net/wiki/
 - Governance API: https://api.rootmc.net/api/governance/
 - Plugin handoffs: `Server Handoffs\1. RootMC - Claims\`, `2. RootMC - Towny\`

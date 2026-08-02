@@ -7,15 +7,15 @@
 
 | Role | Path |
 |------|------|
-| **Canonical live edit (Windows today)** | `D:\.1 Work Stations\` |
-| **Migration / Linux Cursor source (E:)** | `E:\.1 Work Stations\` — Cursor over SSH **reads here** |
+| **Primary Cursor / handoff root (E:)** | `E:\.1 Work Stations\` — open RootMC here |
+| **D twin (until cutover wipe)** | `D:\.1 Work Stations\` — keep in sync via robocopy |
 | **Caches / builders / toolchains** | **Main SSD** (Linux home · npm · Gradle · Cursor) — not the only source |
 | **Full D: disk backup** | `E:\windows backup\D\` |
 | **C: profile keep backup** | `E:\windows backup\C\` |
 | **This handoff (Ava Ivy)** | `...\RootMC\Server Handoffs\Ava Ivy\` on **both** D and E |
 | **Linux mount (planned)** | `/mnt/e/.1 Work Stations/` → Cursor Remote-SSH; optional `/srv/rootmc` bind |
 
-**Rule:** Prefer editing on **D:** while Windows is primary. Treat **E:\.1 Work Stations** as the migration mirror Cursor will open on Linux. Builds/caches go to SSD. See `notes/LINUX-E-SSD-LAYOUT.md`.
+**Rule (locked 2026-08-02):** Prefer editing on **E:\.1 Work Stations**. D remains a twin until Windows wipe. Re-sync: `E:\windows backup\logs\sync-e-workstations-now.ps1`. Builds/caches go to SSD. See `notes/LINUX-E-SSD-LAYOUT.md` + `SESSION-HANDOFF-2026-08-02-E.md`.
 
 ## What is under `E:\.1 Work Stations` (and D mirror)
 
