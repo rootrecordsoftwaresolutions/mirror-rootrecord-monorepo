@@ -243,11 +243,18 @@ export function formatStripeIncomePlain(snap) {
       : "Stripe not configured yet.";
   }
   const ageMin = Math.round((Date.now() - (snap.fetchedAt || 0)) / 60000);
-  return [
+  const lines = [
     `Stripe available: ${formatUsd(snap.usdAvailable)} (pending ${formatUsd(snap.usdPending)})`,
     `~30d gross credits: ${formatUsd(snap.income30dUsd)} · fees ~${formatUsd(snap.fees30dUsd)} · payouts ~${formatUsd(snap.payouts30dUsd)}`,
     `Snapshot age: ${ageMin}m`,
-  ].join("\n");
+  ];
+  const bal = explainStripeBalance(snap);
+  if (bal?.healthyTiming) {
+    lines.push(
+      "Fee/payout timing — pending covers the penny deficit; healthy, not a tooling error.",
+    );
+  }
+  return lines.join("\n");
 }
 
 export { formatUsd, centsToUsd, financeDir };

@@ -11,7 +11,6 @@ import {
   refreshEcoFlow,
   loadEcoSnapshot,
   summarizeMorningSolar,
-  ECO_NICKNAMES,
 } from "./ecoflow.mjs";
 import { loadSolarProfile } from "./solarProfile.mjs";
 
@@ -119,12 +118,12 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
 }
 
 function snLabel(sn) {
-  for (const [nick, serial] of Object.entries(ECO_NICKNAMES)) {
-    if (String(serial) === String(sn) && !/^(delta-2|river)/i.test(nick)) {
-      return nick;
-    }
-  }
-  return sn.slice(-6);
+  const map = {
+    R331ZAB5SG6S2858: "cucumbers",
+    R331ZAB5SG755642: "Delta 2-B",
+    R621ZA16XH6K1155: "shackas",
+  };
+  return map[sn] || sn.slice(-6);
 }
 
 export function formatSolarLines(snap, morning = null) {
@@ -228,7 +227,7 @@ export async function buildHostSiteHourlyBlock({ refreshPower = true } = {}) {
 
   const lines = [
     `**Host site** - ${site.label || site.locale}`,
-    `Starlink + solar server · ${site.locale}`,
+    `Starlink + solar server - ${site.locale}`,
     "",
     "**Solar / EcoFlow**",
     ...formatSolarLines(snap, morning),

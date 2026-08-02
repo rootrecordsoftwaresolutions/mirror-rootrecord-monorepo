@@ -13,6 +13,15 @@ import { appendAction } from "./fullLog.mjs";
 import { recordLocalLesson } from "./localBrain.mjs";
 import { storePaths, pushStatusEvent } from "./store.mjs";
 import { runAvaGithubPush } from "../scripts/ava-github-push.mjs";
+import { loadStripeSnapshot, explainStripeBalance } from "./stripeFinance.mjs";
+
+/** Pre-fix finance_review briefs that looped on healthy Stripe penny negatives. */
+const FINANCE_NEG_BRIEF_RE =
+  /finance\s+review\s+tooling\s+error.*(?:negative|available\s+balance)/i;
+
+export function isStaleFinanceNegativeBalanceBrief(brief = "") {
+  return FINANCE_NEG_BRIEF_RE.test(String(brief || ""));
+}
 
 function queuePath() {
   return path.join(storePaths().dir, "self-fix-queue.json");
@@ -136,6 +145,36 @@ export function listQueuedSelfFixes() {
 }
 
 /**
+ * Cancel queued/running finance_review self-fix loops when Stripe is healthy
+ * (trivial negative available + pending cover — fee/payout timing, not tooling).
+ */
+export function cancelStaleFinanceSelfFixes(snap = null) {
+  const s = snap || loadStripeSnapshot();
+  const bal = explainStripeBalance(s);
+  if (!bal?.healthyTiming) return { cancelled: 0 };
+
+  const q = loadQueue();
+  let cancelled = 0;
+  for (const item of q.items) {
+    if (
+      (item.status === "queued" || item.status === "running") &&
+      item.source === "finance_review" &&
+      isStaleFinanceNegativeBalanceBrief(item.brief)
+    ) {
+      item.status = "cancelled";
+      item.cancelledAt = Date.now();
+      item.cancelReason = "healthy_stripe_timing";
+      cancelled += 1;
+    }
+  }
+  if (cancelled) {
+    saveQueue(q);
+    appendAction("selfFix.cancel_stale", { cancelled, reason: "healthy_stripe_timing" });
+  }
+  return { cancelled };
+}
+
+/**
  * Run one self-fix dig via Cursor (writes Ava-owned files), then github push.
  */
 export async function runSelfFix({
@@ -230,7 +269,25 @@ export async function runQueuedSelfFix({ env = {}, force = false } = {}) {
   if (!force && q.lastRunAt && Date.now() - q.lastRunAt < minGap) {
     return { ok: true, skipped: true, reason: "too_soon" };
   }
-  const next = q.items.find((i) => i.status === "queued");
+  cancelStaleFinanceSelfFixes();
+
+  let next = null;
+  for (const item of q.items) {
+    if (item.status !== "queued") continue;
+    if (isStaleFinanceNegativeBalanceBrief(item.brief)) {
+      const bal = explainStripeBalance(loadStripeSnapshot());
+      if (bal?.healthyTiming) {
+        item.status = "cancelled";
+        item.cancelledAt = Date.now();
+        item.cancelReason = "healthy_stripe_timing";
+        saveQueue(q);
+        appendAction("selfFix.skip_stale", { id: item.id });
+        continue;
+      }
+    }
+    next = item;
+    break;
+  }
   if (!next) return { ok: true, skipped: true, reason: "empty" };
 
   next.status = "running";

@@ -38,7 +38,6 @@ const PRIORITY_CHANNELS = () =>
     AVA_CHANNELS.admins,
     AVA_CHANNELS.avaHome,
     AVA_CHANNELS.ingameChat,
-    AVA_CHANNELS.hourlySnapshots,
     AVA_CHANNELS.memesMedia,
   ].filter(Boolean);
 

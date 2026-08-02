@@ -244,6 +244,13 @@ export async function runFinanceReview(opts = {}) {
     ? await refreshStripeSnapshot(env, { force: true })
     : { ok: false, reason: "stripe_not_configured" };
 
+  try {
+    const { cancelStaleFinanceSelfFixes } = await import("./selfFix.mjs");
+    cancelStaleFinanceSelfFixes(snap);
+  } catch {
+    /* non-fatal */
+  }
+
   const ledger = loadOpsLedger();
   const sum = summarizeOpsLedger(ledger);
   const suggestions = buildFinanceSuggestions({ snap, ledger });

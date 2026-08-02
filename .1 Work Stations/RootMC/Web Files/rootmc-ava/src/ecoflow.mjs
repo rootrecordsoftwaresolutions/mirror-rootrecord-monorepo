@@ -339,7 +339,7 @@ export function summarizeMorningSolar(opts = {}) {
     sns,
     note:
       earliest != null && earliest > morningStart + 30 * 60_000
-        ? "sample window starts after dawn — not a full morning average"
+        ? "sample window starts after dawn - not a full morning average"
         : siteVals.length
           ? "ok"
           : "no morning samples yet",

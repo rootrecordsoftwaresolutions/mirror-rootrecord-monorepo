@@ -8,6 +8,10 @@ import { formatOpsLedgerPlain, loadOpsLedger } from "../src/opsFinanceLedger.mjs
 import { runFinanceReview, buildFinanceSuggestions } from "../src/financeReview.mjs";
 import { explainStripeBalance } from "../src/stripeFinance.mjs";
 import { tryHandleFinanceCommand } from "../src/playerFinance.mjs";
+import {
+  cancelStaleFinanceSelfFixes,
+  isStaleFinanceNegativeBalanceBrief,
+} from "../src/selfFix.mjs";
 
 const env = await loadEnv();
 const notify = process.argv.includes("--notify");
@@ -74,5 +78,15 @@ if (!bal?.healthyTiming) {
 }
 if (neg) {
   console.error("FAIL: trivial negative should not produce a review suggestion");
+  process.exitCode = 1;
+}
+
+const staleBrief =
+  "Finance review tooling error — investigate and fix Ava-owned code if needed: Stripe available balance is negative ($-0.02). Investigate payouts/disputes.";
+console.log("--- stale brief match ---", isStaleFinanceNegativeBalanceBrief(staleBrief));
+const pruned = cancelStaleFinanceSelfFixes(mockSnap);
+console.log("--- stale queue prune ---", pruned);
+if (!isStaleFinanceNegativeBalanceBrief(staleBrief)) {
+  console.error("FAIL: stale finance negative brief should match prune pattern");
   process.exitCode = 1;
 }
