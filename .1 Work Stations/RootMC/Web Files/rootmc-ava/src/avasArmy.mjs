@@ -16,7 +16,7 @@ export const ARMY_DEPARTMENTS = {
     name: "Command",
     short: "Ava + Alex absolute ops",
     digSurface: "slack",
-    keywords: /\b(army|avas?\s*army|command\s+tree|department\s+structure)\b/i,
+    keywords: /\b(army|ava'?s?\s*army|command\s+tree|department\s+structure)\b/i,
   },
   engineering: {
     id: "engineering",
@@ -154,7 +154,7 @@ export function classifyArmyDept(text = "") {
       confidence: hits[0].score >= 8 ? "high" : "soft",
     };
   }
-  if (/\bavas?\s*army\b|\barmy\s+department\b/i.test(q)) {
+  if (/\bava'?s?\s*army\b|\barmy\s+department\b/i.test(q)) {
     const d = ARMY_DEPARTMENTS.command;
     return { dept: d.id, name: d.name, tag: armyTag(d.id), confidence: "high" };
   }
@@ -174,7 +174,7 @@ export function armyTag(deptId) {
 export function looksLikeArmyAsk(question = "") {
   const q = String(question || "");
   return (
-    /\bavas?\s*army\b/i.test(q) ||
+    /\bava'?s?\s*army\b/i.test(q) ||
     /\barmy\s+(department|foundation|charter|roster|corps)\b/i.test(q) ||
     /\b(which|what)\s+department\b/i.test(q) ||
     /\bdepartment\s+(tree|structure|brief)\b/i.test(q)

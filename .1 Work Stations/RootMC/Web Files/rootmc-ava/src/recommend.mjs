@@ -36,6 +36,7 @@ import { gatherWildTrustBrief, looksLikeWildAsk, wildDenyReply, wildTrustStatus,
 import { gatherProMembershipBrief } from "./membershipPro.mjs";
 import { gatherFinanceBrief } from "./financeBrief.mjs";
 import { gatherArmyBrief, assignArmyJob, looksLikeArmyAsk } from "./avasArmy.mjs";
+import { gatherIngameJoinBrief } from "./ingameJoinWelcome.mjs";
 import { isSelfFixableAsk } from "./selfFix.mjs";
 import { isAsleep } from "./sleepMode.mjs";
 import { isCloudDark } from "./cloudDark.mjs";
@@ -413,6 +414,7 @@ export async function recommend({
     channelId,
   });
   const armyPack = gatherArmyBrief({ question: q });
+  const joinPack = gatherIngameJoinBrief();
   if (looksLikeArmyAsk(q) || armyPack.route?.confidence === "high") {
     try {
       assignArmyJob({ text: q, source: surfaceNorm, dept: armyPack.route?.dept });
@@ -445,6 +447,7 @@ export async function recommend({
     proPack.brief,
     financePack.brief,
     armyPack.brief,
+    joinPack.brief,
     reactions.brief,
     jobs.brief,
     eco.brief,

@@ -49,6 +49,7 @@ function parseEventLine(line) {
 function bucketLabel(text) {
   const t = String(text || "").toLowerCase();
   if (/host-site|ecoflow|solar|telemetry/.test(t)) return "host power sync";
+  if (/join welcome|ingame join/.test(t)) return "new-player welcomes";
   if (/followup|replied|soft.?ack|phase.?catch/.test(t)) return "catch-up / replies";
   if (/poll|governance|vote|prop/.test(t)) return "governance";
   if (/self.?fix|fix/.test(t)) return "self-fix";

@@ -113,6 +113,11 @@ import {
   ingameChatAssistBootDelayMs,
 } from "./ingameChatAssist.mjs";
 import {
+  runIngameJoinWelcome,
+  joinWelcomeIntervalMs,
+  joinWelcomeBootDelayMs,
+} from "./ingameJoinWelcome.mjs";
+import {
   runFinanceReview,
   financeReviewIntervalMs,
   financeReviewBootDelayMs,
@@ -225,6 +230,10 @@ const INGAME_CHAT_MS = ingameChatAssistIntervalMs();
 const INGAME_CHAT_BOOT_MS = ingameChatAssistBootDelayMs();
 const ingameChatBootAt = Date.now() + INGAME_CHAT_BOOT_MS;
 let lastIngameChatAssist = 0;
+const INGAME_JOIN_MS = joinWelcomeIntervalMs();
+const INGAME_JOIN_BOOT_MS = joinWelcomeBootDelayMs();
+const ingameJoinBootAt = Date.now() + INGAME_JOIN_BOOT_MS;
+let lastIngameJoinWelcome = 0;
 const FINANCE_REVIEW_MS = financeReviewIntervalMs();
 const FINANCE_REVIEW_BOOT_MS = financeReviewBootDelayMs();
 const financeReviewBootAt = Date.now() + FINANCE_REVIEW_BOOT_MS;
@@ -924,6 +933,24 @@ async function tick() {
       }
     }
 
+    // New-player join lookout (~45s) — template welcome via RCON (no AI)
+    const joinBoot =
+      Date.now() >= ingameJoinBootAt && lastIngameJoinWelcome === 0;
+    const joinInterval =
+      lastIngameJoinWelcome > 0 &&
+      Date.now() - lastIngameJoinWelcome >= INGAME_JOIN_MS;
+    if (live && !isHushed() && !isAsleep() && (joinBoot || joinInterval)) {
+      lastIngameJoinWelcome = Date.now();
+      try {
+        const jw = await runIngameJoinWelcome({ env, force: joinBoot });
+        if (jw?.welcomed > 0) {
+          console.log(`ingame join welcome · ${jw.welcomed}`);
+        }
+      } catch (err) {
+        console.warn("ingame join welcome:", err.message);
+      }
+    }
+
     // Finance review — Stripe + ledger suggestions → Telegram Alex (~12h)
     const financeBoot =
       Date.now() >= financeReviewBootAt && lastFinanceReview === 0;
@@ -1503,6 +1530,16 @@ setTimeout(() => {
 }, INGAME_CHAT_BOOT_MS);
 console.log(
   `ingame chat assist · quiet · first in ~${Math.round(INGAME_CHAT_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_CHAT_MS / 60000)}m (bridge scan + RCON tell)`,
+);
+setTimeout(() => {
+  if (!live || isHushed() || isAsleep()) return;
+  lastIngameJoinWelcome = Date.now();
+  runIngameJoinWelcome({ env, force: true }).catch((err) =>
+    console.warn("ingame join welcome boot:", err.message),
+  );
+}, INGAME_JOIN_BOOT_MS);
+console.log(
+  `ingame join welcome · new players · first in ~${Math.round(INGAME_JOIN_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_JOIN_MS / 1000)}s (bridge + RCON list · template tell)`,
 );
 setTimeout(() => {
   if (!live || isHushed() || isAsleep()) return;
