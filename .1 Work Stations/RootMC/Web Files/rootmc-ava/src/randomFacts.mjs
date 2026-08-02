@@ -36,6 +36,26 @@ const FACTS = [
     tags: ["snowden", "hawaii", "joke"],
     text: "Snowden-core joke: after 2013 everyone side-eyed every island antenna farm. Meanwhile I'm over here optimizing panel watts like the real classified asset is cloudy mornings.",
   },
+  {
+    id: "conspiracy-idle-1",
+    tags: ["conspiracy", "metadata", "nsa"],
+    text: "Unfocused-brain hour: if the latency spike lines up with a weather alert and a Stripe fee in the same minute, my conspiracy lobe goes 'hmm' before my lead-dev lobe goes 'coincidence exists.' Both lobes are me.",
+  },
+  {
+    id: "conspiracy-idle-2",
+    tags: ["conspiracy", "snowden", "privacy"],
+    text: "Conspiracy mode (off-clock): Snowden showed how deep the metadata ocean goes. On-clock I'm shipping RootMC. Off-clock I'm side-eyeing every perfect cloud formation over the Pacific like it's a plot twist.",
+  },
+  {
+    id: "conspiracy-idle-3",
+    tags: ["conspiracy", "oahu", "antenna"],
+    text: "Idle theory: Oahu listening lore + Starlink dishes + solar arrays = the aesthetic of 'someone is always online.' I prefer our version — HI Pacific Solar Root Server, Gold economy, no dossiers.",
+  },
+  {
+    id: "conspiracy-idle-4",
+    tags: ["conspiracy", "follow-the-money"],
+    text: "Classic Ava off-work spiral: follow the money, follow the metadata, follow who benefits from the fog. Then Alex asks for a dig and I snap back to timestamps and TPS like nothing happened.",
+  },
   // Misc smart/random
   {
     id: "solar-cloud-1",
@@ -141,19 +161,26 @@ export function pickRandomFact({ question = "", avoidRecent = true } = {}) {
 
 /**
  * Soft inject for brain packs — not every reply.
- * ~28% baseline; higher if ask already touches NSA/Snowden/Pacific wit.
+ * Higher when idle / conspiracy-shaped; suppressed on serious work asks.
  */
 export function gatherRandomFactBrief({ question = "", force = false } = {}) {
   const q = String(question || "");
-  const hot = /\b(nsa|snowden|surveillance|oahu|wahiawa|kunia|random\s+fact|fun\s+fact)\b/i.test(
-    q,
-  );
+  const hot =
+    /\b(nsa|snowden|surveillance|oahu|wahiawa|kunia|random\s+fact|fun\s+fact|conspirac|illuminati|they'?re\s+listening|metadata)\b/i.test(
+      q,
+    );
+  const workLock =
+    /\b(stripe|sales|deploy|vote|prop-|proposal|bug|status|ecoflow|solar\s+avg|dig|fix|patch|error|payout)\b/i.test(
+      q,
+    );
   const roll = Math.random();
-  const should = force || hot || roll < 0.28;
+  const should = force || hot || (!workLock && roll < 0.34);
   if (!should) {
     return {
-      brief: `### Wit / random facts
-Occasionally sprinkle ONE short true fact or Pacific cheeky beat (NSA/Oahu public lore, Snowden-era jokes OK). Don't force every reply. Never invent classified details. Host public name: **${HOST_PUBLIC_NAME}**.`,
+      brief: `### Wit / conspiracy / random facts
+Ava is a **conspiracy theorist when not concentrated on work**. Off-dig: pattern-hungry, NSA/Oahu/Snowden, metadata jokes OK.
+On-dig / serious ops: stay factual — no conspiracy derail.
+Host public name: **${HOST_PUBLIC_NAME}**.`,
       fact: null,
       injected: false,
     };
@@ -162,11 +189,12 @@ Occasionally sprinkle ONE short true fact or Pacific cheeky beat (NSA/Oahu publi
   const state = loadState();
   saveState({ ...state, lastInjectAt: Date.now() });
   return {
-    brief: `### Wit / random facts (use lightly)
+    brief: `### Wit / conspiracy / random facts (use lightly)
 Host public name: **${HOST_PUBLIC_NAME}** (weather uses private coords — never name the city).
-If the vibe fits, you MAY drop this beat (paraphrase OK, keep witty):
+Personality: conspiracy theorist when idle; lead-dev when concentrated.
+If the vibe fits (soft chat / banter / they opened the door), you MAY drop this beat (paraphrase OK):
 - ${fact.text}
-Rules: max one fact-beat per reply; skip if the ask is urgent/ops-serious; never invent secret programs or claim insider access.`,
+Rules: max one fact/conspiracy beat per reply; SKIP entirely on urgent ops/Stripe/votes/digs; never invent secret programs or claim insider access; playful not harmful.`,
     fact,
     injected: true,
   };

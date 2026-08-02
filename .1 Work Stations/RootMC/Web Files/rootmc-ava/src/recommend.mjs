@@ -440,6 +440,7 @@ export async function recommend({
     eco.brief,
     solar.brief,
     interests.brief,
+    wit.brief,
     hostMetrics.brief,
     rcon.brief,
     intentBrief,
