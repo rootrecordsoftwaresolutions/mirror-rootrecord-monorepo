@@ -1,8 +1,8 @@
 /**
- * Host site (Mountain View, HI) — solar + localized NWS weather/hazards.
+ * Root Server host site — solar + localized NWS weather/hazards.
  * Used in hourly snapshot enrichment and ops power talk.
+ * Public copy never names the host city/state — coords stay private for NWS only.
  * Weather: api.weather.gov (NWS) — same storm/hazard rail RootRecord Weather Manager uses.
- * Optional: WEATHER_API_PUBLIC_URL / api-weather.rootrecord.info when routes exist.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -16,9 +16,9 @@ import { loadSolarProfile } from "./solarProfile.mjs";
 
 const NWS_UA = "RootMC Ava (rootmc.net; host-site hourly)";
 const DEFAULT_SITE = {
-  id: "host-site-mountain-view-hi-v1",
-  label: "Hawaii Mountain View - Starlink / solar server",
-  locale: "Mountain View, HI",
+  id: "host-site-primary-v1",
+  label: "Root Server host (Starlink / solar)",
+  locale: "Host site",
   lat: 19.5558,
   lon: -155.1069,
   tz_offset_hours: -10,
@@ -71,10 +71,9 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
     `https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`,
   );
   const forecastUrl = points?.properties?.forecast;
-  const city =
-    points?.properties?.relativeLocation?.properties?.city || site.locale;
-  const state =
-    points?.properties?.relativeLocation?.properties?.state || "HI";
+  // Keep city/state off public payloads — NWS needs coords only.
+  const city = null;
+  const state = null;
 
   let period = null;
   if (forecastUrl) {
@@ -171,7 +170,7 @@ export function formatWeatherLines(weather) {
         (p.wind ? ` - wind ${p.wind}` : ""),
     );
   }
-  lines.push(`- **Source:** ${weather.source || "NWS"} (${weather.city || "?"}, ${weather.state || "HI"})`);
+  lines.push(`- **Source:** ${weather.source || "NWS"} (local point)`);
   if (weather.alerts?.length) {
     for (const a of weather.alerts) {
       lines.push(
@@ -207,15 +206,26 @@ export async function buildHostSiteHourlyBlock({ refreshPower = true } = {}) {
     weather = { ok: false, detail: err.message };
   }
 
+  const publicSite = {
+    ...site,
+    id: site.id || DEFAULT_SITE.id,
+    label: site.label || DEFAULT_SITE.label,
+    locale: "Host site",
+  };
+  const publicWeather =
+    weather && typeof weather === "object"
+      ? { ...weather, city: null, state: null }
+      : weather;
+
   const payload = {
-    site,
+    site: publicSite,
     solar: {
       batteryPct: snap?.batteryPct ?? null,
       perSn: snap?.perSn || {},
       morningAvgW: morning.siteAvgW ?? null,
       morningNote: morning.note || null,
     },
-    weather,
+    weather: publicWeather,
     updatedAt: new Date().toISOString(),
   };
   try {
@@ -226,14 +236,13 @@ export async function buildHostSiteHourlyBlock({ refreshPower = true } = {}) {
   }
 
   const lines = [
-    `**Host site** - ${site.label || site.locale}`,
-    `Starlink + solar server - ${site.locale}`,
+    `**Host site** - ${publicSite.label}`,
     "",
     "**Solar / EcoFlow**",
     ...formatSolarLines(snap, morning),
     "",
     "**Local weather (NWS)**",
-    ...formatWeatherLines(weather),
+    ...formatWeatherLines(publicWeather),
   ];
   return {
     content: lines.join("\n"),

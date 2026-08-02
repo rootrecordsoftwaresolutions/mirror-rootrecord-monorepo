@@ -117,6 +117,11 @@ import {
   financeReviewBootDelayMs,
 } from "./financeReview.mjs";
 import {
+  runHourRecap,
+  hourRecapIntervalMs,
+  hourRecapBootDelayMs,
+} from "./hourRecap.mjs";
+import {
   runQueuedSelfFix,
   selfFixIntervalMs,
   selfFixBootDelayMs,
@@ -218,6 +223,10 @@ const FINANCE_REVIEW_MS = financeReviewIntervalMs();
 const FINANCE_REVIEW_BOOT_MS = financeReviewBootDelayMs();
 const financeReviewBootAt = Date.now() + FINANCE_REVIEW_BOOT_MS;
 let lastFinanceReview = 0;
+const HOUR_RECAP_MS = hourRecapIntervalMs();
+const HOUR_RECAP_BOOT_MS = hourRecapBootDelayMs();
+const hourRecapBootAt = Date.now() + HOUR_RECAP_BOOT_MS;
+let lastHourRecap = 0;
 const SELF_FIX_MS = selfFixIntervalMs();
 const SELF_FIX_BOOT_MS = selfFixBootDelayMs();
 const selfFixBootAt = Date.now() + SELF_FIX_BOOT_MS;
@@ -916,6 +925,25 @@ async function tick() {
         }
       } catch (err) {
         console.warn("finance review:", err.message);
+      }
+    }
+
+    // Hourly ops recap → #updates (what Ava did recently)
+    const hourRecapBoot =
+      Date.now() >= hourRecapBootAt && lastHourRecap === 0;
+    const hourRecapInterval =
+      lastHourRecap > 0 && Date.now() - lastHourRecap >= HOUR_RECAP_MS;
+    if (live && !isHushed() && !isAsleep() && (hourRecapBoot || hourRecapInterval)) {
+      lastHourRecap = Date.now();
+      try {
+        const hr = await runHourRecap({ force: hourRecapBoot });
+        if (hr?.posted) {
+          console.log(`hour recap · posted ${hr.postId || ""}`);
+        } else {
+          console.log(`hour recap · ${hr?.reason || hr?.detail || "ok"}`);
+        }
+      } catch (err) {
+        console.warn("hour recap:", err.message);
       }
     }
 

@@ -57,14 +57,14 @@ async function nwsJson(url: string): Promise<any> {
   return res.json();
 }
 
-/** Live NWS forecast + alerts for Mountain View, HI (or telemetry coords). */
+/** Live NWS forecast + alerts for host-site coords (city/state never published). */
 export async function fetchNwsHostWeather(lat = DEFAULT_LAT, lon = DEFAULT_LON) {
   const points = await nwsJson(
     `https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`,
   );
   const forecastUrl = points?.properties?.forecast as string | undefined;
-  const city = points?.properties?.relativeLocation?.properties?.city || "Mountain View";
-  const state = points?.properties?.relativeLocation?.properties?.state || "HI";
+  const city = null;
+  const state = null;
   let period: any = null;
   if (forecastUrl) {
     const forecast = await nwsJson(forecastUrl);
@@ -156,9 +156,7 @@ export async function buildHostSiteHourlySection(
         (p.wind ? ` - wind ${p.wind}` : ""),
     );
   }
-  wxLines.push(
-    `\u2022 **Source:** ${weather?.source || "NWS"} (${weather?.city || "Mountain View"}, ${weather?.state || "HI"})`,
-  );
+  wxLines.push(`\u2022 **Source:** ${weather?.source || "NWS"} (local point)`);
   if (Array.isArray(weather?.alerts) && weather.alerts.length) {
     for (const a of weather.alerts.slice(0, 4)) {
       wxLines.push(
@@ -169,8 +167,11 @@ export async function buildHostSiteHourlySection(
     wxLines.push(`\u2022 **Hazards:** none active (NWS)`);
   }
 
+  const siteLabel =
+    str((site as Record<string, unknown>).label) ||
+    "Root Server host (Starlink / solar)";
   const content = [
-    `**Host site** - Hawaii Mountain View (Starlink / solar)`,
+    `**Host site** - ${siteLabel}`,
     `**Solar / EcoFlow**`,
     ...solarLines,
     `**Local weather**`,
