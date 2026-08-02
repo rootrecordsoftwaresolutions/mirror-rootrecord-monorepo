@@ -85,6 +85,7 @@ import {
   buildHostSiteHourlyBlock,
   pushHostSiteTelemetry,
 } from "./hostSite.mjs";
+import { ensureArmyFoundation } from "./avasArmy.mjs";
 import { startHostMetricsSampler, refreshHostMetrics } from "./hostMetrics.mjs";
 import {
   isAsleep,
@@ -736,6 +737,12 @@ async function bootHandshake() {
     }
   } catch (err) {
     console.warn("host-site boot:", err.message);
+  }
+  try {
+    ensureArmyFoundation();
+    pushStatusEvent("avas-army foundation ready");
+  } catch (err) {
+    console.warn("avas-army boot:", err.message);
   }
   startHostMetricsSampler();
 

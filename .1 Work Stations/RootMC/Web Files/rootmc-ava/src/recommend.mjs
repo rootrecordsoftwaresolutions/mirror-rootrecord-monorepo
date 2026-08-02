@@ -35,6 +35,7 @@ import { isEmergencyStopped } from "./emergencyStop.mjs";
 import { gatherWildTrustBrief, looksLikeWildAsk, wildDenyReply, wildTrustStatus, recordWildPush } from "./wildTrust.mjs";
 import { gatherProMembershipBrief } from "./membershipPro.mjs";
 import { gatherFinanceBrief } from "./financeBrief.mjs";
+import { gatherArmyBrief, assignArmyJob, looksLikeArmyAsk } from "./avasArmy.mjs";
 import { isSelfFixableAsk } from "./selfFix.mjs";
 import { isAsleep } from "./sleepMode.mjs";
 import { isCloudDark } from "./cloudDark.mjs";
@@ -411,6 +412,14 @@ export async function recommend({
     surface,
     channelId,
   });
+  const armyPack = gatherArmyBrief({ question: q });
+  if (looksLikeArmyAsk(q) || armyPack.route?.confidence === "high") {
+    try {
+      assignArmyJob({ text: q, source: surfaceNorm, dept: armyPack.route?.dept });
+    } catch {
+      /* non-fatal */
+    }
+  }
 
   const wantGov =
     classified.intent === "governance" ||
@@ -435,6 +444,7 @@ export async function recommend({
     wildPack.brief,
     proPack.brief,
     financePack.brief,
+    armyPack.brief,
     reactions.brief,
     jobs.brief,
     eco.brief,

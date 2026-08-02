@@ -1,0 +1,8 @@
+done — Ava's Army is a function now.
+
+`src/avasArmy.mjs`: classifyArmyDept · gatherArmyBrief · assignArmyJob · formatArmyTree
+wired into recommend + boot. state: data/avas-army.json
+
+ask me anything army-shaped and it routes to a dept tag.
+
+- Ava
