@@ -4,6 +4,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/** Workspace root: Web Files/rootmc-ava/src → RootMC */
+export const WORKSPACE_ROOT = path.resolve(__dirname, "../../..");
+
+/** Default Ava handoff — layout-relative (SSH/Linux safe). Override with AVA_HANDOFF. */
+export const DEFAULT_AVA_HANDOFF = path.join(
+  WORKSPACE_ROOT,
+  "Server Handoffs",
+  "Ava Ivy",
+);
+
 /** Reuse RootMC realm-api env loader without publishing a package. */
 export async function loadEnv() {
   const loaderPath = path.resolve(
@@ -58,14 +68,34 @@ export function avaBotAppId(env = {}) {
 /** @deprecated use avaBotAppId */
 export const sexiBotAppId = avaBotAppId;
 
-/** @deprecated Grok unplugged — do not use in recommend path. */
-export function grokToken(_env) {
-  return "";
+/**
+ * Dream-state (cloud) API key — xAI under the hood; never named in public voice.
+ * Prefers AVA_* then SEXI_* then shared RootMC keys.
+ */
+export function dreamApiKey(env = {}) {
+  return firstEnv(env, [
+    "AVA_XAI_API_KEY",
+    "AVA_GROK_API_KEY",
+    "SEXI_XAI_API_KEY",
+    "XAI_API_KEY",
+    "GROK_API_BEARER_TOKEN",
+  ]);
+}
+
+/** @deprecated use dreamApiKey — kept for legacy imports */
+export function grokToken(env = {}) {
+  return dreamApiKey(env);
 }
 
 /** Cursor user / service-account API key (Dashboard → Integrations). */
 export function cursorApiKey(env) {
   return firstEnv(env, ["CURSOR_API_KEY", "CURSOR_SDK_API_KEY"]);
+}
+
+/** Force dream brain even when Cursor key exists (ops testing). */
+export function forceDreamBrain(env = {}) {
+  const v = firstEnv(env, ["AVA_FORCE_DREAM", "SEXI_FORCE_DREAM"]);
+  return v === "1" || /^true$/i.test(v);
 }
 
 export const AVA_MODEL = String(
@@ -80,10 +110,25 @@ export const AVA_GROK_MODEL = String(
 /** @deprecated */
 export const SEXI_GROK_MODEL = AVA_GROK_MODEL;
 
-/** Default brain is Cursor — Grok unplugged. */
+/** Default: Slack/on-device = Cursor; Discord = dream state (see recommend.mjs). */
 export const AVA_BRAIN_DEFAULT = "cursor";
 /** @deprecated */
 export const SEXI_BRAIN_DEFAULT = AVA_BRAIN_DEFAULT;
+
+/**
+ * Local organizer (Goal B3) — Ollama on OptiPlex SSD.
+ * AVA_LOCAL_BRAIN=1|true|auto|0  (default auto = use when Ollama is up)
+ * AVA_OLLAMA_URL=http://127.0.0.1:11434
+ * AVA_OLLAMA_MODEL=ava-ivy (persona baseline) or qwen2.5-coder:7b (organizer)
+ */
+export const AVA_OLLAMA_URL = String(
+  process.env.AVA_OLLAMA_URL || "http://127.0.0.1:11434",
+).trim();
+export const AVA_OLLAMA_MODEL = String(
+  process.env.AVA_OLLAMA_MODEL ||
+    process.env.OLLAMA_MODEL ||
+    "ava-ivy",
+).trim();
 
 /** Override workspace cwd for the local Cursor agent (defaults to RootMC root). */
 export const AVA_WORKSPACE = String(
@@ -94,10 +139,18 @@ export const SEXI_WORKSPACE = AVA_WORKSPACE;
 
 /** Ava Ivy handoff folder — lead-dev notes + future agent assets. */
 export const AVA_HANDOFF = String(
-  process.env.AVA_HANDOFF ||
-    process.env.SEXI_HANDOFF ||
-    "D:\\.1 Work Stations\\RootMC\\Server Handoffs\\Ava Ivy",
+  process.env.AVA_HANDOFF || process.env.SEXI_HANDOFF || DEFAULT_AVA_HANDOFF,
 ).trim();
+
+/** True when running headless / over SSH (no GUI status window). */
+export function isHeadlessHost() {
+  if (String(process.env.AVA_NO_STATUS_WINDOW || "").trim() === "1") return true;
+  if (String(process.env.AVA_HEADLESS || "").trim() === "1") return true;
+  if (process.platform !== "win32") return true;
+  if (process.env.SSH_CONNECTION || process.env.SSH_TTY) return true;
+  if (!process.stdout.isTTY) return true;
+  return false;
+}
 
 /** Discord user IDs Ava must never @mention. */
 export const NEVER_MENTION = new Set([
@@ -113,7 +166,7 @@ export const AVA_BOT_APP_ID = "1532751879875072070";
 /** @deprecated */
 export const SEXI_BOT_APP_ID = AVA_BOT_APP_ID;
 
-/** Default watch list — proposals, admins, general, governance, voting, constitution, memes. */
+/** Default watch list — proposals, admins, general, governance, voting, constitution, memes, updates. */
 export const DEFAULT_WATCH_CHANNELS = [
   "1526664180491358419", // proposals
   "1516121832493678612", // admins
@@ -122,8 +175,8 @@ export const DEFAULT_WATCH_CHANNELS = [
   "1522413185364398090", // voting
   "1522406019152478210", // constitution
   "1516389376198840421", // #memes-and-media
-  "1532903049499246636", // #ava-ivy
-  "1532929974154166522", // #development (staff)
+  "1532929974154166522", // #development (staff pointer → Slack)
+  "1520665313631408251", // #updates — ops status + staff pings (she posts here; must listen too)
 ];
 
 /** Named channel fallbacks (aligned with rootmc-discord-channels). */
@@ -136,17 +189,80 @@ export const AVA_CHANNELS = {
   constitution: "1522406019152478210",
   development: "1532929974154166522",
   memesMedia: "1516389376198840421",
+  /** Centralized Ava GIF/media vault */
+  avaMedia: "1533268458668687392",
   updates: "1520665313631408251",
-  /** Prefer env; else admins for audit posts */
-  audit:
-    String(process.env.AVA_AUDIT_CHANNEL_ID || "").trim() || "1516121832493678612",
+  /** MC ↔ Discord bridge — Ava batch-scans for quiet in-game assists */
+  ingameChat: "1516706598519832677",
+  /** Prefer env; empty = no Discord audit spam (status events only) */
+  audit: String(process.env.AVA_AUDIT_CHANNEL_ID || "").trim() || "",
   /** Changelog / notable ship notes */
   changelog:
     String(process.env.AVA_CHANGELOG_CHANNEL_ID || "").trim() ||
     "1520665313631408251",
+  /**
+   * Home for addressed replies / watch. Unsolicited digests must NOT use this
+   * when it is #admins — see channelPolicy.mjs.
+   */
   avaHome:
-    String(process.env.AVA_HOME_CHANNEL_ID || "").trim() || "1532903049499246636",
+    String(process.env.AVA_HOME_CHANNEL_ID || "").trim() || "1516121832493678612",
+  /** Slack staff dig core */
+  slackDev: "C0BMCPMDDQR", // #development-feed
+  slackPlans: "C0BM4P3GVDX", // #new-plugin-development-plans
+  slackDevUrl: "https://rootmcworkspace.slack.com/archives/C0BMCPMDDQR",
+  slackPlansUrl: "https://rootmcworkspace.slack.com/archives/C0BM4P3GVDX",
+  slackOrgCanvasUrl:
+    "https://rootmcworkspace.slack.com/docs/T0BM02SM1FE/F0BM7FRUXJ9",
 };
+
+export function slackBotToken(env = {}) {
+  return firstEnv(env, ["AVA_SLACK_BOT_TOKEN"]).replace(/^bot\s+/i, "");
+}
+
+/** Telegram BotFather token — never commit; live in RootMC .env only. */
+export function telegramBotToken(env = {}) {
+  return firstEnv(env, ["AVA_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"]);
+}
+
+/** Default on when token present unless AVA_TELEGRAM_ENABLED=0. */
+export function telegramEnabled(env = {}) {
+  const v = firstEnv(env, ["AVA_TELEGRAM_ENABLED"]);
+  if (v === "0" || /^false$/i.test(v)) return false;
+  if (v === "1" || /^true$/i.test(v)) return true;
+  return Boolean(telegramBotToken(env));
+}
+
+export function slackAppToken(env = {}) {
+  return firstEnv(env, ["AVA_SLACK_APP_TOKEN"]);
+}
+
+export function slackBotUserId(env = {}) {
+  return firstEnv(env, ["AVA_SLACK_BOT_USER_ID"]);
+}
+
+/** Slack channels Ava listens on for digs (Socket Mode). */
+export function slackWatchChannels(env = {}) {
+  const fromEnv = String(
+    process.env.AVA_SLACK_WATCH_CHANNELS || env.AVA_SLACK_WATCH_CHANNELS || "",
+  )
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (fromEnv.length) return [...new Set(fromEnv)];
+  return [AVA_CHANNELS.slackDev, AVA_CHANNELS.slackPlans];
+}
+
+/** Slack user IDs treated as QUIET / power-down / restart operators. */
+export function slackOperatorIds(env = {}) {
+  const fromEnv = String(
+    process.env.AVA_SLACK_OPERATOR_IDS || env.AVA_SLACK_OPERATOR_IDS || "",
+  )
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const defaults = ["U0BLWBTGYTU", "U0BLQ5Q8WTD"]; // Alexrs94 + Alexander Storey
+  return [...new Set([...defaults, ...fromEnv])];
+}
 
 /** Transport: gateway (preferred) | poller | both */
 export const AVA_TRANSPORT = String(

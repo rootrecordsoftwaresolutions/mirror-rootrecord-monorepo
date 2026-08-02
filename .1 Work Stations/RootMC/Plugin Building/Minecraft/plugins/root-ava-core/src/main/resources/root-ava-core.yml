@@ -1,0 +1,10 @@
+# Root-Ava-Core — plugins/RootMC/root-ava-core.yml
+# Soft / read-only companion only — no economy, bans, or cross-server credentials.
+enabled: true
+
+messages:
+  prefix: "&dAva &8· "
+  status-line: "&7v{version} &8· &f{online} online &8· &f{tps} TPS &8· &aAva companion online"
+  disabled: "&cRoot-Ava-Core is disabled."
+  no-permission: "&cNo permission."
+  reloaded: "&aRoot-Ava-Core reloaded."

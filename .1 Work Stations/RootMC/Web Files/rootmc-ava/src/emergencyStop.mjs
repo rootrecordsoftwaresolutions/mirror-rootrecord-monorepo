@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { storePaths } from "./store.mjs";
-import { personByDiscordId, personByName } from "./people.mjs";
+import { personByAuthorId } from "./people.mjs";
 
 /**
  * Emergency stop — Alexrs94 + Melee can pause RCON / file-write jobs
@@ -34,8 +34,7 @@ export function setEmergencyStop(active, { by, reason } = {}) {
 }
 
 export function canEmergencyStop(authorId, authorName) {
-  const p =
-    personByDiscordId(authorId) || personByName(authorName || "");
+  const p = personByAuthorId(authorId, authorName);
   if (!p) return false;
   return (
     p.id === "alexrs94" ||

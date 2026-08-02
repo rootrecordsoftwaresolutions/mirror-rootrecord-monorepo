@@ -4,12 +4,12 @@ import { storePaths, isHushed, pushStatusEvent } from "./store.mjs";
 import { listJobs } from "./jobQueue.mjs";
 import { cursorSlots, CURSOR_CONCURRENCY } from "./cursorBrain.mjs";
 import { postMessage } from "./discordApi.mjs";
-import { AVA_CHANNELS } from "./config.mjs";
-import { avaHomeChannelId } from "./guildScout.mjs";
+import { allowsUnsolicitedPost } from "./channelPolicy.mjs";
 
 /**
- * Ava-initiated pending-tasks check — now and then she audits her own queue
- * and posts a short status to #ava-ivy (or announce fallback).
+ * Ava-initiated pending-tasks check — audits her own queue locally.
+ * Discord posts only when AVA_PENDING_CHECK_CHANNEL is set explicitly
+ * and is not a no-unsolicited channel (#admins).
  */
 
 const OPEN_STATUSES = new Set([
@@ -125,13 +125,8 @@ export function pendingCheckBootDelayMs() {
 }
 
 function targetChannelId() {
-  return (
-    String(process.env.AVA_PENDING_CHECK_CHANNEL || "").trim() ||
-    AVA_CHANNELS.avaHome ||
-    avaHomeChannelId() ||
-    process.env.AVA_ANNOUNCE_CHANNEL ||
-    "1516108586307158088"
-  );
+  // Explicit opt-in only — never fall back to #admins / avaHome.
+  return String(process.env.AVA_PENDING_CHECK_CHANNEL || "").trim();
 }
 
 /**
@@ -148,10 +143,24 @@ export async function runPendingTasksCheck(fetchJson, { force = false } = {}) {
   }
 
   const snap = collectPendingTasks();
+  state.lastAt = Date.now();
+  state.lastOpen = snap.open;
+
+  // Local-only by default (status page / events). No Discord spam.
+  const channelId = targetChannelId();
+  if (!channelId || !allowsUnsolicitedPost(channelId)) {
+    if (!snap.hasWork) state.quietStreak = (state.quietStreak || 0) + 1;
+    else state.quietStreak = 0;
+    saveState(state);
+    pushStatusEvent(
+      `pending check · local · ${snap.hasWork ? snap.open + " open" : "clear"}`,
+    );
+    return { posted: false, reason: channelId ? "blocked_channel" : "local_only", open: snap.open };
+  }
+
   // Quiet: skip most empty checks (post every 3rd quiet streak)
   if (!snap.hasWork && !force) {
     state.quietStreak = (state.quietStreak || 0) + 1;
-    state.lastAt = Date.now();
     if (state.quietStreak % 3 !== 0) {
       saveState(state);
       pushStatusEvent("pending check · quiet (skipped post)");
@@ -161,15 +170,10 @@ export async function runPendingTasksCheck(fetchJson, { force = false } = {}) {
     state.quietStreak = 0;
   }
 
-  const channelId = targetChannelId();
-  if (!channelId) return { posted: false, reason: "no_channel" };
-
   const content = buildPendingTasksMessage(snap);
   try {
     const msg = await postMessage(fetchJson, channelId, content, null);
-    state.lastAt = Date.now();
     state.lastPostId = msg?.id || null;
-    state.lastOpen = snap.open;
     saveState(state);
     pushStatusEvent(
       `pending check · ${snap.hasWork ? snap.open + " open" : "clear"} → #${channelId}`,

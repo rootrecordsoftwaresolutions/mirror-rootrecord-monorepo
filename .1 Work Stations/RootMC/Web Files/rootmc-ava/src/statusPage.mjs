@@ -218,6 +218,18 @@ export function statusPageHtml() {
           ["CPU 1h", d.hostMetricsTimeframes?.last_hour
             ? d.hostMetricsTimeframes.last_hour.cpu_avg_pct + "%"
             : "—"],
+          ["Reserve Claims", d.reserves?.claims
+            ? ((d.reserves.claims.gold ?? 0) + " G" + (d.reserves.claims.pausedPayouts ? " · paused" : ""))
+            : "—"],
+          ["Reserve Towny", d.reserves?.towny
+            ? ((d.reserves.towny.gold ?? 0) + " G" + (d.reserves.towny.pausedPayouts ? " · paused" : ""))
+            : "—"],
+          ["Token discord", d.tokenEconomy?.surfaces?.discord
+            ? (d.tokenEconomy.surfaces.discord.used + "/" + (d.tokenEconomy.surfaces.discord.softCap ?? "∞"))
+            : "—"],
+          ["Token slack", d.tokenEconomy?.surfaces?.slack
+            ? (d.tokenEconomy.surfaces.slack.used + "/" + (d.tokenEconomy.surfaces.slack.softCap ?? "∞"))
+            : "—"],
         ]);
 
         $("events").innerHTML = (d.events || []).map((line) => {

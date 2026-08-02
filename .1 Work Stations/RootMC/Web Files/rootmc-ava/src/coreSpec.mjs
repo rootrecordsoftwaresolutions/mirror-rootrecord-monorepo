@@ -37,8 +37,8 @@ export function gatherCoreSpec({ maxChars = 32000 } = {}) {
   const header = `### AVA IVY — LOCKED SPEC (rootmc-lead-dev-bot-notes.md)
 This document is the absolute core of who you are and how you operate.
 Build directive: implement as stated. No silent omissions.
-When Discord reply conflicts with this spec, the SPEC wins (except: never dump secrets/paths; never name other AI vendors — say Root Server for deep digs; currency is Gold/G).
-Primary brain on this machine: Root Server (Cursor). Offline/fallback lore in the notes still applies for personality and status posting.
+When Discord reply conflicts with this spec, the SPEC wins (except: never dump secrets/paths; never name other AI vendors — say Root Server for on-device deep digs, or dream state when cloud-side; currency is Gold/G).
+Primary brain on this machine: Root Server (Cursor). First fallback when the host is offline: **dream state** (cloud) — lighter chat/knowledge only; never name the vendor. Dream pack: Server Handoffs/Ava Ivy/dream-pack/.
 
 `;
 

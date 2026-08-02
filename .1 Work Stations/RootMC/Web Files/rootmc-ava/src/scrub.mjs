@@ -1,4 +1,5 @@
 import { NEVER_MENTION } from "./config.mjs";
+import { AVA_APP_EMOJIS } from "./appEmojis.mjs";
 
 export function stripForbiddenMentions(text) {
   let out = String(text || "");
@@ -8,9 +9,52 @@ export function stripForbiddenMentions(text) {
   return out;
 }
 
-/** Strip common secret / path leaks before Discord. */
-export function scrubPublicReply(text) {
+/** Strip Discord app-emoji markup that does not render on Slack. */
+export function stripDiscordAppEmojis(text) {
+  let out = String(text || "");
+  out = out.replace(/<a?:[a-zA-Z0-9_]+:\d+>/g, "");
+  out = out.replace(
+    /:(?:ava_[a-z0-9_]+|ship_it|vote_yes|vote_no|sleepy|pickaxe|party_pop|on_fire|hologram|heart|grass_block|gold_coin|diamond_gem|creeper_face|bug_report|warn):/gi,
+    "",
+  );
+  out = out.replace(/[ \t]{2,}/g, " ");
+  out = out.replace(/\n{3,}/g, "\n\n");
+  return out.trim();
+}
+
+/**
+ * Turn `:ava_wave:` shortcodes into real `<:ava_wave:id>` mentions on Discord.
+ * LLMs love typing shortcodes that never render.
+ */
+export function expandDiscordAppEmojiShortcodes(text) {
+  let out = String(text || "");
+  out = out.replace(/:([a-zA-Z0-9_]+):/g, (full, name) => {
+    const key = String(name).toLowerCase();
+    const id = AVA_APP_EMOJIS[key];
+    if (!id) return full;
+    return `<:${key}:${id}>`;
+  });
+  return out;
+}
+
+/** Strip common secret / path leaks before Discord/Slack. */
+export function scrubPublicReply(text, opts = {}) {
+  const surface = String(opts.surface || "").toLowerCase();
   let out = stripForbiddenMentions(text);
+  // Harden punctuation — mojibake / broken pipes turn em-dashes & curly quotes into ???
+  out = out
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ")
+    .replace(/\uFFFD/g, "");
+  if (surface === "slack") {
+    out = stripDiscordAppEmojis(out);
+  } else {
+    // Discord (default): expand shortcodes so :ava_wave: actually renders
+    out = expandDiscordAppEmojiShortcodes(out);
+  }
   out = out.replace(/```[\s\S]*?```/g, (block) => {
     if (/password|token|secret|api[_-]?key|\.env/i.test(block)) {
       return "_[code omitted]_";
@@ -18,6 +62,7 @@ export function scrubPublicReply(text) {
     return block;
   });
   out = out.replace(/D:\\\.1 Work Stations\\RootMC[^\s`]*/gi, "`(workspace)`");
+  out = out.replace(/\/(?:srv|opt|home)\/[^\s`]*[Rr]oot[Mm][Cc][^\s`]*/g, "`(workspace)`");
   out = out.replace(/\/(?:Users|home)\/[^\s`]+/gi, "`(path)`");
   out = out.replace(
     /\b(?:CURSOR_API_KEY|DISCORD_(?:ROOTMC_)?BOT_TOKEN|GROK_[A-Z0-9_]+|JWT_[A-Z0-9_]+|XAI_API_KEY)\b\s*[:=]\s*\S+/gi,
@@ -25,11 +70,15 @@ export function scrubPublicReply(text) {
   );
   out = out.replace(/\bsk-[a-zA-Z0-9_-]{20,}\b/g, "[redacted]");
   out = out.replace(/\bcursor_[a-zA-Z0-9_-]{20,}\b/g, "[redacted]");
+  out = out.replace(/\b\d{8,12}:[A-Za-z0-9_-]{30,}\b/g, "[redacted-telegram-token]");
   out = out.replace(/\bcrsr_[a-zA-Z0-9_-]{20,}\b/g, "[redacted]");
   // Never leak other AI / vendor names into Discord
   out = out.replace(
     /\b(grok|xai|chatgpt|chat\s*gpt|claude|openai|gemini|copilot|cursor\s*sdk|cursor)\b/gi,
     "Root Server",
   );
-  return out.trim().slice(0, 1900);
+  // Soft ceiling only — Discord/Slack multipost (splitContent) handles platform
+  // limits. Do not hard-cut at 1900 or long official-style updates die mid-line.
+  const max = surface === "slack" ? 100_000 : 80_000;
+  return out.trim().slice(0, max);
 }

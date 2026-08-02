@@ -1,0 +1,38 @@
+---
+description: After every daily-plan phase/update, run Ava catch-up rescan (reply + react)
+alwaysApply: true
+---
+
+# Ava daily-plan phase catch-up
+
+When executing a **daily plan**, Absolute Ops-style checklist, or any multi-phase Ava ops work:
+
+## Hard rule
+
+**At the end of every phase or meaningful update**, before starting the next phase (and again at plan close):
+
+1. Run Ava catch-up so she replies and reacts to mail that landed while you were digging
+2. If the phase introduced new durable behavior, absorb it (short note under `Server Handoffs/Ava Ivy/notes/` and/or `recordLocalLesson`)
+3. If repo files changed, run GitHub auto-push: `node scripts/ava-github-push.mjs` from `Web Files/rootmc-ava` (Ava-owned paths only; never secrets; never force-push main)
+
+```bat
+cd "Web Files\rootmc-ava"
+node scripts/phase-catchup.mjs phase-<id-or-name>
+node scripts/ava-github-push.mjs
+```
+
+Or from code: `import { runPhaseCatchup } from "./src/phaseCatchup.mjs"` then `await runPhaseCatchup({ label: "phase-1" })`.
+`import { runAvaGithubPush } from "../scripts/ava-github-push.mjs"` then `await runAvaGithubPush({ message: "Ava: …" })`.
+
+## What catch-up does
+
+- Soft-acks recent Ava-addressed Discord messages (⏱️)
+- Forces follow-up scan (Discord + Slack) so unreplied @Ava / thread follow-ups get real replies
+- Drains in-game `/proposal` + `/feedback` queues lightly
+
+## Do not
+
+- Skip catch-up because “Ava’s poller will get it later”
+- Use Slack MCP for Ava replies during catch-up — bot token only (`avaPost` / phase-catchup)
+- Spam new status boards instead of reacting/replying to people who already pinged
+- Commit `.env`, keystores, live `cloud.yml` secrets, or force-push `main`/`master`

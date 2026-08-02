@@ -72,8 +72,66 @@ const server = http.createServer(async (req, res) => {
         conversations: (await import("./conversationStore.mjs")).conversationStats(),
         hostMetrics: loadHostSnapshot(),
         hostMetricsTimeframes: itemizeHostMetricsTimeframes(),
+        tokenEconomy: (await import("./tokenEconomy.mjs")).loadTokenEconomy(),
+        tokenBoard: (await import("./tokenEconomy.mjs")).tokenBoardText(),
+        reserves: (await import("./tokenEconomy.mjs")).reserveSnapshot(),
       }),
     );
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/rewrite") {
+    const body = await readJsonBody(req);
+    if (!body || typeof body !== "object") {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ ok: false, detail: "invalid_json" }));
+      return;
+    }
+    const draft = String(body.text || body.content || "").trim();
+    const context = Array.isArray(body.context) ? body.context.slice(-42) : [];
+    const surface = String(body.surface || "discord");
+    if (!draft) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ ok: false, detail: "empty_text" }));
+      return;
+    }
+    const contextBlock = context
+      .map((m) => {
+        if (typeof m === "string") return m;
+        const who = m.who || m.author || "?";
+        const text = m.text || m.content || "";
+        return `${who}: ${text}`;
+      })
+      .join("\n")
+      .slice(0, 6000);
+    const question = [
+      "Rewrite the following draft in Ava Ivy voice before send.",
+      "Keep meaning; improve clarity; Gold not dollars; no secrets.",
+      "Return ONLY the rewritten message text.",
+      contextBlock ? `\nRecent context (last msgs):\n${contextBlock}` : "",
+      `\nDraft:\n${draft}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    try {
+      const rewritten = await recommend({
+        question,
+        env,
+        surface,
+        authorId: String(body.authorId || "desktop"),
+        authorName: String(body.authorName || "desktop"),
+      });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          text: String(rewritten || draft).trim() || draft,
+          contextUsed: context.length,
+        }),
+      );
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ ok: false, detail: err.message, text: draft }));
+    }
     return;
   }
 
@@ -96,6 +154,8 @@ const server = http.createServer(async (req, res) => {
         restartPending: Boolean(loadRestartRequest()),
         degraded: deg.degraded,
         onBreak: Boolean(heartbeat?.onBreak),
+        asleep: Boolean(heartbeat?.asleep),
+        sleepWakeAt: heartbeat?.sleepWakeAtIso || null,
         gateway: heartbeat?.gatewayStats || null,
         childRestarts: liveness?.childRestartsTotal ?? 0,
         children: liveness?.children || null,

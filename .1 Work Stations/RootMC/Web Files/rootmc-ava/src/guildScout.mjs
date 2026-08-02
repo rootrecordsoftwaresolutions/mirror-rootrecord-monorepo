@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { ROOTMC_GUILD_ID, AVA_BOT_APP_ID } from "./config.mjs";
+import { ROOTMC_GUILD_ID, AVA_BOT_APP_ID, AVA_CHANNELS } from "./config.mjs";
 import { storePaths } from "./store.mjs";
 import { silentlyProfileMessage } from "./playerProfiles.mjs";
 import { inspectBotPermissions, buildAdminRequestMessage } from "./guildAccess.mjs";
@@ -75,8 +75,8 @@ function findExistingAvaChannel(channels) {
 }
 
 /**
- * Create Ava's home channel on first join (needs Manage Channels).
- * Reuses an existing #ava-ivy / #ava if present.
+ * Resolve Ava's announce/home channel — never recreate #ava-ivy (retired).
+ * Prefers #admins / AVA_CHANNELS.avaHome.
  */
 export async function ensureAvaHomeChannel({
   fetchJson,
@@ -85,64 +85,57 @@ export async function ensureAvaHomeChannel({
   generalCategoryHint,
   existingHomeId,
 }) {
-  if (existingHomeId) {
-    const byId = (channels || []).find((c) => c.id === existingHomeId);
-    if (byId) {
-      return {
-        id: byId.id,
-        name: byId.name,
-        created: false,
-        topic: byId.topic || "",
-      };
-    }
-  }
-  const existing = findExistingAvaChannel(channels);
-  if (existing) {
+  void fetchJson;
+  void guildId;
+  void generalCategoryHint;
+
+  const deletedIvy = "1532903049499246636";
+  const preferId =
+    existingHomeId && existingHomeId !== deletedIvy
+      ? existingHomeId
+      : AVA_CHANNELS.avaHome || AVA_CHANNELS.admins;
+
+  const byPrefer = (channels || []).find((c) => c.id === preferId);
+  if (byPrefer) {
     return {
-      id: existing.id,
-      name: existing.name,
+      id: byPrefer.id,
+      name: byPrefer.name,
       created: false,
-      topic: existing.topic || "",
+      topic: byPrefer.topic || "",
+    };
+  }
+
+  const admins = (channels || []).find(
+    (c) => c.type === 0 && /admins?/i.test(String(c.name || "")),
+  );
+  if (admins) {
+    return {
+      id: admins.id,
+      name: admins.name,
+      created: false,
+      topic: admins.topic || "",
     };
   }
 
   const general = (channels || []).find(
     (c) => c.type === 0 && String(c.name || "").toLowerCase() === "general",
   );
-  const parent_id =
-    general?.parent_id ||
-    generalCategoryHint ||
-    (channels || []).find((c) => c.type === 4)?.id || // category
-    undefined;
-
-  const topic =
-    "Ava Ivy — home base. Intros, status, self-updates. Ping Ava here or anywhere. Rename this channel anytime.";
-
-  try {
-    const created = await fetchJson(`/guilds/${guildId}/channels`, {
-      method: "POST",
-      body: JSON.stringify({
-        name: "ava-ivy",
-        type: 0,
-        topic,
-        parent_id: parent_id || undefined,
-        reason: "Ava Ivy first-join home channel",
-      }),
-    });
+  if (general) {
     return {
-      id: created.id,
-      name: created.name || "ava-ivy",
-      created: true,
-      topic,
-    };
-  } catch (err) {
-    return {
-      id: null,
-      name: "ava-ivy",
+      id: general.id,
+      name: general.name,
       created: false,
-      error: String(err?.message || err),
+      topic: general.topic || "",
     };
   }
+
+  return {
+    id: AVA_CHANNELS.admins || AVA_CHANNELS.general,
+    name: "admins",
+    created: false,
+    topic: "",
+    error: "no_home_fallback",
+  };
 }
 
 /**
@@ -352,5 +345,13 @@ ${vibes || "(none)"}`,
 
 /** Home channel id for watch list / announce, if known. */
 export function avaHomeChannelId(guildId = ROOTMC_GUILD_ID) {
-  return loadGuildProfile(guildId)?.avaChannelId || null;
+  const deletedIvy = new Set([
+    "1532903049499246636", // original #ava-ivy
+    "1533223535311327322", // accidental recreate — also deleted
+  ]);
+  const id = loadGuildProfile(guildId)?.avaChannelId || null;
+  if (!id || deletedIvy.has(String(id))) {
+    return AVA_CHANNELS.avaHome || AVA_CHANNELS.admins || AVA_CHANNELS.general;
+  }
+  return id;
 }

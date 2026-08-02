@@ -5,6 +5,7 @@ import { writeProposalPlan, proposalPlanTemplate } from "./uploads.mjs";
 import { postAudit } from "./audit.mjs";
 import { postChangelog } from "./changelog.mjs";
 import { postMessage } from "./discordApi.mjs";
+import { appendAction } from "./fullLog.mjs";
 
 /**
  * Cursor / Root Server job queue.
@@ -90,6 +91,13 @@ export function createJob({
   };
   writeJob(job);
 
+  appendAction("job.created", {
+    jobId: job.id,
+    kind: job.kind,
+    title: job.title,
+    channelId: job.channelId,
+  });
+
   if (fetchJson && auditChannelId) {
     postAudit(fetchJson, auditChannelId, {
       title: `Job created · ${job.id}`,
@@ -110,6 +118,7 @@ export function advanceJob(id, status, note = "", { fetchJson } = {}) {
     "watching",
     "failed",
     "blocked",
+    "done",
   ];
   if (!allowed.includes(status)) return job;
   const prev = job.status;
@@ -118,6 +127,13 @@ export function advanceJob(id, status, note = "", { fetchJson } = {}) {
   job.history = job.history || [];
   job.history.push({ at: Date.now(), status, note: String(note || "").slice(0, 400) });
   writeJob(job);
+
+  appendAction("job.advance", {
+    jobId: job.id,
+    from: prev,
+    to: status,
+    note: String(note || "").slice(0, 200),
+  });
 
   // Thread/channel progress note on meaningful transitions
   if (fetchJson && job.channelId && prev !== status) {
@@ -139,10 +155,18 @@ export function markImplementing(id, note = "Root Server dig started") {
   return advanceJob(id, "implementing", note);
 }
 
-/** Soft: mark implementing → staged without live restart. */
-export function markStaged(id, note = "staged to handoff — awaiting human restart", opts = {}) {
+/** Soft: plan/jars staged — stays staged (no fake restart gate). */
+export function markStaged(id, note = "staged — plan or jars ready", opts = {}) {
+  return advanceJob(id, "staged", note, opts);
+}
+
+/** Jar deploy needs human FileZilla / Shockbyte restart. */
+export function markAwaitingRestart(
+  id,
+  note = "staged to handoff — awaiting human restart",
+  opts = {},
+) {
   const job = advanceJob(id, "staged", note, opts);
-  // Immediately move to waiting_restart (humans own FileZilla/Shockbyte)
   return advanceJob(id, "waiting_restart", "awaiting human restart", opts) || job;
 }
 
@@ -152,6 +176,10 @@ export function markWatching(id, note = "human restarted — watching", opts = {
 
 export function markFailed(id, note = "failed", opts = {}) {
   return advanceJob(id, "failed", note, opts);
+}
+
+export function markDone(id, note = "done", opts = {}) {
+  return advanceJob(id, "done", note, opts);
 }
 
 /**

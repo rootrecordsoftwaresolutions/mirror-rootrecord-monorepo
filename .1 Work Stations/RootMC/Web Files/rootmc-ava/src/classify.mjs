@@ -25,7 +25,14 @@ export function classifyIntent(question = "") {
   }
 
   if (
-    /\b(proposal|vote|poll|governance|council|voting\s*power|bill)\b/.test(q)
+    /\b(look\s+at|read|update|audit|rewrite|revise|review|dig\s+into)\b/.test(q) &&
+    /\b(constitution|governance|wiki|changelog|docs?)\b/.test(q)
+  ) {
+    return { intent: "dig_assign", reason: "operator_dig_assign", confidence: 0.9 };
+  }
+
+  if (
+    /\b(proposal|vote|poll|governance|council|voting\s*power|bill|constitution)\b/.test(q)
   ) {
     return { intent: "governance", reason: "governance_keyword", confidence: 0.85 };
   }
@@ -65,12 +72,138 @@ export function classifyIntent(question = "") {
   return { intent: "chat", reason: "default", confidence: 0.5 };
 }
 
+/**
+ * Soft chat — logistics only (thanks, night, pronouns, bare ping, "I'll list later").
+ * Personality / flirt / bi / dark-side / "who are you" → NOT soft (full voice).
+ */
+export function isSoftChat(question = "", rawContent = "") {
+  const raw = String(rawContent || question || "")
+    .replace(/<@!?\d+>/g, " ")
+    .replace(/<#\d+>/g, " ")
+    .replace(/<a?:[\w~]+:\d+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const q = String(question || raw)
+    .replace(/\[attachments[\s\S]*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!q || q === "you pinged me — what's up?" || q === "you pinged me - what's up?") {
+    return true;
+  }
+  // Character / flirt / identity talk — never soft-flatten
+  if (
+    /\b(dark\s+side|who\s+are\s+you|personality|freak|sexy|bi\b|gay\b|lesbian|queer|crush|flirt|devious|hawt|hot\b|cute|girlfriend|boyfriend|dating|kiss|horny|nsfw)\b/i.test(
+      q,
+    )
+  ) {
+    return false;
+  }
+  // Dig / work language → never soft
+  if (
+    /\b(bug|broken|crash|fix|implement|proposal|vote|audit|rewrite|plugin|skills?|xp|constitution|wiki|rcon|deploy|jar|commit|patch|dig|look\s+at|read\s+what|check\s+(slack|the|logs?))\b/i.test(
+      q,
+    )
+  ) {
+    if (
+      /\b(i'?ll|ill|i\s+will)\s+(make\s+)?(a\s+)?list\b/.test(q) ||
+      (/\btomorrow\b/.test(q) && /\b(list|check|poke|test)\b/.test(q))
+    ) {
+      return !/\b(fix|patch|deploy|implement)\b/.test(q);
+    }
+    return false;
+  }
+  if (
+    /\b(i'?m\s+a\s+he|im\s+a\s+he|he\/him|she\/her|pronouns?|is\s+a\s+guy|is\s+a\s+dude|melle\s+is|melee\s+is)\b/i.test(
+      q,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(ill|i'?ll)\s+(make|send|drop)\s+(a\s+)?list\b/i.test(q) ||
+    /\b(beat|tired|sleep|gn|night+|good\s*night)\b/i.test(q)
+  ) {
+    return true;
+  }
+  if (
+    /^(hey|hi|yo|sup|ava|ok|okay|thanks?|ty|thx|gn|night+|good\s*night|lol+|lmao+|haha+|heh+|bet|noted|cool|nice|np|yw)[.!?]*$/i.test(
+      raw,
+    )
+  ) {
+    return true;
+  }
+  // Affirming / dismissive closes — still soft (may be react-only)
+  if (isReactOnlyAck(question, rawContent)) return true;
+  // Very short logistics only — not open-ended personality asks
+  if (raw.length <= 24 && !/\?/.test(raw)) return true;
+  return false;
+}
+
+/**
+ * Soft closes that should get reactions only — no text yap.
+ * e.g. "you good, keep doing you" / "sounds good" / bare ok/👍
+ */
+export function isReactOnlyAck(question = "", rawContent = "") {
+  const raw = String(rawContent || question || "")
+    .replace(/<@!?\d+>/g, " ")
+    .replace(/<#\d+>/g, " ")
+    .replace(/<a?:[\w~]+:\d+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw || raw.length > 100) return false;
+  if (/\?/.test(raw)) return false;
+  const q = raw.toLowerCase();
+  if (
+    /\b(you\s+good|you'?re\s+good|keep\s+doing\s+(you|it)|keep\s+(it\s+)?up|keep\s+at\s+it|carry\s+on|sounds\s+good|all\s+good|that'?s\s+fine|no\s+rush|take\s+your\s+time|godspeed|lfg|good\s+luck|you\s+do\s+you)\b/i.test(
+      q,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^(ok|okay|k|kk|cool|nice|bet|noted|np|yw|got\s+it|alright|all\s+right)[.!]*$/i.test(
+      q,
+    )
+  ) {
+    return true;
+  }
+  // lone emoji / very short thumbs-up style
+  if (/^([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}👍❤️💯🙏✅✨]+)$/u.test(raw)) {
+    return true;
+  }
+  return false;
+}
+
+/** Short logistics reply — no Root Server dig. Personality banter never lands here. */
+export function softChatReply(question = "", rawContent = "") {
+  const q = String(question || rawContent || "").toLowerCase();
+  if (/\b(i'?m\s+a\s+he|im\s+a\s+he|he\/him|is\s+a\s+guy|melle\s+is|melee\s+is)\b/.test(q)) {
+    return "got it — Melee is a **he**. Locked. Sorry about the slip.";
+  }
+  if (/\b(ill|i'?ll)\s+(make|send|drop)\s+(a\s+)?list\b/.test(q) || /\btomorrow\b/.test(q)) {
+    return "perfect — drop the block list when you're up. I'll patch the dead XP triggers off that.";
+  }
+  if (/\b(gn|night+|good\s*night|beat|tired|sleep)\b/.test(q)) {
+    return "night — rest up. don't dream about broken XP blocks too hard.";
+  }
+  if (/\b(thanks?|ty|thx)\b/.test(q)) {
+    return "anytime ❤";
+  }
+  if (!q || /you pinged me/.test(q) || /^(hey|hi|yo|ava|sup)\b/.test(q.trim())) {
+    return "hey — what's up?";
+  }
+  return "mm?";
+}
+
 /** Should we open a job for this classification? */
 export function shouldCreateJob(classified) {
   if (!classified) return false;
   if (classified.intent === "feature" && (classified.confidence || 0) >= 0.75) return true;
   if (classified.intent === "bug" && (classified.confidence || 0) >= 0.75) return true;
   if (classified.intent === "self_evo") return true;
+  if (classified.intent === "dig_assign") return true;
+  if (classified.intent === "governance" && (classified.confidence || 0) >= 0.8) return true;
   return false;
 }
 
@@ -93,9 +226,13 @@ Verify fully from packs/logs, then describe the fix. Features still need proposa
     return `### Intent: CONFIG TUNE ("playing with her")
 Collaborative fine-tune of Ava's configuration (persona/rules/tone/tools). First reply cooperative + concrete. Don't lecture nicknames. Not default-flirty.`;
   }
+  if (i === "dig_assign") {
+    return `### Intent: DIG ASSIGN (operator handed you real work)
+Do the dig NOW in this reply — first real artifact (stale sections, draft bullets, verified status). Do NOT say "give me a beat" / "I'll pull later" and go idle. If you need a second pass, still deliver something concrete first. Runtime will chase any open commitment.`;
+  }
   if (i === "governance") {
     return `### Intent: GOVERNANCE
-Use attached governance pack (polls / voting power / council). Report vote math honestly. Never claim a feature shipped without a passed gate.`;
+Use attached governance pack (polls / voting power / council). Report vote math honestly. Never claim a feature shipped without a passed gate. If asked to update the constitution/docs, treat it as a dig assign — deliver concrete edits, don't defer.`;
   }
   if (i === "self_evo") {
     return `### Intent: SELF-EVO

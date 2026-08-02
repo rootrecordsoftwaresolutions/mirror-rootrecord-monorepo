@@ -3,7 +3,7 @@ import path from "node:path";
 import { AVA_HANDOFF } from "./config.mjs";
 
 function dataDir() {
-  const root = AVA_HANDOFF || path.resolve("D:\\.1 Work Stations\\RootMC\\Server Handoffs\\Ava Ivy");
+  const root = AVA_HANDOFF;
   const dir = path.join(root, "data");
   fs.mkdirSync(dir, { recursive: true });
   fs.mkdirSync(path.join(root, "uploads"), { recursive: true });
@@ -14,6 +14,10 @@ function dataDir() {
   fs.mkdirSync(path.join(dir, "jobs"), { recursive: true });
   fs.mkdirSync(path.join(dir, "players"), { recursive: true });
   fs.mkdirSync(path.join(dir, "host-metrics"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "logs"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "training"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "slack"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "slack", "channels"), { recursive: true });
   return dir;
 }
 

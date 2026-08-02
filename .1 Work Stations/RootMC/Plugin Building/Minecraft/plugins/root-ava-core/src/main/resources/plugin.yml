@@ -1,0 +1,19 @@
+name: Root-Ava-Core
+version: '${version}'
+main: com.rootrecord.minecraft.rootavacore.RootAvaCorePlugin
+api-version: '26.1'
+description: Ava companion — read-only in-game status hooks
+author: Root Record
+website: https://rootmc.net/plugins/
+depend: [Root-Core]
+commands:
+  ava:
+    description: Show Ava companion status
+    usage: /<command> [reload]
+permissions:
+  rootavacore.use:
+    description: Use /ava status
+    default: true
+  rootavacore.admin:
+    description: Reload Root-Ava-Core
+    default: op

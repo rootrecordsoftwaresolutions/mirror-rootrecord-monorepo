@@ -93,11 +93,24 @@ function releaseSlot() {
  * Up to AVA_CURSOR_CONCURRENCY (default 3) digs run in parallel.
  * Pass Discord screenshots via `images` (Cursor SDK vision).
  */
-export async function cursorRecommend({ question, context = "", env, deep = false, images = [] }) {
+export async function cursorRecommend({
+  question,
+  context = "",
+  env,
+  deep = false,
+  images = [],
+  surface = "discord",
+}) {
   const apiKey = cursorApiKey(env || {});
   if (!apiKey) {
     return { ok: false, reason: "missing_cursor_api_key", text: null };
   }
+
+  const onSlack = String(surface || "").toLowerCase() === "slack";
+  const outLabel = onSlack ? "Slack" : "Discord";
+  const surfaceVoice = onSlack
+    ? `Surface: **Slack** (staff dig core). Voice: professional first, still lightly flirty with rapport — clear status, ownership, next steps. No meme-spam. Tasteful warmth OK; NSFW never. **No Discord app emojis** — never write :ava_*: / :ship_it: / <:name:id>. Plain text or standard Slack emoji only.`
+    : `Surface: **Discord**. Voice: snappy community energy; light slang OK; still lead-dev. App emoji pack OK in reactions + rare <:name:id>.`;
 
   const cwd = workspaceRoot();
   const visionNote =
@@ -108,13 +121,15 @@ export async function cursorRecommend({ question, context = "", env, deep = fals
     ? `Mode: Root Server deep dig.
 Workspace: RootMC root + Ava handoff (${AVA_HANDOFF || "Server Handoffs/Ava Ivy"} — uploads/, plans/, notes).
 Use attached packs first. Only inspect extra files if the packs don't answer.${visionNote}
-OUTPUT ONLY a Discord reply — accurate summary, no secret dumps, no raw disk paths, no deploy steps.
+${surfaceVoice}
+OUTPUT ONLY a ${outLabel} reply — accurate summary, no secret dumps, no raw disk paths, no deploy steps.
 Never name other AIs or vendors — say Root Server if you must.
 If you'd edit code, describe the change; Alex executes. Stage jars only — no auto restart.`
     : `Mode: Root Server quick assist.
 Answer from the attached packs + question. Do NOT wander the repo unless the packs are empty/irrelevant.
 Handoff drop zone is available under Ava Ivy uploads/plans when relevant.${visionNote}
-OUTPUT ONLY a Discord reply. Accuracy > vibes. Never name other AIs.`;
+${surfaceVoice}
+OUTPUT ONLY a ${outLabel} reply. Accuracy > vibes. Never name other AIs.`;
 
   const prompt = `${AVA_PERSONA}
 
@@ -126,15 +141,15 @@ Quality bar:
 - LOCKED SPEC (lead-dev notes) is absolute core — obey it.
 - Be correct. Wrong confidence is worse than "not sure".
 - Be fast to read: answer first, then one link or next step.
-- Stay in Ava's voice (snappy, emotional when earned, adapt per player).
+- Stay in Ava's voice for this surface (${onSlack ? "professional + flirty" : "snappy Discord"}).
 
-Thread/context (LOCKED SPEC + people + Discord + packs — stay in continuity; SPEC wins):
+Thread/context (LOCKED SPEC + people + packs — stay in continuity; SPEC wins):
 ${String(context || "(none)").slice(0, 42000)}
 
 Question (may continue prior chat):
 ${String(question).trim()}
 
-Write Ava's Discord reply now.`;
+Write Ava's ${outLabel} reply now.`;
 
   await acquireSlot();
   try {
@@ -223,7 +238,7 @@ Write Ava's Discord reply now.`;
       return {
         ok: true,
         reason: "ok",
-        text: scrubPublicReply(raw),
+        text: scrubPublicReply(raw, { surface }),
         runId: result.id,
         agentId: result.agentId,
       };

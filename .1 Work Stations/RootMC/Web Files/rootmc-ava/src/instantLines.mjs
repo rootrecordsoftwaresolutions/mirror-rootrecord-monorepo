@@ -75,7 +75,6 @@ export const AVA_ACKS = [
   "searching RootMC side…",
   "pulling it…",
   "hang tight",
-  "working",
   "on the hunt",
   "mmmm checking",
   "idk yet — searching",
