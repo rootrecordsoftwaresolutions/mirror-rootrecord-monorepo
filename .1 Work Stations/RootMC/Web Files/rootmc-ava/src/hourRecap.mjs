@@ -1,13 +1,12 @@
 /**
- * Automated hour recap — what Ava did recently (status events + optional Discord self-posts).
- * Posts to #updates when due. Never names host-site locale.
+ * Automated hour recap — status events digest.
+ * Posts to Slack #development-feed (NOT Discord #updates) — Alex lock 2026-08-02.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { storePaths, loadStatusEvents, pushStatusEvent } from "./store.mjs";
 import { AVA_CHANNELS } from "./config.mjs";
-import { allowsUnsolicitedPost } from "./channelPolicy.mjs";
-import { postAvaDiscord } from "./avaPost.mjs";
+import { postAvaSlack } from "./avaPost.mjs";
 import { scrubPublicReply } from "./scrub.mjs";
 
 /** Default 60m. Override AVA_HOUR_RECAP_MS (min 15m). */
@@ -17,8 +16,8 @@ export function hourRecapIntervalMs() {
 }
 
 export function hourRecapBootDelayMs() {
-  const n = Number(process.env.AVA_HOUR_RECAP_BOOT_MS || 120_000);
-  return Number.isFinite(n) && n >= 20_000 ? n : 120_000;
+  const n = Number(process.env.AVA_HOUR_RECAP_BOOT_MS || 180_000);
+  return Number.isFinite(n) && n >= 30_000 ? n : 180_000;
 }
 
 function statePath() {
@@ -56,12 +55,10 @@ function bucketLabel(text) {
   if (/finance|stripe/.test(t)) return "finance";
   if (/wake|sleep|dream|boot|gateway|slack/.test(t)) return "lifecycle";
   if (/hour.?recap/.test(t)) return null;
+  if (/respawn/.test(t)) return "lifecycle";
   return "ops";
 }
 
-/**
- * Build a short hour-recap body from status events + optional highlight bullets.
- */
 export function buildHourRecapText({
   windowMs = 60 * 60 * 1000,
   now = Date.now(),
@@ -82,27 +79,24 @@ export function buildHourRecapText({
   }
 
   const hours = Math.max(1, Math.round(windowMs / 3600_000));
-  const lines = [
-    `**Ava hour recap** (~last ${hours}h)`,
-    "",
-  ];
+  const lines = [`*Ava hour recap* (~last ${hours}h)`, ""];
 
   const hs = (Array.isArray(highlights) ? highlights : [])
     .map((h) => String(h || "").trim())
     .filter(Boolean)
     .slice(0, 12);
   if (hs.length) {
-    lines.push("**Shipped / answered**");
-    for (const h of hs) lines.push(`- ${h}`);
+    lines.push("*Shipped / answered*");
+    for (const h of hs) lines.push(`• ${h}`);
     lines.push("");
   }
 
   if (!buckets.size && !hs.length) {
-    lines.push("- Quiet on internal status log - replies may still have landed via Cursor / catch-up.");
+    lines.push("• Quiet on status log — replies may still have landed via catch-up.");
   } else if (buckets.size) {
-    lines.push("**Automation pulse**");
+    lines.push("*Automation pulse*");
     for (const [label, items] of buckets) {
-      lines.push(`- **${label}:** ${items.length} event(s)`);
+      lines.push(`• *${label}:* ${items.length} event(s)`);
       for (const item of items.slice(0, 2)) {
         lines.push(`  - ${item}`);
       }
@@ -110,18 +104,16 @@ export function buildHourRecapText({
   }
 
   lines.push("");
-  lines.push(
-    "_Auto-posted each hour when live. Ask anytime for a fresh dig. Host public name: HI Pacific Solar Root Server._",
-  );
+  lines.push("_Staff dig channel only. Host: HI Pacific Solar Root Server._");
   lines.push("");
   lines.push("- Ava");
 
-  return scrubPublicReply(lines.join("\n"), { surface: "discord" });
+  return scrubPublicReply(lines.join("\n"), { surface: "slack" });
 }
 
 /**
- * Run hour recap. Posts to #updates unless skipPost.
- * @param {{ force?: boolean, skipPost?: boolean, windowMs?: number, channelId?: string }} opts
+ * Run hour recap → Slack #development-feed.
+ * Boot must NOT force-spam; watermark always respected unless opts.force.
  */
 export async function runHourRecap(opts = {}) {
   const force = Boolean(opts.force);
@@ -141,28 +133,21 @@ export async function runHourRecap(opts = {}) {
       now,
       highlights: opts.highlights || [],
     });
-  const channelId =
-    opts.channelId ||
-    AVA_CHANNELS.updates ||
-    AVA_CHANNELS.changelog ||
-    AVA_CHANNELS.general;
+
+  const channelId = opts.channelId || AVA_CHANNELS.slackDev || "C0BMCPMDDQR";
 
   let postId = null;
   if (!skipPost) {
-    if (!channelId || !allowsUnsolicitedPost(channelId)) {
-      saveState({ ...state, lastRunAt: now });
-      return { ok: false, detail: "no_unsolicited_channel", content };
-    }
-    const msg = await postAvaDiscord({
+    const data = await postAvaSlack({
       channelId,
       content,
       kind: "hour_recap",
       source: "hour-recap",
     });
-    postId = msg?.id || null;
+    postId = data?.ts || null;
   }
 
-  saveState({ lastRunAt: now, lastPostId: postId });
-  pushStatusEvent(`hour recap · posted${postId ? ` ${postId}` : ""}`);
-  return { ok: true, posted: !skipPost, postId, content, channelId };
+  saveState({ lastRunAt: now, lastPostId: postId, surface: "slack" });
+  pushStatusEvent(`hour recap · slack${postId ? ` ${postId}` : ""}`);
+  return { ok: true, posted: !skipPost, postId, content, channelId, surface: "slack" };
 }

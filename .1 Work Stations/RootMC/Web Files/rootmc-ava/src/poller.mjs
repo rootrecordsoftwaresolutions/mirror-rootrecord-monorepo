@@ -937,7 +937,7 @@ async function tick() {
       }
     }
 
-    // Hourly ops recap → #updates (what Ava did recently)
+    // Hourly ops recap → Slack #development-feed (NOT Discord)
     const hourRecapBoot =
       Date.now() >= hourRecapBootAt && lastHourRecap === 0;
     const hourRecapInterval =
@@ -945,9 +945,10 @@ async function tick() {
     if (live && !isHushed() && !isAsleep() && (hourRecapBoot || hourRecapInterval)) {
       lastHourRecap = Date.now();
       try {
-        const hr = await runHourRecap({ force: hourRecapBoot });
+        // Never force on boot — watermark in hour-recap.json blocks restart spam
+        const hr = await runHourRecap({ force: false });
         if (hr?.posted) {
-          console.log(`hour recap · posted ${hr.postId || ""}`);
+          console.log(`hour recap · slack ${hr.postId || ""}`);
         } else {
           console.log(`hour recap · ${hr?.reason || hr?.detail || "ok"}`);
         }
