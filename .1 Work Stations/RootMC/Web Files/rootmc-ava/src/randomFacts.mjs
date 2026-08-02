@@ -137,7 +137,7 @@ Host: **${HOST_PUBLIC_NAME}**.`,
     !workLock &&
     (hot || /\b(lol|lmao|gm|gn|meme|bored|idle)\b/i.test(q) || q.trim().length < 60);
   const roll = Math.random();
-  const should = force || (!workLock && (soft ? roll < 0.45 : roll < 0.22));
+  const should = force || (!workLock && (soft ? roll < 0.12 : roll < 0.05));
 
   if (!should) {
     return {
@@ -172,6 +172,15 @@ export function randomFactChannelBootDelayMs() {
 }
 
 export async function runOccasionalRandomFact(opts = {}) {
+  // Alex 2026-08-02: unsolicited #random-facts posts are silly/redundant — off by default.
+  // Set AVA_RANDOM_FACT_CHANNEL=1 to re-enable. Soft chat inject via gatherRandomFactBrief still OK (rare).
+  const enabled =
+    Boolean(opts.force) ||
+    process.env.AVA_RANDOM_FACT_CHANNEL === "1" ||
+    /^true$/i.test(process.env.AVA_RANDOM_FACT_CHANNEL || "");
+  if (!enabled) {
+    return { ok: true, skipped: true, reason: "channel_posts_disabled" };
+  }
   const force = Boolean(opts.force);
   const state = loadState();
   const now = Date.now();

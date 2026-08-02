@@ -957,7 +957,7 @@ async function tick() {
       }
     }
 
-    // Occasional random fact → #random-facts (protective paranoia + misc)
+    // Occasional random fact → #random-facts (DISABLED unless AVA_RANDOM_FACT_CHANNEL=1)
     const randomFactBoot =
       Date.now() >= randomFactBootAt && lastRandomFactPost === 0;
     const randomFactInterval =
