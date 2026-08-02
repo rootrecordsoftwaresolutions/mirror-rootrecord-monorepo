@@ -1345,10 +1345,6 @@ export function createPipeline(deps) {
           isDm: currentIsDm,
           channelId,
         });
-          authorName: msg.author?.username,
-          surface: surf,
-          forceDream: true,
-        });
         const text = String(answer || "").trim();
         if (!text) {
           void ackReact.reactNoReply(channelId, msg.id);
