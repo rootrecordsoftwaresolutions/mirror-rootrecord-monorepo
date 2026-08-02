@@ -103,6 +103,7 @@ export async function cursorRecommend({
   images = [],
   surface = "discord",
   selfFix = false,
+  allowCustomerDetails: allowCust = false,
 }) {
   const apiKey = cursorApiKey(env || {});
   if (!apiKey) {
@@ -265,7 +266,10 @@ Write Ava's ${outLabel} reply now.`;
       return {
         ok: true,
         reason: "ok",
-        text: scrubPublicReply(raw, { surface }),
+        text: scrubPublicReply(raw, {
+          surface,
+          allowCustomerDetails: allowCust,
+        }),
         runId: result.id,
         agentId: result.agentId,
       };

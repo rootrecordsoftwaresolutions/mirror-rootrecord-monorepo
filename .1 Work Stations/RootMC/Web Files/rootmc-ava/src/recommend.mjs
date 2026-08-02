@@ -229,11 +229,22 @@ export async function recommend({
   images = [],
   surface = "discord",
   forceDream = false,
+  isDm = false,
+  channelId = "",
 }) {
   const q = String(question || "").trim();
+  const { allowCustomerDetails } = await import("./privacy.mjs");
+  const customerOk = allowCustomerDetails({
+    isDm,
+    surface,
+    authorId,
+    authorName,
+    channelId,
+  });
   if (!q) {
     return scrubPublicReply(
       "What's up? Wiki, design, logs, proposals — fire away. Give me a sec when you ping; I think before I talk.",
+      { surface, allowCustomerDetails: customerOk },
     );
   }
 
@@ -364,6 +375,9 @@ export async function recommend({
     authorId,
     authorName,
     env,
+    isDm,
+    surface,
+    channelId,
   });
 
   const wantGov =
@@ -425,6 +439,7 @@ export async function recommend({
     images,
     surface,
     selfFix,
+    allowCustomerDetails: customerOk,
   });
 
   if (cursor.ok && cursor.text) {

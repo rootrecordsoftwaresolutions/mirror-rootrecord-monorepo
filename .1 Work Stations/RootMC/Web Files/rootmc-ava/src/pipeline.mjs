@@ -237,9 +237,16 @@ export function createPipeline(deps) {
     return "discord";
   }
 
+  /** Set per-ingest — customer scrub bypass only for Alex-only DMs */
+  let replyPrivacy = { allowCustomerDetails: false };
+  let currentIsDm = false;
+
   const reply = async (channelId, content, refId, kind = "reply") => {
     const surface = pipelineSurface(null, channelId);
-    const cleaned = scrubPublicReply(content, { surface });
+    const cleaned = scrubPublicReply(content, {
+      surface,
+      allowCustomerDetails: replyPrivacy.allowCustomerDetails,
+    });
     // Never post empty / signoff-only leftovers ("— Ava" / "- Ava")
     if (!cleaned || /^[—\-–]\s*Ava\s*$/i.test(cleaned.trim())) {
       if (refId && kind !== "instant_open") {
@@ -708,6 +715,8 @@ export function createPipeline(deps) {
           member: member.member,
           images: visionImages,
           surface: pipelineSurface(msg, channelId),
+          isDm: currentIsDm,
+          channelId,
         });
       } catch (err) {
         console.warn("recommend failed:", err.message);
@@ -845,6 +854,24 @@ export function createPipeline(deps) {
 
   async function ingestMessage(msg, { messages = [], isDm = false } = {}) {
     if (!msg?.id || !msg.channel_id) return;
+    const { allowCustomerDetails } = await import("./privacy.mjs");
+    currentIsDm = Boolean(isDm);
+    replyPrivacy = {
+      allowCustomerDetails: allowCustomerDetails({
+        isDm,
+        surface:
+          msg.surface === "telegram"
+            ? "telegram"
+            : msg.surface === "slack"
+              ? "slack"
+              : isDm
+                ? "discord-dm"
+                : "discord",
+        authorId: msg.author?.id,
+        authorName: msg.author?.username,
+        channelId: msg.channel_id,
+      }),
+    };
     logInbound(msg, {
       isDm,
       surface:
@@ -1312,6 +1339,12 @@ export function createPipeline(deps) {
           context: memoryContext(msg.author?.id, channelId),
           env,
           authorId: msg.author?.id,
+          authorName: msg.author?.username || msg.author?.global_name || "",
+          surface: surf,
+          forceDream: true,
+          isDm: currentIsDm,
+          channelId,
+        });
           authorName: msg.author?.username,
           surface: surf,
           forceDream: true,

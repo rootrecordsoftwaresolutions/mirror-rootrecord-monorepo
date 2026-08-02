@@ -20,6 +20,10 @@ import {
   summarizePlayerFinance,
   isOperatorAuthor,
 } from "./playerFinance.mjs";
+import {
+  allowCustomerDetails,
+  CUSTOMER_PRIVACY_BRIEF,
+} from "./privacy.mjs";
 
 export function looksLikeFinanceAsk(question = "") {
   const q = String(question || "").toLowerCase();
@@ -34,7 +38,7 @@ export function looksLikeFinanceAsk(question = "") {
 }
 
 /**
- * @param {{ question?: string, authorId?: string, authorName?: string, env?: object, refresh?: boolean }} opts
+ * @param {{ question?: string, authorId?: string, authorName?: string, env?: object, refresh?: boolean, isDm?: boolean, surface?: string, channelId?: string }} opts
  */
 export async function gatherFinanceBrief({
   question = "",
@@ -42,9 +46,19 @@ export async function gatherFinanceBrief({
   authorName = "",
   env = {},
   refresh = false,
+  isDm = false,
+  surface = "",
+  channelId = "",
 } = {}) {
   const ask = looksLikeFinanceAsk(question);
   const operator = isOperatorAuthor(authorId, authorName);
+  const alexPrivate = allowCustomerDetails({
+    isDm,
+    surface,
+    authorId,
+    authorName,
+    channelId,
+  });
   const playerFin = authorId ? getPlayerFinance(authorId) : null;
 
   let snap = loadStripeSnapshot();
@@ -56,17 +70,18 @@ export async function gatherFinanceBrief({
   const opsSum = summarizeOpsLedger(ledger);
 
   const parts = [
+    CUSTOMER_PRIVACY_BRIEF,
     "### Finance lane (LOCKED rules)",
     "- Player economy stays **Gold (G)** — never mint Gold from Stripe/membership dollars.",
     "- Checkout stays masked https://rootmc.net/pro/ — never paste buy.stripe.com or Stripe secrets.",
-    "- Ava may state **how much Pro/Stripe is earning** when Alex (or she) is asked — prefer Telegram/DM/Slack digs; keep public Discord high-level unless Alex asks there.",
-    "- Ops projects (RootMC ops, Ava, …) each have **multiple accounts** for income + debts in `data/finance/ops-ledger.json`.",
-    "- Player personal finance = **opt-in only**, multi-account, isolated on their Discord profile (`finance.accounts`). Never share another player's numbers.",
+    "- Ava may state **aggregate** Pro/Stripe earnings when Alex asks. Customer-level detail ONLY in Alex-only DMs.",
+    "- Ops projects (RootMC ops, Ava, …) each have **multiple accounts** for income + debts in data/finance/ops-ledger.json.",
+    "- Player personal finance = **opt-in only**, multi-account, isolated on their Discord profile (finance.accounts). Never share another player's numbers.",
   ];
 
-  if (operator) {
+  if (operator && alexPrivate) {
     parts.push(
-      "### Ops Stripe (operator)",
+      "### Ops Stripe (Alex-only DM — customer detail OK here)",
       snap?.ok
         ? formatStripeIncomePlain(snap)
         : `Stripe: ${snap?.reason || (stripeConfigured(env) ? "no snapshot yet" : "not configured")}`,
@@ -79,10 +94,19 @@ export async function gatherFinanceBrief({
         `Stale ledger rows needing updated totals: ${opsSum.staleIds.join(", ")}`,
       );
     }
+  } else if (operator) {
+    parts.push(
+      "### Ops finance (NOT Alex-only DM — aggregates only)",
+      snap?.ok
+        ? `Stripe available ~${formatUsd(snap.usdAvailable)} · ~30d credits ~${formatUsd(snap.income30dUsd)} (no customer names/emails/ids here).`
+        : `Stripe: ${snap?.reason || "unavailable"}`,
+      `Ops burn ~${formatUsd(opsSum.expensesMonthlyUsd)}/mo · other income ~${formatUsd(opsSum.otherIncomeMonthlyUsd)}/mo`,
+      "For customer-level detail, ask Ava in your Discord DM or Telegram private chat.",
+    );
   } else if (ask) {
     parts.push(
       "### Public / player finance ask",
-      "Do NOT dump exact Stripe account balances or payout schedules in public player chat unless Alex already opened that dig here.",
+      "Do NOT dump Stripe balances, customer lists, or payout schedules.",
       "You may say Pro/membership supports hosting and that Ava tracks ops finances privately with Alex.",
       "If they want personal budgeting help: invite “track my finances” (opt-in, profile-isolated).",
     );

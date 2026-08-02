@@ -30,10 +30,6 @@
 - Masked Pro links only  
 - Never dump secrets / buy.stripe.com  
 - Other players never see your personal accounts  
-
-## Modules
-- `src/financeAccounts.mjs` (shared multi-account)  
-- `src/stripeFinance.mjs` · `src/opsFinanceLedger.mjs` · `src/playerFinance.mjs`  
-- `src/financeBrief.mjs` · `src/financeReview.mjs`  
+- **Customer details** (emails, names, Stripe cus_/invoices, who bought what) — **Alex-only DMs only**; never public channels  
 
 — Ava

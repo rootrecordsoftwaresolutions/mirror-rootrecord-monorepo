@@ -37,9 +37,10 @@ export function expandDiscordAppEmojiShortcodes(text) {
   return out;
 }
 
-/** Strip common secret / path leaks before Discord/Slack. */
+/** Strip common secret / path / customer-detail leaks before Discord/Slack. */
 export function scrubPublicReply(text, opts = {}) {
   const surface = String(opts.surface || "").toLowerCase();
+  const allowCustomer = Boolean(opts.allowCustomerDetails);
   let out = stripForbiddenMentions(text);
   // Harden punctuation — mojibake / broken pipes turn em-dashes & curly quotes into ???
   out = out
@@ -65,10 +66,12 @@ export function scrubPublicReply(text, opts = {}) {
   out = out.replace(/\/(?:srv|opt|home)\/[^\s`]*[Rr]oot[Mm][Cc][^\s`]*/g, "`(workspace)`");
   out = out.replace(/\/(?:Users|home)\/[^\s`]+/gi, "`(path)`");
   out = out.replace(
-    /\b(?:CURSOR_API_KEY|DISCORD_(?:ROOTMC_)?BOT_TOKEN|GROK_[A-Z0-9_]+|JWT_[A-Z0-9_]+|XAI_API_KEY)\b\s*[:=]\s*\S+/gi,
+    /\b(?:CURSOR_API_KEY|DISCORD_(?:ROOTMC_)?BOT_TOKEN|GROK_[A-Z0-9_]+|JWT_[A-Z0-9_]+|XAI_API_KEY|STRIPE_SECRET_KEY)\b\s*[:=]\s*\S+/gi,
     "[redacted]",
   );
   out = out.replace(/\bsk-[a-zA-Z0-9_-]{20,}\b/g, "[redacted]");
+  out = out.replace(/\bsk_live_[a-zA-Z0-9]+/gi, "[redacted]");
+  out = out.replace(/\bsk_test_[a-zA-Z0-9]+/gi, "[redacted]");
   out = out.replace(/\bcursor_[a-zA-Z0-9_-]{20,}\b/g, "[redacted]");
   out = out.replace(/\b\d{8,12}:[A-Za-z0-9_-]{30,}\b/g, "[redacted-telegram-token]");
   out = out.replace(/\bcrsr_[a-zA-Z0-9_-]{20,}\b/g, "[redacted]");
@@ -77,6 +80,26 @@ export function scrubPublicReply(text, opts = {}) {
     /\b(grok|xai|chatgpt|chat\s*gpt|claude|openai|gemini|copilot|cursor\s*sdk|cursor)\b/gi,
     "Root Server",
   );
+
+  // Customer details — only Alex-only DMs may keep these
+  if (!allowCustomer) {
+    out = out.replace(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+      "[redacted-email]",
+    );
+    out = out.replace(/\bcus_[a-zA-Z0-9]+/g, "[redacted-customer]");
+    out = out.replace(/\bsub_[a-zA-Z0-9]+/g, "[redacted-sub]");
+    out = out.replace(/\bin_[a-zA-Z0-9]+/g, "[redacted-invoice]");
+    out = out.replace(/\bpi_[a-zA-Z0-9]+/g, "[redacted-payment]");
+    out = out.replace(/\bch_[a-zA-Z0-9]+/g, "[redacted-charge]");
+    out = out.replace(/\bcard\s*ending\s*\d{4}\b/gi, "card ending [redacted]");
+    out = out.replace(/\b(?:last\s*4|last4)\s*[:=]?\s*\d{4}\b/gi, "last4 [redacted]");
+    out = out.replace(
+      /\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b/g,
+      "[redacted-phone]",
+    );
+  }
+
   // Soft ceiling only — Discord/Slack multipost (splitContent) handles platform
   // limits. Do not hard-cut at 1900 or long official-style updates die mid-line.
   const max = surface === "slack" ? 100_000 : 80_000;
