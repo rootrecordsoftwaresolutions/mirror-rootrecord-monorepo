@@ -255,6 +255,11 @@ ${
     : ""
 }
 ${tone}${distrustCue}
+${
+  p.finance?.optIn
+    ? `personalFinance: OPT-IN · income lines=${(p.finance.income || []).length} · expense lines=${(p.finance.expenses || []).length} (isolated — never share with others)`
+    : "personalFinance: off (invite “track my finances” if they ask for budgeting help)"
+}
 recent lines:
 ${(p.samples || [])
   .slice(-6)

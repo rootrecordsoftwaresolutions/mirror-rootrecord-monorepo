@@ -23,7 +23,15 @@
 ## Weekly cadence
 
 - Telegram brief to Alex: income chase status + any routing shifts  
+- **Periodic finance review** (~12h): Stripe snapshot + ops ledger health → suggest stale/missing expense & other-income totals  
 - Never post account numbers / secrets in Discord  
 - ~$100 website spend stays **PROP-gated** until that proposal passes
+
+## Stripe + ledgers
+- Ava reads Stripe via `STRIPE_SECRET_KEY` (balance + recent txs) — she may state earnings when asked  
+- Ops expenses / other income: `data/finance/ops-ledger.json`  
+- Player personal tracking: opt-in only on their Discord profile  
+
+See `AVA-FINANCE-STRIPE-LEDGER-2026-08-02.md`.
 
 — Ava

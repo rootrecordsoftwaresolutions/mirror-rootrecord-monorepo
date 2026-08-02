@@ -108,6 +108,11 @@ import {
   ingameChatAssistBootDelayMs,
 } from "./ingameChatAssist.mjs";
 import {
+  runFinanceReview,
+  financeReviewIntervalMs,
+  financeReviewBootDelayMs,
+} from "./financeReview.mjs";
+import {
   chaseCommitments,
   commitmentChaseIntervalMs,
   commitmentChaseBootDelayMs,
@@ -200,6 +205,10 @@ const INGAME_CHAT_MS = ingameChatAssistIntervalMs();
 const INGAME_CHAT_BOOT_MS = ingameChatAssistBootDelayMs();
 const ingameChatBootAt = Date.now() + INGAME_CHAT_BOOT_MS;
 let lastIngameChatAssist = 0;
+const FINANCE_REVIEW_MS = financeReviewIntervalMs();
+const FINANCE_REVIEW_BOOT_MS = financeReviewBootDelayMs();
+const financeReviewBootAt = Date.now() + FINANCE_REVIEW_BOOT_MS;
+let lastFinanceReview = 0;
 const COMMITMENT_CHASE_MS = commitmentChaseIntervalMs();
 const COMMITMENT_BOOT_MS = commitmentChaseBootDelayMs();
 const commitmentBootAt = Date.now() + COMMITMENT_BOOT_MS;
@@ -861,6 +870,26 @@ async function tick() {
       }
     }
 
+    // Finance review — Stripe + ledger suggestions → Telegram Alex (~12h)
+    const financeBoot =
+      Date.now() >= financeReviewBootAt && lastFinanceReview === 0;
+    const financeInterval =
+      lastFinanceReview > 0 &&
+      Date.now() - lastFinanceReview >= FINANCE_REVIEW_MS;
+    if (live && !isHushed() && !isAsleep() && (financeBoot || financeInterval)) {
+      lastFinanceReview = Date.now();
+      try {
+        const fr = await runFinanceReview({ env, force: financeBoot });
+        if (fr?.sent) {
+          console.log(`finance review · telegram · ${fr.suggestions?.length || 0} suggestion(s)`);
+        } else {
+          console.log(`finance review · ${fr?.reason || "ok"}`);
+        }
+      } catch (err) {
+        console.warn("finance review:", err.message);
+      }
+    }
+
     // Incremental Discord+Slack dumps → text files + Telegram (new msgs only)
     const dumpBoot =
       Date.now() >= channelDumpBootAt && lastChannelDump === 0;
@@ -1363,6 +1392,16 @@ setTimeout(() => {
 }, INGAME_CHAT_BOOT_MS);
 console.log(
   `ingame chat assist · quiet · first in ~${Math.round(INGAME_CHAT_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_CHAT_MS / 60000)}m (bridge scan + RCON tell)`,
+);
+setTimeout(() => {
+  if (!live || isHushed() || isAsleep()) return;
+  lastFinanceReview = Date.now();
+  runFinanceReview({ env, force: true }).catch((err) =>
+    console.warn("finance review boot:", err.message),
+  );
+}, FINANCE_REVIEW_BOOT_MS);
+console.log(
+  `finance review · first in ~${Math.round(FINANCE_REVIEW_BOOT_MS / 1000)}s · then every ${Math.round(FINANCE_REVIEW_MS / 3600000)}h (Stripe + ledger → Telegram)`,
 );
 console.log(
   `commitment chase · first in ~${Math.round(COMMITMENT_BOOT_MS / 1000)}s · then every ${Math.round(COMMITMENT_CHASE_MS / 1000)}s when open`,

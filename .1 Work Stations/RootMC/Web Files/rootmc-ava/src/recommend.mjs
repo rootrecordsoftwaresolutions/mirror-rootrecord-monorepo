@@ -31,6 +31,7 @@ import { offlineReply, dreamStateConfigured } from "./offlineNotes.mjs";
 import { isEmergencyStopped } from "./emergencyStop.mjs";
 import { gatherWildTrustBrief, looksLikeWildAsk, wildDenyReply, wildTrustStatus, recordWildPush } from "./wildTrust.mjs";
 import { gatherProMembershipBrief } from "./membershipPro.mjs";
+import { gatherFinanceBrief } from "./financeBrief.mjs";
 import { isAsleep } from "./sleepMode.mjs";
 import { isCloudDark } from "./cloudDark.mjs";
 
@@ -357,6 +358,12 @@ export async function recommend({
   const intentBrief = intentPromptBrief(classified);
   const wildPack = gatherWildTrustBrief(authorId, q);
   const proPack = gatherProMembershipBrief(q);
+  const financePack = await gatherFinanceBrief({
+    question: q,
+    authorId,
+    authorName,
+    env,
+  });
 
   const wantGov =
     classified.intent === "governance" ||
@@ -380,6 +387,7 @@ export async function recommend({
     usage.brief,
     wildPack.brief,
     proPack.brief,
+    financePack.brief,
     reactions.brief,
     jobs.brief,
     eco.brief,

@@ -1,6 +1,7 @@
 /**
  * Shared live-message pipeline for poller + gateway.
  */
+import { tryHandleFinanceCommand } from "./playerFinance.mjs";
 import {
   extractQuestion,
   looksLikeTalkingAboutAva,
@@ -405,6 +406,24 @@ export function createPipeline(deps) {
         }
       } catch (err) {
         console.warn("messageRefs:", err.message);
+      }
+
+      // Finance opt-in / ledger commands — short-circuit before dig
+      try {
+        const finCmd = tryHandleFinanceCommand({
+          text: question,
+          authorId: msg.author?.id,
+          authorName: msg.author?.username,
+          surface: msg.surface || "discord",
+        });
+        if (finCmd?.handled && finCmd.reply) {
+          void ackReact.reactStored(channelId, msg.id);
+          await reply(channelId, finCmd.reply, msg.id, "finance_cmd");
+          touchActivity("finance-cmd");
+          return;
+        }
+      } catch (err) {
+        console.warn("finance cmd:", err.message);
       }
 
       // Silent: inbound + attachments + refs recorded — ⏱️

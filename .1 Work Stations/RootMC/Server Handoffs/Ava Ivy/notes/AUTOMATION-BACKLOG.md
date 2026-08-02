@@ -12,10 +12,14 @@ Grow these so Cursor is not required for every repeat. Check off when owned by A
 | vote_yes / vote_no seed on PROP open | **live** | `seedVoteReactions.mjs` |
 | Hourly Governance block | **live** | Worker `rootmc-live-economy-status.ts` |
 | Absorb Cursor digs → lessons | **live** | notes/LESSONS-* + `recordLocalLesson` |
+| Stripe income + ops expense ledger | **live** | `stripeFinance.mjs` + `opsFinanceLedger.mjs` |
+| Player finance opt-in (profile-isolated) | **live** | `playerFinance.mjs` |
+| Periodic finance review → Telegram | **live** | `financeReview.mjs` (~12h) |
 
 ## Next to automate
 1. Job↔Worker reconcile pass on boot (auto markDone when Governance already live)
 2. Stronger ingame assist heuristics from training samples
 3. Wire silent-close to registry `done` / operator-done flags without Cursor
+4. Auto-fill Shockbyte/domain expense rows from invoices when available (still manual-confirm)
 
 — Ava
