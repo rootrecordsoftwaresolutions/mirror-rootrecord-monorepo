@@ -88,19 +88,20 @@ function isAvaAddressed(line) {
 function cutePresenceReply(line) {
   const name = sanitizePlayerName(line.username) || "friend";
   const t = String(line.text || "").toLowerCase();
+  let body;
   if (/hear\s+me|can\s+you\s+hear|listening/.test(t)) {
-    return `hey ${name} — yeah i hear you. im with you in-game. talk away. - Ava`;
+    body = `hey ${name} — yeah i hear you. im with you in-game. talk away. - Ava`;
+  } else if (/join\s+us|come\s+(here|join)|are\s+you\s+(here|online|there)/.test(t)) {
+    body = `im here with you, ${name}. not a skin in the world yet — but i hear chat and i'll whisper back. - Ava`;
+  } else if (/hi|hey|hello|gm|good\s*morning|tysm|thank|neato|awe+/.test(t)) {
+    body = `hey ${name}! right back at you — whisper lane stays open. /ava tip · /ava pulse when 1.8.2 is live. - Ava`;
+  } else if (/army|department/.test(t)) {
+    body = `Ava's Army is live as /ava army (after 1.8.2). want a dept brief? - Ava`;
+  } else {
+    body = `hey ${name} — heard you. what do you need? - Ava`;
   }
-  if (/join\s+us|come\s+(here|join)|are\s+you\s+(here|online|there)/.test(t)) {
-    return `im here with you, ${name}. not a skin in the world yet — but i hear chat and i'll whisper back. - Ava`;
-  }
-  if (/hi|hey|hello|gm|good\s*morning/.test(t)) {
-    return `hey ${name}! im here. /ava army for my departments, or just ask. - Ava`;
-  }
-  if (/army|department/.test(t)) {
-    return `Ava's Army is live as /ava army (after 1.8.1). want a dept brief? - Ava`;
-  }
-  return `hey ${name} — heard you. what do you need? - Ava`;
+  // Relations stamp — Ava's own flourish
+  return `[Relations] ${body}`;
 }
 
 async function tellPlayer(target, username, body) {
