@@ -257,7 +257,7 @@ ${
 ${tone}${distrustCue}
 ${
   p.finance?.optIn
-    ? `personalFinance: OPT-IN · income lines=${(p.finance.income || []).length} · expense lines=${(p.finance.expenses || []).length} (isolated — never share with others)`
+    ? `personalFinance: OPT-IN · accounts=${(p.finance.accounts || []).length || "legacy"} · isolated multi-account (income/debts) — never share with others`
     : "personalFinance: off (invite “track my finances” if they ask for budgeting help)"
 }
 recent lines:

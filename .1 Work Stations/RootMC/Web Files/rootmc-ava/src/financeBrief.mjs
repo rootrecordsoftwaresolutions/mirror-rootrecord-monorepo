@@ -27,7 +27,7 @@ export function looksLikeFinanceAsk(question = "") {
     /\b(stripe|how\s+much\s+(am\s+i|are\s+we|we('?re)?|she('?s)?|ava('?s)?)\s+(earn|making|income)|income|revenue|burn\s*rate|expenses?|budget|profit|payout|balance\s+sheet|cash\s*flow|financial\s+advisor|finance\s+review)\b/i.test(
       q,
     ) ||
-    /\b(my\s+finances?|track\s+my\s+finances?|ops\s+(expense|income|ledger))\b/i.test(
+    /\b(my\s+finances?|track\s+my\s+finances?|ops\s+(expense|income|ledger|finances?)|project\s+account|add\s+debt|add\s+account)\b/i.test(
       q,
     )
   );
@@ -60,8 +60,8 @@ export async function gatherFinanceBrief({
     "- Player economy stays **Gold (G)** — never mint Gold from Stripe/membership dollars.",
     "- Checkout stays masked https://rootmc.net/pro/ — never paste buy.stripe.com or Stripe secrets.",
     "- Ava may state **how much Pro/Stripe is earning** when Alex (or she) is asked — prefer Telegram/DM/Slack digs; keep public Discord high-level unless Alex asks there.",
-    "- Ops expenses + other income live in Ava handoff `data/finance/ops-ledger.json`.",
-    "- Player personal finance = **opt-in only**, isolated on their Discord profile (`finance` field). Never share another player's numbers.",
+    "- Ops projects (RootMC ops, Ava, …) each have **multiple accounts** for income + debts in `data/finance/ops-ledger.json`.",
+    "- Player personal finance = **opt-in only**, multi-account, isolated on their Discord profile (`finance.accounts`). Never share another player's numbers.",
   ];
 
   if (operator) {
