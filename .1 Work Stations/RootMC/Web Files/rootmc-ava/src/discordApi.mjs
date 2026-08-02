@@ -8,7 +8,7 @@ import { splitDiscordContent, sleep } from "./splitContent.mjs";
 export function authHeaders(token) {
   return {
     Authorization: `Bot ${token}`,
-    "Content-Type": "application/json",
+    "Content-Type": "application/json; charset=utf-8",
     "User-Agent": "AvaIvyRootMC (rootmc.net, 0.5)",
   };
 }

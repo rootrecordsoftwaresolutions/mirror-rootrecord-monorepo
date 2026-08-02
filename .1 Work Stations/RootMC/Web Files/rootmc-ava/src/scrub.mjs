@@ -37,28 +37,61 @@ export function expandDiscordAppEmojiShortcodes(text) {
   return out;
 }
 
+/**
+ * Discord-safe text: flatten fancy punctuation that Windows pipes turn into ???.
+ * Keeps Discord custom emoji markup and normal Unicode letters/emoji.
+ */
+export function discordSafeText(text) {
+  let out = String(text || "");
+  out = out
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ")
+    .replace(/\uFFFD/g, "")
+    .replace(/[\u00B7\u2022\u2023\u2043\u2219\u25CF\u25E6\u30FB]/g, "-")
+    .replace(/\u2192|\u21D2|\u2794|\u279C|\u27A1/g, "->")
+    .replace(/\u2190|\u21D0/g, "<-")
+    .replace(/[\u2190-\u21FF]/g, "->")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[\u00AB\u00BB]/g, '"')
+    .replace(/\u2039/g, "'")
+    .replace(/\u203A/g, "'")
+    .replace(/\u00D7/g, "x")
+    .replace(/\u00F7/g, "/")
+    .replace(/\u2122/g, "(TM)")
+    .replace(/\u00AE/g, "(R)");
+
+  // Protect Discord custom emoji / mentions, ASCII-sanitize leftover odd punctuation
+  const held = [];
+  out = out.replace(/<a?:[\w~]+:\d+>|<@!?\d+>|<@&\d+>|<#\d+>/g, (m) => {
+    held.push(m);
+    return `\u0000HOLD${held.length - 1}\u0000`;
+  });
+
+  // Replace other General Punctuation / fancy symbols that often become ???
+  out = out.replace(/[\u2000-\u206F]/g, (ch) => {
+    if (ch === "\n" || ch === "\t") return ch;
+    return "-";
+  });
+
+  out = out.replace(/\u0000HOLD(\d+)\u0000/g, (_, i) => held[Number(i)] || "");
+  return out;
+}
+
 /** Strip common secret / path / customer-detail leaks before Discord/Slack. */
 export function scrubPublicReply(text, opts = {}) {
   const surface = String(opts.surface || "").toLowerCase();
   const allowCustomer = Boolean(opts.allowCustomerDetails);
   let out = stripForbiddenMentions(text);
-  // Harden punctuation — mojibake / broken pipes turn em-dashes & curly quotes into ???
-  out = out
-    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
-    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
-    .replace(/[\u2013\u2014\u2212]/g, "-")
-    .replace(/\u2026/g, "...")
-    .replace(/\u00A0/g, " ")
-    .replace(/\uFFFD/g, "")
-    .replace(/[\u00B7\u2022\u2023\u2043\u2219]/g, "-")
-    .replace(/\u2192/g, "->")
-    .replace(/\u2190/g, "<-")
-    .replace(/[\u2190-\u2199]/g, "->")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+  // Always flatten fancy punctuation first (before any pipe can leave ???)
+  out = discordSafeText(out);
+
   if (surface === "slack") {
     out = stripDiscordAppEmojis(out);
   } else {
-    // Discord (default): expand shortcodes so :ava_wave: actually renders
     out = expandDiscordAppEmojiShortcodes(out);
   }
   out = out.replace(/```[\s\S]*?```/g, (block) => {
