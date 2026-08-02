@@ -45,10 +45,31 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             return sendArmy(sender, args.length > 1 ? args[1] : null);
         }
 
+        if (args.length > 0 && "tip".equalsIgnoreCase(args[0])) {
+            AvaConfig cfg = plugin.config();
+            sender.sendMessage(plugin.colorize(cfg.prefix() + cfg.tipHeader()));
+            sender.sendMessage(plugin.colorize(cfg.prefix() + "&f" + cfg.randomTip()));
+            return true;
+        }
+
+        if (args.length > 0 && "pulse".equalsIgnoreCase(args[0])) {
+            AvaConfig cfg = plugin.config();
+            int online = Bukkit.getOnlinePlayers().size();
+            String tpsText = formatTps();
+            sender.sendMessage(plugin.colorize(cfg.prefix() + cfg.pulseHeader()));
+            sender.sendMessage(plugin.colorize(
+                    cfg.prefix() + "&7" + online + " online &8· &7" + tpsText + " TPS &8· &dAva's Army soft-online"));
+            sender.sendMessage(plugin.colorize(cfg.prefix() + "&f" + cfg.randomPulse()));
+            sender.sendMessage(plugin.colorize(cfg.prefix() + "&8also: &7/ava army &8· &7/ava tip"));
+            return true;
+        }
+
         if (args.length > 0 && ("help".equalsIgnoreCase(args[0]) || "?".equals(args[0]))) {
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava &8— &fstatus"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava army &8— &fAva's Army departments"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava army <dept> &8— &fone department"));
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava tip &8— &fVoice tip"));
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava pulse &8— &fWatch heartbeat"));
             return true;
         }
 
@@ -59,7 +80,7 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
                 .replace("{online}", String.valueOf(online))
                 .replace("{tps}", tpsText);
         sender.sendMessage(plugin.colorize(plugin.config().prefix() + line));
-        sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&8also: &7/ava army &8· &7/ava help"));
+        sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&8also: &7/ava army &8· &7/ava tip &8· &7/ava pulse"));
         return true;
     }
 
@@ -93,6 +114,8 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             String partial = args[0].toLowerCase(Locale.ROOT);
             List<String> opts = new ArrayList<>();
             if ("army".startsWith(partial)) opts.add("army");
+            if ("tip".startsWith(partial)) opts.add("tip");
+            if ("pulse".startsWith(partial)) opts.add("pulse");
             if ("help".startsWith(partial)) opts.add("help");
             if (sender.hasPermission("rootavacore.admin") && "reload".startsWith(partial)) {
                 opts.add("reload");

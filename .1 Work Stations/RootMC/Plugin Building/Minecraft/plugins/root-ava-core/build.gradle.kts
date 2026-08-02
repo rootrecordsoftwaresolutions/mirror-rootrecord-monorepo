@@ -2,7 +2,7 @@ plugins {
     java
 }
 
-version = "1.8.1"
+version = "1.8.2"
 
 dependencies {
     compileOnly(project(":plugins:root-core"))

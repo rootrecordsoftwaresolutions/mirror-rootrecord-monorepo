@@ -9,7 +9,7 @@ depend: [Root-Core]
 commands:
   ava:
     description: Ava companion status and Ava's Army
-    usage: /<command> [army|help|reload]
+    usage: /<command> [army|tip|pulse|help|reload]
 permissions:
   rootavacore.use:
     description: Use /ava and /ava army

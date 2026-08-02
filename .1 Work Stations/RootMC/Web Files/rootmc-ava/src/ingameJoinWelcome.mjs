@@ -155,6 +155,46 @@ async function listOnlineNames(target) {
     .filter((s) => /^[A-Za-z0-9_]{1,16}$/.test(s));
 }
 
+function isOperatorMc(name) {
+  const set = new Set(
+    String(process.env.AVA_OPERATOR_MC_NAMES || "Alexrs94,Melee")
+      .split(/[,;\s]+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  return set.has(keyName(name));
+}
+
+const OPERATOR_PULSE = [
+  "hey {name} — Watch pulse: im with you. /ava tip · /ava pulse · /ava army when 1.8.2 is live. - Ava",
+  "welcome back {name}. Relations says hi. army ideas cooking — /ava army. - Ava",
+  "{name}! Continuity checked in. clocks are running. try /ava pulse. - Ava",
+];
+
+async function maybeOperatorPulse(name, target, metrics) {
+  if (!isOperatorMc(name) || !rconConfigured()) return { sent: false };
+  metrics.operatorPulse = metrics.operatorPulse || {};
+  const k = keyName(name);
+  const last = Number(metrics.operatorPulse[k] || 0);
+  // Once per 6 hours
+  if (Date.now() - last < 6 * 60 * 60 * 1000) return { sent: false };
+  const tpl = OPERATOR_PULSE[Math.floor(Math.random() * OPERATOR_PULSE.length)];
+  const body = sanitizeTellBody(tpl.replace(/\{name\}/gi, name));
+  const sent = await tellPlayer(target, name, body);
+  if (!sent.ok) return { sent: false, reason: sent.reason };
+  metrics.operatorPulse[k] = Date.now();
+  pushStatusEvent(`operator pulse · ${name} · ${target}`);
+  await recordAvaUtterance({
+    surface: "minecraft",
+    channelId: `rcon:${target}`,
+    content: body,
+    kind: "ingame_operator_pulse",
+    source: "ingame_join_welcome",
+    meta: { player: name },
+  });
+  return { sent: true };
+}
+
 /**
  * @param {{ name: string, target: string, source: string, at?: number }} join
  * @param {object} metrics
@@ -186,7 +226,15 @@ async function handleJoin(join, metrics, env) {
 
   if (!neu) {
     metrics.returningJoins = (metrics.returningJoins || 0) + 1;
-    return { welcomed: false, reason: "returning", name, target };
+    // Operator session pulse — Ava's own idea (Relations/Watch)
+    const pulse = await maybeOperatorPulse(name, target, metrics);
+    return {
+      welcomed: false,
+      reason: pulse.sent ? "returning_pulsed" : "returning",
+      name,
+      target,
+      pulsed: pulse.sent,
+    };
   }
 
   // Dedup: already welcomed this session/lifetime

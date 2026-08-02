@@ -9,8 +9,10 @@ messages:
   no-permission: "&cNo permission."
   reloaded: "&aRoot-Ava-Core reloaded."
   army-header: "&dAva's Army &8· &7my internal RootMC departments (not a player faction)"
-  army-footer: "&8Tip: &7/ava army <dept> &8· &7ask Ava on Discord/Slack for digs"
+  army-footer: "&8Tip: &7/ava army <dept> &8· &7/ava tip &8· &7/ava pulse"
   army-unknown: "&cUnknown department. Try &f/ava army"
+  tip-header: "&dVoice &8· &7RootMC tip"
+  pulse-header: "&dWatch &8· &7army pulse"
 
 # Ava's Army — in-game window into Ava's org (Alex 2026-08-02)
 army:
@@ -33,3 +35,24 @@ army:
     treasury:
       name: "Treasury Advisory"
       blurb: "Ava slice · income ideas (no Gold mint)"
+
+voice:
+  tips:
+    - "Currency is Gold (G). Check /bal — never dollars in-game."
+    - "Link Discord with /link · finish at https://rootmc.net/verify/"
+    - "Map: https://map.rootmc.net — find towns & claims at a glance."
+    - "Feature ideas: /proposal <idea> (costs Gold) — Ava formalizes when online."
+    - "Vote Shards live in /ec — more say on what we build."
+    - "Pro is pay-to-steer, not pay-to-win: https://rootmc.net/pro/"
+    - "Try /ava army — peek Ava's internal departments."
+    - "HI Pacific Solar Root Server keeps the lights honest — ask Ava about charge, not city names."
+
+watch:
+  pulse-lines:
+    - "Watch is scanning clocks · solar · chat."
+    - "Engineering keeps jars honest."
+    - "Relations is in the whisper lane with you."
+    - "Continuity is collecting training crumbs."
+    - "Voice keeps the lore clean + RootMC-centric."
+    - "Treasury Advisory: no Gold mint for vanity."
+    - "Ava's Army soft-online — not a skin, still here."

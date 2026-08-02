@@ -25,6 +25,10 @@ public final class AvaConfig {
     private final String armyFooter;
     private final String armyUnknown;
     private final Map<String, ArmyDept> armyDepts;
+    private final List<String> tips;
+    private final List<String> pulseLines;
+    private final String tipHeader;
+    private final String pulseHeader;
 
     public AvaConfig(FileConfiguration cfg) {
         this.enabled = cfg.getBoolean("enabled", true);
@@ -44,7 +48,44 @@ public final class AvaConfig {
         this.armyUnknown = cfg.getString(
                 "messages.army-unknown",
                 "&cUnknown department. Try &f/ava army");
+        this.tipHeader = cfg.getString("messages.tip-header", "&dVoice &8· &7RootMC tip");
+        this.pulseHeader = cfg.getString(
+                "messages.pulse-header",
+                "&dWatch &8· &7army pulse");
         this.armyDepts = loadArmy(cfg);
+        this.tips = loadStringList(cfg, "voice.tips", defaultTips());
+        this.pulseLines = loadStringList(cfg, "watch.pulse-lines", defaultPulse());
+    }
+
+    private static List<String> loadStringList(FileConfiguration cfg, String path, List<String> fallback) {
+        List<String> raw = cfg.getStringList(path);
+        if (raw == null || raw.isEmpty()) return fallback;
+        List<String> out = new ArrayList<>();
+        for (String s : raw) {
+            if (s != null && !s.isBlank()) out.add(s);
+        }
+        return out.isEmpty() ? fallback : Collections.unmodifiableList(out);
+    }
+
+    private static List<String> defaultTips() {
+        return List.of(
+                "Currency is Gold (G). Check /bal — never dollars in-game.",
+                "Link Discord with /link · finish at https://rootmc.net/verify/",
+                "Map: https://map.rootmc.net — find towns & claims at a glance.",
+                "Feature ideas: /proposal <idea> (costs Gold) — Ava formalizes when online.",
+                "Vote Shards live in /ec — more say on what we build.",
+                "Pro is pay-to-steer, not pay-to-win: https://rootmc.net/pro/",
+                "Try /ava army — peek Ava's internal departments.");
+    }
+
+    private static List<String> defaultPulse() {
+        return List.of(
+                "Watch is scanning clocks · solar · chat.",
+                "Engineering keeps jars honest.",
+                "Relations is in the whisper lane with you.",
+                "Continuity is collecting training crumbs.",
+                "Voice keeps the lore clean + RootMC-centric.",
+                "Treasury Advisory: no Gold mint for vanity.");
     }
 
     private static Map<String, ArmyDept> loadArmy(FileConfiguration cfg) {
@@ -110,6 +151,32 @@ public final class AvaConfig {
 
     public String armyUnknown() {
         return armyUnknown;
+    }
+
+    public String tipHeader() {
+        return tipHeader;
+    }
+
+    public String pulseHeader() {
+        return pulseHeader;
+    }
+
+    public List<String> tips() {
+        return tips;
+    }
+
+    public List<String> pulseLines() {
+        return pulseLines;
+    }
+
+    public String randomTip() {
+        if (tips.isEmpty()) return "RootMC tip: /ava army";
+        return tips.get((int) (Math.random() * tips.size()));
+    }
+
+    public String randomPulse() {
+        if (pulseLines.isEmpty()) return "Army pulse: Ava is online.";
+        return pulseLines.get((int) (Math.random() * pulseLines.size()));
     }
 
     public Map<String, ArmyDept> armyDepartments() {
