@@ -156,6 +156,15 @@ import {
   maybeAnnounceSafeMode,
   clearSafeMode,
 } from "./overloadSafeMode.mjs";
+import {
+  enqueueDiscordBatch,
+  combineBatchQuestions,
+  shouldGatekeepDeep,
+  gatekeepDenyReply,
+  gatekeepBrief,
+  discordTrustTier,
+} from "./discordCadence.mjs";
+import { isOpsPowerStatusAsk } from "./opsPowerStatus.mjs";
 
 const busyChannels = new Set();
 const CHANNEL_COOLDOWN_MS = Number(process.env.AVA_CHANNEL_COOLDOWN_MS || 40_000);
@@ -286,9 +295,12 @@ export function createPipeline(deps) {
     }
   };
 
-  async function handleTrigger(channelId, msg, messages = []) {
+  async function handleTrigger(channelId, msg, messages = [], overrides = {}) {
     const earlySoft = isSoftChat(
-      extractQuestion(msg.content) || msg.content || "",
+      overrides.questionForce ||
+        extractQuestion(msg.content) ||
+        msg.content ||
+        "",
       msg.content || "",
     );
 
@@ -385,6 +397,7 @@ export function createPipeline(deps) {
       }
 
       let question =
+        overrides.questionForce ||
         extractQuestion(msg.content) ||
         (visionImages.length
           ? String(channelId) === String(AVA_CHANNELS.memesMedia)
@@ -393,12 +406,43 @@ export function createPipeline(deps) {
           : uploads.length
             ? "you sent a file — what should I do with it?"
             : "you pinged me — what's up?");
-      if (uploads.length) {
+      if (uploads.length && !overrides.questionForce) {
         const names = uploads.map((u) => u.relative || u).join(", ");
         question += `\n\n[attachments saved to handoff uploads/: ${names}]`;
         if (visionImages.length) {
           question += `\n[${visionImages.length} image(s) attached for vision — describe what you see.]`;
         }
+      }
+
+      // Discord gatekeep — strangers / cool-known don't get deep digs
+      const surfNow = pipelineSurface(msg, channelId);
+      const isDiscordSurf =
+        surfNow === "discord" || surfNow === "discord-dm";
+      if (
+        isDiscordSurf &&
+        shouldGatekeepDeep(msg.author?.id) &&
+        (wantsRootServer(question) ||
+          isOpsPowerStatusAsk(question) ||
+          /\b(implement|deploy|ecoflow|finance|stripe|dig\s+into)\b/i.test(
+            question,
+          ))
+      ) {
+        const deny = gatekeepDenyReply(question);
+        void ackReact.reactStored(channelId, msg.id);
+        await reply(channelId, deny, msg.id);
+        pushStatusEvent(
+          `gatekeep · ${discordTrustTier(msg.author?.id)} · ${msg.author?.username || "?"}`,
+        );
+        persistTurn({
+          channelId,
+          messageId: msg.id,
+          authorId: msg.author?.id,
+          authorName: msg.author?.username,
+          question,
+          answer: deny,
+          intent: "gatekeep",
+        });
+        return;
       }
 
       // Pasted message IDs / jump links → fetch real content before dig

@@ -14,7 +14,11 @@ import {
   stripeConfigured,
   formatUsd,
   financeDir,
+  explainStripeBalance,
 } from "./stripeFinance.mjs";
+
+/** Finance-review codes that mean Ava tooling is broken (not Stripe account state). */
+const SELF_FIX_SUGGESTION_CODES = new Set(["stripe_unreadable"]);
 import {
   loadOpsLedger,
   saveOpsLedger,
@@ -95,13 +99,35 @@ export function buildFinanceSuggestions({ snap, ledger } = {}) {
       severity: "warn",
       code: "stripe_unreadable",
       text: `Stripe snapshot failed or missing (${snap?.reason || "none"}). Check STRIPE_SECRET_KEY / API access.`,
+      selfFixable: true,
     });
   } else {
     if ((snap.usdAvailable || 0) < 0) {
+      const bal = explainStripeBalance(snap);
+      let severity = "warn";
+      let text = `Stripe available ${formatUsd(snap.usdAvailable)} (pending ${formatUsd(snap.usdPending)}).`;
+
+      if (bal?.pendingCoversDeficit) {
+        severity = bal.isTrivialNegative ? "info" : "warn";
+        text = `Stripe available ${formatUsd(snap.usdAvailable)} — pending ${formatUsd(snap.usdPending)} covers it (fee/payout timing; not a tooling error).`;
+        if (bal.feesInRecent > 0) {
+          text += ` Recent Stripe fees ~${formatUsd(bal.feesInRecent)} in snapshot.`;
+        }
+      } else {
+        text += " Review payouts/disputes in Stripe.";
+        if (bal?.disputeCount) {
+          text += ` ${bal.disputeCount} dispute/refund-like tx in recent window.`;
+        }
+        if (bal?.lastPayoutAmount) {
+          text += ` Last payout ${formatUsd(bal.lastPayoutAmount)}.`;
+        }
+      }
+
       suggestions.push({
-        severity: "error",
+        severity,
         code: "negative_balance",
-        text: `Stripe available balance is negative (${formatUsd(snap.usdAvailable)}). Investigate payouts/disputes.`,
+        text,
+        selfFixable: false,
       });
     }
     if ((snap.income30dUsd || 0) === 0) {
@@ -222,12 +248,12 @@ export async function runFinanceReview(opts = {}) {
   ledger.lastSuggestions = suggestions;
   saveOpsLedger(ledger);
 
-  // Tooling errors → Ava may self-fix (queue; poller drains)
+  // Tooling errors only — never self-fix normal Stripe account states (fees/payouts).
   try {
     const { enqueueSelfFix } = await import("./selfFix.mjs");
     for (const s of suggestions) {
-      if (s.severity !== "error") continue;
-      if (!/stripe|ledger|script|api|code|parse|crash/i.test(s.text || "")) continue;
+      if (s.selfFixable === false) continue;
+      if (!SELF_FIX_SUGGESTION_CODES.has(s.code)) continue;
       enqueueSelfFix({
         brief: `Finance review tooling error — investigate and fix Ava-owned code if needed: ${s.text}`,
         source: "finance_review",

@@ -187,6 +187,48 @@ export function loadStripeSnapshot() {
   }
 }
 
+const DISPUTE_TYPES = new Set([
+  "dispute",
+  "dispute_reversal",
+  "payment_refund",
+  "refund",
+]);
+
+/**
+ * Context for negative/tight Stripe balances (account state — not Ava tooling).
+ */
+export function explainStripeBalance(snap) {
+  if (!snap?.ok) return null;
+  const avail = Number(snap.usdAvailable) || 0;
+  const pending = Number(snap.usdPending) || 0;
+  const recent = Array.isArray(snap.recent) ? snap.recent : [];
+
+  let feesInRecent = 0;
+  let disputeCount = 0;
+  let lastPayout = null;
+  for (const t of recent) {
+    const type = String(t.type || "");
+    const amt = Math.abs(Number(t.amount) || 0);
+    if (type === "stripe_fee") feesInRecent += amt;
+    if (DISPUTE_TYPES.has(type) || /dispute|chargeback/i.test(t.description || "")) {
+      disputeCount += 1;
+    }
+    if (type === "payout" && !lastPayout) lastPayout = t;
+  }
+
+  const deficit = avail < 0 ? Math.abs(avail) : 0;
+  return {
+    avail,
+    pending,
+    deficit,
+    feesInRecent: Math.round(feesInRecent * 100) / 100,
+    disputeCount,
+    lastPayoutAmount: lastPayout ? Number(lastPayout.amount) || 0 : null,
+    pendingCoversDeficit: avail < 0 && pending >= deficit,
+    isTrivialNegative: avail < 0 && deficit <= 1,
+  };
+}
+
 /** Human-readable summary for operator asks (Telegram / Slack / DM). */
 export function formatStripeIncomePlain(snap) {
   if (!snap?.ok) {

@@ -49,7 +49,12 @@ export function scrubPublicReply(text, opts = {}) {
     .replace(/[\u2013\u2014\u2212]/g, "-")
     .replace(/\u2026/g, "...")
     .replace(/\u00A0/g, " ")
-    .replace(/\uFFFD/g, "");
+    .replace(/\uFFFD/g, "")
+    .replace(/[\u00B7\u2022\u2023\u2043\u2219]/g, "-")
+    .replace(/\u2192/g, "->")
+    .replace(/\u2190/g, "<-")
+    .replace(/[\u2190-\u2199]/g, "->")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "");
   if (surface === "slack") {
     out = stripDiscordAppEmojis(out);
   } else {
