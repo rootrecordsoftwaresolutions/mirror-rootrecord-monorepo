@@ -520,10 +520,15 @@ export function createPipeline(deps) {
       const talkingAboutCue = looksLikeTalkingAboutAva(msg, botAppId)
         ? "They are talking ABOUT you (not a hard @ping). You overheard it. Chime in short and self-aware — don't be needy, don't hijack unrelated chat. Never @ping Zuppa."
         : "";
-      const context = [mem, liveCtx, talkingAboutCue]
+      const gateCue = isDiscordSurf ? gatekeepBrief(msg.author?.id) : "";
+      const batchCue =
+        overrides.batchCount > 1
+          ? `### Batch cadence\nThey sent ${overrides.batchCount} messages before you answered. One natural reply covering all beats — not a ticket list.`
+          : "";
+      const context = [mem, liveCtx, talkingAboutCue, gateCue, batchCue]
         .filter(Boolean)
         .join("\n\n")
-        .slice(0, 5500);
+        .slice(0, 6500);
 
       console.log(
         `ava trigger in ${channelId} from ${msg.author?.username} intent=${classified.intent}${soft ? " soft" : ""} (asks=${depthAtAck} agents=${slots.active}/${slots.max})`,
@@ -1525,6 +1530,91 @@ export function createPipeline(deps) {
       } catch (err) {
         await reply(channelId, `couldn't recheck yet (${err.message})`, msg.id);
       }
+      return;
+    }
+
+    // Discord cadence: buffer ~3 addressed messages, then one reply covering all.
+    // Feels human; keeps context lower. Slack/Telegram stay immediate.
+    const surf = pipelineSurface(msg, channelId);
+    if (surf === "discord" || surf === "discord-dm") {
+      const qEarly =
+        extractQuestion(msg.content) ||
+        String(msg.content || "").trim() ||
+        "you pinged me — what's up?";
+      const batchItem = {
+        surface: surf,
+        channelId,
+        authorId: msg.author?.id,
+        authorName: msg.author?.username,
+        messageId: msg.id,
+        content: msg.content || "",
+        question: qEarly,
+        msg,
+      };
+
+      const flushItems = async (items, reason) => {
+        if (!items?.length) return;
+        const combined = combineBatchQuestions(items);
+        const last = items[items.length - 1];
+        const triggerMsg = last.msg || last;
+        for (const it of items) {
+          try {
+            void ackReact.reactSeen(channelId, it.messageId);
+            if (it.msg?.author?.id) {
+              silentlyProfileMessage(it.msg, channelId, "batch");
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        if (combined.allReactOnly) {
+          for (const it of items) {
+            void ackReact.reactNoReply(channelId, it.messageId);
+          }
+          pushStatusEvent(
+            `discord batch · react-only · ${items.length} · ${reason}`,
+          );
+          return;
+        }
+        // Reply targets the latest message; question covers all
+        const synthetic = {
+          ...triggerMsg,
+          id: combined.replyToId || triggerMsg.id,
+          content: last.content,
+        };
+        await handleTrigger(channelId, synthetic, messages, {
+          questionForce: combined.question,
+          batchCount: items.length,
+          batchReason: reason,
+        });
+      };
+
+      const result = enqueueDiscordBatch(batchItem, {
+        onFlushTimeout: async ({ items, reason }) => {
+          try {
+            await flushItems(items, reason || "timeout");
+          } catch (err) {
+            console.warn("batch timeout:", err.message);
+          }
+        },
+      });
+
+      if (result.action === "buffer") {
+        touchActivity("batch-buffer");
+        void ackReact.reactSeen(channelId, msg.id);
+        if (msg.author?.id) {
+          silentlyProfileMessage(msg, channelId, "batch-buffer");
+        }
+        // Still collect attachments so nothing is lost while waiting
+        try {
+          await saveMessageAttachments(msg);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+
+      await flushItems(result.items, result.reason || "flush");
       return;
     }
 
