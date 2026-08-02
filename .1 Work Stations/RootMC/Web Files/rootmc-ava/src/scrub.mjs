@@ -142,9 +142,11 @@ export function scrubPublicReply(text, opts = {}) {
     out = out.replace(/\bcard\s*ending\s*\d{4}\b/gi, "card ending [redacted]");
     out = out.replace(/\b(?:last\s*4|last4)\s*[:=]?\s*\d{4}\b/gi, "last4 [redacted]");
     out = out.replace(
-      /\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b/g,
+      /\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s])\d{3}[-.\s]\d{4}\b/g,
       "[redacted-phone]",
     );
+    // Do not treat exit codes / short numbers as phones
+    out = out.replace(/\(exit\s+\[redacted-phone\]\)/gi, "(exit code)");
   }
 
   // Soft ceiling only — Discord/Slack multipost (splitContent) handles platform

@@ -12,13 +12,14 @@ import { allowsUnsolicitedPost } from "./channelPolicy.mjs";
  * and is not a no-unsolicited channel (#admins).
  */
 
-const OPEN_STATUSES = new Set([
+const ACTIVE_STATUSES = new Set([
   "pending",
   "implementing",
   "staged",
   "waiting_restart",
-  "blocked",
 ]);
+
+const PARKED_STATUSES = new Set(["blocked"]);
 
 function statePath() {
   return path.join(storePaths().dir, "pending-tasks.json");
@@ -47,30 +48,37 @@ function loadPendingEmojiAsks() {
 }
 
 export function collectPendingTasks() {
-  const jobs = listJobs(40).filter((j) => OPEN_STATUSES.has(j.status));
+  const all = listJobs(40);
+  const jobs = all.filter((j) => ACTIVE_STATUSES.has(j.status));
+  const parked = all.filter((j) => PARKED_STATUSES.has(j.status));
   const byStatus = {};
-  for (const j of jobs) {
+  for (const j of [...jobs, ...parked]) {
     byStatus[j.status] = (byStatus[j.status] || 0) + 1;
   }
   const slots = cursorSlots();
   const emojiAsks = loadPendingEmojiAsks();
+  // Parked/blocked need Alex/vote — don't count as nagging "open" work
   const open = jobs.length + emojiAsks + slots.active + slots.waiting;
   return {
     jobs,
+    parked,
     byStatus,
     slots,
     emojiAsks,
     open,
-    hasWork: open > 0 || jobs.length > 0,
+    hasWork: open > 0,
   };
 }
 
 export function buildPendingTasksMessage(snapshot) {
-  const { jobs, byStatus, slots, emojiAsks, hasWork } = snapshot;
+  const { jobs, parked = [], byStatus, slots, emojiAsks, hasWork } = snapshot;
   const lines = [];
 
   if (!hasWork) {
-    lines.push("pending check — queue's clean. no open jobs, no digs waiting. I'm good.");
+    lines.push("pending check — queue's clean. no active jobs, no digs waiting. I'm good.");
+    if (parked.length) {
+      lines.push(`parked/blocked (need vote/Alex): **${parked.length}** — not nagging.`);
+    }
     lines.push("");
     lines.push(`agents **0/${CURSOR_CONCURRENCY}** · emoji asks **0**`);
     lines.push("— Ava");
