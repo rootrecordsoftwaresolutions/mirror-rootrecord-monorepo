@@ -118,6 +118,11 @@ import {
   joinWelcomeBootDelayMs,
 } from "./ingameJoinWelcome.mjs";
 import {
+  runIngameMentionWatch,
+  mentionWatchIntervalMs,
+  mentionWatchBootDelayMs,
+} from "./ingameMentionWatch.mjs";
+import {
   runFinanceReview,
   financeReviewIntervalMs,
   financeReviewBootDelayMs,
@@ -234,6 +239,10 @@ const INGAME_JOIN_MS = joinWelcomeIntervalMs();
 const INGAME_JOIN_BOOT_MS = joinWelcomeBootDelayMs();
 const ingameJoinBootAt = Date.now() + INGAME_JOIN_BOOT_MS;
 let lastIngameJoinWelcome = 0;
+const INGAME_MENTION_MS = mentionWatchIntervalMs();
+const INGAME_MENTION_BOOT_MS = mentionWatchBootDelayMs();
+const ingameMentionBootAt = Date.now() + INGAME_MENTION_BOOT_MS;
+let lastIngameMentionWatch = 0;
 const FINANCE_REVIEW_MS = financeReviewIntervalMs();
 const FINANCE_REVIEW_BOOT_MS = financeReviewBootDelayMs();
 const financeReviewBootAt = Date.now() + FINANCE_REVIEW_BOOT_MS;
@@ -951,6 +960,24 @@ async function tick() {
       }
     }
 
+    // Fast Ava-mention / operator summon (~20s) — template tell, no AI
+    const mentionBoot =
+      Date.now() >= ingameMentionBootAt && lastIngameMentionWatch === 0;
+    const mentionInterval =
+      lastIngameMentionWatch > 0 &&
+      Date.now() - lastIngameMentionWatch >= INGAME_MENTION_MS;
+    if (live && !isHushed() && !isAsleep() && (mentionBoot || mentionInterval)) {
+      lastIngameMentionWatch = Date.now();
+      try {
+        const mw = await runIngameMentionWatch({ env, force: mentionBoot });
+        if (mw?.replied > 0) {
+          console.log(`ingame mention watch · ${mw.replied}`);
+        }
+      } catch (err) {
+        console.warn("ingame mention watch:", err.message);
+      }
+    }
+
     // Finance review — Stripe + ledger suggestions → Telegram Alex (~12h)
     const financeBoot =
       Date.now() >= financeReviewBootAt && lastFinanceReview === 0;
@@ -1540,6 +1567,16 @@ setTimeout(() => {
 }, INGAME_JOIN_BOOT_MS);
 console.log(
   `ingame join welcome · new players · first in ~${Math.round(INGAME_JOIN_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_JOIN_MS / 1000)}s (bridge + RCON list · template tell)`,
+);
+setTimeout(() => {
+  if (!live || isHushed() || isAsleep()) return;
+  lastIngameMentionWatch = Date.now();
+  runIngameMentionWatch({ env, force: true }).catch((err) =>
+    console.warn("ingame mention watch boot:", err.message),
+  );
+}, INGAME_MENTION_BOOT_MS);
+console.log(
+  `ingame mention watch · Ava hear · first in ~${Math.round(INGAME_MENTION_BOOT_MS / 1000)}s · then every ${Math.round(INGAME_MENTION_MS / 1000)}s`,
 );
 setTimeout(() => {
   if (!live || isHushed() || isAsleep()) return;
