@@ -242,6 +242,110 @@ function appendMinuteTotals(sn, sample) {
   );
 }
 
+function readMinuteRows(sn) {
+  try {
+    const file = minuteBucketPath(sn);
+    if (!fs.existsSync(file)) return [];
+    return fs
+      .readFileSync(file, "utf8")
+      .trim()
+      .split(/\n+/)
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Average solar intake from local minute buckets for "this morning" (local TZ).
+ * Honest about sample window — never invent dawn if buckets start later.
+ * @param {{ tzOffsetHours?: number, morningStartHour?: number, morningEndHour?: number }} [opts]
+ */
+export function summarizeMorningSolar(opts = {}) {
+  const tz = Number(opts.tzOffsetHours ?? -10); // Hawaii default
+  const startHour = Number(opts.morningStartHour ?? 6);
+  const endHour = Number(opts.morningEndHour ?? 12);
+  const now = Date.now();
+  // Local calendar day at tz offset
+  const localNow = new Date(now + tz * 3600_000);
+  const y = localNow.getUTCFullYear();
+  const m = localNow.getUTCMonth();
+  const d = localNow.getUTCDate();
+  // Convert local wall times back to UTC ms
+  const morningStart =
+    Date.UTC(y, m, d, startHour, 0, 0) - tz * 3600_000;
+  const morningEnd = Date.UTC(y, m, d, endHour, 0, 0) - tz * 3600_000;
+  const end = Math.min(now, morningEnd);
+
+  const snap = loadEcoSnapshot();
+  const fromSnap = Object.keys(snap?.perSn || {});
+  const sns = fromSnap.length
+    ? fromSnap
+    : configuredSerials().length
+      ? configuredSerials()
+      : Object.values(ECO_NICKNAMES).filter((v, i, a) => a.indexOf(v) === i);
+
+  const perSn = {};
+  const minuteMap = new Map();
+  let earliest = null;
+  let latest = null;
+
+  for (const sn of sns) {
+    const rows = readMinuteRows(sn).filter((r) => {
+      const t = Number(r.minute || r.at || 0);
+      return t >= morningStart && t <= end;
+    });
+    const vals = rows
+      .map((r) => Number(r.solarW))
+      .filter((n) => Number.isFinite(n));
+    for (const r of rows) {
+      const t = Number(r.minute || Math.floor(Number(r.at || 0) / 60000) * 60000);
+      if (!Number.isFinite(t)) continue;
+      if (earliest == null || t < earliest) earliest = t;
+      if (latest == null || t > latest) latest = t;
+      const cur = minuteMap.get(t) || { solar: 0 };
+      if (Number.isFinite(Number(r.solarW))) cur.solar += Number(r.solarW);
+      minuteMap.set(t, cur);
+    }
+    perSn[sn] = {
+      samples: vals.length,
+      avgW: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null,
+      minW: vals.length ? Math.min(...vals) : null,
+      maxW: vals.length ? Math.max(...vals) : null,
+    };
+  }
+
+  const siteVals = [...minuteMap.values()].map((v) => v.solar);
+  return {
+    tzOffsetHours: tz,
+    morningStart,
+    morningEnd: end,
+    sampleStart: earliest,
+    sampleEnd: latest,
+    siteMinutes: siteVals.length,
+    siteAvgW: siteVals.length
+      ? siteVals.reduce((a, b) => a + b, 0) / siteVals.length
+      : null,
+    siteMaxW: siteVals.length ? Math.max(...siteVals) : null,
+    perSn,
+    sns,
+    note:
+      earliest != null && earliest > morningStart + 30 * 60_000
+        ? "sample window starts after dawn — not a full morning average"
+        : siteVals.length
+          ? "ok"
+          : "no morning samples yet",
+  };
+}
+
 /** Friendly nicknames (cucumbers / shackas) → SN for ops talk. */
 export const ECO_NICKNAMES = {
   cucumbers: "R331ZAB5SG6S2858", // Delta 2 primary

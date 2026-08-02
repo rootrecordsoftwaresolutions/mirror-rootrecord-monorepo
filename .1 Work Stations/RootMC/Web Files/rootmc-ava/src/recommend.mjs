@@ -288,7 +288,10 @@ export async function recommend({
   // Read-only telemetry — not a jar dig. Bypasses dream-only + cloud-dark mute.
   if (isOpsPowerStatusAsk(q) && cursorUp && !forceDream) {
     try {
-      const powerReply = await buildOpsPowerStatusReply({ authorId });
+      const powerReply = await buildOpsPowerStatusReply({
+        authorId,
+        question: q,
+      });
       if (powerReply?.trim()) {
         return scrubPublicReply(powerReply, {
           surface,
