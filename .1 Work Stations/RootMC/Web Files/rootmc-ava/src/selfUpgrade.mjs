@@ -40,7 +40,8 @@ function spawnWindowsRestart(waitSec, handoff) {
 $ErrorActionPreference = 'SilentlyContinue'
 Start-Sleep -Seconds ${waitSec}
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object {
-  $_.CommandLine -match 'rootmc-ava' -or $_.CommandLine -match 'ava\\\\src\\\\(index|server|poller)'
+  $_.CommandLine -match 'rootmc-ava' -or
+  $_.CommandLine -match 'src[/\\\\](index|server|poller)\\.mjs'
 } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 1
 $env:AVA_NO_STATUS_WINDOW = '1'

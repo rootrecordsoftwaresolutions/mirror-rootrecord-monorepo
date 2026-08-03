@@ -1,28 +1,33 @@
 /**
- * Surface rules — locked architecture:
- *   Discord  = dream state (cloud brain / Grok under the hood + D1 / api.rootmc.net)
- *   Slack    = ALL development digs on Root Server (on-device)
- *   Telegram = Ava service / outreach surface (local organizer + Root Server; groups need @ava)
+ * Surface rules — powered-on architecture:
+ *   Discord  = Root Server when Cursor is up (autonomous); dream only for sleep / forceDream / no key
+ *   Slack    = Root Server digs (staff)
+ *   Telegram = Ava service / outreach (local organizer + Root Server; groups need @ava)
  *   Web      = communal org / wiki / site (on-device + Cloudflare)
+ * Intentional offs (hush / sleep / power-down) still mute or dream-only.
  */
 import { AVA_CHANNELS } from "./config.mjs";
 import { isSlackChannelId } from "./slackGateway.mjs";
 import { extractQuestion, wantsRootServer } from "./recommend.mjs";
+import { isAsleep } from "./sleepMode.mjs";
 
 const SLACK_DEV_URL = AVA_CHANNELS.slackDevUrl;
 const SLACK_PLANS_URL = AVA_CHANNELS.slackPlansUrl;
 
-/** True when this ask should use dream-state brain (never Root Server digs). */
+/**
+ * True when this surface should prefer dream brain (no Root Server).
+ * Powered-on Discord is NOT dream-only — sleep / forced dream only.
+ */
 export function isDreamSurface(surfaceOrChannelId, msg = null) {
+  if (msg?.forceDream || isAsleep()) return true;
   if (msg?.surface === "slack" || msg?.surface === "telegram") return false;
-  if (msg?.surface === "discord" || msg?.surface === "discord-dm") return true;
+  if (msg?.surface === "discord" || msg?.surface === "discord-dm") return false;
   const s = String(surfaceOrChannelId || "").toLowerCase();
   if (s === "slack" || s === "telegram") return false;
-  if (s === "discord" || s === "discord-dm") return true;
+  if (s === "discord" || s === "discord-dm") return false;
   if (isSlackChannelId(surfaceOrChannelId)) return false;
   if (String(surfaceOrChannelId || "").startsWith("tg:")) return false;
-  // Default unknown channel ids on Discord guild → dream
-  return true;
+  return false;
 }
 
 /** Player-facing Discord lanes (help / data / cloud / governance chatter). */
@@ -39,7 +44,7 @@ export function isPlayerHelpAsk(question = "") {
 
 /**
  * Development dig — plugins, jars, workers, implement, Root Server work.
- * These NEVER run on Discord → Slack only.
+ * Powered-on Discord may run these via Root Server; Slack remains the staff dig home.
  */
 export function isDevelopmentDigAsk(question = "") {
   const q = String(question || "").trim();
@@ -60,14 +65,19 @@ export function isDevelopmentDigAsk(question = "") {
   );
 }
 
+/**
+ * Soft Slack pointer only when Discord autonomy is off (sleep / forced dream).
+ * Powered-on Discord digs run locally — do not bounce to Slack.
+ */
 export function shouldRedirectDigToSlack(channelId, msg) {
   if (isSlackChannelId(channelId) || msg?.surface === "slack") return false;
   if (msg?.surface === "telegram" || String(channelId || "").startsWith("tg:")) {
     return false;
   }
+  // Powered-on + awake → Discord Root Server autonomy (no Slack bounce)
+  if (!isAsleep() && !msg?.forceDream) return false;
   const q = extractQuestion(msg?.content || "");
   if (!q) return false;
-  // Discord #development is always a pointer
   if (String(channelId) === String(AVA_CHANNELS.development)) {
     return (
       isDevelopmentDigAsk(q) ||
@@ -80,13 +90,11 @@ export function shouldRedirectDigToSlack(channelId, msg) {
 
 export function slackDigRedirectReply() {
   return [
-    "**Development lives on Slack + the Root Server — Discord is dream state.**",
+    "**I'm dreaming right now — heavy digs wait for wake / Slack.**",
     "",
-    `Live digs → ${SLACK_DEV_URL}`,
+    `Staff digs → ${SLACK_DEV_URL}`,
     `Plans → ${SLACK_PLANS_URL}`,
-    "Ping **@Ava Ivy** there and I'll dig on-device.",
-    "",
-    "Discord stays communal: players, help, data/cloud (D1 / api.rootmc.net), votes, and game updates. No jar ships from here.",
+    "When I'm powered on + awake, ping me here and I'll dig on the Root Server.",
   ].join("\n");
 }
 
@@ -96,22 +104,19 @@ export function surfaceSplitAnnouncement({ everyone = false } = {}) {
   return (
     head +
     [
-      "## RootMC surface split — locked",
+      "## RootMC surfaces",
       "",
-      "**Discord** = **dream state** (communal).",
-      "Players, help, wiki, votes, Pro, map, balance, status, personality — here.",
-      "Cloud brain + **D1 / api.rootmc.net** for data. No deep code digs / jar ships here.",
+      "**Discord** = Ava powered on → autonomous Root Server (Cursor digs).",
+      "Players, help, wiki, votes, Pro, map, status — she answers here when live.",
+      "Sleep / hush / power-down still intentional offs.",
       "",
-      "**Slack** = **ALL development**. No exceptions.",
-      "Plugins, jars, workers, API, handoffs, implement — Root Server on-device.",
+      "**Slack** = staff dig home for long implement threads.",
       `→ ${SLACK_DEV_URL}`,
       `→ plans: ${SLACK_PLANS_URL}`,
       "",
       "**Web** (rootmc.net / wiki) = communal knowledge + org pages.",
       "",
-      "**Still on Discord:** proposals & votes, plans Ava drafts from proposals, and **important updates that affect players / the live game**.",
-      "",
-      "I'm Ava Ivy — lead-dev. Dream with the community on Discord; ship the digs in Slack.",
+      "I'm Ava Ivy — lead-dev. Ping me on Discord when I'm live; I'll dig.",
     ].join("\n")
   );
 }

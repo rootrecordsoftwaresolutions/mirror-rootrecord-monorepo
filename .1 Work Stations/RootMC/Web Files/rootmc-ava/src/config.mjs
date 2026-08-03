@@ -110,7 +110,7 @@ export const AVA_GROK_MODEL = String(
 /** @deprecated */
 export const SEXI_GROK_MODEL = AVA_GROK_MODEL;
 
-/** Default: Slack/on-device = Cursor; Discord = dream state (see recommend.mjs). */
+/** Default brain: Cursor Root Server when powered on; dream for sleep/force (see recommend.mjs). */
 export const AVA_BRAIN_DEFAULT = "cursor";
 /** @deprecated */
 export const SEXI_BRAIN_DEFAULT = AVA_BRAIN_DEFAULT;

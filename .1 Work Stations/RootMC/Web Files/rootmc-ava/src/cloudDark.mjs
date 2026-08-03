@@ -1,6 +1,7 @@
 /**
  * Cloud-dark mode — dream brain (Grok) unavailable / unpaid.
- * Discord + Telegram stay silent for auto-replies until cleared.
+ * Discord + Telegram stay silent for auto-replies only when dream is required
+ * (no Cursor key / sleep / forced dream). With Cursor up, Discord Root Server still runs.
  * Slack / Root Server digs can still run when Cursor is up.
  */
 import fs from "node:fs";

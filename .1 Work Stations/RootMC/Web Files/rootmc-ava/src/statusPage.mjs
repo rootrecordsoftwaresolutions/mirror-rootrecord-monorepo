@@ -189,10 +189,14 @@ export function statusPageHtml() {
         $("grid").innerHTML = cells([
           ["Mode", hb.mode || (onBreak ? "break" : live ? "hot" : "—")],
           ["Poll", (hb.pollMs != null ? (hb.pollMs / 1000) + "s" : "—")],
-          ["Agents", (hb.cursorAgents != null
+          ["Cursor digs", (hb.cursorAgents != null
             ? (hb.cursorAgents + "/" + (hb.cursorMax || 3))
             : "—")
-            + (hb.cursorWaiting ? (" · +" + hb.cursorWaiting + " wait") : "")],
+            + (hb.cursorWaiting
+              ? (" · +" + hb.cursorWaiting + " wait")
+              : (Number(hb.cursorAgents) === 0 && Number(hb.queueDepth || 0) === 0
+                ? " · idle"
+                : ""))],
           ["Asks open", String(hb.queueDepth ?? "—")],
           ["Transport", hb.transport || (hb.gateway ? "gateway" : "poller")],
           ["Reactions", hb.reactions

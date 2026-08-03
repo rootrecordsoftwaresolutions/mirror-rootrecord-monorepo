@@ -126,7 +126,7 @@ import {
   enforceAvaSelfRespect,
 } from "./avaSelfRespect.mjs";
 import { shouldAvaChimeIn, chimeInBrief } from "./chimeIn.mjs";
-import { AVA_CHANNELS, ROOTMC_GUILD_ID } from "./config.mjs";
+import { AVA_CHANNELS, ROOTMC_GUILD_ID, cursorApiKey } from "./config.mjs";
 import {
   getFigureOutSession,
   absorbFigureOutReply,
@@ -722,11 +722,12 @@ export function createPipeline(deps) {
       let jobId = null;
       const digAssign =
         classified.intent === "dig_assign" || looksLikeDigAssign(question);
-      // Discord never runs Root Server dig jobs — surface split → Slack
+      // Sleep / forced dream: dig_assign still points to Slack. Powered-on Discord digs run here.
       if (
         digAssign &&
         msg.surface !== "slack" &&
-        !isSlackChannelId(channelId)
+        !isSlackChannelId(channelId) &&
+        (isAsleep() || !cursorApiKey(env || {}))
       ) {
         const redirect = slackDigRedirectReply();
         await ackP;
@@ -741,7 +742,7 @@ export function createPipeline(deps) {
           answer: redirect,
           intent: "slack_redirect",
         });
-        pushStatusEvent("redirect dig_assign → slack");
+        pushStatusEvent("redirect dig_assign → slack (sleep/no-cursor)");
         return;
       }
       if (
@@ -1394,7 +1395,7 @@ export function createPipeline(deps) {
       msg._avaChime = chime;
     }
 
-    // ALL development digs → Slack only (Discord = players / help / data / cloud).
+    // Sleep / no-cursor only: soft Slack pointer. Powered-on Discord digs run Root Server.
     if (shouldRedirectDigToSlack(channelId, msg)) {
       touchActivity("slack-redirect");
       try {
@@ -1402,7 +1403,7 @@ export function createPipeline(deps) {
       } catch {
         /* ignore */
       }
-      pushStatusEvent("redirect dig → slack");
+      pushStatusEvent("redirect dig → slack (sleep)");
       return;
     }
 
@@ -1471,15 +1472,16 @@ export function createPipeline(deps) {
       return;
     }
 
-    // Cloud-dark: Discord + Telegram stay silent until Grok is funded again.
+    // Cloud-dark: mute Discord/Telegram only when dream brain is required (no Cursor).
+    // Powered-on + CURSOR_API_KEY → Root Server still answers on Discord.
     if (
       isCloudDark() &&
+      !cursorApiKey(env || {}) &&
       (msg.surface === "telegram" ||
         msg.surface === "discord" ||
         msg.surface === "discord-dm" ||
         (!isSlackChannelId(channelId) && !isTelegramChannelId(channelId)))
     ) {
-      // Allow operator sleep/wake/power already handled above; mute normal chatter.
       if (
         !(
           isWakeCommand(msg.content) ||

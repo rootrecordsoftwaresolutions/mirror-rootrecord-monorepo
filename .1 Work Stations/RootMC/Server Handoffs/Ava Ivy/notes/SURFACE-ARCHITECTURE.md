@@ -1,22 +1,28 @@
-# Ava surface architecture (locked)
+# Ava surface architecture
 
-**Discord** = dream state (communal). Cloud brain + **D1 / api.rootmc.net**. No Root Server digs / jar ships.
+**Discord (powered on + awake + Cursor key)** = autonomous Root Server digs. Mentions / replies / chimes run through gateway+poller → pipeline → Cursor agents (up to concurrency). No manual agent IDs needed.
 
-**Exception (Cursor online):** ops **power status** asks (EcoFlow / solar SOC + council voting shares) may answer from live Root Server packs on Discord — read-only telemetry, not a plugin dig. Bypasses cloud-dark mute. See `src/opsPowerStatus.mjs`.
+**Discord (sleep / `AVA_FORCE_DREAM` / no Cursor key)** = dream state (cloud brain). Soft Slack pointer for heavy digs while dreaming.
 
-**Slack** = all development. On-device **Root Server** (Cursor + filesystem).
+**Slack** = staff dig home (Root Server on-device). Still preferred for long implement threads.
 
 **Web** (rootmc.net / wiki) = communal organization + knowledge pages.
 
-**Operator sleep** = soft offline until ~10:00 HST (still dream brain on Discord; digs paused).
+**Intentional offs** (unchanged):
+- **QUIET / hush** — mute
+- **Operator sleep** — dream summons only until ~10:00 HST
+- **Power-down** — process off until human `npm start`
+- **Cloud-dark** — silences Discord/Telegram only when dream is required (no Cursor); with Cursor up, Discord still answers
 
 ## Code
-- `Web Files/rootmc-ava/src/surfaceRules.mjs`
-- `Web Files/rootmc-ava/src/dreamBrain.mjs` — Discord replies (+ eco/solar packs)
-- `Web Files/rootmc-ava/src/opsPowerStatus.mjs` — Cursor-online power/voting status
-- `Web Files/rootmc-ava/src/cursorBrain.mjs` — Slack / Root Server digs
-- `Web Files/rootmc-ava/src/recommend.mjs` — routes by `surface`
+- `Web Files/rootmc-ava/src/recommend.mjs` — routes by power/sleep/forceDream + Cursor key
+- `Web Files/rootmc-ava/src/surfaceRules.mjs` — Slack redirect only while asleep / no cursor
+- `Web Files/rootmc-ava/src/dreamBrain.mjs` — sleep / fallback dream replies
+- `Web Files/rootmc-ava/src/cursorBrain.mjs` — Root Server digs (Discord + Slack)
+- `Web Files/rootmc-ava/src/opsPowerStatus.mjs` — EcoFlow / voting pack shortcut
+
+## Status page
+`Cursor digs 0/3 · idle` means free slots (not broken). Digging shows `1/3`…`3/3`.
 
 ## Test
-Restart Ava, ping Discord → dream replies. Dig on Slack → Root Server.
-Ask “power status / voting % / ecoflow solar” with `CURSOR_API_KEY` set → live pack reply on Discord.
+Restart Ava. Ping Discord while live·hot → Root Server ask opens (`asks` / cursor digs bump). Sleep / QUIET still mute or dream-only.
