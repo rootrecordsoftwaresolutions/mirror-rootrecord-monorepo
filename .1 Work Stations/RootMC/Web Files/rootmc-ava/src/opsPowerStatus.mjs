@@ -11,6 +11,8 @@ import {
   summarizeMorningSolar,
   ECO_NICKNAMES,
   isEcoOffCircuit,
+  isEcoRemoved,
+  isEcoSampleLive,
 } from "./ecoflow.mjs";
 import { gatherSolarBrief, loadSolarProfile } from "./solarProfile.mjs";
 import { gatherGovernanceBrief, getCouncil, listOpenPolls } from "./governanceClient.mjs";
@@ -148,7 +150,7 @@ export async function buildOpsPowerStatusReply({
 
   if (morningOnly) {
     const liveSolar = Object.values(snap?.perSn || {}).reduce((sum, v) => {
-      return sum + (v?.ok && v.solarW != null ? Number(v.solarW) || 0 : 0);
+      return sum + (isEcoSampleLive(v) && v.solarW != null ? Number(v.solarW) || 0 : 0);
     }, 0);
     const lines = [
       ...formatMorningSolarBlock(morning),
@@ -219,9 +221,13 @@ export async function buildOpsPowerStatusReply({
   const per = snap?.perSn || {};
   let solarTotal = 0;
   for (const [sn, v] of Object.entries(per)) {
+    if (isEcoRemoved(sn)) continue;
     const off = v?.offCircuit || isEcoOffCircuit(sn);
-    if (!v?.ok) {
-      lines.push(`• ${snLabel(sn, snap)}: FAIL ${v?.message || "?"}`);
+    if (!isEcoSampleLive(v)) {
+      lines.push(
+        `• **${snLabel(sn, snap)}**: offline / stale — not in live calc` +
+          (v?.message ? ` (${v.message})` : ""),
+      );
       continue;
     }
     if (!off && v.solarW != null) solarTotal += Number(v.solarW) || 0;
@@ -242,12 +248,6 @@ export async function buildOpsPowerStatusReply({
     `• Host array: **${panels} panels / ${circuits} circuits / ${batteries} batteries**` +
       (solarTotal > 0 ? ` - ~${Math.round(solarTotal)}W solar in right now` : ""),
   );
-
-  if (per.R621ZA16XH6K1155?.ok) {
-    lines.push(
-      "• River 2 Pro online-flag can lie - SOC/watts above are from quota (trust those)",
-    );
-  }
 
   if (morning?.siteAvgW != null) {
     lines.push("");

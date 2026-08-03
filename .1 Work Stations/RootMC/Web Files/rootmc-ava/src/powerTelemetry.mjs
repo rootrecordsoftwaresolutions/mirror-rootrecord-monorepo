@@ -8,7 +8,9 @@ import {
   summarizeMorningSolar,
   isEcoOffCircuit,
   isEcoRemoved,
+  isEcoSampleLive,
   ECO_NICKNAMES,
+  ECO_STALE_MS,
   moodFromPower,
   configuredSerials,
 } from "./ecoflow.mjs";
@@ -33,8 +35,6 @@ const NICK_BY_SN = {
   R331ZAB5SG6S2858: "Delta 2",
   R621ZA16XH6K1155: "River 2 Pro",
 };
-
-const ECO_STALE_MS = 12 * 60_000;
 
 function snLabel(sn, snap) {
   if (NICK_BY_SN[sn]) return NICK_BY_SN[sn];
@@ -89,10 +89,11 @@ function deviceRows(snap, { ecoStale = false } = {}) {
     .filter(([sn]) => !isEcoRemoved(sn))
     .map(([sn, v]) => {
     const offCircuit = Boolean(v?.offCircuit || isEcoOffCircuit(sn));
-    const ok = Boolean(v?.ok);
+    const live = isEcoSampleLive(v);
+    const ok = Boolean(v?.ok) && live;
     let status = "online";
-    if (!ok) status = "offline";
-    else if (ecoStale) status = "stale";
+    if (!v?.ok || v?.deviceOnline === false) status = "offline";
+    else if (ecoStale || !live) status = "stale";
     else if (offCircuit) status = "off-circuit";
     return {
       sn,
@@ -101,7 +102,7 @@ function deviceRows(snap, { ecoStale = false } = {}) {
       status,
       online: ok && !ecoStale,
       disconnected: !ok,
-      stale: Boolean(ok && ecoStale),
+      stale: Boolean(v?.ok && (ecoStale || !live)),
       soc: ok ? v?.soc ?? null : null,
       solarW: ok ? v?.solarW ?? null : null,
       inW: ok ? v?.inW ?? null : null,
@@ -143,7 +144,8 @@ function siteSolarNow(snap) {
   let inW = 0;
   let any = false;
   for (const [sn, v] of Object.entries(snap?.perSn || {})) {
-    if (!v?.ok) continue;
+    if (isEcoRemoved(sn)) continue;
+    if (!isEcoSampleLive(v)) continue;
     if (v.offCircuit || isEcoOffCircuit(sn)) continue;
     any = true;
     if (v.solarW != null) solar += Number(v.solarW) || 0;

@@ -15,7 +15,7 @@ const DEFAULT_LON = -155.1069;
 /** Host-site D1 feed is pushed ~10m; treat older as offline for mining mult. */
 const TELEMETRY_STALE_MS = 15 * 60_000;
 /** EcoFlow sample age when Ava includes ecoUpdatedAt (matches Ava ECO_STALE_MS). */
-const ECO_STALE_MS = 12 * 60_000;
+const ECO_STALE_MS = 3 * 60_000;
 
 function str(v: unknown): string {
   return String(v ?? "").trim();

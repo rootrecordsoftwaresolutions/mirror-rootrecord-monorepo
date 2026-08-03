@@ -12,6 +12,9 @@ import {
   loadEcoSnapshot,
   summarizeMorningSolar,
   isEcoOffCircuit,
+  isEcoRemoved,
+  isEcoSampleLive,
+  ECO_STALE_MS,
 } from "./ecoflow.mjs";
 import { loadSolarProfile } from "./solarProfile.mjs";
 import { isAsleep } from "./sleepMode.mjs";
@@ -146,7 +149,13 @@ export function formatSolarLines(snap, morning = null) {
   let solarTotal = 0;
   for (const [sn, v] of Object.entries(per)) {
     if (isEcoRemoved(sn)) continue;
-    if (!v?.ok) continue;
+    if (!isEcoSampleLive(v)) {
+      lines.push(
+        `- **${snLabel(sn)}**: offline / stale — excluded from live` +
+          (v?.message ? ` (${v.message})` : ""),
+      );
+      continue;
+    }
     const off = v?.offCircuit || isEcoOffCircuit(sn);
     if (!off && v.solarW != null) solarTotal += Number(v.solarW) || 0;
     const bits = [
@@ -278,7 +287,7 @@ export async function buildHostSiteHourlyBlock({ refreshPower = true } = {}) {
       ecoOffline: !hostOnline || ecoReallyOffline,
       ecoStale:
         snap?.updatedAt != null
-          ? Date.now() - Number(snap.updatedAt) > 12 * 60_000
+          ? Date.now() - Number(snap.updatedAt) > ECO_STALE_MS
           : !snap,
     },
     weather: publicWeather,

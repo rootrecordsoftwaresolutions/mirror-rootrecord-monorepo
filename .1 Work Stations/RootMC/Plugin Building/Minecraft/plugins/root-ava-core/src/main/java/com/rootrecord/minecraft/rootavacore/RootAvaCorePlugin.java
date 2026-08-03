@@ -31,6 +31,7 @@ public final class RootAvaCorePlugin extends JavaPlugin {
         presence = new AvaPresenceService(this);
         getServer().getPluginManager().registerEvents(new PresenceSafetyListener(this, presence), this);
         bindAvaCommand();
+        bindSolarCommand();
 
         // Defer one tick so worlds are ready
         getServer().getScheduler().runTask(this, () -> presence.startIfEnabled());
@@ -79,6 +80,24 @@ public final class RootAvaCorePlugin extends JavaPlugin {
         AvaCommand handler = new AvaCommand(this);
         cmd.setExecutor(handler);
         cmd.setTabCompleter(handler);
+    }
+
+    private void bindSolarCommand() {
+        PluginCommand cmd = getCommand("solar");
+        if (cmd == null) {
+            cmd = PluginCommandRegistrar.register(
+                    this,
+                    "solar",
+                    "HI Pacific Solar Root Server — live power + weather",
+                    "/solar",
+                    List.of());
+        }
+        if (cmd == null) {
+            getLogger().severe("Could not bind /solar — command missing from plugin.yml and CommandMap fallback failed.");
+            return;
+        }
+        cmd.setExecutor(new SolarCommand(this));
+        cmd.setPermission("rootavacore.use");
     }
 
     @SuppressWarnings("deprecation")

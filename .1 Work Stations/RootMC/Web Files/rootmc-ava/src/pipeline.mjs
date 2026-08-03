@@ -2,6 +2,7 @@
  * Shared live-message pipeline for poller + gateway.
  */
 import { tryHandleFinanceCommand } from "./playerFinance.mjs";
+import { isSolarCommand, tryHandleSolarCommand } from "./solarCommand.mjs";
 import {
   extractQuestion,
   looksLikeTalkingAboutAva,
@@ -1435,6 +1436,31 @@ export function createPipeline(deps) {
       }).catch(() => {});
       await reply(channelId, "Emergency stop cleared.", msg.id);
       return;
+    }
+
+    // /solar — live host power + weather (any channel; no @ needed)
+    if (isSolarCommand(msg.content || "")) {
+      touchActivity("solar-cmd");
+      try {
+        const solar = await tryHandleSolarCommand({ text: msg.content || "" });
+        if (solar?.handled && solar.reply) {
+          void ackReact.reactStored(channelId, msg.id);
+          await reply(channelId, solar.reply, msg.id, "solar_cmd");
+          return;
+        }
+      } catch (err) {
+        console.warn("solar cmd:", err.message);
+        try {
+          await reply(
+            channelId,
+            `**/solar** hiccup: ${err.message || "unknown"} — try again in a sec.`,
+            msg.id,
+          );
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
     }
 
     if (isHushed()) {

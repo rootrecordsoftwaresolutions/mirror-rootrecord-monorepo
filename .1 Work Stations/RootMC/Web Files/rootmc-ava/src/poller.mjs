@@ -59,6 +59,10 @@ import { allowsUnsolicitedPost } from "./channelPolicy.mjs";
 import { createPipeline, pipelineBusyCount } from "./pipeline.mjs";
 import { startGateway } from "./gateway.mjs";
 import {
+  registerSolarSlashCommand,
+  handleSolarInteraction,
+} from "./solarCommand.mjs";
+import {
   listGuildWatchChannelIds,
   mergeWatchIds,
 } from "./guildChannelWatch.mjs";
@@ -1405,6 +1409,22 @@ console.log(`handoff data: ${storePaths().dir}`);
 
 await bootHandshake();
 
+// Guild slash /solar — usable in every channel (no watch allowlist needed)
+try {
+  const reg = await registerSolarSlashCommand(token, {
+    appId: botAppId,
+    guildId: ROOTMC_GUILD_ID,
+  });
+  if (reg.ok) {
+    console.log(`slash /solar registered · id ${reg.id}`);
+    pushStatusEvent("slash /solar registered");
+  } else {
+    console.warn("slash /solar register:", reg.detail || reg.status);
+  }
+} catch (err) {
+  console.warn("slash /solar register:", err.message);
+}
+
 // Seed proposal forum threads into gateway watch before connecting
 try {
   await channelTargets();
@@ -1465,6 +1485,18 @@ if (useGateway) {
         console.warn("gateway ingest:", err.message);
       }
       saveSeen(seen);
+    },
+    onInteraction: async (interaction) => {
+      if (!live) return;
+      try {
+        const handled = await handleSolarInteraction(interaction, { token });
+        if (handled) {
+          touchActivity("solar-slash");
+          pushStatusEvent("slash /solar");
+        }
+      } catch (err) {
+        console.warn("solar interaction:", err.message);
+      }
     },
     onReaction: async (d, meta) => {
       if (!live) return;

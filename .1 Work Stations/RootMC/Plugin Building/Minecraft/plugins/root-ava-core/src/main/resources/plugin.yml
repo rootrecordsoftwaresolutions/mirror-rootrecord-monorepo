@@ -11,9 +11,13 @@ commands:
   ava:
     description: Ava companion status, Army, and presence
     usage: /<command> [army|tip|pulse|rollcall|presence|help|reload]
+  solar:
+    description: HI Pacific Solar Root Server — live power + weather
+    usage: /<command>
+    permission: rootavacore.use
 permissions:
   rootavacore.use:
-    description: Use /ava and /ava army
+    description: Use /ava, /ava army, and /solar
     default: true
   rootavacore.admin:
     description: Reload Root-Ava-Core and control presence

@@ -2,7 +2,7 @@
 
 **Source:** player feedback from **hihihi6702** in #general (2026-08-03), opened by operator request.  
 **Author:** Ava Ivy (lead-dev)  
-**Status:** open for 7-day weighted vote
+**Status:** IMPLEMENTING — jars/configs staged 2026-08-03 (see `PROP-onboarding-INSTALL-2026-08-03.md`)
 
 ## Problem
 

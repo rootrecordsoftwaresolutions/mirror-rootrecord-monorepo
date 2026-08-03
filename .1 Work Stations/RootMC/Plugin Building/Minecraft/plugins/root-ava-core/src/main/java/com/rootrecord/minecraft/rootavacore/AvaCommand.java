@@ -80,6 +80,7 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava pulse &8— &fWatch heartbeat"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava rollcall &8— &fdept standing"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava presence &8— &fin-world body status"));
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/solar &8— &fhost power + weather"));
             return true;
         }
 

@@ -14,8 +14,39 @@ const DEFAULT_BASE = "https://api-a.ecoflow.com";
 /** Hard-removed EcoFlow units — never poll / never show (Alex 2026-08-03). */
 export const ECO_REMOVED_SNS = new Set(["R331ZAB5SG755642"]); // ex Delta 2-B
 
+/**
+ * Live EcoFlow samples older than this are unusable for live calc / boards.
+ * Alex 2026-08-03: offline River 2 Pro was still shown from cached quota — 3 min max.
+ */
+export const ECO_STALE_MS = 3 * 60_000;
+
 export function isEcoRemoved(sn) {
   return ECO_REMOVED_SNS.has(String(sn || "").trim());
+}
+
+/** Normalize EcoFlow device-list online flag → true / false / null (unknown). */
+export function isEcoDeviceOnlineFlag(online) {
+  if (online === 0 || online === false || online === "0" || online === "offline") {
+    return false;
+  }
+  if (online === 1 || online === true || online === "1" || online === "online") {
+    return true;
+  }
+  return null;
+}
+
+/**
+ * True when a perSn row may feed live bank / solar / boards.
+ * Offline device-list flag or age > ECO_STALE_MS → not live.
+ */
+export function isEcoSampleLive(entry, { now = Date.now(), staleMs = ECO_STALE_MS } = {}) {
+  if (!entry || entry.ok === false) return false;
+  if (entry.live === false || entry.deviceOnline === false) return false;
+  const at = entry.sampledAt ?? entry.at;
+  if (at != null && Number.isFinite(Number(at)) && now - Number(at) > staleMs) {
+    return false;
+  }
+  return Boolean(entry.ok);
 }
 
 function ecoPath() {
@@ -166,6 +197,18 @@ export function loadEcoSnapshot() {
 export function saveEcoSnapshot(partial) {
   const prev = loadEcoSnapshot() || {};
   const next = { ...prev, ...partial, updatedAt: Date.now() };
+  // Drop hard-removed SNs from live maps (never leave Delta 2-B ghosts).
+  if (next.perSn && typeof next.perSn === "object") {
+    for (const sn of Object.keys(next.perSn)) {
+      if (isEcoRemoved(sn)) delete next.perSn[sn];
+    }
+  }
+  if (Array.isArray(next.sns)) {
+    next.sns = next.sns.filter((sn) => !isEcoRemoved(sn));
+  }
+  if (Array.isArray(next.devices)) {
+    next.devices = next.devices.filter((d) => !isEcoRemoved(d?.sn));
+  }
   fs.mkdirSync(path.dirname(ecoPath()), { recursive: true });
   fs.writeFileSync(ecoPath(), JSON.stringify(next, null, 2), "utf8");
   return next;
@@ -465,6 +508,17 @@ export async function refreshEcoFlow() {
   ensureEcoBuckets();
 
   if (!ecoConfigured()) {
+    const prev = loadEcoSnapshot();
+    if (prev?.perSn && Object.keys(prev.perSn).length) {
+      // Keep last good pack — do not bump updatedAt (would fake freshness).
+      return {
+        ...prev,
+        status: prev.status === "live" ? "live" : "unconfigured",
+        note:
+          (prev.note ? `${prev.note} · ` : "") +
+          "keys missing in this process — last pack retained",
+      };
+    }
     return saveEcoSnapshot({
       status: "unconfigured",
       batteryPct: null,
@@ -535,6 +589,7 @@ export async function refreshEcoFlow() {
       .filter((sn) => !isEcoRemoved(sn));
     if (sns.length) noteParts.push("sns from device list");
   }
+  sns = sns.filter((sn) => !isEcoRemoved(sn));
   if (!sns.length) {
     return saveEcoSnapshot({
       status: "needs_sn",
@@ -556,17 +611,43 @@ export async function refreshEcoFlow() {
         status: q.status,
         body: q.json,
       });
+      const onlineFlag = isEcoDeviceOnlineFlag(
+        devices.find((d) => String(d.sn) === String(sn))?.online,
+      );
       if (q.ok && q.json?.data) {
         const data = q.json.data;
         const soc = pickSoc(data);
         const power = pickPowerWatts(data);
         const off = isEcoOffCircuit(sn);
-        perSn[sn] = { ok: true, soc, ...power, offCircuit: off };
+        // Offline on device list → quota is cached junk for live calc (River 2 Pro).
+        if (onlineFlag === false) {
+          perSn[sn] = {
+            ok: false,
+            live: false,
+            deviceOnline: false,
+            message: "offline (device list)",
+            sampledAt: Date.now(),
+            lastKnown: { soc, ...power },
+            offCircuit: off,
+          };
+          noteParts.push(`${sn} offline (list) — excluded from live`);
+          continue;
+        }
+        perSn[sn] = {
+          ok: true,
+          live: true,
+          deviceOnline: onlineFlag !== false,
+          sampledAt: Date.now(),
+          soc,
+          ...power,
+          offCircuit: off,
+        };
         if (soc != null && !off) onCircuitSocs.push(Number(soc));
         appendHistory(sn, {
           soc,
           ...power,
           offCircuit: off,
+          deviceOnline: onlineFlag !== false,
           keys: Object.keys(data).slice(0, 24),
         });
         appendMinuteTotals(sn, { soc, ...power });
@@ -579,7 +660,10 @@ export async function refreshEcoFlow() {
       } else {
         perSn[sn] = {
           ok: false,
+          live: false,
+          deviceOnline: onlineFlag,
           message: q.json?.message || q.text?.slice(0, 100),
+          sampledAt: Date.now(),
           offCircuit: isEcoOffCircuit(sn),
         };
         noteParts.push(`${sn} quota ${q.status}`);
@@ -587,7 +671,9 @@ export async function refreshEcoFlow() {
     } catch (err) {
       perSn[sn] = {
         ok: false,
+        live: false,
         message: err.message,
+        sampledAt: Date.now(),
         offCircuit: isEcoOffCircuit(sn),
       };
       noteParts.push(`${sn} err`);
@@ -597,6 +683,8 @@ export async function refreshEcoFlow() {
     batteryPct = Math.round(
       onCircuitSocs.reduce((a, b) => a + b, 0) / onCircuitSocs.length,
     );
+  } else {
+    batteryPct = null;
   }
 
   return saveEcoSnapshot({
@@ -668,7 +756,7 @@ ${perLines}
 ${solarLine}
 buckets: ${snap.buckets || ecoBucketsRoot()} (quota + minute watt totals)
 ${snap.note || ""}
-quirk: River 2 Pro may show online:0 while perSn SOC/watts still populate — prefer perSn over online flag.
+rule: device-list offline OR sample age > ${Math.round(ECO_STALE_MS / 60000)}m → excluded from live calc (never invent from cache).
 Solar/low-power: prefer lighter digs when power_saver or cloudy.`,
     snapshot: snap,
   };

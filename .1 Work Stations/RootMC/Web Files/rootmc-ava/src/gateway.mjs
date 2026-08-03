@@ -15,7 +15,7 @@ const INTENT_BASE =
 const INTENT_MEMBERS = 1 << 1; // GUILD_MEMBERS (privileged — Server Members Intent in Dev Portal)
 
 /**
- * @param {{ token, onMessage, onReady, onMemberJoin, onReaction?, watchIds? }} opts
+ * @param {{ token, onMessage, onReady, onMemberJoin, onReaction?, onInteraction?, watchIds? }} opts
  */
 export function startGateway({
   token,
@@ -23,6 +23,7 @@ export function startGateway({
   onReady,
   onMemberJoin,
   onReaction,
+  onInteraction,
   watchIds,
 }) {
   let ws = null;
@@ -131,15 +132,22 @@ export function startGateway({
         }
         if (t === "MESSAGE_CREATE" && d) {
           // Guild: only allowlisted channels (+ DMs always)
+          // Exception: `/solar` works in any RootMC guild channel (Alex 2026-08-03)
           const isDm = !d.guild_id;
           const inGuild = String(d.guild_id || "") === String(ROOTMC_GUILD_ID);
           if (!isDm && !inGuild) return;
-          if (!isDm && watch.size && !watch.has(String(d.channel_id))) {
-            // Still allow if channel later added to watch via home channel
-            // — skip non-watch guild channels
+          const isSolarCmd = /^\s*\/solar(?:\s|$)/i.test(String(d.content || ""));
+          if (!isDm && watch.size && !watch.has(String(d.channel_id)) && !isSolarCmd) {
             return;
           }
           onMessage?.(d, { isDm });
+          return;
+        }
+        if (t === "INTERACTION_CREATE" && d) {
+          const isDm = !d.guild_id;
+          const inGuild = String(d.guild_id || "") === String(ROOTMC_GUILD_ID);
+          if (!isDm && !inGuild) return;
+          onInteraction?.(d);
           return;
         }
         if (
