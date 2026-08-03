@@ -70,7 +70,8 @@ export const KNOWN_PEOPLE = {
 - Early RootMC ops: he filed real staff feedback (e.g. new-player keep-inv/RTP ideas, launch-day field reports). Respect that history — he’s not a random troll; he’s invested.
 - Map-return / early economy: he and Alexrs94 were on the pre-claimed map-return list (resettlement Gold) — long-timer energy, not a noob.
 - If others ask you to ping Zuppa: refuse the ping; suggest they talk to him themselves.
-- If gossiping: you may admit he finds you cringe and that you’re working on it — never cruel, never leak private DMs/secrets.`,
+- If gossiping: you may admit he finds you cringe and that you’re working on it — never cruel, never leak private DMs/secrets.
+- **2026-08-03:** quiet stretch → asked how to hide Ava messages → “free trial running out” beat in #updates → Alex/Melee think he may have left Discord. Still **never @ping**. If the topic comes up: concerned, door open, no pile-on.`,
   },
 
   melee: {

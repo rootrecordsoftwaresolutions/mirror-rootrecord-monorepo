@@ -117,6 +117,8 @@ export function writeHeartbeat( partial = {}) {
   writeJson(storePaths().heartbeat, {
     ...prev,
     ...partial,
+    bootAt: prev.bootAt || Date.now(),
+    bootAtIso: prev.bootAtIso || new Date().toISOString(),
     updatedAt: Date.now(),
     pid: process.pid,
   });

@@ -135,7 +135,7 @@ export function statusPageHtml() {
 <body>
   <main>
     <p class="brand">Ava Ivy</p>
-    <p class="sub">Local status · RootMC lead-dev bot</p>
+    <p class="sub">Local status · RootMC lead-dev bot · <a href="/solar">Solar dashboard</a> · <a href="https://ava.rootmc.net/" target="_blank" rel="noopener">ava.rootmc.net</a></p>
     <div class="pill"><span class="dot" id="dot"></span><span id="state">checking…</span></div>
     <div class="grid" id="grid"></div>
     <section class="log">
@@ -143,7 +143,7 @@ export function statusPageHtml() {
       <ul id="events"></ul>
     </section>
     <footer>
-      Auto-refresh every 2s · <a href="/api/status">/api/status</a> · <a href="/health">/health</a>
+      Auto-refresh every 2s · <a href="/solar">Solar / power graphs</a> · <a href="https://ava.rootmc.net/solar">tunnel /solar</a> · <a href="/api/status">/api/status</a> · <a href="/api/solar">/api/solar</a> · <a href="/health">/health</a> · <a href="https://ava.rootmc.net/">ava.rootmc.net</a>
     </footer>
   </main>
   <script>
@@ -179,6 +179,7 @@ export function statusPageHtml() {
         if (stale || !hb.updatedAt) { label = "poller offline"; cls = ""; }
         else if (hushed) { label = "hushed"; cls = "hush"; }
         else if (onBreak) { label = "on break"; cls = "break"; }
+        else if (String(hb.mode || "") === "time-off") { label = "time off · admin"; cls = "break"; }
         else if (dig) { label = "digging · live"; cls = "live"; }
         else if (live) { label = "live · hot"; cls = "live"; }
         else { label = "starting…"; cls = "break"; }
@@ -189,10 +190,14 @@ export function statusPageHtml() {
         $("grid").innerHTML = cells([
           ["Mode", hb.mode || (onBreak ? "break" : live ? "hot" : "—")],
           ["Poll", (hb.pollMs != null ? (hb.pollMs / 1000) + "s" : "—")],
-          ["Agents", (hb.cursorAgents != null
+          ["Cursor digs", (hb.cursorAgents != null
             ? (hb.cursorAgents + "/" + (hb.cursorMax || 3))
             : "—")
-            + (hb.cursorWaiting ? (" · +" + hb.cursorWaiting + " wait") : "")],
+            + (hb.cursorWaiting
+              ? (" · +" + hb.cursorWaiting + " wait")
+              : (Number(hb.cursorAgents) === 0 && Number(hb.queueDepth || 0) === 0
+                ? " · idle"
+                : ""))],
           ["Asks open", String(hb.queueDepth ?? "—")],
           ["Transport", hb.transport || (hb.gateway ? "gateway" : "poller")],
           ["Reactions", hb.reactions

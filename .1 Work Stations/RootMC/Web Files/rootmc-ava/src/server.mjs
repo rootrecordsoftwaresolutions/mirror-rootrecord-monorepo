@@ -15,12 +15,15 @@ import {
   isHushed,
 } from "./store.mjs";
 import { statusPageHtml } from "./statusPage.mjs";
+import { solarPageHtml } from "./solarPage.mjs";
+import { buildSolarDashboardPayload } from "./powerTelemetry.mjs";
 import { loadHostSnapshot, itemizeHostMetricsTimeframes } from "./hostMetrics.mjs";
 import { scheduleSelfRestart, loadRestartRequest } from "./selfUpgrade.mjs";
 import { readLiveness, livenessDegraded } from "./liveness.mjs";
 
 const env = await loadEnv();
 storePaths();
+const httpStartedAt = Date.now();
 
 async function readJsonBody(req) {
   let body = "";
@@ -43,7 +46,29 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && (url.pathname === "/solar" || url.pathname === "/power")) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(solarPageHtml());
+    return;
+  }
+
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+
+  if (req.method === "GET" && url.pathname === "/api/solar") {
+    try {
+      const hours = Number(url.searchParams.get("hours") || 8);
+      const payload = await buildSolarDashboardPayload({
+        hours,
+        statusHttpUptimeMs: Date.now() - httpStartedAt,
+      });
+      res.end(JSON.stringify(payload));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ ok: false, detail: err.message }));
+    }
+    return;
+  }
 
   if (req.method === "GET" && url.pathname === "/api/status") {
     const heartbeat = loadHeartbeat();
