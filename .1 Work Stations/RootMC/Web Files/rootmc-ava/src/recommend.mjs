@@ -566,6 +566,16 @@ function msgContent(contentOrMsg) {
   return String(contentOrMsg || "");
 }
 
+/**
+ * Strip URLs / hostnames so `\bava\b` does not false-positive on
+ * https://ava.rootmc.net/… (word-boundary matches inside the hostname).
+ */
+export function stripUrlsForNameMatch(text) {
+  return String(text || "")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/\b(?:www\.)?[\w.-]*ava[\w.-]*\.(?:net|com|org|io|dev|app)\S*/gi, " ");
+}
+
 /** True if text/@mention clearly refers to Ava (name or bot ping). */
 export function refersToAva(contentOrMsg, botUserId) {
   if (contentOrMsg && typeof contentOrMsg === "object") {
@@ -582,9 +592,10 @@ export function refersToAva(contentOrMsg, botUserId) {
   ) {
     return true;
   }
+  const forName = stripUrlsForNameMatch(raw);
   // Name forms — Ava / Ava Ivy / legacy Sexi Dev branding
-  if (/\bava(\s*[-\s]\s*ivy|\s+ivy)?\b/i.test(raw)) return true;
-  if (/\bsexi(\s+dev|\s+assistant)?\b/i.test(raw)) return true;
+  if (/\bava(\s*[-\s]\s*ivy|\s+ivy)?\b/i.test(forName)) return true;
+  if (/\bsexi(\s+dev|\s+assistant)?\b/i.test(forName)) return true;
   return false;
 }
 

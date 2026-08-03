@@ -155,6 +155,10 @@ import {
   markInstallAskSent,
 } from "./telegramGroupVault.mjs";
 import {
+  isFernForestGroup,
+  fernForestContextBrief,
+} from "./fernForestHawaii.mjs";
+import {
   logInbound,
   recordAvaUtterance,
   appendAction,
@@ -570,6 +574,13 @@ export function createPipeline(deps) {
       const groupVaultCue = tgGroup
         ? `### Telegram group vault (LOCKED)\nThis chat is private to THIS group only. Never dump other groups' or Discord/Slack context here. Install scopes need Alex (@WildEcho94) "install go" inside this group first (approved=${isGroupInstallApproved(channelId)}).`
         : "";
+      const fernForestCue =
+        tgGroup && isFernForestGroup(channelId, msg.telegram?.chatType)
+          ? fernForestContextBrief({
+              chatIdOrChannel: channelId,
+              question,
+            })
+          : "";
       const context = [
         mem,
         liveCtx,
@@ -578,6 +589,7 @@ export function createPipeline(deps) {
         batchCue,
         chimeCue,
         groupVaultCue,
+        fernForestCue,
       ]
         .filter(Boolean)
         .join("\n\n")
@@ -1486,9 +1498,16 @@ export function createPipeline(deps) {
           ? msg.telegram.botUserId
           : botAppId;
 
+    // Telegram groups: only engage when poller marked addressed, @/name match, or reply-to-bot.
+    // Never treat every Telegram surface hit as addressed (URL `\bava\b` bleed defense).
+    const tgPrivate =
+      msg.surface === "telegram" &&
+      (isDm || msg.telegram?.chatType === "private");
     const addressed =
       isDm ||
-      msg.surface === "telegram" ||
+      tgPrivate ||
+      Boolean(msg.telegram?.addressed) ||
+      Boolean(msg.telegram?.replyToBot) ||
       shouldAvaEngage(msg, triggerBotId) ||
       isReplyToAva(msg, messages, triggerBotId);
 

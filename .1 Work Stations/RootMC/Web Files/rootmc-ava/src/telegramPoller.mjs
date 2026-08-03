@@ -18,7 +18,10 @@ import {
   isTelegramChannelId,
   telegramChatIdFromChannel,
 } from "./telegramApi.mjs";
-import { looksLikeTalkingAboutAva } from "./recommend.mjs";
+import {
+  looksLikeTalkingAboutAva,
+  stripUrlsForNameMatch,
+} from "./recommend.mjs";
 import {
   touchGroupVault,
   isTelegramGroupChannel,
@@ -240,6 +243,7 @@ export function startTelegramPoller(opts = {}) {
         botUserId,
         isGroup: isTelegramGroupChannel(channelId, m.chat.type),
         replyToBot: isReplyToBot(m, botUserId),
+        addressed: true,
       },
     };
 
