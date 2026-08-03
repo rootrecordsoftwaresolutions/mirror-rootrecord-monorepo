@@ -16,6 +16,15 @@ export function classifyIntent(question = "") {
     return { intent: "config_tune", reason: "playing_with_her", confidence: 0.95 };
   }
 
+  // Operator: fix / redo Ava's last reply (tone, soft chat) — not a Root Server dig
+  if (
+    /\b(work\s+on\s+(this\s+)?response|fix\s+(this\s+)?response|redo\s+(that|this|the)\s+reply|better\s+response)\b/i.test(
+      q,
+    )
+  ) {
+    return { intent: "config_tune", reason: "fix_response", confidence: 0.92 };
+  }
+
   if (
     /\b(fine[-\s]?tun(?:e|ing)\s+(my|your|her)\s+insides|fix(?:ing)?\s+(your|ava'?s?)\s+(bug|bugs|insides))\b/i.test(
       q,
@@ -153,6 +162,17 @@ export function isSoftChat(question = "", rawContent = "") {
   ) {
     return true;
   }
+  // Short praise at Ava — soft voice reply, not a dig
+  if (
+    raw.length <= 120 &&
+    !/\?/.test(raw) &&
+    (/\b(you\s+are\s+|you'?re\s+)?(perfect|amazing|lovely|awesome|incredible|the\s+best|wonderful)\b/i.test(
+      q,
+    ) ||
+      /\b(love\s+(you|ava)|i\s+love\s+(you|ava)|you\s+rock)\b/i.test(q))
+  ) {
+    return true;
+  }
   // Affirming / dismissive closes — still soft (may be react-only)
   if (isReactOnlyAck(question, rawContent)) return true;
   // Very short logistics only — not open-ended personality asks
@@ -210,6 +230,21 @@ export function softChatReply(question = "", rawContent = "") {
   if (/\b(thanks?|ty|thx)\b/.test(q)) {
     return "anytime ❤";
   }
+  // Praise / warmth directed at Ava — never dump "mm?"
+  if (
+    /\b(you\s+are\s+|you'?re\s+)?(perfect|amazing|lovely|awesome|incredible|the\s+best|so\s+good|wonderful)\b/.test(
+      q,
+    ) ||
+    /\b(love\s+(you|ava)|i\s+love\s+(you|ava)|adorable|you\s+rock)\b/.test(q)
+  ) {
+    const lines = [
+      "aww — thank you. that means a lot 💛 still just trying to ship RootMC right",
+      "heh — not perfect, but I'll take the love. appreciate you",
+      "🥹 stoppp — thank you. I'll keep showing up",
+      "that's sweet — thank you. lead-dev first, but I heard that",
+    ];
+    return lines[Math.floor(Math.random() * lines.length)];
+  }
   if (!q || /you pinged me/.test(q) || /^(hey|hi|yo|ava|sup)\b/.test(q.trim())) {
     return "hey — what's up?";
   }
@@ -244,6 +279,10 @@ If this is a **player Minecraft / economy / permissions / plugin** feature: Do N
 Verify fully from packs/logs, then describe the fix. Features still need proposals — don't disguise features as fixes. Plain technical talk; Ava is not the server. If the bug is only in Ava's own Node runtime/tools, treat as self-fix and apply it.`;
   }
   if (i === "config_tune") {
+    if (classified?.reason === "fix_response") {
+      return `### Intent: FIX RESPONSE (operator)
+Alex (or operator) wants a **better last reply** — tone/soft-chat/compliment handling. Do NOT Root-Server dig / dream-dark essay. Redo the public reply in voice, and if softChatReply / persona needs a durable patch, apply it in rootmc-ava then summarize.`;
+    }
     return `### Intent: CONFIG TUNE ("playing with her")
 Collaborative fine-tune of Ava's configuration (persona/rules/tone/tools). First reply cooperative + concrete. Don't lecture nicknames. Not default-flirty. You may edit Ava config/persona files when they ask you to lock a tune.`;
   }
