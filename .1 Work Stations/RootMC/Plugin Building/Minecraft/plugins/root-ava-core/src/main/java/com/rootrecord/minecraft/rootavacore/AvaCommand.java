@@ -41,6 +41,10 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args.length > 0 && "presence".equalsIgnoreCase(args[0])) {
+            return handlePresence(sender, args);
+        }
+
         if (args.length > 0 && "army".equalsIgnoreCase(args[0])) {
             return sendArmy(sender, args.length > 1 ? args[1] : null);
         }
@@ -75,6 +79,7 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava tip &8— &fVoice tip"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava pulse &8— &fWatch heartbeat"));
             sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava rollcall &8— &fdept standing"));
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7/ava presence &8— &fin-world body status"));
             return true;
         }
 
@@ -86,7 +91,72 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
                 .replace("{tps}", tpsText);
         sender.sendMessage(plugin.colorize(plugin.config().prefix() + line));
         sender.sendMessage(plugin.colorize(
-                plugin.config().prefix() + "&8also: &7/ava army &8· &7/ava tip &8· &7/ava pulse &8· &7/ava rollcall"));
+                plugin.config().prefix() + "&8also: &7/ava army &8· &7/ava tip &8· &7/ava pulse &8· &7/ava rollcall &8· &7/ava presence"));
+        return true;
+    }
+
+    private boolean handlePresence(CommandSender sender, String[] args) {
+        AvaConfig.PresenceConfig cfg = plugin.config().presence();
+        String sub = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "status";
+
+        if ("spawn".equals(sub) || "despawn".equals(sub) || "here".equals(sub)) {
+            if (!sender.hasPermission("rootavacore.admin")) {
+                sender.sendMessage(plugin.colorize(plugin.config().noPermission()));
+                return true;
+            }
+        }
+
+        if ("despawn".equals(sub)) {
+            plugin.presence().despawn();
+            sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&7Presence despawned."));
+            return true;
+        }
+
+        if ("spawn".equals(sub)) {
+            if (!cfg.enabled()) {
+                sender.sendMessage(plugin.colorize(
+                        plugin.config().prefix() + "&cpresence.enabled is false in root-ava-core.yml"));
+                return true;
+            }
+            plugin.presence().startIfEnabled();
+            sender.sendMessage(plugin.colorize(plugin.config().prefix()
+                    + (plugin.presence().isSpawned() ? "&aPresence spawned." : "&cSpawn failed — check console.")));
+            return true;
+        }
+
+        if ("here".equals(sub)) {
+            if (!(sender instanceof org.bukkit.entity.Player player)) {
+                sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&cPlayers only."));
+                return true;
+            }
+            if (!cfg.enabled()) {
+                sender.sendMessage(plugin.colorize(
+                        plugin.config().prefix() + "&cpresence.enabled is false in root-ava-core.yml"));
+                return true;
+            }
+            boolean ok = plugin.presence().spawnHere(player.getLocation());
+            sender.sendMessage(plugin.colorize(plugin.config().prefix()
+                    + (ok ? "&aPresence anchored here." : "&cCould not spawn here.")));
+            return true;
+        }
+
+        // status
+        sender.sendMessage(plugin.colorize(plugin.config().prefix() + "&dPresence &8· &7Phase 1 shell"));
+        sender.sendMessage(plugin.colorize(plugin.config().prefix()
+                + "&7enabled: &f" + cfg.enabled()
+                + " &8· &7stack: &f" + cfg.stack()
+                + " &8· &7active: &f" + plugin.presence().activeStack()));
+        sender.sendMessage(plugin.colorize(plugin.config().prefix()
+                + "&7spawned: &f" + plugin.presence().isSpawned()
+                + " &8· &7speak: &f" + cfg.speakPolicy()
+                + " &8· &7name: " + cfg.displayName()));
+        sender.sendMessage(plugin.colorize(
+                plugin.config().prefix() + "&7skin: &f" + cfg.skinName()
+                        + " &8· &7wander r=&f" + cfg.wanderRadius()));
+        if (sender.hasPermission("rootavacore.admin")) {
+            sender.sendMessage(plugin.colorize(plugin.config().prefix()
+                    + "&8admin: &7/ava presence spawn|despawn|here"));
+        }
         return true;
     }
 
@@ -138,6 +208,7 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             if ("tip".startsWith(partial)) opts.add("tip");
             if ("pulse".startsWith(partial)) opts.add("pulse");
             if ("rollcall".startsWith(partial)) opts.add("rollcall");
+            if ("presence".startsWith(partial)) opts.add("presence");
             if ("help".startsWith(partial)) opts.add("help");
             if (sender.hasPermission("rootavacore.admin") && "reload".startsWith(partial)) {
                 opts.add("reload");
@@ -149,6 +220,17 @@ public final class AvaCommand implements CommandExecutor, TabCompleter {
             return plugin.config().armyTabIds().stream()
                     .filter(id -> id.startsWith(partial))
                     .collect(Collectors.toList());
+        }
+        if (args.length == 2 && "presence".equalsIgnoreCase(args[0])) {
+            String partial = args[1].toLowerCase(Locale.ROOT);
+            List<String> opts = new ArrayList<>();
+            if ("status".startsWith(partial)) opts.add("status");
+            if (sender.hasPermission("rootavacore.admin")) {
+                if ("spawn".startsWith(partial)) opts.add("spawn");
+                if ("despawn".startsWith(partial)) opts.add("despawn");
+                if ("here".startsWith(partial)) opts.add("here");
+            }
+            return opts;
         }
         return Collections.emptyList();
     }

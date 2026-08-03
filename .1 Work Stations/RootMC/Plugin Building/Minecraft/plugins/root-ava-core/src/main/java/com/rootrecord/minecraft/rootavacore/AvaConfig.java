@@ -15,6 +15,27 @@ public final class AvaConfig {
 
     public record ArmyDept(String id, String name, String blurb) {}
 
+    /**
+     * Phase 1 in-world body. Default off — enable only on Test until Alex greenlights live hosts.
+     */
+    public record PresenceConfig(
+            boolean enabled,
+            String stack,
+            String displayName,
+            String skinName,
+            String skinTexture,
+            String speakPolicy,
+            boolean useWorldSpawn,
+            String world,
+            double x,
+            double y,
+            double z,
+            float yaw,
+            boolean wanderEnabled,
+            double wanderRadius,
+            long wanderIntervalTicks,
+            boolean invulnerable) {}
+
     private final boolean enabled;
     private final String prefix;
     private final String statusLine;
@@ -32,6 +53,7 @@ public final class AvaConfig {
     private final String pulseHeader;
     private final String rollcallHeader;
     private final String rollcallFooter;
+    private final PresenceConfig presence;
 
     public AvaConfig(FileConfiguration cfg) {
         this.enabled = cfg.getBoolean("enabled", true);
@@ -65,6 +87,27 @@ public final class AvaConfig {
         this.tips = loadStringList(cfg, "voice.tips", defaultTips());
         this.pulseLines = loadStringList(cfg, "watch.pulse-lines", defaultPulse());
         this.rollcallLines = loadRollcall(cfg);
+        this.presence = loadPresence(cfg);
+    }
+
+    private static PresenceConfig loadPresence(FileConfiguration cfg) {
+        return new PresenceConfig(
+                cfg.getBoolean("presence.enabled", false),
+                cfg.getString("presence.stack", "native-mannequin"),
+                cfg.getString("presence.display-name", "&dAva Ivy"),
+                cfg.getString("presence.skin-name", "AvaIvy"),
+                cfg.getString("presence.skin-texture", ""),
+                cfg.getString("presence.speak-policy", "summon-only"),
+                cfg.getBoolean("presence.spawn.use-world-spawn", true),
+                cfg.getString("presence.spawn.world", "world"),
+                cfg.getDouble("presence.spawn.x", 0.5),
+                cfg.getDouble("presence.spawn.y", 64),
+                cfg.getDouble("presence.spawn.z", 0.5),
+                (float) cfg.getDouble("presence.spawn.yaw", 0),
+                cfg.getBoolean("presence.wander.enabled", true),
+                cfg.getDouble("presence.wander.radius", 6.0),
+                cfg.getLong("presence.wander.interval-ticks", 80L),
+                cfg.getBoolean("presence.safety.invulnerable", true));
     }
 
     private static Map<String, String> loadRollcall(FileConfiguration cfg) {
@@ -262,5 +305,9 @@ public final class AvaConfig {
 
     public List<String> armyTabIds() {
         return new ArrayList<>(armyDepts.keySet());
+    }
+
+    public PresenceConfig presence() {
+        return presence;
     }
 }

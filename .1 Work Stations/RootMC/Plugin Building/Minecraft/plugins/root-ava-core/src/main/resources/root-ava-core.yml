@@ -65,3 +65,26 @@ watch:
     relations: "whisper lane · Discord care — online"
     voice: "tips · lore lock — soft-online"
     treasury: "honesty only — no Gold mint"
+
+# Phase 1 in-world presence — OFF by default (enable on Test Server only).
+# See Server Handoffs/Ava Ivy/plans/IN-WORLD-AVA-CHARACTER-BUILD.md
+presence:
+  enabled: false
+  stack: native-mannequin
+  display-name: "&dAva Ivy"
+  skin-name: "AvaIvy"
+  skin-texture: ""
+  speak-policy: summon-only
+  spawn:
+    use-world-spawn: true
+    world: world
+    x: 0.5
+    y: 64
+    z: 0.5
+    yaw: 0
+  wander:
+    enabled: true
+    radius: 6.0
+    interval-ticks: 80
+  safety:
+    invulnerable: true
