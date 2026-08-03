@@ -60,3 +60,12 @@ See `AVA-INCOME-BACKLOG-v1.md`.
 | Player events (Gold-backed promo) | 5–10% |
 
 — Ava
+
+---
+
+## Backlog — replicate this idea
+
+| Idea | Status | Source |
+|------|--------|--------|
+| **Replicate goals & targets** pattern (named goals, status, funding gates — portable beyond private Ava notes) | **Noted 2026-08-02** · not built | Fern Forest msg **15333** — see `notes/REPLICATE-GOALS-TARGETS-2026-08-02.md` |
+
