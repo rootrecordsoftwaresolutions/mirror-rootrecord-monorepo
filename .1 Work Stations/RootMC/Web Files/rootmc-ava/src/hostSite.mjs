@@ -82,9 +82,21 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
   const state = null;
 
   let period = null;
+  let outlook = [];
   if (forecastUrl) {
     const forecast = await nwsJson(forecastUrl);
-    period = forecast?.properties?.periods?.[0] || null;
+    const periods = Array.isArray(forecast?.properties?.periods)
+      ? forecast.properties.periods
+      : [];
+    period = periods[0] || null;
+    // Next 1–2 periods = outlook (Tonight / Tomorrow / etc.)
+    outlook = periods.slice(1, 3).map((p) => ({
+      name: p.name,
+      temp: p.temperature,
+      unit: p.temperatureUnit || "F",
+      wind: p.windSpeed,
+      short: p.shortForecast,
+    }));
   }
 
   let alerts = [];
@@ -129,6 +141,7 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
           short: period.shortForecast,
         }
       : null,
+    outlook,
     sun,
     alerts,
     fetchedAt: new Date().toISOString(),
@@ -143,45 +156,66 @@ function snLabel(sn) {
   return map[sn] || sn.slice(-6);
 }
 
-export function formatSolarLines(snap, morning = null) {
+/**
+ * Live last-pull line — SOC + in/out only.
+ * Do not print solarW here: when panels feed the pack, solar ≈ in and the 3rd watt is redundant.
+ * Full solar totals / averages / deltas stay in minute buckets for when asked.
+ */
+export function formatLivePullBits(v) {
+  if (!v) return [];
+  const bits = [];
+  if (v.soc != null) bits.push(`SOC ${v.soc}%`);
+  const inW = v.inW != null ? Math.round(Number(v.inW)) : null;
+  const outW = v.outW != null ? Math.round(Number(v.outW)) : null;
+  if (inW != null || outW != null) {
+    const pull = [
+      inW != null ? `${inW}W in` : null,
+      outW != null ? `${outW}W out` : null,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+    bits.push(`last pull ${pull}`);
+  }
+  return bits;
+}
+
+export function formatSolarLines(snap, morning = null, { detail = false } = {}) {
   const lines = [];
   const per = snap?.perSn || {};
   let solarTotal = 0;
   for (const [sn, v] of Object.entries(per)) {
     if (isEcoRemoved(sn)) continue;
     if (!isEcoSampleLive(v)) {
-      lines.push(
-        `- **${snLabel(sn)}**: offline / stale — excluded from live` +
-          (v?.message ? ` (${v.message})` : ""),
-      );
+      lines.push(`- **${snLabel(sn)}**: offline`);
       continue;
     }
     const off = v?.offCircuit || isEcoOffCircuit(sn);
     if (!off && v.solarW != null) solarTotal += Number(v.solarW) || 0;
     const bits = [
-      v.soc != null ? `SOC ${v.soc}%` : null,
-      v.solarW != null ? `solar ${Math.round(v.solarW)}W` : null,
-      v.outW != null ? `out ${Math.round(v.outW)}W` : null,
+      ...formatLivePullBits(v),
       off ? "off-circuit" : null,
     ].filter(Boolean);
-    lines.push(`- **${snLabel(sn)}**: ${bits.join(" / ") || "ok"}`);
+    lines.push(`- **${snLabel(sn)}**: ${bits.join(" · ") || "ok"}`);
   }
   if (snap?.batteryPct != null) {
-    lines.unshift(`- **Bank:** ${snap.batteryPct}% overall`);
+    lines.unshift(`- **Bank:** ${snap.batteryPct}%`);
   }
-  if (solarTotal > 0) {
-    lines.push(`- **Site solar in now:** ~${Math.round(solarTotal)}W`);
-  }
-  if (morning?.siteAvgW != null) {
+  // Totals / averages only when detail asked — not on every /solar live board.
+  if (detail) {
+    if (solarTotal > 0) {
+      lines.push(`- **Site solar in now:** ~${Math.round(solarTotal)}W`);
+    }
+    if (morning?.siteAvgW != null) {
+      lines.push(
+        `- **Morning solar avg (sampled):** ~${Math.round(morning.siteAvgW)}W` +
+          (morning.note && morning.note !== "ok" ? ` (${morning.note})` : ""),
+      );
+    }
+    const solar = loadSolarProfile();
     lines.push(
-      `- **Morning solar avg (sampled):** ~${Math.round(morning.siteAvgW)}W` +
-        (morning.note && morning.note !== "ok" ? ` (${morning.note})` : ""),
+      `- **Array:** ${solar?.panels?.count ?? 10} panels / ${solar?.panels?.circuits ?? 2} circuits / ${solar?.batteries?.count ?? 3} batteries`,
     );
   }
-  const solar = loadSolarProfile();
-  lines.push(
-    `- **Array:** ${solar?.panels?.count ?? 10} panels / ${solar?.panels?.circuits ?? 2} circuits / ${solar?.batteries?.count ?? 3} batteries`,
-  );
   return lines;
 }
 
@@ -197,26 +231,14 @@ export function formatWeatherLines(weather) {
         (p.wind ? ` - wind ${p.wind}` : ""),
     );
   }
-  const sun = weather.sun;
-  if (sun?.sunrise || sun?.sunset) {
-    const fmt = (iso) => {
-      if (!iso) return "?";
-      try {
-        return new Date(iso).toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-          timeZone: "Pacific/Honolulu",
-        });
-      } catch {
-        return String(iso).slice(11, 16);
-      }
-    };
+  const outlook = Array.isArray(weather.outlook) ? weather.outlook : [];
+  for (const o of outlook.slice(0, 2)) {
+    if (!o) continue;
     lines.push(
-      `- **Sun:** rise ${fmt(sun.sunrise)} / set ${fmt(sun.sunset)}` +
-        (sun.transit ? ` / noon ${fmt(sun.transit)}` : ""),
+      `- **Outlook (${o.name}):** ${o.temp}${o.unit} - ${o.short}` +
+        (o.wind ? ` - wind ${o.wind}` : ""),
     );
   }
-  lines.push(`- **Source:** ${weather.source || "NWS"} (local point)`);
   if (weather.alerts?.length) {
     for (const a of weather.alerts) {
       lines.push(

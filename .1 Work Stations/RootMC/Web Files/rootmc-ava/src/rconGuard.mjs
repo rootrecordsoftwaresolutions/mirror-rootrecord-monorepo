@@ -118,10 +118,18 @@ function resolveTarget(which) {
 
 /**
  * @param {string} command
- * @param {{ allow?: boolean, target?: string }} [opts] target: claims | towny
+ * @param {{ allow?: boolean, target?: string, avaSelfRespect?: boolean, avaBuildAssist?: boolean }} [opts]
  * @returns {Promise<{ ok: boolean, reason?: string, output?: string, target?: string }>}
  */
-export async function guardedRcon(command, { allow = false, target = "claims", avaSelfRespect = false } = {}) {
+export async function guardedRcon(
+  command,
+  {
+    allow = false,
+    target = "claims",
+    avaSelfRespect = false,
+    avaBuildAssist = false,
+  } = {},
+) {
   if (isEmergencyStopped()) {
     return { ok: false, reason: "emergency_stop" };
   }
@@ -160,11 +168,29 @@ export async function guardedRcon(command, { allow = false, target = "claims", a
       /^execute\s+as\s+[A-Za-z0-9_]{1,16}\s+at\s+[A-Za-z0-9_]{1,16}\s+run\s+fill\s+.+\bminecraft:cobblestone\b/i.test(
         cmd,
       ));
+  // Alex 2026-08-03 — in-game help powers via console RCON (setblock/fill/WE/schematics)
+  const buildAssist =
+    avaBuildAssist === true &&
+    (/^(minecraft:)?(setblock|fill|clone|particle|playsound|data|item)\b/i.test(cmd) ||
+      /^execute\b/i.test(cmd) ||
+      /^\/?(\/\/|schem|schematic|br\b|brush|we\b|worldedit|fawe|powertool|litematica|lite)\b/i.test(
+        cmd,
+      ) ||
+      /^\/\//.test(cmd) ||
+      /^(tp|teleport)\s+/i.test(cmd) ||
+      /^(give|clear)\s+[A-Za-z0-9_]{1,16}\s+/i.test(cmd) ||
+      /^gamemode\s+(creative|spectator|survival|adventure)\s+AvaIvy\b/i.test(cmd) ||
+      /^rootperms\s+user\s+AvaIvy\b/i.test(cmd) ||
+      /^say\b/i.test(cmd) ||
+      /^broadcast\b/i.test(cmd) ||
+      /^dh\s+/i.test(cmd) || // DecentHolograms reload/create while helping spawn
+      /^rootspawn\b/i.test(cmd));
   if (
     !staffRestart &&
     !safeAssist &&
     !selfRespect &&
-    /^(ban|kick|pardon|whitelist|gamemode|give|xp|effect|fill|setblock|summon|damage)\b/i.test(
+    !buildAssist &&
+    /^(ban|kick|pardon|whitelist|gamemode|give|xp|effect|fill|setblock|summon|damage|clone|execute)\b/i.test(
       cmd,
     )
   ) {

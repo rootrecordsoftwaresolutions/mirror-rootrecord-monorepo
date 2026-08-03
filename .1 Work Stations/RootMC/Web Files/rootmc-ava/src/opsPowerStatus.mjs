@@ -15,6 +15,7 @@ import {
   isEcoSampleLive,
 } from "./ecoflow.mjs";
 import { gatherSolarBrief, loadSolarProfile } from "./solarProfile.mjs";
+import { formatLivePullBits } from "./hostSite.mjs";
 import { gatherGovernanceBrief, getCouncil, listOpenPolls } from "./governanceClient.mjs";
 
 const NICK_BY_SN = {
@@ -224,21 +225,17 @@ export async function buildOpsPowerStatusReply({
     if (isEcoRemoved(sn)) continue;
     const off = v?.offCircuit || isEcoOffCircuit(sn);
     if (!isEcoSampleLive(v)) {
-      lines.push(
-        `• **${snLabel(sn, snap)}**: offline / stale — not in live calc` +
-          (v?.message ? ` (${v.message})` : ""),
-      );
+      lines.push(`• **${snLabel(sn, snap)}**: offline`);
       continue;
     }
     if (!off && v.solarW != null) solarTotal += Number(v.solarW) || 0;
     const bits = [
-      v.soc != null ? `SOC **${v.soc}%**` : null,
-      v.inW != null ? `in ${fmtW(v.inW)}` : null,
-      v.outW != null ? `out ${fmtW(v.outW)}` : null,
-      v.solarW != null ? `solar ${fmtW(v.solarW)}` : null,
+      ...formatLivePullBits(v).map((b) =>
+        b.startsWith("SOC ") ? b.replace(/^SOC /, "SOC **").replace(/%$/, "%**") : b,
+      ),
       off ? "**off-circuit** (not host load · can disconnect)" : null,
     ].filter(Boolean);
-    lines.push(`• **${snLabel(sn, snap)}**: ${bits.join(" - ") || "ok"}`);
+    lines.push(`• **${snLabel(sn, snap)}**: ${bits.join(" · ") || "ok"}`);
   }
   if (!Object.keys(per).length) {
     lines.push("• EcoFlow snapshot empty - keys/sns may still be wiring up");

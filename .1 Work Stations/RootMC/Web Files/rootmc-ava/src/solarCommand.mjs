@@ -93,12 +93,10 @@ export async function buildSolarCommandReply({ refreshPower = true } = {}) {
     `**${site.label || "HI Pacific Solar Root Server"}** — \`/solar\` @ ~${fmtHstClock()}${ageNote}`,
     "",
     `**Power:** host **${hostOnline ? "online" : "off"}** — ${ecoLabel}${bank}`,
-    ...formatSolarLines(snap, morning),
+    ...formatSolarLines(snap, morning, { detail: false }),
     "",
-    "**Weather (NWS)**",
+    "**Weather + outlook (NWS)**",
     ...formatWeatherLines(block?.payload?.weather || { ok: false }),
-    "",
-    `_Live rule: device offline or sample >${Math.round(ECO_STALE_MS / 60000)}m → excluded. Dashboard: https://ava.rootmc.net/solar_`,
     "",
     "— Ava",
   ];
@@ -165,6 +163,7 @@ export async function registerSolarSlashCommand(token, { appId, guildId } = {}) 
 
 /**
  * Handle Discord INTERACTION_CREATE for /solar.
+ * Must ACK within ~3s or Discord shows "The application did not respond".
  */
 export async function handleSolarInteraction(interaction, { token } = {}) {
   const name = interaction?.data?.name || interaction?.data?.custom_id;
@@ -173,35 +172,73 @@ export async function handleSolarInteraction(interaction, { token } = {}) {
 
   const id = interaction.id;
   const itoken = interaction.token;
-  if (!id || !itoken || !token) return false;
+  const appId = interaction.application_id;
+  if (!id || !itoken) return false;
 
-  // Defer then edit — EcoFlow refresh can take a few seconds
-  await fetch(`${DISCORD_API}/interactions/${id}/${itoken}/callback`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
-    }),
-  });
-
-  let content;
+  // ACK immediately (no auth header required for interaction callback)
+  let deferred = false;
   try {
-    content = await buildSolarCommandReply({ refreshPower: true });
+    const ack = await fetch(
+      `${DISCORD_API}/interactions/${id}/${itoken}/callback`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: 5 }), // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+      },
+    );
+    deferred = ack.ok;
+    if (!ack.ok) {
+      const body = await ack.text().catch(() => "");
+      console.warn("solar slash ACK failed", ack.status, body.slice(0, 160));
+    }
   } catch (err) {
-    content = `**/solar** failed: ${err.message || "unknown"}`;
+    console.warn("solar slash ACK err:", err.message);
   }
 
-  const appId = interaction.application_id;
-  await fetch(
-    `${DISCORD_API}/webhooks/${appId}/${itoken}/messages/@original`,
-    {
-      method: "PATCH",
-      headers: {
-        ...authHeaders(token),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ content: String(content).slice(0, 2000) }),
-    },
-  );
+  // If ACK failed, try a direct channel message as last resort
+  const finish = async () => {
+    let content;
+    try {
+      content = await buildSolarCommandReply({ refreshPower: true });
+    } catch (err) {
+      content = `**/solar** failed: ${err.message || "unknown"}`;
+    }
+    content = String(content).slice(0, 2000);
+
+    if (deferred && appId) {
+      const patch = await fetch(
+        `${DISCORD_API}/webhooks/${appId}/${itoken}/messages/@original`,
+        {
+          method: "PATCH",
+          headers: {
+            ...(token ? authHeaders(token) : {}),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content }),
+        },
+      );
+      if (!patch.ok) {
+        const body = await patch.text().catch(() => "");
+        console.warn("solar slash patch failed", patch.status, body.slice(0, 160));
+      }
+      return;
+    }
+
+    // Fallback: post into the channel if interaction ACK died
+    const channelId = interaction.channel_id;
+    if (channelId && token) {
+      await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+        method: "POST",
+        headers: {
+          ...authHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content }),
+      }).catch((err) => console.warn("solar slash fallback post:", err.message));
+    }
+  };
+
+  // Don't block the gateway loop on EcoFlow/NWS
+  void finish().catch((err) => console.warn("solar slash finish:", err.message));
   return true;
 }

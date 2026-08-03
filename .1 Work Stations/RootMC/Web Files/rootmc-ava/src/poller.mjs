@@ -1487,7 +1487,7 @@ if (useGateway) {
       saveSeen(seen);
     },
     onInteraction: async (interaction) => {
-      if (!live) return;
+      // Slash /solar must ACK even during hush/boot — Discord times out at ~3s
       try {
         const handled = await handleSolarInteraction(interaction, { token });
         if (handled) {
