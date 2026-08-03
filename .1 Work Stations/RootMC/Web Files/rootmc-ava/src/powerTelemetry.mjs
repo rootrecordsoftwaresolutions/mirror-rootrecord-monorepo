@@ -26,21 +26,23 @@ import { loadHeartbeat } from "./store.mjs";
 import { readLiveness } from "./liveness.mjs";
 
 const NICK_BY_SN = {
-  R331ZAB5SG6S2858: "cucumbers",
+  R331ZAB5SG6S2858: "Delta 2",
   R331ZAB5SG755642: "Delta 2-B",
-  R621ZA16XH6K1155: "shackas",
+  R621ZA16XH6K1155: "River 2 Pro",
 };
 
 const ECO_STALE_MS = 12 * 60_000;
 
 function snLabel(sn, snap) {
+  if (NICK_BY_SN[sn]) return NICK_BY_SN[sn];
   const nicks = { ...ECO_NICKNAMES, ...(snap?.nicknames || {}) };
   for (const [nick, serial] of Object.entries(nicks)) {
-    if (String(serial) === String(sn) && !/^(delta-2|river)/i.test(nick)) {
-      return nick;
-    }
+    // Prefer product labels; skip kebab slugs + retired casual aliases.
+    if (String(serial) !== String(sn)) continue;
+    if (/^(delta-2-|river-2-|cucumbers|shackas)$/i.test(nick)) continue;
+    return nick;
   }
-  return NICK_BY_SN[sn] || String(sn || "").slice(-6);
+  return String(sn || "").slice(-6);
 }
 
 function publicSite(site) {

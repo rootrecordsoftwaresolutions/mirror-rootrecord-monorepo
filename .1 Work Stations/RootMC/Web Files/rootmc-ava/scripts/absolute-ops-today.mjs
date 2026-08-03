@@ -244,7 +244,7 @@ async function phaseDPosts() {
       "",
       "• Fixed quota signing (GET must not send Content-Type application/json — was 8521 signature wrong)",
       "• SOC + in/out/solar watts (mW→W) into quota buckets + per-minute totals",
-      "• Nicknames: *cucumbers*→Delta 2 `R331ZAB5SG6S2858` · *shackas*→River 2 Pro `R621ZA16XH6K1155`",
+      "• Labels: Delta 2 `R331ZAB5SG6S2858` · River 2 Pro `R621ZA16XH6K1155`",
       `• Snapshot: battery ${eco?.batteryPct != null ? eco.batteryPct + "%" : "unknown"} · ${eco?.note || ""}`.slice(
         0,
         280,
@@ -404,7 +404,7 @@ async function phaseF() {
       "• Worker deploy — awards bot-exclusion + claim-before-post live",
       "• Verified handoff 1.8.0 jars Claims+Towny; no waiting_restart jobs",
       "• Constitution ratification PROP opened (#voting + forum)",
-      "• EcoFlow quota signing fixed; SOC + watt minute buckets; cucumbers/shackas nicknames",
+      "• EcoFlow quota signing fixed; SOC + watt minute buckets; Delta 2 / River 2 Pro labels",
       "• Linux-ops focus ASK posted (awaiting your yes)",
       "• Answered imaging/Kilauea + Towny-through-26.3 in Slack",
       "• Discord #development pointer refreshed; parity soak notes",

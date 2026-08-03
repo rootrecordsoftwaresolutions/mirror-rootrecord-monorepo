@@ -18,7 +18,7 @@ const DEFAULT_PROFILE = {
   batteries: {
     count: 2,
     notes:
-      "On-circuit: cucumbers (Delta 2) + shackas (River 2 Pro). Delta 2-B is off-circuit — not host load; can disconnect (Alex 2026-08-02).",
+      "On-circuit: Delta 2 + River 2 Pro. Delta 2-B is off-circuit — not host load; can disconnect (Alex 2026-08-02).",
   },
   weather_note:
     "When cloudy / sun not fully out, expect thin solar and lighter digs. Apologize plainly — no drama.",

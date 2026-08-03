@@ -132,9 +132,9 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
 
 function snLabel(sn) {
   const map = {
-    R331ZAB5SG6S2858: "cucumbers",
+    R331ZAB5SG6S2858: "Delta 2",
     R331ZAB5SG755642: "Delta 2-B",
-    R621ZA16XH6K1155: "shackas",
+    R621ZA16XH6K1155: "River 2 Pro",
   };
   return map[sn] || sn.slice(-6);
 }

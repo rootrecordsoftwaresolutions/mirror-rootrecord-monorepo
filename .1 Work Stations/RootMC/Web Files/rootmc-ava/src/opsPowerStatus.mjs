@@ -16,9 +16,9 @@ import { gatherSolarBrief, loadSolarProfile } from "./solarProfile.mjs";
 import { gatherGovernanceBrief, getCouncil, listOpenPolls } from "./governanceClient.mjs";
 
 const NICK_BY_SN = {
-  R331ZAB5SG6S2858: "cucumbers",
+  R331ZAB5SG6S2858: "Delta 2",
   R331ZAB5SG755642: "Delta 2-B",
-  R621ZA16XH6K1155: "shackas",
+  R621ZA16XH6K1155: "River 2 Pro",
 };
 
 function wantsMorningSolarAvg(question = "") {
@@ -65,13 +65,14 @@ export function isOpsPowerStatusAsk(question = "") {
 }
 
 function snLabel(sn, snap) {
+  if (NICK_BY_SN[sn]) return NICK_BY_SN[sn];
   const nicks = { ...ECO_NICKNAMES, ...(snap?.nicknames || {}) };
   for (const [nick, serial] of Object.entries(nicks)) {
-    if (String(serial) === String(sn) && !/^(delta-2|river)/i.test(nick)) {
-      return nick;
-    }
+    if (String(serial) !== String(sn)) continue;
+    if (/^(delta-2-|river-2-|cucumbers|shackas)$/i.test(nick)) continue;
+    return nick;
   }
-  return NICK_BY_SN[sn] || sn.slice(-6);
+  return sn.slice(-6);
 }
 
 function fmtW(n) {
@@ -245,7 +246,7 @@ export async function buildOpsPowerStatusReply({
 
   if (per.R621ZA16XH6K1155?.ok) {
     lines.push(
-      "• shackas online-flag can lie - SOC/watts above are from quota (trust those)",
+      "• River 2 Pro online-flag can lie - SOC/watts above are from quota (trust those)",
     );
   }
 

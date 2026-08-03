@@ -419,10 +419,12 @@ export function summarizeMorningSolar(opts = {}) {
   };
 }
 
-/** Friendly nicknames (cucumbers / shackas) → SN for ops talk. */
+/** Friendly labels / aliases → SN for ops talk. Display names: Delta 2 · River 2 Pro. */
 export const ECO_NICKNAMES = {
-  cucumbers: "R331ZAB5SG6S2858", // Delta 2 primary — on host circuit
-  shackas: "R621ZA16XH6K1155", // River 2 Pro — on host circuit
+  "Delta 2": "R331ZAB5SG6S2858", // primary — on host circuit
+  "River 2 Pro": "R621ZA16XH6K1155", // on host circuit
+  cucumbers: "R331ZAB5SG6S2858", // retired casual alias
+  shackas: "R621ZA16XH6K1155", // retired casual alias
   "delta-2-a": "R331ZAB5SG6S2858",
   "delta-2-b": "R331ZAB5SG755642",
   "river-2-pro": "R621ZA16XH6K1155",
@@ -644,7 +646,7 @@ export function gatherEcoBrief() {
     })
     .join("\n");
   const nick =
-    "nicknames: cucumbers→Delta2 R331ZAB5SG6S2858 · shackas→River2Pro R621ZA16XH6K1155";
+    "labels: Delta 2 R331ZAB5SG6S2858 · River 2 Pro R621ZA16XH6K1155 · Delta 2-B off-circuit R331ZAB5SG755642";
   return {
     brief: `### Power (EcoFlow)
 status: ${snap.status || "?"} · battery: ${snap.batteryPct != null ? `${snap.batteryPct}%` : "unknown"} · mood hint: ${moodFromPower(snap)}
@@ -654,7 +656,7 @@ ${perLines}
 ${solarLine}
 buckets: ${snap.buckets || ecoBucketsRoot()} (quota + minute watt totals)
 ${snap.note || ""}
-quirk: River2Pro (shackas) may show online:0 while perSn SOC/watts still populate — prefer perSn over online flag.
+quirk: River 2 Pro may show online:0 while perSn SOC/watts still populate — prefer perSn over online flag.
 Solar/low-power: prefer lighter digs when power_saver or cloudy.`,
     snapshot: snap,
   };

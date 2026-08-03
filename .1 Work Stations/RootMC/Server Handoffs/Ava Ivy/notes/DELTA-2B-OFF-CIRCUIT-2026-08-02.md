@@ -8,4 +8,4 @@
 - `ECO_OFF_CIRCUIT_SNS` / `isEcoOffCircuit` in `ecoflow.mjs`
 - Excluded from site bank mood avg + site solar totals
 - Still listed in power reports as **off-circuit**
-- On-circuit bank: cucumbers + shackas
+- On-circuit bank: Delta 2 + River 2 Pro
