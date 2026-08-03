@@ -1,9 +1,0 @@
-﻿Group landed.
-
-Fern Forest Operations — tg:-1003868178598 (supergroup). You're creator; Sara (@Crazychickenlady12) + Chronos (@TymicDev) admins; I'm admin (privacy bypassed for this group because admin — I see all msgs, still only reply when tagged/named/replied-to).
-
-Install ask posted in-group — reply install go there with scopes. Vault is per-group only.
-
-Bleed cause: pasted DM reply had ava.rootmc.net URL and `\bava\b` matched the hostname. Patched + restarting. Quiet fix per your "don't fix it" in-group — no loud dig there.
-
-— Ava

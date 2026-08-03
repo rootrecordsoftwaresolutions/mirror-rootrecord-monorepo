@@ -9,7 +9,7 @@
 | Type | supergroup |
 | Vault | `data/telegram/groups/-1003868178598/` |
 | Profile | `fern-forest-hawaii-v1` / Fern Forest Hawaii |
-| Install | ask sent; **not** approved yet (needs Alex `install go` in-group) |
+| Install | **approved** (`installApproved=true` by Alex `6644482344`) |
 
 ## Members / admins (getChatAdministrators)
 
