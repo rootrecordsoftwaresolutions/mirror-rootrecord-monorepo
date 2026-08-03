@@ -16,6 +16,8 @@ Live `getUpdates` caught lines the vault had not fully ingested yet:
 | 15290 | Alex | **Ok, Ava can catch up on the chat** |
 | DM 376 | Alex | Fern Forest may have **3 dig-queue lines**; fully catch up on TG |
 | DM 346 | Alex | Per-group private vault; ask him **in-group** before install functions |
+| 15298 | Alex | Personality: looking for things; morning data collect; digging/singing/farming; MC skill lore |
+| ~Do everything | Alex | Do everything (autonomous helpers in this vault) |
 | earlier | Alex | Solar countdown chips; no bleed; July summary / more of this; "everything that's best" while he's active |
 
 ## What shipped / improved
@@ -24,6 +26,7 @@ Live `getUpdates` caught lines the vault had not fully ingested yet:
 - Solar crumb reframed for growers (→ sunrise / → sunset / soft time-off band) + dashboard
 - Dig queue preference noted = 3 (vault-local); install still needs in-group go
 - Runtime: `Web Files/rootmc-ava/src/fernForestHawaii.mjs`
+- In-group replies: **15299** (catch-up improve) + personality-lock follow-up after 15298
 
 ## Do not
 - Cross-post this group's internals to Discord/Slack/other TG groups

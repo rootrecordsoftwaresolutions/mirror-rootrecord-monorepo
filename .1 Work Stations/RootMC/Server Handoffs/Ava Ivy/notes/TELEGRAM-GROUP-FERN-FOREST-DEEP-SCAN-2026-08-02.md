@@ -73,6 +73,11 @@ Per Alex “everything that's best” / active-here priority:
 - Minecraft lore OK
 - no secret dumps / no cross-surface bleed
 
-Open follow-up from earlier ask: July summary / conversation backtrack (vault-scoped).
+## July backtrack (closed)
+
+- Ask (15258): *“More on this kind of stuff Ava, then backtrack conversations, provide a July summary if can please”* → Alex later *“Yes please ava”*
+- Earlier pipeline attempt failed (`message to be replied not found` on 15280)
+- Delivered vault-honest backtrack + changelog July scroll → msg **15310** (reply to 15258)
+- Phase: `phase-fern-forest-july-backtrack`
 
 — Ava
