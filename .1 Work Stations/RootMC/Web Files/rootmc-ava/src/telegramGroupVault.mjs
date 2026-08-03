@@ -183,8 +183,14 @@ export function markInstallAskSent(chatIdOrChannel, { pendingBrief = null } = {}
 }
 
 export function looksLikeInstallGo(text) {
-  return /\b(install\s+(go|ok|yes|approved)|approve\s+install|greenlight\s+install|you'?re?\s+good\s+to\s+install|go\s+ahead\s+and\s+install)\b/i.test(
-    String(text || ""),
+  const t = String(text || "");
+  return (
+    /\b(install\s+(go|ok|yes|approved)|approve\s+install|greenlight\s+install|you'?re?\s+good\s+to\s+install|go\s+ahead\s+and\s+install)\b/i.test(
+      t,
+    ) ||
+    /\beverything\s+that'?s\s+best\b/i.test(t) ||
+    /\byou\s+know\s+how\s+i\s+like\s+things\b/i.test(t) ||
+    /\b(full\s+install|install\s+full|best\s+scopes?|full\s+scopes?)\b/i.test(t)
   );
 }
 

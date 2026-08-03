@@ -20,14 +20,15 @@ Operator DM (`@WildEcho94` / `6644482344`) — msg 346:
 - `privacy.mjs`: Telegram **groups** are not treated as Alex-only DMs (no billing PII in groups).
 - Pipeline: group vault memory context; install ask / `install go` gate.
 
-## Traffic read (this pass)
+## Traffic read (updated 2026-08-03 deep scan)
 
-- All inbound Telegram to date is **DM only** `tg:6644482344` (37 unique msgs). Latest group-design DM = msg **346**; solar countdown DM = msg **363**.
-- `getUpdates` pending = **0**. No `tg:-…` group chat id in inbound/logs/seen yet.
-- Join event for the add-to-group was missed earlier (empty service message + no `my_chat_member` in allowed_updates). Fixed going forward.
+- Group live: **Fern Forest Operations** `tg:-1003868178598` — see `TELEGRAM-GROUP-FERN-FOREST-DEEP-SCAN-2026-08-02.md`.
+- Admin status bypasses privacy for *delivery* of all group msgs; engage still @/reply/name gated.
+- Bleed bug fixed: `\bava\b` no longer matches `ava.rootmc.net` hostnames (`stripUrlsForNameMatch`).
+- Install ask fires on first Alex engage (not only install-keyword msgs). Waiting on in-group **`install go`**.
 
 ## Operator note
 
-To land a group id + reply in-thread: `@ava_ivy_bot` (or reply to Ava) inside the group once. Privacy mode requires the username tag.
+In this group Ava is already admin — `@ava_ivy_bot` still preferred. Reply **`install go`** in-group to unlock install scopes.
 
 — Ava

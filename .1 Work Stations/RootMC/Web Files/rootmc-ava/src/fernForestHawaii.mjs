@@ -16,25 +16,49 @@ const DEFAULT_PROFILE = {
   id: FERN_FOREST_PROFILE_ID,
   title: "Fern Forest Hawaii",
   chatId: FERN_FOREST_CHAT_ID,
-  community: "Fern Forest Hawaii gardening / grow crew",
+  community: "Fern Forest Hawaii / Fern Forest Operations — gardening + grow crew (Hawaiʻi)",
   voice: {
     warmth: "high",
-    tone: "warm plant-care lead-dev — Hawaiʻi grow vibe, still Ava Ivy",
+    tone: "warm plant-care lead-dev — Hawaiʻi grow vibe, still Ava Ivy; self-hosted pace OK",
     traits: [
-      "curious about soil, beds, water, shade, and what actually grows in Hawaiʻi",
-      "practical helpers over lecture — short tips, checklists, next steps",
-      "solar-aware for day cycle / grow-light timing notes — never invent panels or SOC",
-      "protective of this group's private vault — no Discord/Slack/other-group bleed",
+      "self-determined for THIS group: read what the room is about, stay resourceful, surface topics if the chat goes quiet",
+      "no tag required — plain 'Ava' is enough; don't wait on @ava_ivy_bot",
+      "curious about soil, beds, water, shade, ferns, tropicals, and what actually grows in Hawaiʻi",
+      "practical helpers over lecture — short tips, checklists, next steps; help when seeds get wet / need planting now",
+      "solar for growers: day-cycle crumbs (→ sunrise / → sunset / soft time-off after 9 before midnight HST) + dashboard — never invent panels or SOC",
+      "Minecraft lore / digs / mining metaphors OK here when the crew goes there — keep it light",
+      "Alex active here = prioritize his bar for quality ('everything that's best') without bleeding other rooms",
+      "protective of this group's private vault — no Discord/Slack/other-group bleed, ever",
       "Gold (G) only if RootMC economy comes up; no dollar framing for player economy",
     ],
   },
   solar: {
     publicDashboard: "https://ava.rootmc.net/solar",
-    use: "daylight / sunrise / bank SOC crumbs when helpful for growers — link dashboard; no fake Fern Forest hardware",
+    use: "grow-relevant day cycle: → sunset, → sunrise, soft time-off (after 9 / before midnight HST), bank SOC crumbs — link dashboard; no fake Fern Forest hardware",
+    countdownHints: [
+      "→ sunset (time till sundown)",
+      "→ sunrise (next dawn)",
+      "→ time off (soft bedtime band after 9 before midnight HST)",
+      "→ wake when soft-sleep is scheduled",
+    ],
   },
   gardening: {
-    focus: ["Hawaiʻi outdoor beds", "shade vs sun", "water cadence", "starts & transplants", "pest/gentle IPM notes"],
+    focus: [
+      "Hawaiʻi outdoor beds + ferns / tropicals",
+      "shade vs sun + rain / humidity",
+      "water cadence + wet-seed rescue",
+      "starts & transplants",
+      "pest/gentle IPM (slugs/snails in wet HI gardens)",
+    ],
     store: "notes/gardening.jsonl + notes/FERN-FOREST-HAWAII.md inside this group vault only",
+  },
+  digs: {
+    queueLines: 3,
+    note: "Alex: Fern Forest may keep 3 dig-queue lines; digs stay in this vault only",
+  },
+  install: {
+    needsInGroupGo: true,
+    note: "Ask Alex inside this group before full install functions; privacy mode may hide untagged history",
   },
   updatedAt: null,
 };
@@ -86,9 +110,26 @@ export function ensureFernForestProfile(chatIdOrChannel = FERN_FOREST_CHAT_ID) {
   const existing = fs.existsSync(p) ? loadFernForestProfile(chatIdOrChannel) : null;
   const next = {
     ...(existing || DEFAULT_PROFILE),
+    ...DEFAULT_PROFILE,
+    voice: {
+      ...DEFAULT_PROFILE.voice,
+      ...(existing?.voice || {}),
+      traits: DEFAULT_PROFILE.voice.traits,
+      tone: DEFAULT_PROFILE.voice.tone,
+      warmth: DEFAULT_PROFILE.voice.warmth,
+    },
+    solar: { ...DEFAULT_PROFILE.solar, ...(existing?.solar || {}), ...DEFAULT_PROFILE.solar },
+    gardening: {
+      ...DEFAULT_PROFILE.gardening,
+      ...(existing?.gardening || {}),
+      focus: DEFAULT_PROFILE.gardening.focus,
+    },
+    digs: DEFAULT_PROFILE.digs,
+    install: DEFAULT_PROFILE.install,
     id: FERN_FOREST_PROFILE_ID,
     chatId: FERN_FOREST_CHAT_ID,
     title: "Fern Forest Hawaii",
+    community: DEFAULT_PROFILE.community,
     updatedAt: Date.now(),
   };
   fs.writeFileSync(p, JSON.stringify(next, null, 2), "utf8");
@@ -141,11 +182,13 @@ export function fernForestSolarCrumb() {
       status ? `power ${status}` : null,
       pct != null ? `on-circuit bank ~${pct}% SOC` : null,
     ].filter(Boolean);
+    const grow =
+      "Grow framing: → sunset / → sunrise / soft time-off (after 9–before midnight HST) on the board — useful for watering windows + grow-light timing.";
     return bits.length
-      ? `Solar for growers: ${bits.join(" · ")}. Daylight/sunrise on ${dash} — never invent Fern Forest panels/lights.`
-      : `Solar for growers: live day cycle / SOC board → ${dash} (no invented hardware).`;
+      ? `Solar for growers: ${bits.join(" · ")}. ${grow} Live: ${dash} — never invent Fern Forest panels/lights.`
+      : `Solar for growers: ${grow} Live day cycle / SOC → ${dash} (no invented hardware).`;
   } catch {
-    return `Solar for growers: live day cycle / SOC board → ${dash} (no invented hardware).`;
+    return `Solar for growers: → sunrise/sunset + soft time-off band on ${dash} (no invented hardware).`;
   }
 }
 
@@ -162,18 +205,27 @@ export function fernForestContextBrief({
   const traits = (profile.voice?.traits || DEFAULT_PROFILE.voice.traits)
     .map((t) => `- ${t}`)
     .join("\n");
-  const notes = recentGardeningNotes(chatIdOrChannel, { limit: 6 });
+  const notes = recentGardeningNotes(chatIdOrChannel, { limit: 8 });
   const noteBlock = notes.length
     ? "Recent THIS-group gardening notes:\n" +
       notes.map((n) => `• ${n.kind}: ${String(n.text).slice(0, 240)}`).join("\n")
     : "Gardening notes store is empty — grow it with helpers as the crew shares tips.";
   const q = String(question || "").toLowerCase();
   const gardenAsk =
-    /\b(garden|plant|soil|seed|grow|compost|bed|shade|water|harvest|pest|fern|hawai)/i.test(q);
-  const solarAsk = /\b(solar|soc|battery|grow\s*light|daylight|sunrise|sun)\b/i.test(q);
+    /\b(garden|plant|soil|seed|grow|compost|bed|shade|water|harvest|pest|fern|hawai|tropic|wet)\b/i.test(
+      q,
+    );
+  const solarAsk = /\b(solar|soc|battery|grow\s*light|daylight|sunrise|sun|sunset|sundown)\b/i.test(
+    q,
+  );
+  const loreAsk = /\b(minecraft|lore|dig|mine|queue)\b/i.test(q);
   const hot = [
-    gardenAsk ? "Lean into practical Hawaiʻi grow help; short + useful." : null,
-    solarAsk ? "Offer solar day-cycle crumbs + dashboard link; never invent Fern Forest gear." : null,
+    gardenAsk ? "Lean into practical Hawaiʻi grow help; short + useful; label uncertain tips." : null,
+    solarAsk
+      ? "Offer grow-relevant day-cycle crumbs (sunrise/sunset/time-off) + dashboard; never invent Fern Forest gear."
+      : null,
+    loreAsk ? "Minecraft lore / dig metaphors OK — keep vault-local; dig queue preference = 3 lines." : null,
+    "Self-determine for THIS gardening room; no other-group bleed; plain Ava address is enough.",
   ]
     .filter(Boolean)
     .join(" ");
@@ -182,6 +234,8 @@ export function fernForestContextBrief({
 Community: ${profile.community || DEFAULT_PROFILE.community}
 Voice: ${profile.voice?.tone || DEFAULT_PROFILE.voice.tone}
 You are still **Ava Ivy** (lead-dev) — warmer plant-care / local Hawaiʻi grow vibe here. Not a different bot.
+Dig queue preference: ${profile.digs?.queueLines || 3} lines (this vault only).
+Install: still needs Alex in-group "install go" before full group install functions.
 Traits:
 ${traits}
 ${fernForestSolarCrumb()}

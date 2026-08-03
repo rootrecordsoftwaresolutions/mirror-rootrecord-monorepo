@@ -1474,12 +1474,15 @@ export function createPipeline(deps) {
         }
       } else if (
         !isGroupInstallApproved(channelId) &&
-        isAlexTelegramId(msg.author?.id) &&
-        looksLikeInstallBrief(msg.content)
+        isAlexTelegramId(msg.author?.id)
       ) {
+        // First Alex engage in an unapproved group → always ask install (DM #346).
         const meta = loadGroupMeta(channelId);
         if (!meta.installAskSent) {
-          markInstallAskSent(channelId, { pendingBrief: msg.content });
+          const pending = looksLikeInstallBrief(msg.content)
+            ? msg.content
+            : null;
+          markInstallAskSent(channelId, { pendingBrief: pending });
           touchActivity("tg-group-install-ask");
           await reply(
             channelId,

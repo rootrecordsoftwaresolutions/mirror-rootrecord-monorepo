@@ -67,7 +67,11 @@ function addressesAva(m, botUsername, botUserId) {
   if (entityMentionsBot(m, botUsername, botUserId)) return true;
   if (isReplyToBot(m, botUserId)) return true;
   if (!t.trim()) return false;
-  return looksLikeTalkingAboutAva(t, null) || /\bava(\s+ivy)?\b/i.test(t);
+  // Strip URLs first — \bava\b matches inside https://ava.rootmc.net (bleed bug).
+  const forName = stripUrlsForNameMatch(t);
+  return (
+    looksLikeTalkingAboutAva(forName, null) || /\bava(\s+ivy)?\b/i.test(forName)
+  );
 }
 
 /**

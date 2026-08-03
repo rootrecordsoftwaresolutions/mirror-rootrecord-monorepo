@@ -625,13 +625,16 @@ export function looksLikeAvaTrigger(contentOrMsg, botUserId) {
   if (botUserId && (raw.includes(`<@${botUserId}>`) || raw.includes(`<@!${botUserId}>`))) {
     return true;
   }
-  if (/^(hey\s+|hi\s+|yo\s+|ok\s+|okay\s+|alright\s+)?ava(\s+ivy)?([,:!?]|\s|$)/i.test(raw)) {
+  // Telegram @ava_ivy_bot / @ava
+  if (/@(?:ava_ivy_bot|ava)\b/i.test(raw)) return true;
+  const forName = stripUrlsForNameMatch(raw);
+  if (/^(hey\s+|hi\s+|yo\s+|ok\s+|okay\s+|alright\s+)?ava(\s+ivy)?([,:!?]|\s|$)/i.test(forName)) {
     return true;
   }
-  if (/^ava(\s+ivy)?[!?.]*$/i.test(raw)) return true;
+  if (/^ava(\s+ivy)?[!?.]*$/i.test(forName)) return true;
   // Trailing / mid-line address: "…, ava" / "thoughts ava?"
-  if (/[,;:]\s*ava(\s+ivy)?\s*[?!]?$/i.test(raw)) return true;
-  if (/\bava(\s+ivy)?\s*[?!]+$/i.test(raw)) return true;
+  if (/[,;:]\s*ava(\s+ivy)?\s*[?!]?$/i.test(forName)) return true;
+  if (/\bava(\s+ivy)?\s*[?!]+$/i.test(forName)) return true;
   return false;
 }
 
