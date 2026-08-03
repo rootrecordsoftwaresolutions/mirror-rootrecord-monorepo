@@ -12,8 +12,8 @@ export function solarPageHtml() {
   <style>
     :root {
       --bg0: #0a110e; --bg1: #121c16; --ink: #e8f2ea; --muted: #8aa394;
-      --line: rgba(232, 242, 234, 0.12); --accent: #6ee7a8; --solar: #f0c14a;
-      --load: #7eb8ff; --bank: #3dcf7a; --cpu: #e0a84a; --warn: #e25b5b;
+      --line: rgba(232, 242, 234, 0.12); --accent: #6ee7a8; --lime: #b8ff5c;
+      --solar: #f0c14a; --load: #7eb8ff; --bank: #7dff9a; --cpu: #e0a84a; --warn: #e25b5b;
       --panel: rgba(0,0,0,0.28); --offline: #e25b5b; --stale: #e0a84a;
     }
     * { box-sizing: border-box; }
@@ -48,9 +48,10 @@ export function solarPageHtml() {
       padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid var(--line);
       font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
     }
-    .pill.ok { color: var(--bank); border-color: rgba(61,207,122,0.35); }
+    .pill.ok { color: var(--lime); border-color: rgba(184,255,92,0.4); }
     .pill.warn { color: var(--stale); border-color: rgba(224,168,74,0.4); }
     .pill.bad { color: var(--offline); border-color: rgba(226,91,91,0.45); }
+    .kpi strong.lime { color: var(--lime); text-shadow: 0 0 18px rgba(184,255,92,0.28); }
     .kpis { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 0.65rem; margin: 0 0 1rem; }
     @media (max-width: 960px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 520px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
@@ -77,6 +78,7 @@ export function solarPageHtml() {
     svg.plot { width: 100%; height: 180px; display: block; }
     .legend { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 0.35rem; font-size: 0.72rem; color: var(--muted); }
     .legend i { display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 2px; margin-right: 0.3rem; vertical-align: -1px; }
+    .legend i.lime { box-shadow: 0 0 8px rgba(184,255,92,0.55); }
     .grid2 { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 0.9rem; }
     @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
     .panel { border-top: 1px solid var(--line); padding-top: 0.85rem; margin-top: 0.35rem; }
@@ -126,13 +128,19 @@ export function solarPageHtml() {
         <h2>Site solar intake</h2>
         <p class="meta" id="solarMeta">watts · on-circuit only</p>
         <div id="chartSolar"></div>
-        <div class="legend"><span><i style="background:var(--solar)"></i>Solar W</span></div>
+        <div class="legend">
+          <span><i style="background:var(--solar)"></i>Solar W</span>
+          <span><i class="lime" style="background:var(--lime)"></i>Now</span>
+        </div>
       </section>
       <section class="chart">
         <h2>Battery bank</h2>
         <p class="meta">SOC % · on-circuit average</p>
         <div id="chartBank"></div>
-        <div class="legend"><span><i style="background:var(--bank)"></i>Bank %</span></div>
+        <div class="legend">
+          <span><i class="lime" style="background:var(--bank)"></i>Bank %</span>
+          <span><i class="lime" style="background:var(--lime)"></i>Now</span>
+        </div>
       </section>
       <section class="chart">
         <h2>Load vs charge</h2>
@@ -141,6 +149,7 @@ export function solarPageHtml() {
         <div class="legend">
           <span><i style="background:var(--load)"></i>Out (load)</span>
           <span><i style="background:var(--solar)"></i>Solar in</span>
+          <span><i class="lime" style="background:var(--lime)"></i>Now</span>
         </div>
       </section>
       <section class="chart">
@@ -219,6 +228,22 @@ export function solarPageHtml() {
       }
       return d;
     }
+    /** Carry last good sample across short null gaps so chart lines don't shatter. */
+    function bridgeGaps(values, maxGap = 8) {
+      const out = values.slice();
+      let last = null, gap = 0;
+      for (let i = 0; i < out.length; i++) {
+        const v = out[i];
+        if (v != null && Number.isFinite(Number(v))) {
+          last = Number(v); gap = 0;
+        } else if (last != null && gap < maxGap) {
+          out[i] = last; gap++;
+        } else {
+          gap++;
+        }
+      }
+      return out;
+    }
     function areaFrom(values, w, h, pad, yMax, yMin = 0) {
       const line = pathFrom(values, w, h, pad, yMax, yMin);
       if (!line) return "";
@@ -226,30 +251,59 @@ export function solarPageHtml() {
       const x0 = pad, x1 = pad + (n <= 1 ? 0 : (w - pad * 2)), yBase = h - pad;
       return line + " L " + x1.toFixed(1) + " " + yBase + " L " + x0.toFixed(1) + " " + yBase + " Z";
     }
+    function lastPoint(values, w, h, pad, yMax, yMin = 0) {
+      const n = values.length;
+      const span = Math.max(1e-6, yMax - yMin);
+      for (let i = n - 1; i >= 0; i--) {
+        const v = values[i];
+        if (v == null || !Number.isFinite(Number(v))) continue;
+        return {
+          x: pad + (n <= 1 ? 0 : (i / (n - 1)) * (w - pad * 2)),
+          y: h - pad - ((Number(v) - yMin) / span) * (h - pad * 2),
+          v: Number(v),
+        };
+      }
+      return null;
+    }
     function drawChart(el, seriesList, opts = {}) {
       const w = 560, h = 180, pad = 18;
-      const all = seriesList.flatMap((s) => s.values.filter((v) => v != null));
+      const bridged = seriesList.map((s) => ({
+        ...s,
+        values: opts.bridge === false ? s.values : bridgeGaps(s.values, opts.maxGap || 8),
+      }));
+      const all = bridged.flatMap((s) => s.values.filter((v) => v != null));
       let yMax = opts.yMax != null ? opts.yMax : Math.max(...all, 1);
       let yMin = opts.yMin != null ? opts.yMin : 0;
       if (opts.padMax) yMax = yMax * 1.08;
       if (!all.length) { el.innerHTML = '<p class="empty">No samples in this window yet</p>'; return; }
       const grid = [0.25,0.5,0.75].map((f) => {
         const y = pad + f * (h - pad * 2);
-        return '<line x1="'+pad+'" x2="'+(w-pad)+'" y1="'+y+'" y2="'+y+'" stroke="rgba(232,242,234,0.08)" />';
+        return '<line x1="'+pad+'" x2="'+(w-pad)+'" y1="'+y+'" y2="'+y+'" stroke="rgba(184,255,92,0.08)" />';
       }).join("");
-      const layers = seriesList.map((s) => {
+      const layers = bridged.map((s) => {
         const fill = s.fill ? areaFrom(s.values, w, h, pad, yMax, yMin) : "";
         const line = pathFrom(s.values, w, h, pad, yMax, yMin);
-        return (fill ? '<path d="'+fill+'" fill="'+s.color+'" fill-opacity="0.18" stroke="none" />' : "") +
-          '<path d="'+line+'" fill="none" stroke="'+s.color+'" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />';
+        const limeFill = s.lime
+          ? (fill ? '<path d="'+fill+'" fill="#b8ff5c" fill-opacity="0.10" stroke="none" />' : "")
+          : "";
+        return limeFill +
+          (fill ? '<path d="'+fill+'" fill="'+s.color+'" fill-opacity="'+(s.lime ? '0.16' : '0.18')+'" stroke="none" />' : "") +
+          '<path d="'+line+'" fill="none" stroke="'+s.color+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />';
+      }).join("");
+      const dots = bridged.map((s) => {
+        const p = lastPoint(s.values, w, h, pad, yMax, yMin);
+        if (!p) return "";
+        const c = s.lime ? "#b8ff5c" : (s.dot || s.color);
+        return '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5.5" fill="'+c+'" fill-opacity="0.22" />' +
+          '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.1" fill="'+c+'" stroke="#0a110e" stroke-width="1.2" />';
       }).join("");
       const labels = opts.times || [];
       el.innerHTML =
         '<svg class="plot" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" role="img">' +
-        grid + layers +
+        grid + layers + dots +
         '<text x="'+pad+'" y="'+(h-4)+'" fill="#8aa394" font-size="10">'+esc(fmtTime(labels[0]))+'</text>' +
         '<text x="'+(w-pad)+'" y="'+(h-4)+'" fill="#8aa394" font-size="10" text-anchor="end">'+esc(fmtTime(labels[labels.length-1]))+'</text>' +
-        '<text x="'+(w-pad)+'" y="'+(pad+2)+'" fill="#8aa394" font-size="10" text-anchor="end">'+esc(Math.round(yMax))+(opts.unit||'')+'</text>' +
+        '<text x="'+(w-pad)+'" y="'+(pad+2)+'" fill="#b8ff5c" font-size="10" text-anchor="end">'+esc(Math.round(yMax))+(opts.unit||'')+'</text>' +
         '</svg>';
     }
     function row(label, value) {
@@ -279,14 +333,14 @@ export function solarPageHtml() {
         (live.ecoAgeMs != null ? '<span class="muted">Eco sample age '+esc(Math.round(live.ecoAgeMs/1000))+'s</span>' : '');
 
       $("kpis").innerHTML = [
-        ["Bank now", fmt(live.batteryPct, "%"), "avg day "+fmt(st.bank?.dayAvgPct,"%")+" · roll "+fmt(st.bank?.rollingAvgPct,"%")],
-        ["Solar now", fmt(live.solarW, " W"), "morn ~"+fmt(st.solar?.morningAvgW," W")+" · day "+fmt(st.solar?.dayAvgW," W")],
-        ["Solar Wh", fmt(st.solar?.dayWh, " Wh"), "today · roll "+fmt(st.solar?.rollingWh," Wh")],
-        ["Load out", fmt(live.outW, " W"), "day avg "+fmt(st.load?.dayAvgOutW," W")+" · "+fmt(st.load?.dayOutWh," Wh")],
-        ["CPU now", fmt(live.cpu, "%"), "1h "+fmt(st.cpu?.hourAvgPct,"%")+" · day "+fmt(st.cpu?.dayAvgPct,"%")],
-        ["Weather", period.temp != null ? (period.temp+(period.unit||"F")) : "—", period.short || ""],
-      ].map(([k,v,h]) =>
-        '<div class="kpi"><label>'+esc(k)+'</label><strong>'+esc(v)+'</strong><span class="hint">'+esc(h)+'</span></div>'
+        ["Bank now", fmt(live.batteryPct, "%"), "avg day "+fmt(st.bank?.dayAvgPct,"%")+" · roll "+fmt(st.bank?.rollingAvgPct,"%"), true],
+        ["Solar now", fmt(live.solarW, " W"), "morn ~"+fmt(st.solar?.morningAvgW," W")+" · day "+fmt(st.solar?.dayAvgW," W"), true],
+        ["Solar Wh", fmt(st.solar?.dayWh, " Wh"), "today · roll "+fmt(st.solar?.rollingWh," Wh"), false],
+        ["Load out", fmt(live.outW, " W"), "day avg "+fmt(st.load?.dayAvgOutW," W")+" · "+fmt(st.load?.dayOutWh," Wh"), false],
+        ["CPU now", fmt(live.cpu, "%"), "1h "+fmt(st.cpu?.hourAvgPct,"%")+" · day "+fmt(st.cpu?.dayAvgPct,"%"), false],
+        ["Weather", period.temp != null ? (period.temp+(period.unit||"F")) : "—", period.short || "", false],
+      ].map(([k,v,h,lime]) =>
+        '<div class="kpi"><label>'+esc(k)+'</label><strong'+(lime?' class="lime"':'')+'>'+esc(v)+'</strong><span class="hint">'+esc(h)+'</span></div>'
       ).join("");
 
       $("stats").innerHTML = [
@@ -332,11 +386,11 @@ export function solarPageHtml() {
 
       const mins = (d.series && d.series.minutes) || [];
       const times = mins.map((m) => m.t);
-      drawChart($("chartSolar"), [{ values: mins.map((m)=>m.solarW), color:"#f0c14a", fill:true }], { times, padMax:true, unit:"W" });
-      drawChart($("chartBank"), [{ values: mins.map((m)=>m.bankSoc), color:"#3dcf7a", fill:true }], { times, yMax:100, unit:"%" });
+      drawChart($("chartSolar"), [{ values: mins.map((m)=>m.solarW), color:"#f0c14a", fill:true, lime:true }], { times, padMax:true, unit:"W" });
+      drawChart($("chartBank"), [{ values: mins.map((m)=>m.bankSoc), color:"#7dff9a", fill:true, lime:true }], { times, yMax:100, unit:"%" });
       drawChart($("chartLoad"), [
         { values: mins.map((m)=>m.outW), color:"#7eb8ff", fill:false },
-        { values: mins.map((m)=>m.solarW), color:"#f0c14a", fill:false },
+        { values: mins.map((m)=>m.solarW), color:"#f0c14a", fill:false, lime:true, dot:"#b8ff5c" },
       ], { times, padMax:true, unit:"W" });
       drawChart($("chartCpu"), [
         { values: mins.map((m)=>m.cpu), color:"#e0a84a", fill:true },
