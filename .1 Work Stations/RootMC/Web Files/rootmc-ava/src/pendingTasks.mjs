@@ -4,21 +4,22 @@ import { storePaths, isHushed, pushStatusEvent } from "./store.mjs";
 import { listJobs } from "./jobQueue.mjs";
 import { cursorSlots, CURSOR_CONCURRENCY } from "./cursorBrain.mjs";
 import { postMessage } from "./discordApi.mjs";
-import { AVA_CHANNELS } from "./config.mjs";
-import { avaHomeChannelId } from "./guildScout.mjs";
+import { allowsUnsolicitedPost } from "./channelPolicy.mjs";
 
 /**
- * Ava-initiated pending-tasks check — now and then she audits her own queue
- * and posts a short status to #ava-ivy (or announce fallback).
+ * Ava-initiated pending-tasks check — audits her own queue locally.
+ * Discord posts only when AVA_PENDING_CHECK_CHANNEL is set explicitly
+ * and is not a no-unsolicited channel (#admins).
  */
 
-const OPEN_STATUSES = new Set([
+const ACTIVE_STATUSES = new Set([
   "pending",
   "implementing",
   "staged",
   "waiting_restart",
-  "blocked",
 ]);
+
+const PARKED_STATUSES = new Set(["blocked"]);
 
 function statePath() {
   return path.join(storePaths().dir, "pending-tasks.json");
@@ -47,30 +48,37 @@ function loadPendingEmojiAsks() {
 }
 
 export function collectPendingTasks() {
-  const jobs = listJobs(40).filter((j) => OPEN_STATUSES.has(j.status));
+  const all = listJobs(40);
+  const jobs = all.filter((j) => ACTIVE_STATUSES.has(j.status));
+  const parked = all.filter((j) => PARKED_STATUSES.has(j.status));
   const byStatus = {};
-  for (const j of jobs) {
+  for (const j of [...jobs, ...parked]) {
     byStatus[j.status] = (byStatus[j.status] || 0) + 1;
   }
   const slots = cursorSlots();
   const emojiAsks = loadPendingEmojiAsks();
+  // Parked/blocked need Alex/vote — don't count as nagging "open" work
   const open = jobs.length + emojiAsks + slots.active + slots.waiting;
   return {
     jobs,
+    parked,
     byStatus,
     slots,
     emojiAsks,
     open,
-    hasWork: open > 0 || jobs.length > 0,
+    hasWork: open > 0,
   };
 }
 
 export function buildPendingTasksMessage(snapshot) {
-  const { jobs, byStatus, slots, emojiAsks, hasWork } = snapshot;
+  const { jobs, parked = [], byStatus, slots, emojiAsks, hasWork } = snapshot;
   const lines = [];
 
   if (!hasWork) {
-    lines.push("pending check — queue's clean. no open jobs, no digs waiting. I'm good.");
+    lines.push("pending check — queue's clean. no active jobs, no digs waiting. I'm good.");
+    if (parked.length) {
+      lines.push(`parked/blocked (need vote/Alex): **${parked.length}** — not nagging.`);
+    }
     lines.push("");
     lines.push(`agents **0/${CURSOR_CONCURRENCY}** · emoji asks **0**`);
     lines.push("— Ava");
@@ -125,13 +133,8 @@ export function pendingCheckBootDelayMs() {
 }
 
 function targetChannelId() {
-  return (
-    String(process.env.AVA_PENDING_CHECK_CHANNEL || "").trim() ||
-    AVA_CHANNELS.avaHome ||
-    avaHomeChannelId() ||
-    process.env.AVA_ANNOUNCE_CHANNEL ||
-    "1516108586307158088"
-  );
+  // Explicit opt-in only — never fall back to #admins / avaHome.
+  return String(process.env.AVA_PENDING_CHECK_CHANNEL || "").trim();
 }
 
 /**
@@ -148,10 +151,24 @@ export async function runPendingTasksCheck(fetchJson, { force = false } = {}) {
   }
 
   const snap = collectPendingTasks();
+  state.lastAt = Date.now();
+  state.lastOpen = snap.open;
+
+  // Local-only by default (status page / events). No Discord spam.
+  const channelId = targetChannelId();
+  if (!channelId || !allowsUnsolicitedPost(channelId)) {
+    if (!snap.hasWork) state.quietStreak = (state.quietStreak || 0) + 1;
+    else state.quietStreak = 0;
+    saveState(state);
+    pushStatusEvent(
+      `pending check · local · ${snap.hasWork ? snap.open + " open" : "clear"}`,
+    );
+    return { posted: false, reason: channelId ? "blocked_channel" : "local_only", open: snap.open };
+  }
+
   // Quiet: skip most empty checks (post every 3rd quiet streak)
   if (!snap.hasWork && !force) {
     state.quietStreak = (state.quietStreak || 0) + 1;
-    state.lastAt = Date.now();
     if (state.quietStreak % 3 !== 0) {
       saveState(state);
       pushStatusEvent("pending check · quiet (skipped post)");
@@ -161,15 +178,10 @@ export async function runPendingTasksCheck(fetchJson, { force = false } = {}) {
     state.quietStreak = 0;
   }
 
-  const channelId = targetChannelId();
-  if (!channelId) return { posted: false, reason: "no_channel" };
-
   const content = buildPendingTasksMessage(snap);
   try {
     const msg = await postMessage(fetchJson, channelId, content, null);
-    state.lastAt = Date.now();
     state.lastPostId = msg?.id || null;
-    state.lastOpen = snap.open;
     saveState(state);
     pushStatusEvent(
       `pending check · ${snap.hasWork ? snap.open + " open" : "clear"} → #${channelId}`,

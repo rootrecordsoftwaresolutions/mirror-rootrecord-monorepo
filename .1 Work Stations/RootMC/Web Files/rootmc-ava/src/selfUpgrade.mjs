@@ -33,10 +33,61 @@ export function clearRestartRequest() {
   }
 }
 
+function spawnWindowsRestart(waitSec, handoff) {
+  const rootEsc = AVA_ROOT.replace(/'/g, "''");
+  const handoffEsc = String(handoff || "").replace(/'/g, "''");
+  const ps = `
+$ErrorActionPreference = 'SilentlyContinue'
+Start-Sleep -Seconds ${waitSec}
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object {
+  $_.CommandLine -match 'rootmc-ava' -or $_.CommandLine -match 'ava\\\\src\\\\(index|server|poller)'
+} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 1
+$env:AVA_NO_STATUS_WINDOW = '1'
+$env:AVA_HEADLESS = '1'
+if ('${handoffEsc}') { $env:AVA_HANDOFF = '${handoffEsc}' }
+Set-Location '${rootEsc}'
+Start-Process -FilePath 'npm.cmd' -ArgumentList 'start' -WorkingDirectory '${rootEsc}' -WindowStyle Hidden
+`;
+  return spawn(
+    "powershell.exe",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+    {
+      cwd: AVA_ROOT,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      env: { ...process.env, AVA_NO_STATUS_WINDOW: "1", AVA_HEADLESS: "1" },
+    },
+  );
+}
+
+function spawnUnixRestart(waitSec, handoff) {
+  const rootQ = AVA_ROOT.replace(/'/g, `'\\''`);
+  const handoffQ = String(handoff || "").replace(/'/g, `'\\''`);
+  const sh = `
+sleep ${waitSec}
+pkill -f 'rootmc-ava/src/(index|server|poller)\\.mjs' 2>/dev/null || true
+pkill -f 'Web Files/rootmc-ava/src/(index|server|poller)\\.mjs' 2>/dev/null || true
+sleep 1
+export AVA_NO_STATUS_WINDOW=1
+export AVA_HEADLESS=1
+${handoffQ ? `export AVA_HANDOFF='${handoffQ}'` : ""}
+cd '${rootQ}'
+nohup npm start >/dev/null 2>&1 &
+`;
+  return spawn("bash", ["-lc", sh], {
+    cwd: AVA_ROOT,
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, AVA_NO_STATUS_WINDOW: "1", AVA_HEADLESS: "1" },
+  });
+}
+
 /**
  * Schedule a silent self-restart (manual upgrade push).
- * Spawns a detached PowerShell that waits, kills this Ava tree, then `npm start`.
- * No Discord announce — status event only.
+ * Spawns a detached supervisor that waits, kills this Ava tree, then `npm start`.
+ * Windows: PowerShell. Linux/SSH: bash + pkill + nohup.
  */
 export function scheduleSelfRestart({
   reason = "manual upgrade",
@@ -76,35 +127,13 @@ export function scheduleSelfRestart({
   );
 
   const waitSec = Math.max(1, Math.ceil(Number(delayMs) / 1000));
-  const rootEsc = AVA_ROOT.replace(/'/g, "''");
-  const handoffEsc = String(AVA_HANDOFF || "").replace(/'/g, "''");
-
-  // Detached supervisor: sleep → kill rootmc-ava node → npm start (no status window)
-  const ps = `
-$ErrorActionPreference = 'SilentlyContinue'
-Start-Sleep -Seconds ${waitSec}
-Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object {
-  $_.CommandLine -match 'rootmc-ava' -or $_.CommandLine -match 'ava\\\\src\\\\(index|server|poller)'
-} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-Start-Sleep -Seconds 1
-$env:AVA_NO_STATUS_WINDOW = '1'
-if ('${handoffEsc}') { $env:AVA_HANDOFF = '${handoffEsc}' }
-Set-Location '${rootEsc}'
-Start-Process -FilePath 'npm.cmd' -ArgumentList 'start' -WorkingDirectory '${rootEsc}' -WindowStyle Hidden
-`;
+  const handoff = AVA_HANDOFF;
 
   try {
-    const child = spawn(
-      "powershell.exe",
-      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
-      {
-        cwd: AVA_ROOT,
-        detached: true,
-        stdio: "ignore",
-        windowsHide: true,
-        env: { ...process.env, AVA_NO_STATUS_WINDOW: "1" },
-      },
-    );
+    const child =
+      process.platform === "win32"
+        ? spawnWindowsRestart(waitSec, handoff)
+        : spawnUnixRestart(waitSec, handoff);
     child.unref();
   } catch (err) {
     scheduled = false;
@@ -112,7 +141,6 @@ Start-Process -FilePath 'npm.cmd' -ArgumentList 'start' -WorkingDirectory '${roo
     return { ok: false, reason: err.message };
   }
 
-  // Supervisor kills this tree after delayMs — keep HTTP/poller alive until then.
   return { ok: true, ...payload };
 }
 
@@ -123,8 +151,8 @@ export function isRestartCommand(content) {
     .replace(/\s+/g, " ")
     .trim();
   return (
-    /^(hey\s+|hi\s+|ok\s+|okay\s+)?ava[,:]?\s+(restart|reboot|upgrade|reload)[.!?]*$/.test(q) ||
-    /^(restart|reboot|upgrade|reload)[,.]?\s+ava[.!?]*$/.test(q) ||
-    /^(restart|reboot|upgrade|self-?upgrade)[.!?]*$/.test(q)
+    /\b(restart|reboot|respawn)\s+(ava|yourself)\b/.test(q) ||
+    /\bava[,:]?\s+(restart|reboot)\b/.test(q) ||
+    /^(restart|reboot)\s+ava\b/.test(q)
   );
 }

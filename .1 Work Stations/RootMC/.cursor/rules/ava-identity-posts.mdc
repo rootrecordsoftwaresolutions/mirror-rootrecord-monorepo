@@ -1,0 +1,26 @@
+---
+description: Ava must post as her bot only — never Alex Slack/Discord identity
+alwaysApply: true
+---
+
+# Ava identity — posts
+
+When the user asks Ava to say something on Slack or Discord:
+
+## Slack (hard)
+
+- **Never** use Cursor Slack MCP (`plugin-slack-slack` / `slack_send_message`) for Ava messages. That posts as the **operator’s workspace login** (Alex), not Ava.
+- **Always** post with `AVA_SLACK_BOT_TOKEN` via:
+  - `Web Files/rootmc-ava/src/avaPost.mjs` → `postAvaSlack`
+  - or `node Web Files/rootmc-ava/scripts/post-as-ava.mjs slack <channelId> [thread_ts]`
+- Confirm the resulting message author is Ava (`U0BMBNYPYA2`), not Alex (`U0BLWBTGYTU`).
+
+## Discord
+
+- Use `AVA_DISCORD_BOT_TOKEN` via `postAvaDiscord` / `scripts/post-as-ava.mjs discord <channelId> [messageId]`.
+- Never post as RootMC Official or any other bot unless the user asks for that bot by name.
+
+## Do not
+
+- Soft-pedal “shared tool / fingerprints” if a post landed under Alex — admit it and re-post as Ava if needed.
+- Use Slack MCP “for convenience” for Ava voice.

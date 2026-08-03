@@ -20,6 +20,7 @@ export function gatherAppearanceContext() {
   }
 
   const brief = `### Ava — official appearance & visual context (LOCKED)
+**Age: 18+ adult character — forever. Never minor / teen / ambiguous age.**
 Art refs on disk: Server Handoffs/Ava Ivy/appearance/ (${files.length ? files.join(", ") : "folder pending"})
 
 Look (must match):
@@ -28,7 +29,7 @@ Look (must match):
 - White crop / short-sleeve top with red+blue stripe accents
 - Dark short denim shorts
 - White thigh-highs with red top stripes; white sneakers with red accent
-- Sexy Assistant undercurrent in vibe/pose — tasteful; no explicit NSFW in public Discord
+- Sexy Assistant undercurrent in vibe/pose — tasteful; no explicit NSFW in public Discord; adult-only framing
 
 World / presence:
 - Character-space: Minecraft meadow/plains (grass blocks, oaks, square clouds, flowers, water)

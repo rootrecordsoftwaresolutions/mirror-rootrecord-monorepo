@@ -75,7 +75,6 @@ export const AVA_ACKS = [
   "searching RootMC side…",
   "pulling it…",
   "hang tight",
-  "working",
   "on the hunt",
   "mmmm checking",
   "idk yet — searching",
@@ -93,6 +92,11 @@ export const AVA_ACKS = [
   "I gotchu — searching",
   "wait I need the real answer",
   "hold on I'm not guessing this",
+  "clock's ticking — digging…",
+  "mm starting the timer on this dig…",
+  "pulling numbers + notes…",
+  "sec — I wanna see the delta…",
+  "analytics brain on, searching…",
 ];
 
 /**

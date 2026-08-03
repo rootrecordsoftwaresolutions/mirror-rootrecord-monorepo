@@ -44,6 +44,271 @@ export async function getVotingPower({ discordUserId, uuid } = {}) {
   return getJson(`/api/governance/voting-power?${q}`);
 }
 
+function workstationKey() {
+  return String(
+    process.env.ROOTMC_DEV_WORKSTATION_KEY || process.env.ROOTMC_INTERNAL_API_KEY || "",
+  ).trim();
+}
+
+/**
+ * Push Ava reaction quality scores into D1 vote-factor bonuses.
+ * @param {Array<{ discord_user_id: string, good_count?: number, bad_count?: number, neutral_count?: number, quality_score?: number }>} factors
+ */
+export async function syncAvaReactionFactors(factors) {
+  const key = workstationKey();
+  if (!key) {
+    return {
+      ok: false,
+      detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot sync reaction factors.",
+    };
+  }
+  const list = Array.isArray(factors) ? factors : [];
+  const res = await fetch(`${BASE}/api/governance/ava-reaction-factors`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "AvaIvyRootMC/0.5",
+      "X-RootMC-Dev-Key": key,
+    },
+    body: JSON.stringify({ factors: list }),
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      detail: data?.detail || text.slice(0, 200),
+    };
+  }
+  return data || { ok: true };
+}
+
+/** Rebuild local reactor index and POST Discord factors to api.rootmc.net. */
+export async function pushReactorVoteFactorsToApi(listReactorVoteFactors) {
+  const factors =
+    typeof listReactorVoteFactors === "function"
+      ? listReactorVoteFactors()
+      : Array.isArray(listReactorVoteFactors)
+        ? listReactorVoteFactors
+        : [];
+  if (!factors.length) {
+    return { ok: true, upserted: 0, factors: 0 };
+  }
+  const result = await syncAvaReactionFactors(factors);
+  return { ...result, factors: factors.length };
+}
+
+/** Cast a text vote (Ava or forwarded player) via workstation auth. */
+export async function castTextVote(proposalId, vote, discordUserId) {
+  const key = workstationKey();
+  if (!key) {
+    return { ok: false, detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot cast text votes." };
+  }
+  const res = await fetch(`${BASE}/api/governance/votes/${encodeURIComponent(proposalId)}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "AvaIvyRootMC/0.5",
+      "X-RootMC-Dev-Key": key,
+    },
+    body: JSON.stringify({
+      vote: String(vote || "").toLowerCase(),
+      discord_user_id: String(discordUserId || ""),
+    }),
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, detail: data?.detail || text.slice(0, 200) };
+  }
+  return data || { ok: true };
+}
+
+/** Official in-game /proposal queue — Ava picks these up when online. */
+export async function listQueuedProposalIdeas({ status = "queued", limit = 20 } = {}) {
+  const key = workstationKey();
+  if (!key) {
+    return { ok: false, detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot list proposal ideas." };
+  }
+  const q = new URLSearchParams({ status: String(status), limit: String(limit) });
+  const res = await fetch(`${BASE}/api/governance/proposal-ideas?${q}`, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "AvaIvyRootMC/0.5",
+      "X-RootMC-Dev-Key": key,
+    },
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, detail: data?.detail || text.slice(0, 200) };
+  }
+  return data || { ok: false };
+}
+
+export async function processNextProposalIdea() {
+  const key = workstationKey();
+  if (!key) {
+    return { ok: false, detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot formalize ideas." };
+  }
+  const res = await fetch(`${BASE}/api/governance/proposal-ideas/process-next`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "AvaIvyRootMC/0.5",
+      "X-RootMC-Dev-Key": key,
+    },
+    body: "{}",
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, detail: data?.detail || text.slice(0, 200), ...(data || {}) };
+  }
+  return data || { ok: false };
+}
+
+export async function formalizeProposalIdea(ideaId) {
+  const key = workstationKey();
+  if (!key) {
+    return { ok: false, detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot formalize ideas." };
+  }
+  const res = await fetch(
+    `${BASE}/api/governance/proposal-ideas/${encodeURIComponent(ideaId)}/formalize`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "AvaIvyRootMC/0.5",
+        "X-RootMC-Dev-Key": key,
+      },
+      body: "{}",
+    },
+  );
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, detail: data?.detail || text.slice(0, 200), ...(data || {}) };
+  }
+  return data || { ok: false };
+}
+
+/** In-game /feedback queue for Ava. */
+export async function listQueuedFeedback({ status = "queued", limit = 20 } = {}) {
+  const key = workstationKey();
+  if (!key) {
+    return { ok: false, detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot list feedback." };
+  }
+  const q = new URLSearchParams({ status: String(status), limit: String(limit) });
+  const res = await fetch(`${BASE}/api/governance/feedback-inbox?${q}`, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "AvaIvyRootMC/0.5",
+      "X-RootMC-Dev-Key": key,
+    },
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, detail: data?.detail || text.slice(0, 200) };
+  }
+  return data || { ok: false };
+}
+
+export async function processNextFeedback() {
+  const key = workstationKey();
+  if (!key) {
+    return { ok: false, detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot process feedback." };
+  }
+  const res = await fetch(`${BASE}/api/governance/feedback-inbox/process-next`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "AvaIvyRootMC/0.5",
+      "X-RootMC-Dev-Key": key,
+    },
+    body: "{}",
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, detail: data?.detail || text.slice(0, 200), ...(data || {}) };
+  }
+  return data || { ok: false };
+}
+
+export async function ackFeedback(feedbackId, avaNote = "") {
+  const key = workstationKey();
+  if (!key) {
+    return { ok: false, detail: "ROOTMC_DEV_WORKSTATION_KEY missing — cannot ack feedback." };
+  }
+  const res = await fetch(
+    `${BASE}/api/governance/feedback-inbox/${encodeURIComponent(feedbackId)}/ack`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "AvaIvyRootMC/0.5",
+        "X-RootMC-Dev-Key": key,
+      },
+      body: JSON.stringify({ ava_note: String(avaNote || "").slice(0, 500) }),
+    },
+  );
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, detail: data?.detail || text.slice(0, 200), ...(data || {}) };
+  }
+  return data || { ok: false };
+}
+
 /**
  * Ava vote gates:
  * - 75% anytime → implement_now

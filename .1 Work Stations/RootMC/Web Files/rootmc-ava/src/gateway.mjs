@@ -9,14 +9,22 @@ import { authHeaders } from "./discordApi.mjs";
 const INTENT_BASE =
   (1 << 0) | // GUILDS
   (1 << 9) | // GUILD_MESSAGES
+  (1 << 10) | // GUILD_MESSAGE_REACTIONS
   (1 << 12) | // DIRECT_MESSAGES
   (1 << 15); // MESSAGE_CONTENT
 const INTENT_MEMBERS = 1 << 1; // GUILD_MEMBERS (privileged — Server Members Intent in Dev Portal)
 
 /**
- * @param {{ token, onMessage, onReady, onMemberJoin, watchIds? }} opts
+ * @param {{ token, onMessage, onReady, onMemberJoin, onReaction?, watchIds? }} opts
  */
-export function startGateway({ token, onMessage, onReady, onMemberJoin, watchIds }) {
+export function startGateway({
+  token,
+  onMessage,
+  onReady,
+  onMemberJoin,
+  onReaction,
+  watchIds,
+}) {
   let ws = null;
   let hb = null;
   let seq = null;
@@ -132,6 +140,17 @@ export function startGateway({ token, onMessage, onReady, onMemberJoin, watchIds
             return;
           }
           onMessage?.(d, { isDm });
+          return;
+        }
+        if (
+          (t === "MESSAGE_REACTION_ADD" || t === "MESSAGE_REACTION_REMOVE") &&
+          d
+        ) {
+          const isDm = !d.guild_id;
+          const inGuild = String(d.guild_id || "") === String(ROOTMC_GUILD_ID);
+          if (!isDm && !inGuild) return;
+          if (!isDm && watch.size && !watch.has(String(d.channel_id))) return;
+          onReaction?.(d, { added: t === "MESSAGE_REACTION_ADD", isDm });
           return;
         }
         if (t === "GUILD_MEMBER_ADD" && d) {

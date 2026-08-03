@@ -2,17 +2,77 @@ import { spawn, execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { AVA_PORT, AVA_HANDOFF } from "./config.mjs";
+import { AVA_PORT, AVA_HANDOFF, isHeadlessHost } from "./config.mjs";
 import { startDesktopRichPresence } from "./richPresence.mjs";
 import { clearRestartRequest, loadRestartRequest } from "./selfUpgrade.mjs";
+import { clearPoweredOff, isPoweredOff } from "./powerDown.mjs";
 import { pushStatusEvent, storePaths } from "./store.mjs";
 import { writeLiveness } from "./liveness.mjs";
+import {
+  startAvaPublicTunnel,
+  stopAvaPublicTunnel,
+  publicAvaUrl,
+} from "./publicTunnel.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const statusUrl = `http://127.0.0.1:${AVA_PORT}/`;
 
 storePaths();
+
+/** One parent tree only — second index.mjs exits so we never double-post. */
+function parentLockPath() {
+  return path.join(storePaths().dir, "ava-parent.lock");
+}
+
+function pidAlive(pid) {
+  if (!pid || !Number.isFinite(Number(pid))) return false;
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquireParentLock() {
+  const lockPath = parentLockPath();
+  try {
+    if (fs.existsSync(lockPath)) {
+      const prev = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+      const other = Number(prev?.pid);
+      if (other && other !== process.pid && pidAlive(other)) {
+        console.error(
+          `Ava already running (parent pid ${other}) — refusing second tree to stop double-posts.`,
+        );
+        process.exit(0);
+      }
+    }
+  } catch {
+    /* stale / unreadable — take over */
+  }
+  fs.writeFileSync(
+    lockPath,
+    JSON.stringify({ pid: process.pid, at: Date.now(), statusUrl }, null, 2),
+    "utf8",
+  );
+}
+
+function releaseParentLock() {
+  try {
+    const lockPath = parentLockPath();
+    if (!fs.existsSync(lockPath)) return;
+    const prev = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    if (Number(prev?.pid) === process.pid) fs.unlinkSync(lockPath);
+  } catch {
+    /* ignore */
+  }
+}
+
+acquireParentLock();
+
+// Human npm start = power on — clear sticky power-off so watchdog can run.
+clearPoweredOff();
 const priorRestart = loadRestartRequest();
 clearRestartRequest();
 if (priorRestart?.silent) {
@@ -74,6 +134,16 @@ function runSupervised(script) {
       return;
     }
 
+    // Operator power-down — do not respawn; exit the whole tree.
+    if (isPoweredOff()) {
+      shuttingDown = true;
+      for (const st of children.values()) st.stopping = true;
+      pushStatusEvent("powered off — parent exiting (no respawn)");
+      pulseParentLiveness();
+      setTimeout(() => process.exit(0), 300);
+      return;
+    }
+
     const now = Date.now();
     state.recent = state.recent.filter((t) => now - t < BURST_WINDOW_MS);
     state.recent.push(now);
@@ -94,7 +164,7 @@ function runSupervised(script) {
     pushStatusEvent(`respawn · ${script} in ${Math.round(backoff / 1000)}s (exit ${code ?? signal})`);
     pulseParentLiveness();
     setTimeout(() => {
-      if (shuttingDown || state.stopping) return;
+      if (shuttingDown || state.stopping || isPoweredOff()) return;
       runSupervised(script);
     }, backoff);
   });
@@ -106,15 +176,15 @@ function runSupervised(script) {
  * Open status window at most once (lock file). Restarts reuse the same URL —
  * refresh an existing window instead of spawning stacks of Edge/Chrome apps.
  * Force a new window: AVA_STATUS_WINDOW=force
- * Disable: AVA_NO_STATUS_WINDOW=1
+ * Disable: AVA_NO_STATUS_WINDOW=1 (also auto on Linux / SSH / non-TTY)
  */
 function openStatusWindow() {
-  if (String(process.env.AVA_NO_STATUS_WINDOW || "").trim() === "1") return;
+  if (isHeadlessHost()) {
+    console.log(`Ava status (headless) → ${statusUrl} (ssh -L ${AVA_PORT}:127.0.0.1:${AVA_PORT})`);
+    return;
+  }
   const force = String(process.env.AVA_STATUS_WINDOW || "").trim().toLowerCase() === "force";
-  const lockDir = path.join(
-    AVA_HANDOFF || path.join(root, "..", "..", "Server Handoffs", "Ava Ivy"),
-    "data",
-  );
+  const lockDir = path.join(AVA_HANDOFF, "data");
   try {
     fs.mkdirSync(lockDir, { recursive: true });
   } catch {
@@ -142,6 +212,11 @@ function openStatusWindow() {
     );
   } catch {
     /* ignore */
+  }
+
+  if (process.platform !== "win32") {
+    console.log(`Ava status → ${statusUrl}`);
+    return;
   }
 
   const ps = `
@@ -176,6 +251,7 @@ function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
   pushStatusEvent("parent shutdown");
+  stopAvaPublicTunnel();
   for (const st of children.values()) {
     st.stopping = true;
     try {
@@ -184,9 +260,12 @@ function shutdown() {
       /* ignore */
     }
   }
+  releaseParentLock();
   pulseParentLiveness();
   setTimeout(() => process.exit(0), 500);
 }
+
+process.on("exit", releaseParentLock);
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
@@ -199,5 +278,9 @@ pulseParentLiveness();
 /** Desktop Discord "Playing Ava Ivy" (IPC) — party/join from Rich Presence visualizer. */
 startDesktopRichPresence();
 
+/** Public tunnel https://ava.rootmc.net → :8787 while Ava is live on this box. */
+startAvaPublicTunnel();
+
 setTimeout(openStatusWindow, 2500);
 console.log(`Ava status → ${statusUrl} (watchdog on)`);
+console.log(`Ava public → ${publicAvaUrl()} (when tunnel + DNS live)`);

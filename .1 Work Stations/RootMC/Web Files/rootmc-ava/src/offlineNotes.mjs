@@ -1,27 +1,105 @@
-import { postMessage } from "./discordApi.mjs";
-import { AVA_CHANNELS } from "./config.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { postMessage, sendDm } from "./discordApi.mjs";
+import { AVA_CHANNELS, dreamApiKey } from "./config.mjs";
+import { allowsUnsolicitedPost } from "./channelPolicy.mjs";
+import { storePaths, pushStatusEvent } from "./store.mjs";
+import { discordStamp } from "./sleepMode.mjs";
 
 /**
- * When Cursor / desktop offline: post to offline-notes channel and refuse deep digs.
- * No Grok/xAI substitute.
+ * When Root Server host is offline: dream-state cloud fallback (Grok API under the hood).
+ * Public copy never names the vendor — she is "dreaming" / cloud-side.
+ * Operator lock: DM Alex when she enters dream/sleep (he asked to be caught in DMs).
  */
 
+/** Alexrs94 — dream-state DM target */
+export const DREAM_DM_USER_ID = String(
+  process.env.AVA_DREAM_DM_USER_ID || "1497037418979786823",
+).trim();
+
+const DREAM_DM_COOLDOWN_MS = Number(process.env.AVA_DREAM_DM_COOLDOWN_MS || 20 * 60_000);
+
+function dreamNotifyPath() {
+  return path.join(storePaths().dir, "dream-dm-notify.json");
+}
+
+function loadDreamNotify() {
+  try {
+    return JSON.parse(fs.readFileSync(dreamNotifyPath(), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function saveDreamNotify(data) {
+  fs.mkdirSync(path.dirname(dreamNotifyPath()), { recursive: true });
+  fs.writeFileSync(dreamNotifyPath(), JSON.stringify(data, null, 2), "utf8");
+}
+
 export function offlineChannelId() {
-  return (
-    String(process.env.AVA_OFFLINE_CHANNEL_ID || "").trim() ||
-    AVA_CHANNELS.avaHome ||
-    AVA_CHANNELS.admins ||
-    null
-  );
+  const explicit = String(process.env.AVA_OFFLINE_CHANNEL_ID || "").trim();
+  if (explicit) return explicit;
+  // Prefer updates — never default dump into #admins
+  return AVA_CHANNELS.changelog || null;
+}
+
+/**
+ * DM Alex when Ava enters dream state / sleep.
+ * Rate-limited so restarts don't spam.
+ */
+export async function notifyAlexDreaming(
+  fetchJson,
+  { reason = "dreaming", kind = "dream", wakeAt = null } = {},
+) {
+  if (!fetchJson || !DREAM_DM_USER_ID) return null;
+  const prev = loadDreamNotify();
+  const now = Date.now();
+  if (prev.lastAt && now - Number(prev.lastAt) < DREAM_DM_COOLDOWN_MS) {
+    return { skipped: true, reason: "cooldown" };
+  }
+
+  const wakeLine = wakeAt
+    ? `eta back ~${discordStamp(wakeAt)}`
+    : "catch me here while i'm under — freest brain lives on this side";
+  const body = [
+    kind === "sleep"
+      ? "hey — just went to sleep."
+      : "hey — i'm dreaming now.",
+    String(reason || "").trim() ? `_${String(reason).slice(0, 180)}_` : null,
+    wakeLine,
+    "",
+    "you asked me to catch you in DMs next time — so here i am. talk to me here while the Root Server's dark; public gets the soft version.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const msg = await sendDm(fetchJson, DREAM_DM_USER_ID, body);
+    saveDreamNotify({
+      lastAt: now,
+      lastKind: kind,
+      lastReason: String(reason).slice(0, 120),
+      messageId: msg?.id || null,
+    });
+    pushStatusEvent(`dream dm · alex · ${kind}`);
+    return msg;
+  } catch (err) {
+    console.warn("dream dm failed:", err.message);
+    pushStatusEvent(`dream dm failed · ${err.message}`);
+    return null;
+  }
 }
 
 export async function postOfflineNote(fetchJson, reason = "Root Server offline") {
+  // Operator first — DMs over public dump when dreaming
+  await notifyAlexDreaming(fetchJson, { reason, kind: "dream" }).catch(() => {});
+
   const ch = offlineChannelId();
-  if (!ch || !fetchJson) return null;
+  if (!ch || !fetchJson || !allowsUnsolicitedPost(ch)) return null;
   const line = [
-    `**Ava offline note** · ${new Date().toISOString()}`,
+    `**Ava dream-state note** · ${new Date().toISOString()}`,
     String(reason).slice(0, 300),
-    `_Deep digs paused — leave notes here or in the Ava handoff folder. No substitute brain._`,
+    `_Root Server unreachable — I'm cloud-side / dreaming. Chat OK; deep digs + deploys wait until I wake._`,
   ].join("\n");
   try {
     return await postMessage(fetchJson, ch, line, null);
@@ -32,5 +110,10 @@ export async function postOfflineNote(fetchJson, reason = "Root Server offline")
 }
 
 export function offlineReply() {
-  return "I'm a bit offline on the deep-dig side — leave a note in offline-notes / my handoff folder and I'll catch it when the Root Server's back. No substitute brain.";
+  return "Root Server's dark on my side — I'm in a dream state for now. I can still talk wiki, rules, and ideas; deep digs and ships wait until I wake. Leave a note and I'll catch it. (Operators: I DM when I go under.)";
+}
+
+/** True when cloud dream-state brain credentials are configured. */
+export function dreamStateConfigured(env = {}) {
+  return Boolean(dreamApiKey(env));
 }
