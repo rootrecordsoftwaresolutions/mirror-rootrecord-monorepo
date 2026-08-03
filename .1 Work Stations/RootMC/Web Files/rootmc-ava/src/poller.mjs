@@ -969,7 +969,9 @@ async function tick() {
     const followInterval =
       lastFollowupScan > 0 &&
       Date.now() - lastFollowupScan >= FOLLOWUP_SCAN_MS;
-    if (live && !isHushed() && !isAsleep() && (followBoot || followInterval)) {
+    // Follow-up scan stays ON while asleep — dream summons / @Ava pings must not drop
+    // if gateway missed them (boot race, DM, etc.). Digs still soft via pipeline sleep path.
+    if (live && !isHushed() && (followBoot || followInterval)) {
       lastFollowupScan = Date.now();
       try {
         await runFollowupScan({
