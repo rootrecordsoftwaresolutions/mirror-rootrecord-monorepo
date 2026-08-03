@@ -26,7 +26,7 @@ Never invent panel/battery counts — use the solar pack (10 panels / 2 circuits
 ## EcoFlow telemetry quirk (2026-08-02)
 
 - Live pack: `data/ecoflow.json` (quota signing fixed — SOC/watts/minute buckets).
-- Labels: **Delta 2** `R331ZAB5SG6S2858`; **River 2 Pro** `R621ZA16XH6K1155`; **Delta 2-B** (off-circuit) `R331ZAB5SG755642`. Retired casual aliases cucumbers/shackas still resolve if spoken.
+- Labels: **Delta 2** `R331ZAB5SG6S2858`; **River 2 Pro** `R621ZA16XH6K1155`. **Delta 2-B removed** (Alex 2026-08-03). Retired casual aliases cucumbers/shackas still resolve if spoken.
 - **River 2 Pro may report `online: 0`** in the device list while quota still returns SOC/watts. Treat as an API telemetry quirk, **not** a dig failure — prefer `perSn` SOC/watts over the `online` flag when briefing solar.
 
 ## Gold voice samples

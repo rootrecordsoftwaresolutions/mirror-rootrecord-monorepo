@@ -7,6 +7,7 @@ import {
   loadEcoMinuteSeries,
   summarizeMorningSolar,
   isEcoOffCircuit,
+  isEcoRemoved,
   ECO_NICKNAMES,
   moodFromPower,
   configuredSerials,
@@ -30,7 +31,6 @@ import { isPoweredOff } from "./powerDown.mjs";
 
 const NICK_BY_SN = {
   R331ZAB5SG6S2858: "Delta 2",
-  R331ZAB5SG755642: "Delta 2-B",
   R621ZA16XH6K1155: "River 2 Pro",
 };
 
@@ -84,8 +84,10 @@ function localDayBounds(tzOffsetHours = -10) {
 function deviceRows(snap, { ecoStale = false } = {}) {
   const per = snap?.perSn || {};
   const configured = configuredSerials();
-  const seen = new Set(Object.keys(per));
-  const rows = Object.entries(per).map(([sn, v]) => {
+  const seen = new Set(Object.keys(per).filter((sn) => !isEcoRemoved(sn)));
+  const rows = Object.entries(per)
+    .filter(([sn]) => !isEcoRemoved(sn))
+    .map(([sn, v]) => {
     const offCircuit = Boolean(v?.offCircuit || isEcoOffCircuit(sn));
     const ok = Boolean(v?.ok);
     let status = "online";

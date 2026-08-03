@@ -17,8 +17,7 @@ const DEFAULT_PROFILE = {
   },
   batteries: {
     count: 2,
-    notes:
-      "On-circuit: Delta 2 + River 2 Pro. Delta 2-B is off-circuit — not host load; can disconnect (Alex 2026-08-02).",
+    notes: "On-circuit only: Delta 2 + River 2 Pro. Delta 2-B removed 100% (Alex 2026-08-03).",
   },
   weather_note:
     "When cloudy / sun not fully out, expect thin solar and lighter digs. Apologize plainly — no drama.",

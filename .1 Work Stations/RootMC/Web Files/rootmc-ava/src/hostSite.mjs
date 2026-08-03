@@ -135,7 +135,6 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
 function snLabel(sn) {
   const map = {
     R331ZAB5SG6S2858: "Delta 2",
-    R331ZAB5SG755642: "Delta 2-B",
     R621ZA16XH6K1155: "River 2 Pro",
   };
   return map[sn] || sn.slice(-6);
@@ -146,6 +145,7 @@ export function formatSolarLines(snap, morning = null) {
   const per = snap?.perSn || {};
   let solarTotal = 0;
   for (const [sn, v] of Object.entries(per)) {
+    if (isEcoRemoved(sn)) continue;
     if (!v?.ok) continue;
     const off = v?.offCircuit || isEcoOffCircuit(sn);
     if (!off && v.solarW != null) solarTotal += Number(v.solarW) || 0;

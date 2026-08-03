@@ -1,11 +1,12 @@
-# Delta 2-B off-circuit (Alex 2026-08-02)
+# Delta 2-B — REMOVED 100% (Alex 2026-08-03)
 
-**Channel:** `#random-facts` · msg `1533610461264613396`
+**Was:** `R331ZAB5SG755642` (off-circuit since 2026-08-02)
 
-**Lock:** Delta 2-B (SOC ~99%, out ~7W, solar 0W) is **not on our circuit**, will not run out for Root Server load, **can disconnect**.
+**Now:** fully removed from Ava EcoFlow surface.
 
-## Runtime
-- `ECO_OFF_CIRCUIT_SNS` / `isEcoOffCircuit` in `ecoflow.mjs`
-- Excluded from site bank mood avg + site solar totals
-- Still listed in power reports as **off-circuit**
-- On-circuit bank: Delta 2 + River 2 Pro
+- Stripped from `AVA_ECOFLOW_SN`
+- Hard block: `ECO_REMOVED_SNS` / `isEcoRemoved` in `ecoflow.mjs` (never poll / never show even if API lists it)
+- Labels/nicknames cleared (powerTelemetry, hostSite, opsPowerStatus, fernForest, solarProfile)
+- Host bank = **Delta 2 + River 2 Pro** only
+
+Historical logs may still mention it; live dashboards and mining bank must not.

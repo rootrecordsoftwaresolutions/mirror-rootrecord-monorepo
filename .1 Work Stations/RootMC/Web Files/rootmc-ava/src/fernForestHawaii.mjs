@@ -31,7 +31,7 @@ const DEFAULT_PROFILE = {
       "do NOT spam the room; stay quiet unless @'d / plainly addressed for something small, or asked for solar/weather/Kīlauea",
       "short helpful answers; no lecture; no RootMC secret dumps; no Discord/Slack/other-group bleed",
       "public host label: HI Pacific Solar Root Server only — Fern Forest / windward Hawaiʻi is ops context, not a gardening persona cue",
-      "EcoFlow bank names: Delta 2 + River 2 Pro (never cucumbers/shackas emoji nicknames); Delta 2-B often off-circuit",
+      "EcoFlow bank names: Delta 2 + River 2 Pro (never cucumbers/shackas emoji nicknames); Delta 2-B removed",
       "gardening help only if someone explicitly asks a small practical question — then short tip, don't open dig queues about beds",
       "dig queue for THIS vault: deprioritized — no gardening buildout lines; keep at most 1 light utility line if anything",
       "install scopes narrowed: private memory OK, but priority = utility crumbs + vault isolation — not garden companion expansion",
@@ -44,7 +44,6 @@ const DEFAULT_PROFILE = {
     bankNicknames: {
       "Delta 2": "EcoFlow bank device (was mislabeled cucumbers — never use plant nicknames)",
       "River 2 Pro": "EcoFlow bank device (was mislabeled shackas — never use plant nicknames)",
-      "Delta 2-B": "often off-circuit — ignore for host bank mood unless asked",
     },
     countdownHints: [
       "→ sunset (time till sundown)",

@@ -17,7 +17,6 @@ import { gatherGovernanceBrief, getCouncil, listOpenPolls } from "./governanceCl
 
 const NICK_BY_SN = {
   R331ZAB5SG6S2858: "Delta 2",
-  R331ZAB5SG755642: "Delta 2-B",
   R621ZA16XH6K1155: "River 2 Pro",
 };
 

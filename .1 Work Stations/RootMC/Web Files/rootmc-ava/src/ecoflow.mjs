@@ -11,6 +11,13 @@ import { storePaths } from "./store.mjs";
 
 const DEFAULT_BASE = "https://api-a.ecoflow.com";
 
+/** Hard-removed EcoFlow units — never poll / never show (Alex 2026-08-03). */
+export const ECO_REMOVED_SNS = new Set(["R331ZAB5SG755642"]); // ex Delta 2-B
+
+export function isEcoRemoved(sn) {
+  return ECO_REMOVED_SNS.has(String(sn || "").trim());
+}
+
 function ecoPath() {
   return path.join(storePaths().dir, "ecoflow.json");
 }
@@ -79,7 +86,8 @@ export function configuredSerials() {
   return String(process.env.AVA_ECOFLOW_SN || process.env.ECOFLOW_SN || "")
     .split(/[,;\s]+/)
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((sn) => !ECO_REMOVED_SNS.has(sn));
 }
 
 export function ecoConfigured() {
@@ -426,18 +434,17 @@ export const ECO_NICKNAMES = {
   cucumbers: "R331ZAB5SG6S2858", // retired casual alias
   shackas: "R621ZA16XH6K1155", // retired casual alias
   "delta-2-a": "R331ZAB5SG6S2858",
-  "delta-2-b": "R331ZAB5SG755642",
   "river-2-pro": "R621ZA16XH6K1155",
 };
 
 /**
- * Delta 2-B is NOT on the host solar circuit (Alex 2026-08-02).
- * It will not run out for Root Server load — can disconnect; exclude from site bank / site solar totals.
+ * Off-circuit EcoFlow SNs (excluded from site bank / site solar totals).
+ * Empty after Delta 2-B full removal (Alex 2026-08-03).
  */
-export const ECO_OFF_CIRCUIT_SNS = new Set(["R331ZAB5SG755642"]);
+export const ECO_OFF_CIRCUIT_SNS = new Set();
 
 export function isEcoOffCircuit(sn) {
-  return ECO_OFF_CIRCUIT_SNS.has(String(sn || "").trim());
+  return ECO_OFF_CIRCUIT_SNS.has(String(sn || "").trim()) || isEcoRemoved(sn);
 }
 
 function writeJson(file, obj) {
@@ -501,11 +508,13 @@ export async function refreshEcoFlow() {
       const rows = Array.isArray(list.json.data)
         ? list.json.data
         : list.json.data?.devices || list.json.data?.list || [];
-      devices = rows.map((r) => ({
-        sn: r.sn || r.deviceSn || r.serialNumber,
-        productName: r.productName || r.productType || r.name,
-        online: r.online ?? r.status,
-      }));
+      devices = rows
+        .map((r) => ({
+          sn: r.sn || r.deviceSn || r.serialNumber,
+          productName: r.productName || r.productType || r.name,
+          online: r.online ?? r.status,
+        }))
+        .filter((d) => d.sn && !isEcoRemoved(d.sn));
       writeJson(path.join(ecoBucketsRoot(), "devices", "list.json"), {
         at: Date.now(),
         devices,
@@ -520,7 +529,10 @@ export async function refreshEcoFlow() {
 
   // 3) Quota per SN — env first, else serials discovered from device list
   if (!sns.length && devices.length) {
-    sns = devices.map((d) => String(d.sn || "").trim()).filter(Boolean);
+    sns = devices
+      .map((d) => String(d.sn || "").trim())
+      .filter(Boolean)
+      .filter((sn) => !isEcoRemoved(sn));
     if (sns.length) noteParts.push("sns from device list");
   }
   if (!sns.length) {
@@ -646,7 +658,7 @@ export function gatherEcoBrief() {
     })
     .join("\n");
   const nick =
-    "labels: Delta 2 R331ZAB5SG6S2858 · River 2 Pro R621ZA16XH6K1155 · Delta 2-B off-circuit R331ZAB5SG755642";
+    "labels: Delta 2 R331ZAB5SG6S2858 · River 2 Pro R621ZA16XH6K1155 (Delta 2-B removed)";
   return {
     brief: `### Power (EcoFlow)
 status: ${snap.status || "?"} · battery: ${snap.batteryPct != null ? `${snap.batteryPct}%` : "unknown"} · mood hint: ${moodFromPower(snap)}
