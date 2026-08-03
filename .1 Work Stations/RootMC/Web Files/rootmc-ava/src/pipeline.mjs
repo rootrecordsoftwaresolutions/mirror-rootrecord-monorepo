@@ -136,7 +136,24 @@ import {
   slackDigRedirectReply,
 } from "./surfaceRules.mjs";
 import { isSlackChannelId } from "./slackGateway.mjs";
-import { isTelegramChannelId } from "./telegramPoller.mjs";
+import {
+  isTelegramChannelId,
+  telegramChatIdFromChannel,
+} from "./telegramPoller.mjs";
+import {
+  isTelegramGroupChannel,
+  loadGroupMeta,
+  touchGroupVault,
+  isGroupInstallApproved,
+  approveGroupInstall,
+  logGroupDig,
+  rememberGroupLine,
+  groupMemoryContext,
+  looksLikeInstallGo,
+  looksLikeInstallBrief,
+  isAlexTelegramId,
+  markInstallAskSent,
+} from "./telegramGroupVault.mjs";
 import {
   logInbound,
   recordAvaUtterance,
@@ -526,7 +543,19 @@ export function createPipeline(deps) {
         messages,
         avaBotId: botAppId,
       });
-      const mem = memoryContext(channelId, msg.author?.id);
+      const tgGroup =
+        msg.telegram?.isGroup ||
+        isTelegramGroupChannel(channelId, msg.telegram?.chatType);
+      const mem = tgGroup
+        ? groupMemoryContext(channelId)
+        : memoryContext(channelId, msg.author?.id);
+      if (tgGroup) {
+        rememberGroupLine(channelId, {
+          authorId: msg.author?.id,
+          authorName: msg.author?.username,
+          content: msg.content,
+        });
+      }
       const talkingAboutCue = looksLikeTalkingAboutAva(msg, botAppId)
         ? "They are talking ABOUT you (not a hard @ping). You overheard it. Chime in short and self-aware — don't be needy, don't hijack unrelated chat. Never @ping Zuppa."
         : "";
@@ -538,7 +567,18 @@ export function createPipeline(deps) {
       const chimeCue = msg._avaChime?.chime
         ? chimeInBrief(msg._avaChime.kind || "useful")
         : "";
-      const context = [mem, liveCtx, talkingAboutCue, gateCue, batchCue, chimeCue]
+      const groupVaultCue = tgGroup
+        ? `### Telegram group vault (LOCKED)\nThis chat is private to THIS group only. Never dump other groups' or Discord/Slack context here. Install scopes need Alex (@WildEcho94) "install go" inside this group first (approved=${isGroupInstallApproved(channelId)}).`
+        : "";
+      const context = [
+        mem,
+        liveCtx,
+        talkingAboutCue,
+        gateCue,
+        batchCue,
+        chimeCue,
+        groupVaultCue,
+      ]
         .filter(Boolean)
         .join("\n\n")
         .slice(0, 6500);
@@ -894,15 +934,33 @@ export function createPipeline(deps) {
         intent: classified.intent,
         jobId,
       });
-      logDigTraining({
-        question,
-        answer,
-        jobId,
-        surface: pipelineSurface(msg, channelId),
-        authorId: msg.author?.id,
-        channelId,
-        meta: { intent: classified.intent, messageId: msg.id },
-      });
+      const digIsTgGroup =
+        msg.telegram?.isGroup ||
+        isTelegramGroupChannel(channelId, msg.telegram?.chatType);
+      if (digIsTgGroup) {
+        logGroupDig(channelId, {
+          question,
+          answer,
+          authorId: msg.author?.id,
+          messageId: msg.id,
+          meta: { intent: classified.intent, jobId },
+        });
+        rememberGroupLine(channelId, {
+          authorId: botAppId,
+          authorName: "Ava",
+          content: answer,
+        });
+      } else {
+        logDigTraining({
+          question,
+          answer,
+          jobId,
+          surface: pipelineSurface(msg, channelId),
+          authorId: msg.author?.id,
+          channelId,
+          meta: { intent: classified.intent, messageId: msg.id },
+        });
+      }
       appendAction("dig.complete", {
         jobId,
         channelId,
@@ -933,6 +991,8 @@ export function createPipeline(deps) {
         authorId: msg.author?.id,
         authorName: msg.author?.username,
         channelId: msg.channel_id,
+        chatType: msg.telegram?.chatType || null,
+        telegramChatType: msg.telegram?.chatType || null,
       }),
     };
     logInbound(msg, {
@@ -1361,6 +1421,62 @@ export function createPipeline(deps) {
         void ackReact.reactNoReply(channelId, msg.id);
       }
       return;
+    }
+
+    // Telegram group vault + install gate (Alex absolute command on verified TG id)
+    const tgGroupNow =
+      msg.telegram?.isGroup ||
+      isTelegramGroupChannel(channelId, msg.telegram?.chatType);
+    if (tgGroupNow) {
+      touchGroupVault({
+        chatId: telegramChatIdFromChannel(channelId),
+        title: msg.telegram?.chatTitle || null,
+        chatType: msg.telegram?.chatType || "group",
+        event: "ingest",
+        fromId: msg.author?.id,
+        preview: msg.content,
+      });
+      rememberGroupLine(channelId, {
+        authorId: msg.author?.id,
+        authorName: msg.author?.username,
+        content: msg.content,
+      });
+      if (
+        isAlexTelegramId(msg.author?.id) &&
+        looksLikeInstallGo(msg.content)
+      ) {
+        approveGroupInstall(channelId, {
+          by: msg.author.id,
+          brief: msg.content,
+        });
+        touchActivity("tg-group-install");
+        await reply(
+          channelId,
+          "Install locked for **this group vault only** — memory/notes stay here, no global bleed. Listening to @tags. Tighten scopes anytime.",
+          msg.id,
+        );
+        if (/^\s*(install\s+(go|ok|yes|approved)|approve\s+install).{0,80}$/i.test(
+          String(msg.content || ""),
+        )) {
+          return;
+        }
+      } else if (
+        !isGroupInstallApproved(channelId) &&
+        isAlexTelegramId(msg.author?.id) &&
+        looksLikeInstallBrief(msg.content)
+      ) {
+        const meta = loadGroupMeta(channelId);
+        if (!meta.installAskSent) {
+          markInstallAskSent(channelId, { pendingBrief: msg.content });
+          touchActivity("tg-group-install-ask");
+          await reply(
+            channelId,
+            "Heard you — I'm listening to tags in this group.\n\nIsolation locked: private vault for **this chat only**, nothing bleeds global/Discord/Slack/other groups.\n\nBefore I enable install scopes (what I may remember/do here), reply **install go** with the functions you want. Until then I still talk when @tagged.\n\n— Ava",
+            msg.id,
+          );
+          return;
+        }
+      }
     }
 
     const triggerBotId =

@@ -72,7 +72,7 @@ export async function telegramGetUpdates(
     {
       offset,
       timeout,
-      allowed_updates: ["message", "edited_message"],
+      allowed_updates: ["message", "edited_message", "my_chat_member"],
     },
     env,
   );

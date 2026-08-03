@@ -1,6 +1,9 @@
 /**
  * Telegram long-poll transport — maps updates into Discord-shaped pipeline msgs.
- * Private chats: always engage. Groups: @bot /ava /start or name mention.
+ * Private chats: always engage.
+ * Groups/supergroups: @bot /ava /start, name mention, entity mention, or reply-to-bot.
+ * Privacy mode (can_read_all_group_messages=false): Telegram only delivers those
+ * addressed updates — bare "Ava" without @username never arrives.
  */
 import {
   telegramBotToken,
@@ -16,17 +19,51 @@ import {
   telegramChatIdFromChannel,
 } from "./telegramApi.mjs";
 import { looksLikeTalkingAboutAva } from "./recommend.mjs";
+import {
+  touchGroupVault,
+  isTelegramGroupChannel,
+} from "./telegramGroupVault.mjs";
 
 export { isTelegramChannelId, telegramChatIdFromChannel, toTelegramChannelId };
 
-function addressesAva(text, botUsername) {
-  const t = String(text || "");
-  if (!t.trim()) return false;
-  if (/^\/start\b/i.test(t)) return true;
-  if (/^\/ava\b/i.test(t)) return true;
+function entityMentionsBot(m, botUsername, botUserId) {
+  const ents = [...(m.entities || []), ...(m.caption_entities || [])];
+  const text = String(m.text || m.caption || "");
+  for (const e of ents) {
+    if (e.type === "mention" && botUsername) {
+      const slice = text.slice(e.offset, e.offset + e.length).toLowerCase();
+      if (slice === `@${botUsername.toLowerCase()}`) return true;
+    }
+    if (
+      e.type === "text_mention" &&
+      botUserId &&
+      String(e.user?.id) === String(botUserId)
+    ) {
+      return true;
+    }
+    if (e.type === "bot_command" && botUsername) {
+      const slice = text.slice(e.offset, e.offset + e.length).toLowerCase();
+      if (slice.includes(`@${botUsername.toLowerCase()}`)) return true;
+    }
+  }
+  return false;
+}
+
+function isReplyToBot(m, botUserId) {
+  if (!botUserId || !m.reply_to_message?.from) return false;
+  return String(m.reply_to_message.from.id) === String(botUserId);
+}
+
+function addressesAva(m, botUsername, botUserId) {
+  const t = String(m.text || m.caption || "");
+  if (/^\/start(@\w+)?\b/i.test(t)) return true;
+  if (/^\/ava(@\w+)?\b/i.test(t)) return true;
   if (botUsername && t.toLowerCase().includes(`@${botUsername.toLowerCase()}`)) {
     return true;
   }
+  if (entityMentionsBot(m, botUsername, botUserId)) return true;
+  if (isReplyToBot(m, botUserId)) return true;
+  if (!t.trim()) return false;
   return looksLikeTalkingAboutAva(t, null) || /\bava(\s+ivy)?\b/i.test(t);
 }
 
@@ -85,28 +122,101 @@ export function startTelegramPoller(opts = {}) {
     return { id: String(first?.message_id || ""), ts: first?.message_id };
   }
 
+  function registerGroup(chat, event, fromId = null, preview = null) {
+    if (!chat || chat.type === "private") return;
+    try {
+      touchGroupVault({
+        chatId: chat.id,
+        title: chat.title || null,
+        chatType: chat.type,
+        event,
+        fromId,
+        preview,
+      });
+    } catch (err) {
+      console.warn("telegram group vault:", err.message);
+    }
+  }
+
+  async function handleMyChatMember(u) {
+    const mm = u.my_chat_member;
+    if (!mm?.chat) return;
+    const chat = mm.chat;
+    if (chat.type === "private") return;
+    const status = mm.new_chat_member?.status;
+    registerGroup(
+      chat,
+      `my_chat_member:${status || "unknown"}`,
+      mm.from?.id,
+      `status=${status}`,
+    );
+    console.log(
+      `telegram group member · ${chat.title || chat.id} · ${status} · ${chat.id}`,
+    );
+  }
+
   async function handleUpdate(u) {
+    if (u.my_chat_member) {
+      await handleMyChatMember(u);
+    }
+
     const m = u.message || u.edited_message;
-    if (!m || !m.chat || !m.from) return;
+    if (!m || !m.chat) return;
+
+    // Join / add-bot service messages (often empty text)
+    const newMembers = m.new_chat_members || [];
+    if (
+      botUserId &&
+      newMembers.some((x) => String(x.id) === String(botUserId))
+    ) {
+      registerGroup(m.chat, "added_to_group", m.from?.id, "bot added");
+      console.log(
+        `telegram added to group · ${m.chat.title || m.chat.id} · ${m.chat.id}`,
+      );
+    }
+
+    if (!m.from) return;
     if (m.from.is_bot) return;
     if (botUserId && String(m.from.id) === String(botUserId)) return;
 
     const chatId = m.chat.id;
     const isPrivate = m.chat.type === "private";
     const text = String(m.text || m.caption || "");
-    if (!text.trim()) return;
 
-    if (!isPrivate && !addressesAva(text, username)) return;
+    if (!isPrivate) {
+      registerGroup(m.chat, "group_update", m.from.id, text || "(no text)");
+    }
+
+    // Groups: only engage when addressed (privacy mode already limits delivery)
+    if (!isPrivate && !addressesAva(m, username, botUserId)) {
+      // Still keep empty service msgs from creating false engages
+      return;
+    }
+
+    // Private empty text — ignore; groups may engage on reply-to-bot with media caption
+    if (!text.trim() && isPrivate) return;
+    if (!text.trim() && !isReplyToBot(m, botUserId) && !entityMentionsBot(m, username, botUserId)) {
+      return;
+    }
 
     const channelId = toTelegramChannelId(chatId);
     const msgId = String(m.message_id);
     const key = `tg:${chatId}:${msgId}`;
     if (opts.seenHas?.(key)) return;
 
+    if (!isPrivate) {
+      registerGroup(
+        m.chat,
+        "addressed",
+        m.from.id,
+        text || "(reply/mention)",
+      );
+    }
+
     const msg = {
       id: msgId,
       channel_id: channelId,
-      content: text.replace(/^\/ava(@\w+)?\s*/i, "").trim() || text,
+      content: text.replace(/^\/ava(@\w+)?\s*/i, "").trim() || text || "(ping)",
       author: {
         id: String(m.from.id),
         username:
@@ -127,6 +237,9 @@ export function startTelegramPoller(opts = {}) {
         chatType: m.chat.type,
         chatTitle: m.chat.title || null,
         username,
+        botUserId,
+        isGroup: isTelegramGroupChannel(channelId, m.chat.type),
+        replyToBot: isReplyToBot(m, botUserId),
       },
     };
 
@@ -139,10 +252,16 @@ export function startTelegramPoller(opts = {}) {
       const me = await telegramGetMe(env);
       botUserId = String(me.id);
       username = me.username || null;
+      if (me.can_read_all_group_messages === false) {
+        console.log(
+          "telegram · privacy mode ON · groups need @mention / reply / command",
+        );
+      }
       opts.onReady?.({
         botUserId,
         username,
         name: me.first_name,
+        canReadAllGroupMessages: Boolean(me.can_read_all_group_messages),
       });
     } catch (err) {
       console.warn("Ava Telegram boot:", err.message);
@@ -187,7 +306,6 @@ export function startTelegramPoller(opts = {}) {
     },
     postMessage,
     async waitBoot() {
-      // brief wait for getMe
       for (let i = 0; i < 40 && !botUserId && !stopped; i++) {
         await new Promise((r) => setTimeout(r, 100));
       }

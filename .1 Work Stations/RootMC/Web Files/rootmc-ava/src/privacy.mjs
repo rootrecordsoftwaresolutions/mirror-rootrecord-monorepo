@@ -2,7 +2,10 @@
  * Customer / subscriber privacy — detailed PII only in Alex-only DMs.
  */
 import { personByAuthorId, personByDiscordId, personByTelegramId } from "./people.mjs";
-import { isTelegramChannelId } from "./telegramPoller.mjs";
+import {
+  isTelegramChannelId,
+  telegramChatIdFromChannel,
+} from "./telegramPoller.mjs";
 
 export function isAlexIdentity(authorId, authorName) {
   const p =
@@ -10,6 +13,16 @@ export function isAlexIdentity(authorId, authorName) {
     personByDiscordId(authorId) ||
     personByTelegramId(authorId);
   return Boolean(p?.id === "alexrs94" || p?.roles?.includes("owner"));
+}
+
+function isTelegramPrivateChat({ channelId = "", chatType = "" } = {}) {
+  const ct = String(chatType || "").toLowerCase();
+  if (ct && ct !== "private") return false;
+  if (!isTelegramChannelId(channelId)) return ct === "private";
+  const raw = String(telegramChatIdFromChannel(channelId));
+  // Groups/supergroups/channels use negative ids
+  if (raw.startsWith("-")) return false;
+  return true;
 }
 
 /**
@@ -22,12 +35,16 @@ export function isAlexOnlyPrivateDm({
   authorId = "",
   authorName = "",
   channelId = "",
+  chatType = "",
+  telegramChatType = "",
 } = {}) {
   if (!isAlexIdentity(authorId, authorName)) return false;
   const surf = String(surface || "").toLowerCase();
   if (surf === "telegram" || isTelegramChannelId(channelId)) {
-    // Operator Telegram is always private with Ava bot
-    return true;
+    return isTelegramPrivateChat({
+      channelId,
+      chatType: chatType || telegramChatType,
+    });
   }
   if (surf === "discord-dm" || (surf === "discord" && isDm)) {
     return Boolean(isDm);
