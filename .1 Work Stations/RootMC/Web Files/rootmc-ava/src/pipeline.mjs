@@ -4,6 +4,11 @@
 import { tryHandleFinanceCommand } from "./playerFinance.mjs";
 import { isSolarCommand, tryHandleSolarCommand } from "./solarCommand.mjs";
 import {
+  isStaffBriefingAsk,
+  tryHandleStaffBriefing,
+} from "./staffBriefing.mjs";
+import { tryHandlePeopleSocial } from "./peopleSocial.mjs";
+import {
   extractQuestion,
   looksLikeTalkingAboutAva,
   shouldAvaEngage,
@@ -1461,6 +1466,37 @@ export function createPipeline(deps) {
         }
         return;
       }
+    }
+
+    // Staff GM / quick pulse / full ranked report — instant, no Cursor dig
+    if (isStaffBriefingAsk(msg.content || "")) {
+      touchActivity("staff-briefing");
+      try {
+        const brief = await tryHandleStaffBriefing({
+          text: msg.content || "",
+          authorName: msg.author?.global_name || msg.author?.username || "",
+        });
+        if (brief?.handled && brief.reply) {
+          void ackReact.reactStored(channelId, msg.id);
+          await reply(channelId, brief.reply, msg.id, "staff_briefing");
+          return;
+        }
+      } catch (err) {
+        console.warn("staff briefing:", err.message);
+      }
+    }
+
+    // People departure / quiet beats (Zuppa left, etc.) — soft, never dig-stall
+    try {
+      const social = await tryHandlePeopleSocial({ text: msg.content || "" });
+      if (social?.handled && social.reply) {
+        touchActivity("people-social");
+        void ackReact.reactStored(channelId, msg.id);
+        await reply(channelId, social.reply, msg.id, "people_social");
+        return;
+      }
+    } catch (err) {
+      console.warn("people social:", err.message);
     }
 
     if (isHushed()) {

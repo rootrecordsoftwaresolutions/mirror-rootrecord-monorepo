@@ -222,6 +222,8 @@ const HOT_POLL_MS = Number(process.env.AVA_HOT_POLL_MS || process.env.SEXI_POLL_
 const BREAK_POLL_MS = Number(process.env.AVA_BREAK_POLL_MS || 60_000);
 const BREAK_AFTER_MS = Number(process.env.AVA_BREAK_AFTER_MS || 10 * 60_000);
 const FETCH_LIMIT = Number(process.env.AVA_FETCH_LIMIT || 40);
+/** EcoFlow + host-site SQL push — keep ≤3m live gate fresh (Alex 2026-08-03). */
+const ECO_POLL_MS = Number(process.env.AVA_ECO_POLL_MS || 60_000);
 const useGateway = AVA_TRANSPORT === "gateway" || AVA_TRANSPORT === "both";
 /** REST live answers only when poller-only (gateway owns live traffic in "both"). */
 const usePollerLive = AVA_TRANSPORT === "poller";
@@ -235,6 +237,7 @@ let lastActivityAt = Date.now();
 let pollTimer = null;
 let heartbeatTimer = null;
 let lastPollWatch = 0;
+let lastEcoPoll = 0;
 let lastPendingCheck = 0;
 let lastFollowupScan = 0;
 let gatewayHandle = null;
@@ -932,6 +935,25 @@ async function tick() {
       saveWatermark({ ...wm, channels: { ...(wm.channels || {}), ...latestMap } });
     }
 
+    // EcoFlow live poll (~60s) — River/Delta freshness + D1/SQL sample history
+    if (Date.now() - lastEcoPoll >= ECO_POLL_MS) {
+      lastEcoPoll = Date.now();
+      try {
+        await refreshEcoFlow();
+        const block = await buildHostSiteHourlyBlock({ refreshPower: false });
+        const push = await pushHostSiteTelemetry(env, block.payload);
+        if (push.ok) {
+          pushStatusEvent(
+            `eco poll · bank ${block.payload?.solar?.batteryPct ?? "?"} · sql ${push.data?.eco_samples_inserted ?? "?"}`,
+          );
+        } else if (push.detail !== "no_workstation_key") {
+          console.warn("eco poll push:", push.detail || push.status);
+        }
+      } catch (err) {
+        console.warn("eco poll:", err.message);
+      }
+    }
+
     // Periodic poll watcher (~10 min)
     if (Date.now() - lastPollWatch > 10 * 60_000) {
       lastPollWatch = Date.now();
@@ -944,13 +966,7 @@ async function tick() {
       } catch (err) {
         console.warn("poll watcher:", err.message);
       }
-      await refreshEcoFlow().catch(() => {});
-      try {
-        const block = await buildHostSiteHourlyBlock({ refreshPower: false });
-        await pushHostSiteTelemetry(env, block.payload);
-      } catch (err) {
-        console.warn("host-site sync:", err.message);
-      }
+      // Eco already on 60s cadence — skip duplicate refresh here
       await refreshHostMetrics().catch(() => {});
     }
 

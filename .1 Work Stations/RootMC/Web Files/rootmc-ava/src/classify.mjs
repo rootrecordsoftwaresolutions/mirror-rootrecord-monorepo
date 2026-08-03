@@ -156,9 +156,16 @@ export function isSoftChat(question = "", rawContent = "") {
     return true;
   }
   if (
-    /^(hey|hi|yo|sup|ava|ok|okay|thanks?|ty|thx|gn|night+|good\s*night|lol+|lmao+|haha+|heh+|bet|noted|cool|nice|np|yw)[.!?]*$/i.test(
+    /^(hey|hi|yo|sup|ava|ok|okay|thanks?|ty|thx|gn|night+|good\s*night|good\s*mornin[g']?|mornin[g']?|gm|lol+|lmao+|haha+|heh+|bet|noted|cool|nice|np|yw)[.!?]*$/i.test(
       raw,
     )
+  ) {
+    return true;
+  }
+  // Good morning Ava — soft, not a dig
+  if (
+    raw.length <= 80 &&
+    /\b(good\s*mornin[g']?|mornin[g']?|\bgm\b)\b/i.test(q)
   ) {
     return true;
   }
@@ -229,6 +236,10 @@ export function softChatReply(question = "", rawContent = "") {
   }
   if (/\b(thanks?|ty|thx)\b/.test(q)) {
     return "anytime ❤";
+  }
+  // Good morning — offer pulse/report (staffBriefing usually catches first)
+  if (/\b(good\s*mornin[g']?|mornin[g']?|\bgm\b)\b/.test(q)) {
+    return "gm 🌞 — want a **quick pulse** or a **full report** (1–10)?";
   }
   // Praise / warmth directed at Ava — never dump "mm?"
   if (

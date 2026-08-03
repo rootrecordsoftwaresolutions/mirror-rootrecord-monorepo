@@ -146,6 +146,30 @@ async function ensureTable(db: D1Database): Promise<void> {
        )`,
     )
     .run();
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS rootmc_ecoflow_samples (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         sn TEXT NOT NULL,
+         label TEXT,
+         live INTEGER NOT NULL DEFAULT 0,
+         device_online INTEGER,
+         soc REAL,
+         solar_w REAL,
+         in_w REAL,
+         out_w REAL,
+         sampled_at INTEGER NOT NULL,
+         payload_json TEXT,
+         created_at TEXT NOT NULL
+       )`,
+    )
+    .run();
+  await db
+    .prepare(
+      `CREATE INDEX IF NOT EXISTS idx_ecoflow_samples_sn_at
+       ON rootmc_ecoflow_samples (sn, sampled_at DESC)`,
+    )
+    .run();
 }
 
 export async function readHostSiteTelemetry(
@@ -327,6 +351,27 @@ export async function handleHostSiteRoutes(
     return json({ ok: true, telemetry: telem, mining });
   }
 
+  if (req.method === "GET" && (rest === "/ecoflow/samples" || rest === "/ecoflow/samples/")) {
+    await ensureTable(env.DB);
+    const url = new URL(req.url);
+    const sn = str(url.searchParams.get("sn"));
+    const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 60)));
+    const rows = sn
+      ? await env.DB.prepare(
+          `SELECT sn, label, live, device_online, soc, solar_w, in_w, out_w, sampled_at, created_at
+           FROM rootmc_ecoflow_samples WHERE sn = ? ORDER BY sampled_at DESC LIMIT ?`,
+        )
+          .bind(sn, limit)
+          .all()
+      : await env.DB.prepare(
+          `SELECT sn, label, live, device_online, soc, solar_w, in_w, out_w, sampled_at, created_at
+           FROM rootmc_ecoflow_samples ORDER BY sampled_at DESC LIMIT ?`,
+        )
+          .bind(limit)
+          .all();
+    return json({ ok: true, samples: rows?.results || [] });
+  }
+
   if (req.method === "POST" && rest === "/telemetry") {
     if (!validateDevWorkstationAuth(req, env)) {
       return json({ ok: false, detail: "unauthorized" }, 401);
@@ -348,8 +393,100 @@ export async function handleHostSiteRoutes(
     )
       .bind("primary", JSON.stringify(body), now)
       .run();
-    return json({ ok: true, updated_at: now });
+
+    // Persist per-SN EcoFlow samples for fresh history (Alex 2026-08-03)
+    const inserted = await insertEcoflowSamplesFromTelemetry(env.DB, body, now);
+    return json({ ok: true, updated_at: now, eco_samples_inserted: inserted });
+  }
+
+  if (req.method === "POST" && (rest === "/ecoflow/samples" || rest === "/ecoflow/samples/")) {
+    if (!validateDevWorkstationAuth(req, env)) {
+      return json({ ok: false, detail: "unauthorized" }, 401);
+    }
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ ok: false, detail: "invalid_json" }, 400);
+    }
+    await ensureTable(env.DB);
+    const now = new Date().toISOString();
+    const samples = Array.isArray(body?.samples) ? body.samples : [body];
+    let n = 0;
+    for (const s of samples) {
+      if (!s?.sn) continue;
+      await env.DB.prepare(
+        `INSERT INTO rootmc_ecoflow_samples
+         (sn, label, live, device_online, soc, solar_w, in_w, out_w, sampled_at, payload_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          str(s.sn),
+          str(s.label) || null,
+          s.live === true || s.live === 1 ? 1 : 0,
+          s.deviceOnline === false || s.device_online === 0
+            ? 0
+            : s.deviceOnline === true || s.device_online === 1
+              ? 1
+              : null,
+          s.soc != null ? Number(s.soc) : null,
+          s.solarW != null ? Number(s.solarW) : s.solar_w != null ? Number(s.solar_w) : null,
+          s.inW != null ? Number(s.inW) : s.in_w != null ? Number(s.in_w) : null,
+          s.outW != null ? Number(s.outW) : s.out_w != null ? Number(s.out_w) : null,
+          Number(s.sampledAt || s.sampled_at || Date.now()),
+          JSON.stringify(s),
+          now,
+        )
+        .run();
+      n += 1;
+    }
+    return json({ ok: true, inserted: n, created_at: now });
   }
 
   return null;
+}
+
+async function insertEcoflowSamplesFromTelemetry(
+  db: D1Database,
+  body: any,
+  createdAt: string,
+): Promise<number> {
+  const solar = body?.solar || {};
+  const perSn = (solar.perSn || body?.perSn || {}) as Record<string, any>;
+  const labels: Record<string, string> = {
+    R331ZAB5SG6S2858: "Delta 2",
+    R621ZA16XH6K1155: "River 2 Pro",
+  };
+  let n = 0;
+  for (const [sn, v] of Object.entries(perSn)) {
+    if (!sn || !v) continue;
+    const live = v.ok === true && v.live !== false && v.deviceOnline !== false;
+    const known = live
+      ? v
+      : v.lastKnown && typeof v.lastKnown === "object"
+        ? v.lastKnown
+        : v;
+    await db
+      .prepare(
+        `INSERT INTO rootmc_ecoflow_samples
+         (sn, label, live, device_online, soc, solar_w, in_w, out_w, sampled_at, payload_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        sn,
+        labels[sn] || sn.slice(-6),
+        live ? 1 : 0,
+        v.deviceOnline === false ? 0 : v.deviceOnline === true ? 1 : null,
+        known?.soc != null ? Number(known.soc) : null,
+        known?.solarW != null ? Number(known.solarW) : null,
+        known?.inW != null ? Number(known.inW) : null,
+        known?.outW != null ? Number(known.outW) : null,
+        Number(v.sampledAt || Date.now()),
+        JSON.stringify({ sn, ...v }),
+        createdAt,
+      )
+      .run();
+    n += 1;
+  }
+  return n;
 }
