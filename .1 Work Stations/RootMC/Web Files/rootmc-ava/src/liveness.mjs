@@ -27,6 +27,7 @@ export function writeLiveness(patch = {}) {
     ...patch,
     updatedAt: Date.now(),
     parentPid: process.pid,
+    parentStartedAt: prev.parentStartedAt || startedAt,
     parentUptimeMs: Date.now() - startedAt,
   };
   try {

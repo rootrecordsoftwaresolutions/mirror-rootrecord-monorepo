@@ -265,6 +265,77 @@ function readMinuteRows(sn) {
 }
 
 /**
+ * Rolling minute series for status/solar graphs — live buckets only, never invent.
+ * @param {{ maxAgeMs?: number, limit?: number }} [opts]
+ */
+export function loadEcoMinuteSeries(opts = {}) {
+  const maxAgeMs = Number(opts.maxAgeMs ?? 8 * 3600_000);
+  const limit = Math.max(12, Math.min(720, Number(opts.limit ?? 240)));
+  const since = Date.now() - maxAgeMs;
+  const snap = loadEcoSnapshot();
+  const sns = Object.keys(snap?.perSn || {}).length
+    ? Object.keys(snap.perSn)
+    : configuredSerials();
+  const byMinute = new Map();
+  for (const sn of sns) {
+    const off = isEcoOffCircuit(sn);
+    const rows = readMinuteRows(sn);
+    // Dedupe to last sample per minute floor
+    const lastByMin = new Map();
+    for (const r of rows) {
+      const t = Number(r.minute || Math.floor(Number(r.at || 0) / 60000) * 60000);
+      if (!Number.isFinite(t) || t < since) continue;
+      lastByMin.set(t, r);
+    }
+    for (const [t, r] of lastByMin) {
+      const cur = byMinute.get(t) || {
+        t,
+        solarW: 0,
+        outW: 0,
+        inW: 0,
+        bankSocSum: 0,
+        bankSocN: 0,
+        devices: {},
+      };
+      const solarW = Number.isFinite(Number(r.solarW)) ? Number(r.solarW) : null;
+      const outW = Number.isFinite(Number(r.outW)) ? Number(r.outW) : null;
+      const inW = Number.isFinite(Number(r.inW)) ? Number(r.inW) : null;
+      const soc = Number.isFinite(Number(r.soc)) ? Number(r.soc) : null;
+      if (!off && solarW != null) cur.solarW += solarW;
+      if (!off && outW != null) cur.outW += outW;
+      if (!off && inW != null) cur.inW += inW;
+      if (!off && soc != null) {
+        cur.bankSocSum += soc;
+        cur.bankSocN += 1;
+      }
+      cur.devices[sn] = {
+        soc,
+        solarW,
+        outW,
+        inW,
+        offCircuit: off,
+      };
+      byMinute.set(t, cur);
+    }
+  }
+  const series = [...byMinute.values()]
+    .sort((a, b) => a.t - b.t)
+    .slice(-limit)
+    .map((row) => ({
+      t: row.t,
+      solarW: Math.round(row.solarW),
+      outW: Math.round(row.outW),
+      inW: Math.round(row.inW),
+      bankSoc:
+        row.bankSocN > 0
+          ? Math.round(row.bankSocSum / row.bankSocN)
+          : null,
+      devices: row.devices,
+    }));
+  return { series, sns, sampleCount: series.length };
+}
+
+/**
  * Average solar intake from local minute buckets for "this morning" (local TZ).
  * Honest about sample window — never invent dawn if buckets start later.
  * @param {{ tzOffsetHours?: number, morningStartHour?: number, morningEndHour?: number }} [opts]

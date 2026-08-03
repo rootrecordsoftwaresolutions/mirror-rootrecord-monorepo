@@ -98,6 +98,18 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
     alerts = [];
   }
 
+  const astro = points?.properties?.astronomicalData || null;
+  const sun =
+    astro && typeof astro === "object"
+      ? {
+          sunrise: astro.sunrise || null,
+          sunset: astro.sunset || null,
+          transit: astro.transit || null,
+          civilTwilightBegin: astro.civilTwilightBegin || null,
+          civilTwilightEnd: astro.civilTwilightEnd || null,
+        }
+      : null;
+
   return {
     ok: true,
     source: "NWS",
@@ -112,6 +124,7 @@ export async function fetchHostSiteWeather(site = loadHostSite()) {
           short: period.shortForecast,
         }
       : null,
+    sun,
     alerts,
     fetchedAt: new Date().toISOString(),
   };
@@ -171,6 +184,25 @@ export function formatWeatherLines(weather) {
     lines.push(
       `- **Now (${p.name}):** ${p.temp}${p.unit} - ${p.short}` +
         (p.wind ? ` - wind ${p.wind}` : ""),
+    );
+  }
+  const sun = weather.sun;
+  if (sun?.sunrise || sun?.sunset) {
+    const fmt = (iso) => {
+      if (!iso) return "?";
+      try {
+        return new Date(iso).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: "Pacific/Honolulu",
+        });
+      } catch {
+        return String(iso).slice(11, 16);
+      }
+    };
+    lines.push(
+      `- **Sun:** rise ${fmt(sun.sunrise)} / set ${fmt(sun.sunset)}` +
+        (sun.transit ? ` / noon ${fmt(sun.transit)}` : ""),
     );
   }
   lines.push(`- **Source:** ${weather.source || "NWS"} (local point)`);

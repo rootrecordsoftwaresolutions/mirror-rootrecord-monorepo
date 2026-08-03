@@ -462,6 +462,32 @@ function readRecentMinutes(maxAgeMs = 60 * 60 * 1000) {
   return rows;
 }
 
+/**
+ * Minute CPU/RAM/disk series for solar/status graphs — live sampler only.
+ * @param {{ maxAgeMs?: number, limit?: number }} [opts]
+ */
+export function loadHostMetricsMinuteSeries(opts = {}) {
+  const maxAgeMs = Number(opts.maxAgeMs ?? 8 * 3600_000);
+  const limit = Math.max(12, Math.min(720, Number(opts.limit ?? 240)));
+  const rows = readRecentMinutes(maxAgeMs)
+    .map((row) => {
+      const t = Date.parse(row.minute_ts);
+      if (!Number.isFinite(t)) return null;
+      return {
+        t,
+        minute_ts: row.minute_ts,
+        cpu: round2(row.cpu_avg_pct),
+        ram: round2(row.ram_avg_pct),
+        disk: round2(row.disk_used_pct),
+        samples: row.sample_count || 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.t - b.t)
+    .slice(-limit);
+  return { series: rows, sampleCount: rows.length };
+}
+
 function aggregateMinuteRows(rows) {
   if (!rows.length) return null;
   let cpu = 0;

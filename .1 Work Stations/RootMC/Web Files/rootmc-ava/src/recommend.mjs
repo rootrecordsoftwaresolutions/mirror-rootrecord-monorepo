@@ -283,13 +283,12 @@ export async function recommend({
 
   const asleep = isAsleep();
   const surfaceNorm = String(surface || "discord").toLowerCase();
-  const discordDream =
+  const onDiscord =
     surfaceNorm === "discord" || surfaceNorm === "discord-dm";
   const cursorUp = Boolean(cursorApiKey(env || {}));
 
-  // Cursor-online exception: live EcoFlow + council voting shares on Discord.
-  // Read-only telemetry — not a jar dig. Bypasses dream-only + cloud-dark mute.
-  if (isOpsPowerStatusAsk(q) && cursorUp && !forceDream) {
+  // Cursor-online: live EcoFlow + council voting shares (read-only telemetry).
+  if (isOpsPowerStatusAsk(q) && cursorUp && !forceDream && !asleep) {
     try {
       const powerReply = await buildOpsPowerStatusReply({
         authorId,
@@ -306,29 +305,29 @@ export async function recommend({
     }
   }
 
-  // Locked: Discord is always dream state. Slack / on-device = Root Server digs.
+  // Powered-on + Cursor key → Root Server digs on Discord too (agents usable).
+  // Dream only for: sleep, forceDream / AVA_FORCE_DREAM, or missing Cursor key.
   const useDream =
     forceDream ||
     forceDreamBrain(env || {}) ||
     asleep ||
-    discordDream ||
     !cursorUp;
 
-  // Grok / dream unpaid or unreachable — silence Discord + Telegram auto-replies.
-  // (Ops power-status already handled above when Cursor is online.)
+  // Cloud-dark (Grok unpaid): silence only when we'd need dream brain.
+  // With Cursor up + powered on, Discord still answers via Root Server.
   if (
     isCloudDark() &&
-    (discordDream ||
+    useDream &&
+    (onDiscord ||
       surfaceNorm === "telegram" ||
       forceDream ||
-      asleep ||
-      (useDream && !cursorUp))
+      asleep)
   ) {
     return "";
   }
 
-  // Goal B3: Slack / on-device organizer — local Llama first; escalate Cursor → dream; train.
-  if (!discordDream && !forceDream && !asleep) {
+  // Local Llama first when Root Server path is open; escalate Cursor → dream; train.
+  if (!useDream) {
     try {
       flushPendingLessons();
     } catch {
@@ -374,8 +373,8 @@ export async function recommend({
     });
     if (dream.ok && dream.text) return dream.text;
     console.warn("Ava dream:", dream.reason);
-    // Discord / forced dream / asleep / no Cursor: never fall through to Root Server
-    if (discordDream || forceDream || asleep || !cursorApiKey(env || {})) {
+    // Forced dream / asleep / no Cursor: never fall through to Root Server
+    if (forceDream || asleep || !cursorApiKey(env || {})) {
       return heuristicRecommend(q);
     }
   }

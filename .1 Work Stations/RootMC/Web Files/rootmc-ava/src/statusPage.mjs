@@ -135,7 +135,7 @@ export function statusPageHtml() {
 <body>
   <main>
     <p class="brand">Ava Ivy</p>
-    <p class="sub">Local status · RootMC lead-dev bot</p>
+    <p class="sub">Local status · RootMC lead-dev bot · <a href="/solar">Solar dashboard</a> · <a href="https://ava.rootmc.net/" target="_blank" rel="noopener">ava.rootmc.net</a></p>
     <div class="pill"><span class="dot" id="dot"></span><span id="state">checking…</span></div>
     <div class="grid" id="grid"></div>
     <section class="log">
@@ -143,7 +143,7 @@ export function statusPageHtml() {
       <ul id="events"></ul>
     </section>
     <footer>
-      Auto-refresh every 2s · <a href="/api/status">/api/status</a> · <a href="/health">/health</a>
+      Auto-refresh every 2s · <a href="/solar">Solar / power graphs</a> · <a href="https://ava.rootmc.net/solar">tunnel /solar</a> · <a href="/api/status">/api/status</a> · <a href="/api/solar">/api/solar</a> · <a href="/health">/health</a> · <a href="https://ava.rootmc.net/">ava.rootmc.net</a>
     </footer>
   </main>
   <script>
