@@ -1235,6 +1235,17 @@ export function createPipeline(deps) {
         kind: "sleep",
         wakeAt: state.wakeAt,
       }).catch(() => {});
+      // Gold mine → normal 1.0× while host device is off overnight
+      try {
+        const { buildHostSiteHourlyBlock, pushHostSiteTelemetry } = await import(
+          "./hostSite.mjs"
+        );
+        const block = await buildHostSiteHourlyBlock({ refreshPower: false });
+        await pushHostSiteTelemetry(env, block.payload);
+        pushStatusEvent("host off · mining 1.0× (sleep)");
+      } catch (err) {
+        console.warn("sleep mining offline push:", err.message);
+      }
       return;
     }
 

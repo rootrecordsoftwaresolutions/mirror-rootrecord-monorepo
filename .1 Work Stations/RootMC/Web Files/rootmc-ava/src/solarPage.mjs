@@ -310,6 +310,7 @@ export function solarPageHtml() {
       return '<div style="display:flex;justify-content:space-between;gap:0.75rem"><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>';
     }
     function statusPill(live) {
+      if (live.hostOnline === false) return '<span class="pill bad">host off · Gold 1.0×</span>';
       if (live.ecoOffline) return '<span class="pill bad">EcoFlow offline</span>';
       if (live.anyDisconnected) return '<span class="pill bad">device disconnected</span>';
       if (live.ecoStale) return '<span class="pill warn">EcoFlow stale</span>';

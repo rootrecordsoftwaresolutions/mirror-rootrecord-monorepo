@@ -581,6 +581,14 @@ setPowerDownPrepare(async () => {
   telegramHandle = null;
   writeHeartbeat({ live: false, mode: "off", poweredOff: true });
   pushStatusEvent("discord+slack+telegram disconnected · power down");
+  // Gold mine → normal 1.0× while host device is off (don't wait for stale window)
+  try {
+    const block = await buildHostSiteHourlyBlock({ refreshPower: false });
+    await pushHostSiteTelemetry(env, block.payload);
+    pushStatusEvent("host-site telemetry · host off · mining 1.0×");
+  } catch (err) {
+    console.warn("power-down mining offline push:", err.message);
+  }
 });
 
 async function bootHandshake() {

@@ -1,6 +1,6 @@
 # Solar mining multiplier (Gold G)
 
-**Date:** 2026-08-02  
+**Date:** 2026-08-02 (host-off lock 2026-08-02 night)  
 **Owner:** Ava Ivy  
 **Status:** shipped (API + Ava UI + Root-Economy hook)
 
@@ -15,22 +15,26 @@
 
 ## Online hours
 
-**Online** = fresh host-site telemetry (≤15m) **and** EcoFlow not offline/stale **and** on-circuit bank `%` present.
+**Online** = host device on + fresh host-site telemetry (≤15m) **and** EcoFlow not offline/stale **and** on-circuit bank `%` present.
 
-If feed offline / stale / off-circuit-only → **1.0×** and disconnected state (Ava solar page pill + API `online: false`).
+### Host / device off → **normal Gold (1.0×)** (locked)
+
+If the Root Server host is **off** (Ava asleep / power-down / `hostOnline: false` / `ecoStatus: host_off`) → multiplier **1.0×** immediately — do **not** keep the last battery boost through the stale window.
+
+Same for EcoFlow feed offline / stale / off-circuit-only / device disconnected → **1.0×**.
 
 ## Surfaces
 
 | Surface | Path / touch |
 |---------|----------------|
-| API | `GET https://api.rootmc.net/api/rootmc/solar-mining-multiplier` → `{ ok, battery_percent, multiplier, online, source, updated_at, detail }` |
-| Ava push | `hostSite.mjs` enriches `solar.ecoStatus/ecoUpdatedAt/ecoOffline/ecoStale` on telemetry POST |
+| API | `GET https://api.rootmc.net/api/rootmc/solar-mining-multiplier` → `{ ok, battery_percent, multiplier, online, source, updated_at, detail }` (`detail: host_device_off` when host off) |
+| Ava push | `hostSite.mjs` sets `hostOnline` + `ecoStatus: host_off` on sleep/power-down; enriches eco flags on telemetry POST |
 | Ava solar page | KPI **Gold mine** next to bank %; banner pill |
 | Plugin | `Root-Economy` — `SolarMiningMultiplierService` polls API; `GoldFoundListener` scales ore/block drops; loan ore repayment uses same mult |
 
 ## Deploy / jars
 
-- Deploy: `powershell -File "Web Files\rootmc-api\deploy.ps1"`
+- Deploy: `powershell -File "Web Files\rootmc-api\deploy.ps1"` (picks up `host_device_off` detail; pre-deploy Workers already honor `ecoOffline`/`host_off` via Ava push)
 - Stage **Root-Economy** jar to Claims + Towny handoffs after `publishPlugins` — **do not force Shockbyte restart**
 - No boats jar
 

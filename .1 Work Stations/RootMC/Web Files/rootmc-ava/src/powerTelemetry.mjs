@@ -25,6 +25,8 @@ import {
 import { loadHeartbeat } from "./store.mjs";
 import { readLiveness } from "./liveness.mjs";
 import { miningMultiplierFromLive } from "./solarMiningMultiplier.mjs";
+import { isAsleep } from "./sleepMode.mjs";
+import { isPoweredOff } from "./powerDown.mjs";
 
 const NICK_BY_SN = {
   R331ZAB5SG6S2858: "Delta 2",
@@ -370,6 +372,7 @@ export async function buildSolarDashboardPayload(opts = {}) {
     ecoAgeMs,
     ecoStale,
     ecoOffline,
+    hostOnline: !isAsleep() && !isPoweredOff(),
     devices,
     anyDisconnected,
     cpu: curCpu != null ? Number(curCpu) : null,

@@ -14,6 +14,8 @@ import {
   isEcoOffCircuit,
 } from "./ecoflow.mjs";
 import { loadSolarProfile } from "./solarProfile.mjs";
+import { isAsleep } from "./sleepMode.mjs";
+import { isPoweredOff } from "./powerDown.mjs";
 
 const NWS_UA = "RootMC Ava (rootmc.net; host-site hourly)";
 const DEFAULT_SITE = {
@@ -252,21 +254,28 @@ export async function buildHostSiteHourlyBlock({ refreshPower = true } = {}) {
       ? { ...weather, city: null, state: null }
       : weather;
 
+  // Host PC / Root Server off (sleep or power-down) → Gold mine normal 1.0×
+  const hostOnline = !isAsleep() && !isPoweredOff();
+  const ecoReallyOffline =
+    !snap ||
+    snap.status === "unconfigured" ||
+    snap.status === "needs_sn" ||
+    (!Object.keys(snap?.perSn || {}).length && snap.status !== "live");
+
   const payload = {
     site: publicSite,
+    hostOnline,
     solar: {
       batteryPct: snap?.batteryPct ?? null,
       perSn: snap?.perSn || {},
       morningAvgW: morning.siteAvgW ?? null,
       morningNote: morning.note || null,
       // Mining mult consumers (API / plugin) — never invent; flags from live Eco snapshot.
-      ecoStatus: snap?.status || null,
+      hostOnline,
+      ecoStatus: hostOnline ? snap?.status || null : "host_off",
       ecoUpdatedAt: snap?.updatedAt ?? null,
-      ecoOffline:
-        !snap ||
-        snap.status === "unconfigured" ||
-        snap.status === "needs_sn" ||
-        (!Object.keys(snap?.perSn || {}).length && snap.status !== "live"),
+      // host_off also sets ecoOffline so currently deployed Workers flip to 1.0× immediately
+      ecoOffline: !hostOnline || ecoReallyOffline,
       ecoStale:
         snap?.updatedAt != null
           ? Date.now() - Number(snap.updatedAt) > 12 * 60_000

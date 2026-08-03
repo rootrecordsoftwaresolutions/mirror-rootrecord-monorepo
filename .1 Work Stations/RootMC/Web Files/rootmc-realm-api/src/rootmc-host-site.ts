@@ -24,7 +24,7 @@ function str(v: unknown): string {
 /**
  * Solar bank SOC → gold mining multiplier during online hours.
  * multiplier = 1 + (batteryPercent / 100), clamp battery 0–100, max 3 decimals.
- * Offline / stale / no on-circuit bank → 1.0×.
+ * Offline / stale / no on-circuit bank / host device off → 1.0× (normal Gold).
  */
 export function computeSolarMiningMultiplier(
   batteryPercent: number | null | undefined,
@@ -50,7 +50,7 @@ export type SolarMiningMultiplierSnapshot = {
 /**
  * Online hours = fresh host-site telemetry + live EcoFlow aggregate bank SOC
  * (on-circuit average already on the solar dashboard — not a sum of packs).
- * Off-circuit-only / stale / missing feed → disconnected (1.0×).
+ * Host / device off, EcoFlow offline, off-circuit-only / stale / missing → 1.0× normal Gold.
  */
 export function resolveSolarMiningMultiplier(
   telem: Record<string, unknown> | null,
@@ -79,22 +79,37 @@ export function resolveSolarMiningMultiplier(
   }
 
   const ecoStatus = str(solar.ecoStatus) || null;
+  /** Explicit host PC / Root Server off (sleep or power-down) → normal Gold. */
+  const hostOnline =
+    telem?.hostOnline !== false &&
+    solar.hostOnline !== false &&
+    ecoStatus !== "host_off";
   const ecoOfflineFlag =
     solar.ecoOffline === true ||
     ecoStatus === "unconfigured" ||
     ecoStatus === "needs_sn" ||
-    ecoStatus === "offline";
+    ecoStatus === "offline" ||
+    ecoStatus === "host_off";
   const ecoStaleFlag =
     solar.ecoStale === true ||
     (ecoAgeMs != null && ecoAgeMs > ECO_STALE_MS);
   const telemStale = ageMs != null ? ageMs > TELEMETRY_STALE_MS : !telem;
   const hasBank = battery != null;
 
-  let online = Boolean(telem) && !telemStale && hasBank && !ecoOfflineFlag && !ecoStaleFlag;
+  let online =
+    Boolean(telem) &&
+    hostOnline &&
+    !telemStale &&
+    hasBank &&
+    !ecoOfflineFlag &&
+    !ecoStaleFlag;
   let detail = "live";
   if (!telem) {
     online = false;
     detail = "no_telemetry";
+  } else if (!hostOnline) {
+    online = false;
+    detail = "host_device_off";
   } else if (telemStale) {
     online = false;
     detail = "telemetry_stale";
