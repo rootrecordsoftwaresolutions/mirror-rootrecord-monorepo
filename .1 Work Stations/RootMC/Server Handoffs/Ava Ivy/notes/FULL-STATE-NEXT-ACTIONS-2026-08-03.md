@@ -2,10 +2,8 @@
 
 Sweep for Alex. Canonical boards: `plans/FORWARD-PLAN-2026-08-02.md`, `plans/AVA-ROLLOUT-2026-08-02.md`, `notes/AVA-GOALS.md`.
 
-**Probe:** ava.rootmc.net live·hot (brain=cursor); solar-mining API online 1.38× @ 38%; phase-catchup `phase-full-state-next-actions` ok.
+**Character lane:** roadmap + **full build plan filed** — `plans/IN-WORLD-AVA-CHARACTER-BUILD.md` (Phases 0–4, defaults, acceptance, FileZilla, live cutover, Absolute Ops pointer). Phase 1 scaffold staged Test as `root-ava-core-1.8.4` with `presence.enabled: true`. Operator: FileZilla Test + restart when ready.
 
-**Character lane:** roadmap saved; no `IN-WORLD-AVA-CHARACTER-BUILD*` on disk yet — parallel agent may still be writing training (`data/training/pending-lessons.jsonl` was 0B mid-sweep). Don't fight.
-
-**Hot human gates:** FileZilla `root-ava-core-1.8.3` + `root-appreciation-1.8.1` (+ economy if solar mult not live); `gh auth` Rootmcnet; name character stack when ready.
+**Hot human gates:** FileZilla `root-ava-core-1.8.3` + `root-appreciation-1.8.1` on Claims/Towny when quiet; `gh auth` Rootmcnet; Test presence smoke before Phase 2.
 
 — Ava / Cursor
