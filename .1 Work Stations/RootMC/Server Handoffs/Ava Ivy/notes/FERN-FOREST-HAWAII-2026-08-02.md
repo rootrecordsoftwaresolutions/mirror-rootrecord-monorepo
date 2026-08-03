@@ -3,7 +3,7 @@
 **Surface:** Telegram supergroup **Fern Forest Operations** · chatId `-1003868178598`
 
 ## Rescan improve (same day, post–15266)
-Live `getUpdates` caught lines the vault had not fully ingested yet:
+Live `getUpdates` + vault inbound caught lines after the first scaffold:
 
 | Msg | Who | What |
 |-----|-----|------|
@@ -14,19 +14,27 @@ Live `getUpdates` caught lines the vault had not fully ingested yet:
 | 15288 | Alex | Slow but self-hosted (patience OK) |
 | 15289 | Crazychickenlady12 | Planting seeds that got wet, then dinner |
 | 15290 | Alex | **Ok, Ava can catch up on the chat** |
+| — | Alex | Yes please ava |
+| 15298 | Alex | Personality: looking for things; morning data collect; digging/singing/farming; MC skill lore |
+| — | Alex | **Do everything** |
+| 15306 | Alex | Server location context (Fern Forest / windward HI) |
+| 15309 | Alex | Solar + weather update please |
 | DM 376 | Alex | Fern Forest may have **3 dig-queue lines**; fully catch up on TG |
 | DM 346 | Alex | Per-group private vault; ask him **in-group** before install functions |
-| 15298 | Alex | Personality: looking for things; morning data collect; digging/singing/farming; MC skill lore |
-| ~Do everything | Alex | Do everything (autonomous helpers in this vault) |
-| earlier | Alex | Solar countdown chips; no bleed; July summary / more of this; "everything that's best" while he's active |
+| earlier | Alex | Solar countdown chips; no bleed; July summary / more of this; "everything that's best" |
 
-## What shipped / improved
-- Profile `fern-forest-hawaii-v1` traits aligned to those lines (no-tag, self-determined, lore OK, Alex quality bar, wet-seed help)
-- Gardening notes expanded (wet seeds, ferns, tropicals, rain, slugs, wet/dry seasons) — uncertain tips labeled
-- Solar crumb reframed for growers (→ sunrise / → sunset / soft time-off band) + dashboard
-- Dig queue preference noted = 3 (vault-local); install still needs in-group go
+## What improved
+- Profile `fern-forest-hawaii-v1` traits: no-tag, self-determined, looking-for-things, dig/sing/farm lore, Alex quality bar, wet-seed help, windward HI location context
+- Gardening notes: wet seeds, ferns, tropicals, rain, slugs, wet/dry seasons (uncertain tips labeled)
+- Solar crumb grow framing (→ sunrise / → sunset / soft time-off) + live solar/weather assist
+- Dig queue preference = 3 (vault-local); install still needs in-group go
 - Runtime: `Web Files/rootmc-ava/src/fernForestHawaii.mjs`
-- In-group replies: **15299** (catch-up improve) + personality-lock follow-up after 15298
+
+## In-group reply msg ids
+- **15299** — catch-up / improve ack
+- **15308** — personality lock (looking-for-things / do everything)
+- **15316** — live solar + weather (reply to 15309)
+- Soft-acks: 👀 on 15245, 15258, 15274, 15281, 15285, 15286, 15290, 15298, 15306, 15309 (+ nearby)
 
 ## Do not
 - Cross-post this group's internals to Discord/Slack/other TG groups
