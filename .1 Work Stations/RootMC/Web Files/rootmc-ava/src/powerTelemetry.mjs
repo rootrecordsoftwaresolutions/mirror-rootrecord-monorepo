@@ -24,6 +24,7 @@ import {
 } from "./hostMetrics.mjs";
 import { loadHeartbeat } from "./store.mjs";
 import { readLiveness } from "./liveness.mjs";
+import { miningMultiplierFromLive } from "./solarMiningMultiplier.mjs";
 
 const NICK_BY_SN = {
   R331ZAB5SG6S2858: "Delta 2",
@@ -387,6 +388,7 @@ export async function buildSolarDashboardPayload(opts = {}) {
     dayStart,
   });
   const online = resolveOnline(opts.statusHttpUptimeMs);
+  const mining = miningMultiplierFromLive(live);
 
   return {
     ok: true,
@@ -401,6 +403,7 @@ export async function buildSolarDashboardPayload(opts = {}) {
       localSolar: "http://127.0.0.1:8787/solar",
       localStatus: "http://127.0.0.1:8787/",
       api: "/api/solar",
+      miningMultiplierApi: "https://api.rootmc.net/api/rootmc/solar-mining-multiplier",
     },
     site: publicSite(site),
     array: {
@@ -410,6 +413,7 @@ export async function buildSolarDashboardPayload(opts = {}) {
       notes: solar?.panels?.notes || solar?.batteries?.notes || null,
     },
     online,
+    mining,
     sun: weather?.sun || null,
     live,
     stats,

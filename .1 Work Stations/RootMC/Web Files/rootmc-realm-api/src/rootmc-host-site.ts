@@ -12,9 +12,113 @@ export type HostSiteEnv = DevWorkstationEnv & {
 const NWS_UA = "RootMC Hourly (api.rootmc.net; host-site)";
 const DEFAULT_LAT = 19.5558;
 const DEFAULT_LON = -155.1069;
+/** Host-site D1 feed is pushed ~10m; treat older as offline for mining mult. */
+const TELEMETRY_STALE_MS = 15 * 60_000;
+/** EcoFlow sample age when Ava includes ecoUpdatedAt (matches Ava ECO_STALE_MS). */
+const ECO_STALE_MS = 12 * 60_000;
 
 function str(v: unknown): string {
   return String(v ?? "").trim();
+}
+
+/**
+ * Solar bank SOC → gold mining multiplier during online hours.
+ * multiplier = 1 + (batteryPercent / 100), clamp battery 0–100, max 3 decimals.
+ * Offline / stale / no on-circuit bank → 1.0×.
+ */
+export function computeSolarMiningMultiplier(
+  batteryPercent: number | null | undefined,
+  online: boolean,
+): number {
+  if (!online || batteryPercent == null || !Number.isFinite(Number(batteryPercent))) {
+    return 1;
+  }
+  const pct = Math.min(100, Math.max(0, Number(batteryPercent)));
+  return Math.round((1 + pct / 100) * 1000) / 1000;
+}
+
+export type SolarMiningMultiplierSnapshot = {
+  ok: true;
+  battery_percent: number | null;
+  multiplier: number;
+  online: boolean;
+  source: string;
+  updated_at: string | null;
+  detail?: string;
+};
+
+/**
+ * Online hours = fresh host-site telemetry + live EcoFlow aggregate bank SOC
+ * (on-circuit average already on the solar dashboard — not a sum of packs).
+ * Off-circuit-only / stale / missing feed → disconnected (1.0×).
+ */
+export function resolveSolarMiningMultiplier(
+  telem: Record<string, unknown> | null,
+): SolarMiningMultiplierSnapshot {
+  const updatedAt =
+    str(telem?._updated_at) ||
+    str(telem?.updatedAt) ||
+    null;
+  const solar = (telem?.solar as Record<string, unknown>) || {};
+  const batteryRaw = solar.batteryPct;
+  const battery =
+    batteryRaw != null && Number.isFinite(Number(batteryRaw))
+      ? Number(batteryRaw)
+      : null;
+
+  let ageMs: number | null = null;
+  if (updatedAt) {
+    const t = Date.parse(updatedAt);
+    if (Number.isFinite(t)) ageMs = Date.now() - t;
+  }
+
+  const ecoUpdatedAt = Number(solar.ecoUpdatedAt);
+  let ecoAgeMs: number | null = null;
+  if (Number.isFinite(ecoUpdatedAt) && ecoUpdatedAt > 0) {
+    ecoAgeMs = Date.now() - ecoUpdatedAt;
+  }
+
+  const ecoStatus = str(solar.ecoStatus) || null;
+  const ecoOfflineFlag =
+    solar.ecoOffline === true ||
+    ecoStatus === "unconfigured" ||
+    ecoStatus === "needs_sn" ||
+    ecoStatus === "offline";
+  const ecoStaleFlag =
+    solar.ecoStale === true ||
+    (ecoAgeMs != null && ecoAgeMs > ECO_STALE_MS);
+  const telemStale = ageMs != null ? ageMs > TELEMETRY_STALE_MS : !telem;
+  const hasBank = battery != null;
+
+  let online = Boolean(telem) && !telemStale && hasBank && !ecoOfflineFlag && !ecoStaleFlag;
+  let detail = "live";
+  if (!telem) {
+    online = false;
+    detail = "no_telemetry";
+  } else if (telemStale) {
+    online = false;
+    detail = "telemetry_stale";
+  } else if (ecoOfflineFlag) {
+    online = false;
+    detail = "ecoflow_offline";
+  } else if (ecoStaleFlag) {
+    online = false;
+    detail = "ecoflow_stale";
+  } else if (!hasBank) {
+    online = false;
+    detail = "no_on_circuit_bank";
+  }
+
+  const multiplier = computeSolarMiningMultiplier(battery, online);
+  return {
+    ok: true,
+    battery_percent: hasBank ? battery : null,
+    multiplier,
+    online,
+    source: "host-site-telemetry.solar.batteryPct",
+    updated_at: updatedAt,
+    detail,
+  };
 }
 
 async function ensureTable(db: D1Database): Promise<void> {
@@ -189,12 +293,23 @@ export async function handleHostSiteRoutes(
   env: HostSiteEnv,
   subpath: string,
 ): Promise<Response | null> {
+  // Public live mining multiplier (Gold G) from aggregate bank SOC.
+  if (
+    req.method === "GET" &&
+    (subpath === "/rootmc/solar-mining-multiplier" ||
+      subpath === "/rootmc/solar-mining-multiplier/")
+  ) {
+    const telem = await readHostSiteTelemetry(env.DB);
+    return json(resolveSolarMiningMultiplier(telem));
+  }
+
   if (!subpath.startsWith("/rootmc/host-site")) return null;
   const rest = subpath.slice("/rootmc/host-site".length) || "/";
 
   if (req.method === "GET" && (rest === "/telemetry" || rest === "/")) {
     const telem = await readHostSiteTelemetry(env.DB);
-    return json({ ok: true, telemetry: telem });
+    const mining = resolveSolarMiningMultiplier(telem);
+    return json({ ok: true, telemetry: telem, mining });
   }
 
   if (req.method === "POST" && rest === "/telemetry") {

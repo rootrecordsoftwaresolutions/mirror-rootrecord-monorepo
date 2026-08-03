@@ -259,6 +259,18 @@ export async function buildHostSiteHourlyBlock({ refreshPower = true } = {}) {
       perSn: snap?.perSn || {},
       morningAvgW: morning.siteAvgW ?? null,
       morningNote: morning.note || null,
+      // Mining mult consumers (API / plugin) — never invent; flags from live Eco snapshot.
+      ecoStatus: snap?.status || null,
+      ecoUpdatedAt: snap?.updatedAt ?? null,
+      ecoOffline:
+        !snap ||
+        snap.status === "unconfigured" ||
+        snap.status === "needs_sn" ||
+        (!Object.keys(snap?.perSn || {}).length && snap.status !== "live"),
+      ecoStale:
+        snap?.updatedAt != null
+          ? Date.now() - Number(snap.updatedAt) > 12 * 60_000
+          : !snap,
     },
     weather: publicWeather,
     updatedAt: new Date().toISOString(),

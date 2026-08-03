@@ -52,9 +52,9 @@ export function solarPageHtml() {
     .pill.warn { color: var(--stale); border-color: rgba(224,168,74,0.4); }
     .pill.bad { color: var(--offline); border-color: rgba(226,91,91,0.45); }
     .kpi strong.lime { color: var(--lime); text-shadow: 0 0 18px rgba(184,255,92,0.28); }
-    .kpis { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 0.65rem; margin: 0 0 1rem; }
-    @media (max-width: 960px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 520px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+    .kpis { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 0.65rem; margin: 0 0 1rem; }
+    @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
     .kpi { border-top: 1px solid var(--line); padding: 0.7rem 0 0.2rem; }
     .kpi label { display: block; color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.25rem; }
     .kpi strong { font-size: 1.18rem; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -324,8 +324,23 @@ export function solarPageHtml() {
       const sun = d.sun || wx.sun || {};
       const period = wx.period || {};
 
+      const mining = d.mining || {};
+      const mineOnline = mining.online === true;
+      const mineMultNum = mining.multiplier != null
+        ? Math.round(Number(mining.multiplier) * 1000) / 1000
+        : 1;
+      const mineMult = (Number.isInteger(mineMultNum)
+        ? mineMultNum.toFixed(1)
+        : String(mineMultNum)) + "×";
+      const mineHint = mineOnline
+        ? "Gold mine · bank " + fmt(mining.battery_percent, "%")
+        : "disconnected · 1.0×";
+
       $("banner").innerHTML =
         statusPill(live) +
+        (mineOnline
+          ? '<span class="pill ok">Mining '+esc(mineMult)+'</span>'
+          : '<span class="pill bad">Mining offline 1.0×</span>') +
         '<span><strong>Online since</strong> '+esc(fmtWhen(on.onlineSinceIso || on.onlineSinceMs))+
         ' <span class="muted">('+esc(on.uptimeHuman || "—")+' up)</span></span>' +
         '<span><strong>Sunrise</strong> '+esc(fmtSun(sun.sunrise))+
@@ -334,6 +349,7 @@ export function solarPageHtml() {
 
       $("kpis").innerHTML = [
         ["Bank now", fmt(live.batteryPct, "%"), "avg day "+fmt(st.bank?.dayAvgPct,"%")+" · roll "+fmt(st.bank?.rollingAvgPct,"%"), true],
+        ["Gold mine", mineMult, mineHint, mineOnline],
         ["Solar now", fmt(live.solarW, " W"), "morn ~"+fmt(st.solar?.morningAvgW," W")+" · day "+fmt(st.solar?.dayAvgW," W"), true],
         ["Solar Wh", fmt(st.solar?.dayWh, " Wh"), "today · roll "+fmt(st.solar?.rollingWh," Wh"), false],
         ["Load out", fmt(live.outW, " W"), "day avg "+fmt(st.load?.dayAvgOutW," W")+" · "+fmt(st.load?.dayOutWh," Wh"), false],
@@ -355,6 +371,7 @@ export function solarPageHtml() {
         ]],
         ["Bank / load", [
           ["Bank now", fmt(st.bank?.currentPct, "%")],
+          ["Gold mine mult", mineOnline ? mineMult : "1.0× (offline)"],
           ["Bank day avg", fmt(st.bank?.dayAvgPct, "%")],
           ["Bank rolling", fmt(st.bank?.rollingAvgPct, "%")],
           ["Load now", fmt(st.load?.currentOutW, " W")],
