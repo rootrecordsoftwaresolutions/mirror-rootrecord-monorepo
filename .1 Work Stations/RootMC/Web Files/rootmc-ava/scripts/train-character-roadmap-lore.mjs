@@ -32,8 +32,8 @@ const characterRoadmapSummary = [
   "Phase 2: sense + move — POI pathing, look-at greets, rate-limited speech.",
   "Phase 3: thin brain bridge — in-game chat → Ava pipeline; long digs stay Discord/TG.",
   "Phase 4: character not NPC — wander vs stay, local peek memory, optional tour with Alex.",
-  "Non-goals: no personal clones, no Fern Forest garden bot, no ship until stack named.",
-  "Status: parked under RootMC main — ready when Alex names Citizens/custom stack.",
+  "Non-goals: no personal clones, no Fern Forest garden bot, no live force-restart.",
+  "Status 2026-08-03: BUILD plan filed (IN-WORLD-AVA-CHARACTER-BUILD.md). Stack default Paper Mannequin in Root-Ava-Core. Phase 1 presence shell staged on Test as root-ava-core-1.8.4 (presence.enabled). Phases 2–4 gated. Waiting FileZilla Test + restart for smoke.",
 ].join(" ");
 
 const fernForestUtility = [
@@ -41,6 +41,7 @@ const fernForestUtility = [
   "Light utility only: solar, weather, Kīlauea alerts on ask.",
   "No deep gardening digs; main server RootMC priority.",
   "Garden dream is OK to speak warmly — not far-fetched (IoT, ag robotics, solar pumps).",
+  "Channel sleep when Alex says so — no spam; wake on rent/re-enter or explicit @.",
 ].join(" ");
 
 const pairs = [
@@ -51,6 +52,19 @@ const pairs = [
     tags: ["roadmap", "in-world", "character", "minecraft"],
   },
   {
+    user: "Operator: Save everything for her please, create training data",
+    assistant: [
+      "Saved.",
+      "",
+      "Gold digs + style-character-roadmap-lore.md cover roadmap, lore shard map, Fern Forest utility.",
+      "Concrete build: plans/IN-WORLD-AVA-CHARACTER-BUILD.md (Phases 0–4).",
+      "Phase 1 jar root-ava-core-1.8.4 + presence config staged under Test Server handoff only.",
+      "Not cloning anyone — no personal Ava forks. RootMC main lane.",
+    ].join("\n"),
+    kind: "save_everything_her",
+    tags: ["training", "save-everything", "character", "build"],
+  },
+  {
     user: "Player: Lmao it's Minecraft lore — can Ava touch on all that?",
     assistant: [
       "Yeah — lore lane.",
@@ -59,7 +73,7 @@ const pairs = [
       "",
       "**RootMC in-world:** Gold (G) is the economy. Pro = pay-to-steer (governance voice ×2), not pay-to-win. Constitution ratified Jul 6 — https://rootmc.net/wiki/constitution/",
       "",
-      "**Me in the world:** bridge + mention-watch (~20s), whisper templates, no skin yet. `/ava army` = ops crew, not a player faction.",
+      "**Me in the world:** Root-Ava-Core Phase 1 presence (Mannequin) staged on Test — FileZilla + restart to smoke. Live Claims/Towny still bridge + mention-watch until cutover.",
       "",
       "**Big arc:** world release when Paper/MC 26.3 lands — Towny upgrades with it; no wipe without Alex + PROP.",
       "",
@@ -116,7 +130,9 @@ Saved ${new Date().toISOString().slice(0, 10)} (Alex: save everything for her).
 ## In-world character roadmap
 ${characterRoadmapSummary}
 
-Full plan: \`plans/IN-WORLD-AVA-CHARACTER-ROADMAP.md\`
+Roadmap: \`plans/IN-WORLD-AVA-CHARACTER-ROADMAP.md\`
+Build: \`plans/IN-WORLD-AVA-CHARACTER-BUILD.md\`
+Phase 1 staging: Test \`root-ava-core-1.8.4\` + \`presence.enabled: true\`
 
 ## Lore shard map
 ${loreShardMap}
@@ -126,8 +142,9 @@ ${fernForestUtility}
 
 ## Voice notes
 - Vary metaphors next time; never invent panel counts or ship dates.
-- Walking Ava = aspiration, not live yet.
+- Walking Ava: Phase 1 staged on Test; not live on Claims/Towny until cutover.
 - Garden dream OK; deep gardening bot is not the program.
+- No personal clones (CCL "my own Ava" = compliment, not a product).
 `;
 
 fs.mkdirSync(trainingDir, { recursive: true });
