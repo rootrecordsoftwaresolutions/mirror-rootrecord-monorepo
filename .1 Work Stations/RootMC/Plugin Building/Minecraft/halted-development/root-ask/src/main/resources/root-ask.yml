@@ -1,0 +1,108 @@
+# Root-Ask — plugins/RootMC/root-ask.yml
+
+# Uses server credentials from plugins/RootMC/cloud.yml (same as RootMC heartbeat).
+
+
+
+ask:
+
+  cooldown-seconds: 45
+
+  chunk-delay-ticks: 3
+
+  max-question-length: 200
+
+
+
+proactive:
+
+  enabled: true
+
+  cooldown-minutes: 45
+
+  min-chars: 12
+
+  question-keywords:
+
+    - how do i
+
+    - how to
+
+    - what is
+
+    - where is
+
+    - command
+
+    - shop
+
+    - rank
+
+    - town
+
+    - nation
+
+    - gold
+
+    - net worth
+
+    - mcmmo
+
+    - link
+
+    - verify
+
+    - buy
+
+    - sell
+
+  skip-patterns:
+
+    - "^you\\b"
+
+    - "^lol"
+
+    - "^bruh"
+
+    - "^gg\\b"
+
+    - "^nice\\b"
+
+
+
+messages:
+
+  prefix: "&6[Guide]&r "
+
+  thinking: "&7Thinking..."
+
+  usage: "&7Ask about rules, economy, ranks, shops, or commands. &f/ask <question>"
+
+  too-short: "&eAsk a full question — e.g. &f/ask How do player shops work?"
+
+  too-long: "&eQuestion is limited to &f{max}&e characters."
+
+  cooldown: "&eWait &f{seconds}&e s before asking again."
+
+  no-cloud: "&cGuide unavailable — cloud credentials missing. Ask staff."
+
+  fail: "&cGuide error: &f{error}"
+
+  quota: "&eDaily guide limit reached. Try tomorrow or ask on Discord."
+
+  link-hint: "&7Open: &f{url}"
+
+  feedback-prompt: "&7Did this answer your question? &f/ask yes &7or &f/ask no"
+
+  feedback-none: "&7No guide answer is waiting for feedback."
+
+  feedback-thanks: "&7Thanks — marked as helpful."
+
+  feedback-retrying: "&7Let me try a clearer answer..."
+
+  feedback-closed: "&7Glad that helped."
+
+  off-topic: "&7I only cover RootMC — shops, ranks, towns, commands. What do you need on the server?"
+
+  proactive-offer: "&7Need help with RootMC? Use &f/ask <your question>&7."
+

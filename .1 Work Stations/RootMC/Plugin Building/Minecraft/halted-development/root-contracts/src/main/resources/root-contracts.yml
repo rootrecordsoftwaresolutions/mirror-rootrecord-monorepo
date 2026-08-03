@@ -1,0 +1,45 @@
+# Root-Contracts — plugins/RootMC/root-contracts.yml
+
+mysql:
+  enabled: true
+  host: ""
+  port: 3306
+  database: ""
+  username: ""
+  password: ""
+  table-prefix: "root_"
+  jdbc-params: "verifyServerCertificate=false&useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC"
+
+contracts:
+  enabled: true
+  min-amount: 1.0
+  max-amount: 10000.0
+  max-open-per-player: 5
+
+messages:
+  prefix: ""
+  no-permission: "&cYou do not have permission."
+  players-only: "&cPlayers only."
+  disabled: "&eContracts are disabled."
+  invalid-amount: "&eAmount must be greater than 0."
+  invalid-terms: "&eDescribe the job (1–500 characters)."
+  error: "&cCould not process contract."
+  amount-range: "&eAmount must be between &f{min}&e and &f{max} G&e."
+  target-offline: "&eThat player must be online to receive a contract offer."
+  target-self: "&eYou cannot contract yourself."
+  insufficient: "&cInsufficient balance. Need &f{amount} G&c."
+  too-many-open: "&cToo many open contracts (max &f{max}&c)."
+  offer-sent: "&aOffered &f{amount} G&a to &f{worker}&a — &7{terms}&a (&f#{id}&a). They run &f/contract accept {id}"
+  offer-received: "&6{client} offered you &f{amount} G &6— &7{terms}&6 (&f/contract accept {id}&6)"
+  not-found: "&eContract not found."
+  not-participant: "&eYou are not part of this contract."
+  wrong-status: "&eContract is not in the right state for that action."
+  accept-success: "&aContract &f#{id}&a accepted — get to work!"
+  accept-notify-client: "&a{worker} accepted your contract &f#{id}&a."
+  complete-success: "&aReleased &f{amount} G&a to &f{worker}&a for contract &f#{id}&a."
+  complete-notify-worker: "&a{client} completed contract &f#{id}&a — &f{amount} G &aadded to your balance."
+  cancel-success: "&aContract &f#{id}&a cancelled — &f{amount} G &arefunded."
+  cancel-notify: "&7{client} cancelled contract &f#{id}&a."
+  list-empty: "&7No open contracts."
+  list-row: "&f#{id}&7 [&e{status}&7] &f{client}&7 → &f{worker}&7: &f{amount} G &8— &7{terms}"
+  reload-done: "&aRoot-Contracts config reloaded."

@@ -1,0 +1,70 @@
+# Root-Torch — plugins/RootMC/root-torch.yml
+# Pass-the-torch minigame (Root-Joint alternative). Catalog: https://rootmc.net/plugins/root-torch/
+
+# Gold cost to /torch (light). Change here or: /torch price <amount>
+cost-gold: 1.0
+hold-seconds: 180
+treasury-channel: "service-fee:torch"
+# Relay light / pass / global 30s warn / new records to Discord #ingame-chat (via RootMC).
+discord-relay: true
+# Shown in chat (Towny %roottorch_tag%) and tab list while holding.
+chat-tag: "&6[T]&r "
+
+effects:
+  regeneration-amplifier: 0
+  night-vision-amplifier: 0
+  haste-amplifier: 0
+
+# Longest-duration record: treasury grants when a new record is set.
+record-reward:
+  enabled: true
+  starter-gold: 75.0
+  holder-gold: 25.0
+
+# Walking torch: invisible LIGHT block follows the holder (real light for nearby players).
+holder-light:
+  enabled: true
+  level: 12
+
+# Single global countdown ping (everyone + Discord).
+warn-global-seconds:
+  - 30
+# Holder-only spam (not global / Discord).
+warn-holder-seconds:
+  - 45
+  - 15
+  - 5
+  - 4
+  - 3
+  - 2
+  - 1
+
+messages:
+  prefix: ""
+  lit: "&f{player} &alit a torch!"
+  lit-fee: " &7({fee} G -> Server Reserve)"
+  passed: "&f{from} &apassed the torch to &f{to}&a. &7Session &f{session}&7 · highscore &f{highscore}"
+  burned-out: "&7{player}'s torch went out."
+  milk-spilt: "&f{player} &7spilt milk on the torch."
+  new-record: "&6New longest torch! &f{duration}&6 — lit by &f{player}&6 (last held by &f{holder}&6)"
+  record-reward-starter: "&6Record reward: &f{player}&6 earned &f{amount} G&6 for lighting the longest torch."
+  record-reward-holder: "&6Record reward: &f{player}&6 earned &f{amount} G&6 for holding when it went out."
+  longest: "&6Longest torch: &f{duration}&6 — lit by &f{player}&6 (last held by &f{holder}&6)"
+  no-record: "&7No longest-torch record yet. Keep it burning!"
+  already-active: "&eThere is already a torch being passed."
+  warn: "&eTorch will go out in &f{seconds}s&e. &f/torchpass &eit to another player to keep it going."
+  no-permission: "&cNo permission."
+  players-only: "&cPlayers only."
+  insufficient: "&cNeed &f{fee} G&c to light a torch — you have &f{balance} G&c."
+  economy-unavailable: "&cEconomy is unavailable. Ensure &fRoot-Economy &cis running, then try again."
+  not-holding: "&eYou are not holding the torch."
+  usage-pass: "&eUsage: &f/torchpass <player>"
+  player-not-found: "&cPlayer &f{player} &cis not online."
+  pass-self: "&ePass it to someone else."
+  fee-failed: "&cCould not charge &f{fee} G&c."
+  fee-charged: "&eCharged &f{fee} G&e -> Server Reserve. Balance: &f{balance} G&e."
+  price-current: "&7Torch price: &f{fee} G"
+  price-usage: "&eUsage: &f/torch price <amount>"
+  price-set: "&aTorch price set to &f{fee} G&a."
+  price-invalid: "&cInvalid amount."
+  price-failed: "&cCould not save torch price."

@@ -1,0 +1,25 @@
+name: Root-Questionnaire
+version: '${version}'
+main: com.rootrecord.minecraft.rootquestionnaire.RootQuestionnairePlugin
+api-version: '26.1'
+description: RootMC one-time player survey with reserve reward.
+author: Root Record
+website: https://rootmc.net
+softdepend: [Vault, Root-Essentials, RootMC]
+loadafter: [Vault, Root-Essentials, RootMC]
+commands:
+  questionair:
+    description: Start or continue the one-time RootMC player survey
+    usage: /<command> [cancel|status]
+    aliases: [questionnaire, questionaire]
+  rootquestionnaire:
+    description: Admin reload for Root-Questionnaire
+    usage: /<command> reload
+    permission: rootquestionnaire.reload
+permissions:
+  rootquestionnaire.use:
+    description: Take the one-time player survey
+    default: true
+  rootquestionnaire.reload:
+    description: Reload root-questionnaire.yml
+    default: op

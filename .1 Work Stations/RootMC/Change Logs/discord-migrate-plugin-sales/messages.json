@@ -1,0 +1,227 @@
+﻿[
+    {
+        "type":  0,
+        "content":  "**RootMC — Plugin sales research (Jul 2026)**\nChannel for planning public paid plugins, web pages, and marketplace listings.\n\n---\n\n**1) Tier-1 paid marketplaces (primary sell targets)**\n\n**SpigotMC Resources (premium)**\n• https://www.spigotmc.org/resources/\n• Largest Java plugin audience; still the default place server owners look\n• Platform fee: **0%** — you keep 100% of sale; payments are buyer↔seller (usually PayPal)\n• Price cap: **$0.99–$19.99** USD\n• Seller gate (must meet before premium upload):\n  – Account ≥ 8 weeks old\n  – 80 forum posts + 20 positive ratings\n  – **3 free resources** published\n  – 2FA enabled\n• Approval often ~1 week; “low effort” / common genres can be rejected\n• **DRM / license keys that block the jar from running are prohibited** — plugin must work from downloaded file; obfuscation allowed with caveats\n• Guidelines: https://www.spigotmc.org/threads/premium-resource-guidelines.31667/\n• Best for: max discoverability + free funnel into paid products\n\n**BuiltByBit (ex MC-Market)**\n• https://builtbybit.com/resources/categories/minecraft-plugins.1/\n• Paid plugins browse: https://builtbybit.com/resources/minecraft/plugins/paid/\n• Creators: https://builtbybit.com/resources/creators\n• Platform fee: **~9.9%** + payment gateway fees; payouts via **Tebex wallet**\n• No hard Spigot-style $19.99 ceiling (higher prices OK; mins often ~$1.99–$5.99 by category)\n• Also sells maps, configs, models, **custom plugin commissions**\n• Pro seller features / referrals optional\n• Best for: premium buyers, higher price points, services + products\n\n**Polymart**\n• https://polymart.org/ — plugins: https://polymart.org/products/category/2/plugins\n• Modern marketplace with **built-in checkout**, buyer management, license delivery\n• Takes a **% fee per sale** (check current schedule on-site when listing)\n• Developer API (purchase verify / updates): https://www.polymart.org/wiki/api\n• Supports Spigot/Paper/Velocity/Bungee/etc. tags",
+        "mentions":  [
+
+                     ],
+        "mention_roles":  [
+
+                          ],
+        "attachments":  [
+
+                        ],
+        "embeds":  [
+
+                   ],
+        "timestamp":  "2026-07-21T22:07:01.794000+00:00",
+        "edited_timestamp":  null,
+        "flags":  4,
+        "components":  [
+
+                       ],
+        "id":  "1529248362975727848",
+        "channel_id":  "1529247837420912751",
+        "author":  {
+                       "id":  "1511794429986345020",
+                       "username":  "RootMC",
+                       "avatar":  "0d722d5c6d16e45e8d7e10d2e18aab5d",
+                       "discriminator":  "0781",
+                       "public_flags":  524288,
+                       "flags":  524288,
+                       "bot":  true,
+                       "banner":  null,
+                       "accent_color":  null,
+                       "global_name":  null,
+                       "avatar_decoration_data":  null,
+                       "collectibles":  null,
+                       "display_name_styles":  null,
+                       "banner_color":  null,
+                       "clan":  null,
+                       "primary_guild":  null
+                   },
+        "pinned":  false,
+        "mention_everyone":  false,
+        "tts":  false
+    },
+    {
+        "type":  0,
+        "content":  "• Best for: cleaner store UX + automated delivery without self-hosting payments\n\nComparison write-up: https://mclicense.org/blog/spigotmc-vs-polymart-vs-builtbybit\n\n---\n\n**2) Emerging / niche paid marketplaces**\n\n**Hye** — https://hye.gg/\n• “Try plugin 30 min on temp server before buy”\n• Claims **~5% creator fee**; Stripe; license signing; plugins/mods/builds\n• Worth evaluating for modern buyer conversion\n\n**PulsePlugin** — https://pulseplugin.net/\n• Per-buyer encrypted builds / anti-leak focus\n• Claims **70% to creator** (30% platform)\n• Seller apply flow on site — evaluate maturity before relying on it\n\n**TrustMyServer marketplace** — https://trustmyserver.com/marketplace\n• Multi-game (Minecraft included); Stripe Connect\n• Claims **~10% platform / 90% creator**; instant payouts\n\n**GameServersHub (GSH)** — https://gameservershub.com/become-a-creator\n• Plugins/maps/assets; claims **10% fee**, instant payouts\n• Broader “game server” audience, not MC-only\n\n**AdvancedPlugins** — https://advancedplugins.net/\n• Studio/storefront model (own products + shop), not a open open-to-all marketplace like Spigot\n• Useful as a **reference for premium presentation / own-brand store**, not as a listing portal\n\n**Craftaro / Songoda (legacy note)**\n• Songoda content moved into Craftaro historically; treat as **verify-before-use** — do not assume active open seller onboarding without checking craftaro.com today\n\n---\n\n**3) Free / discovery hubs (NOT for paywalled jars)**\n\nThese are critical for **reputation, SEO, and free editions** — paid full versions usually live elsewhere.\n\n**Hangar (PaperMC)** — https://hangar.papermc.io/\n• Official Paper/Velocity plugin repo\n• Guidelines: https://hangar.papermc.io/guidelines\n• **No paywalls / no license keys required for core functionality**\n• OK: donation links, Patreon for *early free previews*, docs, support Discord\n• Use for: free/lite builds + Paper credibility\n\n**Modrinth** — https://modrinth.com/\n• Hosts plugins (and mods); great search/API",
+        "mentions":  [
+
+                     ],
+        "mention_roles":  [
+
+                          ],
+        "attachments":  [
+
+                        ],
+        "embeds":  [
+
+                   ],
+        "timestamp":  "2026-07-21T22:07:02.066000+00:00",
+        "edited_timestamp":  null,
+        "flags":  4,
+        "components":  [
+
+                       ],
+        "id":  "1529248364116447293",
+        "channel_id":  "1529247837420912751",
+        "author":  {
+                       "id":  "1511794429986345020",
+                       "username":  "RootMC",
+                       "avatar":  "0d722d5c6d16e45e8d7e10d2e18aab5d",
+                       "discriminator":  "0781",
+                       "public_flags":  524288,
+                       "flags":  524288,
+                       "bot":  true,
+                       "banner":  null,
+                       "accent_color":  null,
+                       "global_name":  null,
+                       "avatar_decoration_data":  null,
+                       "collectibles":  null,
+                       "display_name_styles":  null,
+                       "banner_color":  null,
+                       "clan":  null,
+                       "primary_guild":  null
+                   },
+        "pinned":  false,
+        "mention_everyone":  false,
+        "tts":  false
+    },
+    {
+        "type":  0,
+        "content":  "• **No paid downloads** (not planned)\n• Monetization = **ad rewards program** (pageviews/downloads → payout share), not jar sales\n• https://modrinth.com/news/article/creator-monetization\n• https://modrinth.com/legal/cmp-info\n\n**CurseForge (Bukkit Plugins)** — https://www.curseforge.com/minecraft/bukkit-plugins\n• Large free download traffic; Overwolf ecosystem\n• Treat as free distribution / discovery, not Spigot-style premium sales\n\n**Ore (Sponge)** — https://ore.spongepowered.org/\n• Sponge plugins; **selling / paid unlocks forbidden**\n• Guidelines ban monetized feature gates\n\n**BukkitDev (legacy)** — historically CurseForge Bukkit; many classics still mirrored there\n• Low priority for new paid RootMC products\n\n**Paper forums** — forums being wound down; hangout = Paper Discord + Hangar uploads\n• https://forums.papermc.io/ (redirects community to Discord/Hangar)\n\n---\n\n**4) Own-store / delivery infrastructure (recommended alongside marketplaces)**\n\n**rootmc.net plugin pages (our plan)**\n• Branded product pages, docs, changelogs, purchase CTAs\n• Can deep-link to Spigot/Polymart/BBB *or* sell direct\n\n**Tebex** — https://www.tebex.io/ (+ wallet used by BuiltByBit)\n• Industry-standard game-server commerce; packages, coupons, Discord roles, in-game delivery plugins\n• Strong for **server stores**; also used as payout rail on BBB\n\n**MC License** — https://mclicense.org/\n• Cross-marketplace license keys / analytics; imports Spigot + Polymart + BuiltByBit\n• Useful if we list on multiple sites and need one license brain\n• **Note:** Spigot premium rules conflict with hard license locks — design carefully per platform\n\n**Direct PayPal / Stripe + download portal**\n• Highest control; need fraud/refund handling, hosting, ToS, VAT awareness\n• Often paired with free Spigot listing → paid upgrade on Polymart/BBB/own site\n\n---\n\n**5) Development communities (not stores, but where buyers \u0026 reputation live)**\n\n• Spigot forums / Discord — https://www.spigotmc.org/",
+        "mentions":  [
+
+                     ],
+        "mention_roles":  [
+
+                          ],
+        "attachments":  [
+
+                        ],
+        "embeds":  [
+
+                   ],
+        "timestamp":  "2026-07-21T22:07:02.316000+00:00",
+        "edited_timestamp":  null,
+        "flags":  4,
+        "components":  [
+
+                       ],
+        "id":  "1529248365165150299",
+        "channel_id":  "1529247837420912751",
+        "author":  {
+                       "id":  "1511794429986345020",
+                       "username":  "RootMC",
+                       "avatar":  "0d722d5c6d16e45e8d7e10d2e18aab5d",
+                       "discriminator":  "0781",
+                       "public_flags":  524288,
+                       "flags":  524288,
+                       "bot":  true,
+                       "banner":  null,
+                       "accent_color":  null,
+                       "global_name":  null,
+                       "avatar_decoration_data":  null,
+                       "collectibles":  null,
+                       "display_name_styles":  null,
+                       "banner_color":  null,
+                       "clan":  null,
+                       "primary_guild":  null
+                   },
+        "pinned":  false,
+        "mention_everyone":  false,
+        "tts":  false
+    },
+    {
+        "type":  0,
+        "content":  "• Paper Discord + Hangar — https://papermc.io/\n• BuiltByBit plugin-dev commissions forum — https://builtbybit.com/forums/development/minecraft-plugins/\n• Polymart seller/buyer community (on-site)\n• GitHub / GitLab public repos for open components\n• Minecraft Partner / Bedrock Marketplace — https://www.minecraft.net/en-us/marketplace\n  – **Different product** (Bedrock content, Microsoft 70/30). Not Java Spigot plugins. Mention only if we ever ship Bedrock packs.\n\n---\n\n**6) Practical RootMC go-to-market plan**\n\n**Phase A — Inventory**\n• List Gen1 plugins eligible for public paid release (unique value, supportable, EULA-safe)\n• Decide free “lite” vs premium full for each\n\n**Phase B — Accounts \u0026 gates**\n• Spigot: start/maintain account activity + publish **3 free** resources to unlock premium\n• Open seller accounts: BuiltByBit, Polymart (priority)\n• Evaluate Hye / GSH / TrustMyServer as secondary after Tier-1 is live\n\n**Phase C — Packaging**\n• Professional resource pages: feature list, screenshots, video, docs URL, support Discord\n• Version matrix (Paper versions), dependencies, changelog\n• Pricing strategy: Spigot ≤ $19.99; BBB/Polymart can carry higher “complete suite” SKUs if needed\n• Licensing: Spigot-safe (no hard online lock); Polymart/BBB can use their license APIs\n\n**Phase D — Web**\n• New rootmc.net pages: plugin catalog, per-plugin product page, purchase links, docs\n• Optional: aggregate “download portal” that deep-links to marketplace files (don’t violate reupload rules)\n\n**Phase E — Multi-list**\n• Same plugin on Spigot + Polymart + BuiltByBit maximizes reach (audiences don’t fully overlap)\n• Centralize licenses/support so buyers aren’t orphaned across sites\n\n**Phase F — Forums / discovery**\n• Free builds on Hangar + Modrinth for SEO and trust\n• Premium CTA → paid marketplace / rootmc.net\n• Never paywall Hangar/Modrinth jars\n\n---\n\n**7) Quick decision matrix**\n\n| Goal | Where |\n|---|---|\n| Max eyes / classic buyers | SpigotMC premium |",
+        "mentions":  [
+
+                     ],
+        "mention_roles":  [
+
+                          ],
+        "attachments":  [
+
+                        ],
+        "embeds":  [
+
+                   ],
+        "timestamp":  "2026-07-21T22:07:02.644000+00:00",
+        "edited_timestamp":  null,
+        "flags":  4,
+        "components":  [
+
+                       ],
+        "id":  "1529248366540623912",
+        "channel_id":  "1529247837420912751",
+        "author":  {
+                       "id":  "1511794429986345020",
+                       "username":  "RootMC",
+                       "avatar":  "0d722d5c6d16e45e8d7e10d2e18aab5d",
+                       "discriminator":  "0781",
+                       "public_flags":  524288,
+                       "flags":  524288,
+                       "bot":  true,
+                       "banner":  null,
+                       "accent_color":  null,
+                       "global_name":  null,
+                       "avatar_decoration_data":  null,
+                       "collectibles":  null,
+                       "display_name_styles":  null,
+                       "banner_color":  null,
+                       "clan":  null,
+                       "primary_guild":  null
+                   },
+        "pinned":  false,
+        "mention_everyone":  false,
+        "tts":  false
+    },
+    {
+        "type":  0,
+        "content":  "| Higher price / pro buyers / services | BuiltByBit |\n| Modern checkout + licenses | Polymart |\n| Free Paper credibility | Hangar |\n| Free SEO / launcher discovery | Modrinth (+ ad rewards only) |\n| Own brand storefront | rootmc.net (+ Tebex/Stripe) |\n| Cross-site license brain | MC License (careful with Spigot rules) |\n| Try-before-buy experiments | Hye |\n\n---\n\n**8) Next actions for this channel**\n1. Pick first 3–5 plugins for public paid release\n2. Draft rootmc.net plugin page wireframes\n3. Create/verify Spigot + Polymart + BuiltByBit seller accounts\n4. Confirm Spigot free-resource plan to unlock premium\n5. Shortlist Hye vs GSH as optional 4th/5th listing later\n\nQuestions / corrections welcome — fees and seller rules change; re-check each site’s terms before first upload.",
+        "mentions":  [
+
+                     ],
+        "mention_roles":  [
+
+                          ],
+        "attachments":  [
+
+                        ],
+        "embeds":  [
+
+                   ],
+        "timestamp":  "2026-07-21T22:07:02.992000+00:00",
+        "edited_timestamp":  null,
+        "flags":  0,
+        "components":  [
+
+                       ],
+        "id":  "1529248368000237688",
+        "channel_id":  "1529247837420912751",
+        "author":  {
+                       "id":  "1511794429986345020",
+                       "username":  "RootMC",
+                       "avatar":  "0d722d5c6d16e45e8d7e10d2e18aab5d",
+                       "discriminator":  "0781",
+                       "public_flags":  524288,
+                       "flags":  524288,
+                       "bot":  true,
+                       "banner":  null,
+                       "accent_color":  null,
+                       "global_name":  null,
+                       "avatar_decoration_data":  null,
+                       "collectibles":  null,
+                       "display_name_styles":  null,
+                       "banner_color":  null,
+                       "clan":  null,
+                       "primary_guild":  null
+                   },
+        "pinned":  false,
+        "mention_everyone":  false,
+        "tts":  false
+    }
+]

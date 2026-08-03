@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server setup — RootMC</title>
+  <meta name="description" content="RootMC Paper plugin setup for operators — suite jars, Root-Core bind, Towny vs Claims packs.">
+  <link rel="stylesheet" href="/styles/rootmc.css">
+  <link rel="canonical" href="https://rootmc.net/servers/">
+</head>
+<body>
+  <header class="rmc-header">
+    <div class="container rmc-header-inner">
+      <a class="rmc-brand" href="/">RootMC</a>
+      <nav class="rmc-nav" aria-label="Main" data-site-nav="operator" data-site-nav-current="home"></nav>
+    <button class="rmc-nav-toggle" type="button" aria-label="Open menu" data-nav-toggle>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      </div>
+  </header>
+
+  <main class="container verify-main">
+    <header class="verify-hero">
+      <p class="market-badge">Operators</p>
+      <h1>Server <span style="background:linear-gradient(135deg,var(--rmc-gold-bright),var(--rmc-copper));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">setup</span></h1>
+      <p class="rmc-muted">Public suite jars live on the <a href="/plugins/">plugins</a> catalog. Official RootMC runs a <strong>Towny</strong> host and a <strong>Claims</strong> host linked by RootMC-Official.</p>
+    </header>
+
+    <section class="rmc-card verify-card">
+      <h2 style="margin-top:0">Shared spine</h2>
+      <ol class="rmc-muted" style="padding-left:1.2rem;line-height:1.85">
+        <li>Install <a href="/plugins/root-core/">Root-Core</a> — set <code>server-name</code> + <code>product-key</code> in <code>plugins/RootMC/root-core.yml</code>.</li>
+        <li>Add <a href="/plugins/root-times/">Root-Times</a> and <a href="/plugins/root-perms/">Root-Perms</a> (MySQL via <code>database.yml</code>).</li>
+        <li>Continue with Essentials / Play / Ops / Territories / RootMC from the <a href="/plugins/">catalog</a>. Auto-updates use <a href="/plugins/manifest.json">manifest.json</a>.</li>
+      </ol>
+    </section>
+
+    <section class="rmc-card verify-card" style="margin-top:1rem">
+      <h2 style="margin-top:0">Host packs</h2>
+      <ul class="rmc-muted" style="padding-left:1.2rem;line-height:1.85">
+        <li><strong>Towny host</strong> — Vault + Towny + suite (skip Root-Claims). Needs Vault for Towny.</li>
+        <li><strong>Claims host</strong> — Root-Claims + suite (no Vault/LuckPerms required).</li>
+        <li><strong>Official pair only</strong> — RootMC-Official on <em>both</em> hosts; each <code>peer:</code> points at the other MySQL. Syncs playtime / mcMMO / votes / network perms — not Gold or inventories. Auto-updates via Root-Core + <code>manifest.json</code> (no public guide page).</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="rmc-footer">
+    <div class="container rmc-footer-meta">
+      <p><a href="/">Home</a> · <a href="/plugins/">Plugins</a> · <a href="/developer/">Developers</a></p>
+    </div>
+  </footer>
+  <script src="/js/site.js" defer></script>
+  <script src="/scripts/site-nav.js" defer></script>
+</body>
+</html>

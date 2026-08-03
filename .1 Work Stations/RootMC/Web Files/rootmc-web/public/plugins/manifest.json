@@ -1,0 +1,127 @@
+{
+    "root-core": {
+        "version": "1.8.0",
+        "filename": "root-core-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-core-1.8.0.jar"
+    },
+    "root-times": {
+        "version": "1.8.0",
+        "filename": "root-times-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-times-1.8.0.jar"
+    },
+    "root-perms": {
+        "version": "1.8.0",
+        "filename": "root-perms-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-perms-1.8.0.jar"
+    },
+    "root-economy": {
+        "version": "1.8.0",
+        "filename": "root-economy-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-economy-1.8.0.jar"
+    },
+    "root-chestshops": {
+        "version": "1.8.0",
+        "filename": "root-chestshops-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-chestshops-1.8.0.jar"
+    },
+    "root-market": {
+        "version": "1.8.0",
+        "filename": "root-market-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-market-1.8.0.jar"
+    },
+    "root-gamble": {
+        "version": "1.8.0",
+        "filename": "root-gamble-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-gamble-1.8.0.jar"
+    },
+    "root-essentials": {
+        "version": "1.8.0",
+        "filename": "root-essentials-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-essentials-1.8.0.jar"
+    },
+    "root-claims": {
+        "version": "1.8.0",
+        "filename": "root-claims-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-claims-1.8.0.jar"
+    },
+    "root-play": {
+        "version": "1.8.0",
+        "filename": "root-play-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-play-1.8.0.jar"
+    },
+    "root-ops": {
+        "version": "1.8.0",
+        "filename": "root-ops-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-ops-1.8.0.jar"
+    },
+    "root-territories": {
+        "version": "1.8.0",
+        "filename": "root-territories-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-territories-1.8.0.jar"
+    },
+    "root-iteminfo": {
+        "version": "1.8.0",
+        "filename": "root-iteminfo-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-iteminfo-1.8.0.jar"
+    },
+    "root-webstat": {
+        "version": "1.8.0",
+        "filename": "root-webstat-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-webstat-1.8.0.jar"
+    },
+    "root-ping": {
+        "version": "1.8.0",
+        "filename": "root-ping-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-ping-1.8.0.jar"
+    },
+    "root-try": {
+        "version": "1.8.0",
+        "filename": "root-try-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-try-1.8.0.jar"
+    },
+    "root-referrals": {
+        "version": "1.8.0",
+        "filename": "root-referrals-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-referrals-1.8.0.jar"
+    },
+    "root-appreciation": {
+        "version": "1.8.0",
+        "filename": "root-appreciation-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-appreciation-1.8.0.jar"
+    },
+    "root-memberships": {
+        "version": "1.8.0",
+        "filename": "root-memberships-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-memberships-1.8.0.jar"
+    },
+    "root-haste": {
+        "version": "1.8.0",
+        "filename": "root-haste-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-haste-1.8.0.jar"
+    },
+    "root-heads": {
+        "version": "1.8.0",
+        "filename": "root-heads-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-heads-1.8.0.jar"
+    },
+    "root-skills": {
+        "version": "1.8.0",
+        "filename": "root-skills-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-skills-1.8.0.jar"
+    },
+    "root-bluemap-r2-fix": {
+        "version": "1.8.0",
+        "filename": "root-bluemap-r2-fix-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/root-bluemap-r2-fix-1.8.0.jar"
+    },
+    "rootmc": {
+        "version": "1.8.0",
+        "filename": "rootmc-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/rootmc-1.8.0.jar"
+    },
+    "rootmc-official": {
+        "version": "1.8.0",
+        "filename": "rootmc-official-1.8.0.jar",
+        "url": "https://rootmc.net/plugins/rootmc-official-1.8.0.jar"
+    }
+}

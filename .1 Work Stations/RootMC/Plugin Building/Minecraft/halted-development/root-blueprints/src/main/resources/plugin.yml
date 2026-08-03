@@ -1,0 +1,24 @@
+name: Root-Blueprints
+version: '${version}'
+main: com.rootrecord.minecraft.rootblueprints.RootBlueprintsPlugin
+api-version: '26.1'
+description: RootMC plot blueprints — save Towny plots as .schem for Pro/Lifetime members.
+author: Root Record
+website: https://rootmc.net
+softdepend: [Towny]
+commands:
+  blueprint:
+    description: Save your Towny plot as a schematic
+    usage: /<command> save [confirm]
+    aliases: [blueprints, bp]
+  rootblueprints:
+    description: Admin reload for Root-Blueprints
+    usage: /<command> reload
+    permission: rootblueprints.reload
+permissions:
+  rootblueprints.use:
+    description: Use /blueprint save
+    default: true
+  rootblueprints.reload:
+    description: Reload root-blueprints.yml
+    default: op

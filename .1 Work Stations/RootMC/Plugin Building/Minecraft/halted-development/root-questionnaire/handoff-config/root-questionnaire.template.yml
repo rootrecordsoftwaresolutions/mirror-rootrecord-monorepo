@@ -1,0 +1,44 @@
+# Root-Questionnaire — plugins/RootMC/root-questionnaire.yml
+
+enabled: true
+reward-gold: 50
+min-playtime-seconds: 3600
+session-timeout-minutes: 30
+
+mysql:
+  enabled: true
+  host: ""
+  port: 3306
+  database: ""
+  username: ""
+  password: ""
+  table-prefix: "root_"
+  jdbc-params: "verifyServerCertificate=false&useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC"
+  playtime-table: "rootmc_playtime"
+
+messages:
+  prefix: ""
+  no-permission: "&cYou do not have permission."
+  players-only: "&cPlayers only."
+  disabled: "&eThe player survey is currently disabled."
+  already-completed: "&aYou already completed the RootMC survey. Thank you!"
+  playtime-required: "&7Play at least &f1 hour&7 before the survey unlocks. You have &f{played}&7 so far (&f{remaining}&7 left)."
+  not-eligible: "&7The survey is not available yet."
+  started: "&7RootMC player survey — answer each question in chat. Type &fcancel&7 to stop. Reward: &f{reward} G&7 from the Server Reserve."
+  question-header: "&8[&bSurvey&8] &fQuestion {current}/{total}"
+  follow-up-header: "&8[&bSurvey&8] &fFollow-up"
+  type-cancel-hint: "&8Type &fcancel&8 anytime to stop."
+  invalid-yes-no: "&cPlease answer &fyes&c or &fno&c."
+  invalid-scale: "&cEnter a whole number from &f1&c to &f10&c."
+  invalid-choice: "&cChoose one of: &f{choices}&c."
+  cancelled: "&7Survey cancelled. Run &f/questionair&7 when you are ready."
+  session-expired: "&7Your survey session expired. Run &f/questionair&7 to start again."
+  reward-success: "&aSurvey complete! &f+{reward} G&a paid from the Server Reserve. Thank you for your feedback."
+  reward-failed: "&cCould not pay the survey reward — treasury unavailable. Contact staff."
+  discord-failed: "&eSurvey saved and reward paid, but Discord delivery failed. Staff can still read your responses in the database."
+  cloud-unavailable: "&cSurvey delivery is offline — try again later."
+  status-complete: "&aYou completed the RootMC survey."
+  status-pending: "&7Survey available — &f{reward} G&7 reward. Run &f/questionair&7 to begin."
+  status-locked: "&7Survey unlocks after &f1 hour&7 playtime (&f{remaining}&7 left)."
+  join-hint: "&7Complete &f/questionair&7 for &f{reward} G&7 — help us improve RootMC with a one-time survey."
+  reload-done: "&aRoot-Questionnaire reloaded."

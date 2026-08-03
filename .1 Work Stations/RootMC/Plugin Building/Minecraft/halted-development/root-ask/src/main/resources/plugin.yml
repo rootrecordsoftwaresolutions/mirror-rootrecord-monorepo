@@ -1,0 +1,20 @@
+name: Root-Ask
+version: '${version}'
+main: com.rootrecord.minecraft.rootask.RootAskPlugin
+api-version: '26.1'
+description: RootMC in-game AI guide — /ask with feedback loop
+author: Root Record
+website: https://rootmc.net/wiki/player/
+softdepend: [RootMC]
+commands:
+  ask:
+    description: Ask the RootMC guide a question
+    usage: /<command> <question|yes|no>
+    aliases: [guide, rootask]
+permissions:
+  rootask.use:
+    description: Use /ask
+    default: true
+  rootask.bypass.cooldown:
+    description: Skip /ask question cooldown
+    default: op
