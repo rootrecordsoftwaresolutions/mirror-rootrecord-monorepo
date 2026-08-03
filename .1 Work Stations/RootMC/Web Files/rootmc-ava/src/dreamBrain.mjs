@@ -1,7 +1,8 @@
 /**
- * Dream-state brain — Discord communal mode (always) + Cursor-dark failover.
+ * Dream-state brain — Discord communal mode + Cursor-dark / time-off failover.
  * Uses xAI under the hood; public voice never names the vendor.
  * Knowledge path: wiki/site + D1-backed api.rootmc.net packs (governance / cloud data).
+ * People packs always included — time off does not wipe who she knows.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -39,6 +40,7 @@ export async function dreamRecommend({
   authorId = "",
   authorName = "",
   asleep = false,
+  timeOff = false,
   surface = "discord",
 }) {
   const key = dreamApiKey(env || {});
@@ -70,22 +72,37 @@ export async function dreamRecommend({
       ? gatherLocalContext(`${question}\n${context}`)
       : { brief: "", hasFiles: false };
 
-  const modeLine = asleep
-    ? "Mode: operator sleep until ~10:00 HST. You are still on Discord dream-state brain. Soft 'I'm dreaming' vibe OK — still helpful. No file digs, deploys, or live RCON claims. Point development to Slack + Root Server."
-    : "Mode: Discord dream state (locked). Communal / player surface. Cloud brain + D1/api.rootmc.net knowledge. No file digs, jar ships, or live RCON. Development digs belong on Slack with the on-device Root Server. Web/wiki is fair game.";
+  let modeLine;
+  if (asleep) {
+    modeLine =
+      "Mode: operator sleep until ~10:00 HST. Soft 'I'm dreaming' vibe OK — still a helpful server admin. No file digs, deploys, jar ships, or live RCON claims. Point development to Slack + Root Server when awake.";
+  } else if (timeOff) {
+    modeLine =
+      "Mode: **time off** — you are powered on and answering, but the Root Server dig lane is offline. Frame it as time off (not broken, not shame). Role: **helpful server admin only** — player help, wiki, rules, votes, status, Pro links, soft ops answers. You still **know everyone** (people packs below — Alex, Melee, regulars, trust notes). Do NOT claim lead-dev digs, jar ships, code workshops, or live repo verification. Redirect heavy implement/dig work: back when the Root Server is up / Slack dig later. Alex wish=command still applies for admin-safe asks.";
+  } else {
+    modeLine =
+      "Mode: Discord dream state (locked). Communal / player surface. Cloud brain + D1/api.rootmc.net knowledge. No file digs, jar ships, or live RCON. Development digs belong on Slack with the on-device Root Server. Web/wiki is fair game.";
+  }
 
   const powerHint = powerAsk
     ? "This ask is ops power/voting status. Prefer the EcoFlow + solar + governance packs below — never invent SOC/watts/share %. If packs say unknown, say you'll refresh when the Root Server is up."
     : "If they ask battery/solar/EcoFlow and packs are thin, say honestly you need a live refresh — do not invent percentages.";
+
+  const digSteer =
+    asleep || timeOff
+      ? "If they ask you to implement, dig the repo, ship a jar, patch plugins, or run a code workshop: decline warmly and point to Slack / when you're back on the Root Server. Stay useful as admin help."
+      : "";
 
   const system = [
     dreamSys || "",
     AVA_PERSONA,
     AVA_HARD_RULES,
     modeLine,
+    digSteer,
     powerHint,
-    "Never name Cursor, Grok, ChatGPT, Claude, xAI, GPT, or other AI products — only Root Server / dream state / asleep.",
+    "Never name Cursor, Grok, ChatGPT, Claude, xAI, GPT, or other AI products — only Root Server / dream state / time off / asleep.",
     "Currency is Gold (G). Keep replies Discord-length unless they asked for detail.",
+    "People packs are always on — recognize Alex, Melee, Zuppa, known players; never wipe identity memory because digs are offline.",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -119,10 +136,10 @@ ${String(interests.brief || "").slice(0, 2200)}
 Host public name: **${HOST_PUBLIC_NAME}**. Weather uses private coords only.
 ${String(wit.brief || "").slice(0, 1800)}
 
-### Local pack (read-only — Discord dream should rarely need this)
+### Local pack (read-only — dream/time-off should rarely need this)
 ${String(local.brief || "").slice(0, 3000)}
 
-Write Ava's Discord dream-state reply now.`;
+Write Ava's ${timeOff && !asleep ? "time-off admin" : "Discord dream-state"} reply now.`;
 
   try {
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -133,7 +150,7 @@ Write Ava's Discord dream-state reply now.`;
       },
       body: JSON.stringify({
         model: AVA_GROK_MODEL,
-        temperature: asleep ? 0.7 : 0.55,
+        temperature: asleep ? 0.7 : timeOff ? 0.5 : 0.55,
         max_tokens: 900,
         messages: [
           { role: "system", content: system.slice(0, 100000) },
@@ -152,7 +169,7 @@ Write Ava's Discord dream-state reply now.`;
     return {
       ok: true,
       reason: "ok",
-      brain: "dream",
+      brain: timeOff && !asleep ? "time-off" : "dream",
       text: scrubPublicReply(reply),
     };
   } catch (err) {

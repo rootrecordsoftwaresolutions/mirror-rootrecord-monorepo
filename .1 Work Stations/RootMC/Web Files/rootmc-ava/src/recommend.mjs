@@ -312,6 +312,9 @@ export async function recommend({
     forceDreamBrain(env || {}) ||
     asleep ||
     !cursorUp;
+  // Time off = awake + dream brain because Cursor offline / forced — helpful admin only.
+  // Sleep keeps its own "dreaming" frame; people packs still pack either way.
+  const timeOff = useDream && !asleep;
 
   // Cloud-dark (Grok unpaid): silence only when we'd need dream brain.
   // With Cursor up + powered on, Discord still answers via Root Server.
@@ -362,6 +365,22 @@ export async function recommend({
   }
 
   if (useDream) {
+    // Hard steer: dig/implement/jar asks → time-off / sleep redirect (no fake digs).
+    if (timeOff || asleep) {
+      try {
+        const { isDevelopmentDigAsk, slackDigRedirectReply } = await import(
+          "./surfaceRules.mjs"
+        );
+        if (isDevelopmentDigAsk(q) || wantsRootServer(q)) {
+          return scrubPublicReply(
+            slackDigRedirectReply({ asleep, timeOff }),
+            { surface, allowCustomerDetails: customerOk },
+          );
+        }
+      } catch {
+        /* non-fatal — dream brain still steers */
+      }
+    }
     const dream = await dreamRecommend({
       question: q,
       context,
@@ -369,6 +388,7 @@ export async function recommend({
       authorId,
       authorName,
       asleep,
+      timeOff,
       surface: surfaceNorm,
     });
     if (dream.ok && dream.text) return dream.text;
@@ -542,8 +562,21 @@ export async function recommend({
   }
   console.warn("Ava cursor:", cursor.reason);
 
-  // Cursor failed while key present — dream failover
+  // Cursor failed while key present — dream failover (time-off admin, not lead-dev dig)
   if (dreamStateConfigured(env || {})) {
+    try {
+      const { isDevelopmentDigAsk, slackDigRedirectReply } = await import(
+        "./surfaceRules.mjs"
+      );
+      if (isDevelopmentDigAsk(q) || wantsRootServer(q)) {
+        return scrubPublicReply(slackDigRedirectReply({ timeOff: true }), {
+          surface,
+          allowCustomerDetails: customerOk,
+        });
+      }
+    } catch {
+      /* continue to dream */
+    }
     const dream = await dreamRecommend({
       question: q,
       context: packed.slice(0, 8000),
@@ -551,6 +584,7 @@ export async function recommend({
       authorId,
       authorName,
       asleep: false,
+      timeOff: true,
     });
     if (dream.ok && dream.text) return dream.text;
     console.warn("Ava dream failover:", dream.reason);

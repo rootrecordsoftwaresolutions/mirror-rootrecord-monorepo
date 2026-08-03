@@ -14,6 +14,8 @@ import {
   slackBotUserId,
   slackAppToken,
   slackBotToken,
+  cursorApiKey,
+  forceDreamBrain,
 } from "./config.mjs";
 import { shouldAvaEngage, flushPendingLessons } from "./recommend.mjs";
 import { brainQueueDepth, cursorSlots, CURSOR_CONCURRENCY } from "./cursorBrain.mjs";
@@ -163,7 +165,6 @@ import {
   hasOpenCommitments,
 } from "./commitments.mjs";
 import { postOfflineNote } from "./offlineNotes.mjs";
-import { cursorApiKey } from "./config.mjs";
 import { welcomeNewMember } from "./onboarding.mjs";
 
 const env = await loadEnv();
@@ -304,11 +305,19 @@ function currentPollMs() {
 function pulseHeartbeat(extra = {}) {
   const sleep = loadSleepState();
   const asleep = isAsleep();
+  // Time off = live + awake but Root Server dig lane offline (no Cursor / forced dream).
+  const timeOff =
+    live &&
+    !asleep &&
+    !isHushed() &&
+    !onBreak &&
+    (forceDreamBrain() || !cursorApiKey());
   writeHeartbeat({
     live,
     onBreak,
     hushed: isHushed(),
     asleep,
+    timeOff,
     sleepWakeAt: sleep?.wakeAt || null,
     sleepWakeAtIso: sleep?.wakeAtIso || null,
     mode: isHushed()
@@ -317,9 +326,11 @@ function pulseHeartbeat(extra = {}) {
         ? "sleep"
         : onBreak
           ? "break"
-          : live
-            ? "hot"
-            : "boot",
+          : timeOff
+            ? "time-off"
+            : live
+              ? "hot"
+              : "boot",
     transport: AVA_TRANSPORT,
     pollMs: currentPollMs(),
     hotPollMs: HOT_POLL_MS,

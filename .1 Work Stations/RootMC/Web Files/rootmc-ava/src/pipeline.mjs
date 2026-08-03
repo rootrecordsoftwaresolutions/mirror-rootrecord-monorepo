@@ -774,14 +774,17 @@ export function createPipeline(deps) {
       let jobId = null;
       const digAssign =
         classified.intent === "dig_assign" || looksLikeDigAssign(question);
-      // Sleep / forced dream: dig_assign still points to Slack. Powered-on Discord digs run here.
+      // Sleep / time-off (no Cursor): dig_assign still points to Slack. Powered-on + Cursor digs run here.
       if (
         digAssign &&
         msg.surface !== "slack" &&
         !isSlackChannelId(channelId) &&
         (isAsleep() || !cursorApiKey(env || {}))
       ) {
-        const redirect = slackDigRedirectReply();
+        const redirect = slackDigRedirectReply({
+          asleep: isAsleep(),
+          timeOff: !isAsleep() && !cursorApiKey(env || {}),
+        });
         await ackP;
         await reply(channelId, redirect, msg.id);
         setLastReply(channelId, redirect);
@@ -794,7 +797,7 @@ export function createPipeline(deps) {
           answer: redirect,
           intent: "slack_redirect",
         });
-        pushStatusEvent("redirect dig_assign → slack (sleep/no-cursor)");
+        pushStatusEvent("redirect dig_assign → slack (sleep/time-off)");
         return;
       }
       if (
@@ -1533,15 +1536,26 @@ export function createPipeline(deps) {
       msg._avaChime = chime;
     }
 
-    // Sleep / no-cursor only: soft Slack pointer. Powered-on Discord digs run Root Server.
-    if (shouldRedirectDigToSlack(channelId, msg)) {
+    // Sleep / time-off (no Cursor): soft Slack pointer. Powered-on + Cursor digs run Root Server.
+    if (shouldRedirectDigToSlack(channelId, msg, env)) {
       touchActivity("slack-redirect");
       try {
-        await reply(channelId, slackDigRedirectReply(), msg.id);
+        await reply(
+          channelId,
+          slackDigRedirectReply({
+            asleep: isAsleep(),
+            timeOff: !isAsleep() && !cursorApiKey(env || {}),
+          }),
+          msg.id,
+        );
       } catch {
         /* ignore */
       }
-      pushStatusEvent("redirect dig → slack (sleep)");
+      pushStatusEvent(
+        isAsleep()
+          ? "redirect dig → slack (sleep)"
+          : "redirect dig → slack (time-off)",
+      );
       return;
     }
 

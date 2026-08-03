@@ -179,6 +179,7 @@ export function statusPageHtml() {
         if (stale || !hb.updatedAt) { label = "poller offline"; cls = ""; }
         else if (hushed) { label = "hushed"; cls = "hush"; }
         else if (onBreak) { label = "on break"; cls = "break"; }
+        else if (String(hb.mode || "") === "time-off") { label = "time off · admin"; cls = "break"; }
         else if (dig) { label = "digging · live"; cls = "live"; }
         else if (live) { label = "live · hot"; cls = "live"; }
         else { label = "starting…"; cls = "break"; }
