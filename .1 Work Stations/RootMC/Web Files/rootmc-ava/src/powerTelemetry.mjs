@@ -28,6 +28,7 @@ import {
 import { loadHeartbeat } from "./store.mjs";
 import { readLiveness } from "./liveness.mjs";
 import { miningMultiplierFromLive } from "./solarMiningMultiplier.mjs";
+import { publicSolarLinksPayload } from "./solarLinks.mjs";
 import { isAsleep } from "./sleepMode.mjs";
 import { isPoweredOff } from "./powerDown.mjs";
 
@@ -402,16 +403,7 @@ export async function buildSolarDashboardPayload(opts = {}) {
     service: "ava-ivy",
     page: "solar",
     updatedAt: new Date().toISOString(),
-    links: {
-      tunnel: "https://ava.rootmc.net/",
-      solar: "https://ava.rootmc.net/solar",
-      status: "https://ava.rootmc.net/",
-      health: "https://ava.rootmc.net/health",
-      localSolar: "http://127.0.0.1:8787/solar",
-      localStatus: "http://127.0.0.1:8787/",
-      api: "/api/solar",
-      miningMultiplierApi: "https://api.rootmc.net/api/rootmc/solar-mining-multiplier",
-    },
+    links: publicSolarLinksPayload(),
     site: publicSite(site),
     array: {
       panels: solar?.panels?.count ?? 10,

@@ -871,6 +871,17 @@ export function createPipeline(deps) {
 
       if (nearDuplicate(answerText, lastReplyFor(channelId))) {
         pulseHeartbeat({ digging: hasOpenCommitments() });
+        const prev = String(lastReplyFor(channelId) || "");
+        const wasStall =
+          /both dark|queued this|skipping the redo|still dark on the deep dig/i.test(
+            prev,
+          ) || /both dark|queued this|still dark on the deep dig/i.test(answerText);
+        if (wasStall) {
+          // Don't spam "skipping the redo" on top of dream-dark stalls — react only.
+          void ackReact.reactNoReply(channelId, msg.id);
+          pushStatusEvent("dedupe stall · react-only");
+          return;
+        }
         void ackReact.reactWriting(channelId, msg.id);
         await reply(
           channelId,

@@ -21,6 +21,8 @@ const DEFAULT_PROFILE = {
   },
   weather_note:
     "When cloudy / sun not fully out, expect thin solar and lighter digs. Apologize plainly — no drama.",
+  ops_note:
+    "#solar-server Discord is solar server ops. Board: https://ava.rootmc.net/solar · Website: https://rootmc.net. If the solar page does not connect, the Root Server is offline. Solar=panel input W; energy=Wh/kWh estimate.",
   cycle_lore: {
     nighttime:
       "Sun down → battery bank carries the Root Server. Softer voice, lighter digs, bedtime/soft-sleep when the box needs rest. Honest about thin juice — not melodramatic.",

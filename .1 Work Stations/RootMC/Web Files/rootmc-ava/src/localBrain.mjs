@@ -64,6 +64,47 @@ function pendingPath() {
   return path.join(trainingDir(), "pending-lessons.jsonl");
 }
 
+function darkStallCooldownPath() {
+  return path.join(storePaths().dir, "dark-stall-cooldown.json");
+}
+
+const DARK_STALL_COOLDOWN_MS = Number(
+  process.env.AVA_DARK_STALL_COOLDOWN_MS || 15 * 60_000,
+);
+
+function takeDarkStallReply(channelId = "") {
+  const ch = String(channelId || "unknown");
+  let map = {};
+  try {
+    map = JSON.parse(fs.readFileSync(darkStallCooldownPath(), "utf8"));
+  } catch {
+    map = {};
+  }
+  const last = Number(map[ch] || 0);
+  const now = Date.now();
+  if (last && now - last < DARK_STALL_COOLDOWN_MS) {
+    return {
+      text: "still dark on the deep dig — I already queued this. I'll catch it when the core's back; no more spam.",
+      throttled: true,
+    };
+  }
+  map[ch] = now;
+  try {
+    fs.mkdirSync(path.dirname(darkStallCooldownPath()), { recursive: true });
+    fs.writeFileSync(
+      darkStallCooldownPath(),
+      JSON.stringify(map, null, 2),
+      "utf8",
+    );
+  } catch {
+    /* ignore */
+  }
+  return {
+    text: "Root Server and dream state are both dark right now — I queued this for when my core is back online. Ping me again after the host wakes.",
+    throttled: false,
+  };
+}
+
 function lessonsPath() {
   return path.join(trainingDir(), "local-lessons.jsonl");
 }
@@ -472,6 +513,7 @@ export async function localRecommend({
   authorId = "",
   authorName = "",
   surface = "slack",
+  channelId = "",
   images = [],
   deep = false,
 }) {
@@ -631,11 +673,9 @@ ${packs}`;
     console.warn("localBrain dream escalate:", dream.reason);
   }
 
-  // Both teachers down — queue the ask for when Ava core returns
-  const pendingNote = scrubPublicReply(
-    localParsed?.reply ||
-      "Root Server and dream state are both dark right now — I queued this for when my core is back online. Ping me again after the host wakes.",
-  );
+  // Both teachers down — queue the ask; throttle the public stall line per channel
+  const stall = takeDarkStallReply(channelId || surface);
+  const pendingNote = scrubPublicReply(localParsed?.reply || stall.text);
   recordLocalLesson({
     question: q,
     answer: pendingNote,
@@ -643,7 +683,7 @@ ${packs}`;
     surface,
     authorId,
     coreOnline: false,
-    meta: { authorName, awaitingCore: true },
+    meta: { authorName, awaitingCore: true, throttled: stall.throttled },
   });
   appendJsonl(pendingPath(), {
     at: Date.now(),
@@ -652,6 +692,7 @@ ${packs}`;
     question: scrubSecrets(q).slice(0, 4000),
     answer: null,
     surface,
+    channelId: String(channelId || ""),
     authorId,
   });
 

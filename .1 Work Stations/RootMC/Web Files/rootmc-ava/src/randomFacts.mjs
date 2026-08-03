@@ -31,7 +31,7 @@ const FACTS = [
   {
     id: "solar-1",
     tags: ["solar", "host", "rootmc"],
-    text: "HI Pacific Solar Root Server runs on panels + battery. Cloudy mornings = thin juice. Physics, not vibes.",
+    text: "HI Pacific Solar Root Server runs on panels + battery. Board: https://ava.rootmc.net/solar · site: https://rootmc.net · ops in Discord #solar-server. Solar=input W; energy=kWh estimate. If the solar page does not connect, the Root Server is offline. Cloudy mornings = thin juice. Physics, not vibes.",
   },
   {
     id: "pro-1",

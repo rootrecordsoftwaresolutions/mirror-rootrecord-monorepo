@@ -21,6 +21,7 @@ import {
 } from "./ecoflow.mjs";
 import { isAsleep } from "./sleepMode.mjs";
 import { isPoweredOff } from "./powerDown.mjs";
+import { solarLinksFooterLines } from "./solarLinks.mjs";
 
 export function isSolarCommand(text = "") {
   const t = String(text || "").trim();
@@ -97,6 +98,8 @@ export async function buildSolarCommandReply({ refreshPower = true } = {}) {
     "",
     "**Weather + outlook (NWS)**",
     ...formatWeatherLines(block?.payload?.weather || { ok: false }),
+    "",
+    ...solarLinksFooterLines(),
     "",
     "— Ava",
   ];

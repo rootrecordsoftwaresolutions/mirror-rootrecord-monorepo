@@ -105,7 +105,7 @@ function formatMorningSolarBlock(morning) {
         )
       : morning.siteMinutes;
   const lines = [
-    "**Morning solar** - sampled window (not inventing dawn)",
+    "**Today's morning cycle (HST)** — today's buckets only (not mixed with live pull)",
     `• Window: **${fmtHst(morning.sampleStart)}-${fmtHst(morning.sampleEnd)}** (~${spanMin}m · ${morning.siteMinutes} site-minutes)`,
   ];
   if (morning.note && morning.note !== "ok") {

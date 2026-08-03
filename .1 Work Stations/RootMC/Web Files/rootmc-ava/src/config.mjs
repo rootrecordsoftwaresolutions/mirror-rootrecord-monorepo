@@ -170,12 +170,13 @@ export const SEXI_BOT_APP_ID = AVA_BOT_APP_ID;
 export const DEFAULT_WATCH_CHANNELS = [
   "1526664180491358419", // proposals
   "1516121832493678612", // admins
-  "1516108586307158088", // #general
+  "1516108586307158088", // #general — solar server ops (+ community)
   "1522406451413385317", // governance
   "1522413185364398090", // voting
   "1522406019152478210", // constitution
   "1516389376198840421", // #memes-and-media
   "1532929974154166522", // #development (staff pointer → Slack)
+  "1533915343766949949", // #solar-server — HI Pacific Solar Root Server ops
   "1520665313631408251", // #updates — ops status + staff pings (she posts here; must listen too)
   "1531432703675596942", // #random-facts — watch + reply; unsolicited spam stays OFF
 ];
@@ -194,6 +195,8 @@ export const AVA_CHANNELS = {
   avaMedia: "1533268458668687392",
   randomFacts: "1531432703675596942",
   updates: "1520665313631408251",
+  /** HI Pacific Solar Root Server ops */
+  solarServer: "1533915343766949949",
   /** Hourly realm snapshots (Official/Worker) — Ava enriches host-site solar/weather */
   hourlySnapshots: "1528956490831102093",
   /** MC ↔ Discord bridge — Ava batch-scans for quiet in-game assists */

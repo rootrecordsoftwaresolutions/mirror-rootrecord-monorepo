@@ -351,6 +351,7 @@ export async function recommend({
         authorId,
         authorName,
         surface: surfaceNorm,
+        channelId: String(channelId || ""),
         images,
         deep: deepLocal,
       });

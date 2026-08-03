@@ -247,35 +247,46 @@ function toWatts(raw, keyHint = "") {
 
 function pickPowerWatts(data) {
   if (!data || typeof data !== "object") return { inW: null, outW: null, solarW: null };
-  const get = (...keys) => {
-    for (const k of keys) {
-      if (data[k] != null && !Number.isNaN(Number(data[k]))) {
-        return { key: k, val: Number(data[k]) };
-      }
-    }
-    return null;
-  };
-  const inp = get(
-    "pd.wattsInSum",
-    "inv.inputWatts",
-    "mppt.inWatts",
-    "pd.wattsInSum_mw",
-  );
-  const out = get(
-    "pd.wattsOutSum",
-    "inv.outputWatts",
-    "pd.wattsOutSum_mw",
-  );
-  const solar = get(
-    "mppt.inWatts",
-    "mppt.pv1InWatts",
-    "mppt.pv2InWatts",
-  );
-  return {
-    inW: inp ? toWatts(inp.val, inp.key) : null,
-    outW: out ? toWatts(out.val, out.key) : null,
-    solarW: solar ? toWatts(solar.val, solar.key) : null,
-  };
+
+  const has = (k) => data[k] != null && !Number.isNaN(Number(data[k]));
+  const w = (k) => toWatts(Number(data[k]), k);
+
+  /**
+   * Intake: trust pd.wattsInSum when it's actually charging (>0).
+   * River often leaves PD sum empty/0 while mppt.inWatts is the real solar intake —
+   * then use max(mppt, inv.input). Never prefer a bare inv.input=0 over mppt.
+   */
+  let inW = null;
+  if (has("pd.wattsInSum") && w("pd.wattsInSum") > 0) {
+    inW = w("pd.wattsInSum");
+  } else {
+    const cands = [];
+    if (has("mppt.inWatts")) cands.push(w("mppt.inWatts"));
+    if (has("inv.inputWatts")) cands.push(w("inv.inputWatts"));
+    if (has("pd.wattsInSum_mw")) cands.push(w("pd.wattsInSum_mw"));
+    const pos = cands.filter((n) => n != null && n > 0);
+    if (pos.length) inW = Math.max(...pos);
+    else if (has("pd.wattsInSum")) inW = w("pd.wattsInSum");
+    else if (cands.length) inW = cands.find((n) => n != null) ?? null;
+  }
+
+  /**
+   * Load out: pd.wattsOutSum is authoritative when present — including 0.
+   * Do NOT fall through to inv.outputWatts when PD says 0 (River ghost ~49W
+   * with AC disabled fooled us). Only use inv when PD sum key is missing.
+   */
+  let outW = null;
+  if (has("pd.wattsOutSum")) outW = w("pd.wattsOutSum");
+  else if (has("pd.wattsOutSum_mw")) outW = w("pd.wattsOutSum_mw");
+  else if (has("inv.outputWatts")) outW = w("inv.outputWatts");
+
+  let solarW = null;
+  if (has("mppt.inWatts") && w("mppt.inWatts") > 0) solarW = w("mppt.inWatts");
+  else if (has("mppt.pv1InWatts") && w("mppt.pv1InWatts") > 0) solarW = w("mppt.pv1InWatts");
+  else if (has("mppt.pv2InWatts") && w("mppt.pv2InWatts") > 0) solarW = w("mppt.pv2InWatts");
+  else if (has("mppt.inWatts")) solarW = w("mppt.inWatts");
+
+  return { inW, outW, solarW };
 }
 
 function minuteBucketPath(sn) {
@@ -286,11 +297,21 @@ function appendMinuteTotals(sn, sample) {
   const file = minuteBucketPath(sn);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const minute = Math.floor(Date.now() / 60000) * 60000;
+  const hstDay = new Date(minute).toLocaleDateString("en-CA", {
+    timeZone: "Pacific/Honolulu",
+  });
   fs.appendFileSync(
     file,
-    `${JSON.stringify({ minute, at: Date.now(), ...sample })}\n`,
+    `${JSON.stringify({ minute, at: Date.now(), hstDay, ...sample })}\n`,
     "utf8",
   );
+}
+
+/** Current HST calendar day key (YYYY-MM-DD). */
+export function ecoHstDayKey(ms = Date.now()) {
+  return new Date(ms).toLocaleDateString("en-CA", {
+    timeZone: "Pacific/Honolulu",
+  });
 }
 
 function readMinuteRows(sn) {
@@ -421,9 +442,13 @@ export function summarizeMorningSolar(opts = {}) {
   let latest = null;
 
   for (const sn of sns) {
+    const today = ecoHstDayKey(now);
     const rows = readMinuteRows(sn).filter((r) => {
       const t = Number(r.minute || r.at || 0);
-      return t >= morningStart && t <= end;
+      if (!(t >= morningStart && t <= end)) return false;
+      // Don't mix prior HST days into today's morning cycle
+      if (r.hstDay && String(r.hstDay) !== today) return false;
+      return true;
     });
     const vals = rows
       .map((r) => Number(r.solarW))

@@ -109,9 +109,10 @@ export function solarPageHtml() {
         <p class="sub" id="siteLabel">HI Pacific Solar Root Server · live tracking</p>
       </div>
       <nav class="links" aria-label="Ava Core display tunnel">
-        <a class="primary" href="https://ava.rootmc.net/" target="_blank" rel="noopener">Ava Core · ava.rootmc.net</a>
-        <a href="https://ava.rootmc.net/solar" target="_blank" rel="noopener">Solar (tunnel)</a>
-        <a href="https://ava.rootmc.net/" target="_blank" rel="noopener">Status (tunnel)</a>
+        <a class="primary" href="https://ava.rootmc.net/solar" target="_blank" rel="noopener">Solar board</a>
+        <a href="https://rootmc.net" target="_blank" rel="noopener">rootmc.net</a>
+        <a href="https://discord.com/channels/1516108585740800042/1533915343766949949" target="_blank" rel="noopener">Solar ops Discord</a>
+        <a href="https://ava.rootmc.net/" target="_blank" rel="noopener">Ava Core</a>
         <a href="/">Status</a>
         <a href="/solar">Solar</a>
         <a href="/health">Health</a>
@@ -180,8 +181,10 @@ export function solarPageHtml() {
 
     <footer>
       Live numbers only — EcoFlow minute buckets + host-metrics + NWS (no invented Wh/averages).
-      Ava Core tunnel: <a href="https://ava.rootmc.net/">https://ava.rootmc.net/</a>
-      · Solar: <a href="https://ava.rootmc.net/solar">/solar</a>
+      <strong>If this page / <a href="https://ava.rootmc.net/solar">ava.rootmc.net/solar</a> does not connect, the Root Server is offline.</strong>
+      · Website: <a href="https://rootmc.net">rootmc.net</a>
+      · Solar ops Discord: <a href="https://discord.com/channels/1516108585740800042/1533915343766949949">#solar-server</a>
+      · Ava Core: <a href="https://ava.rootmc.net/">ava.rootmc.net</a>
       · Local: <a href="http://127.0.0.1:8787/solar">:8787/solar</a>
       · <span id="age">…</span>
     </footer>
@@ -196,6 +199,12 @@ export function solarPageHtml() {
       const x = Number(n);
       const t = Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 10) / 10;
       return t + suffix;
+    }
+    function fmtKwhFromWh(wh) {
+      if (wh == null || Number.isNaN(Number(wh))) return "—";
+      const k = Number(wh) / 1000;
+      if (Math.abs(k) < 0.01) return Math.round(Number(wh)) + " Wh";
+      return Math.round(k * 1000) / 1000 + " kWh est.";
     }
     function fmtTime(t) {
       try { return new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
@@ -334,8 +343,8 @@ export function solarPageHtml() {
         ? mineMultNum.toFixed(1)
         : String(mineMultNum)) + "×";
       const mineHint = mineOnline
-        ? "Gold mine · bank " + fmt(mining.battery_percent, "%")
-        : "disconnected · 1.0×";
+        ? "1+(bank%/100) · bank " + fmt(mining.battery_percent, "%")
+        : "host/bank offline · 1.0×";
 
       $("banner").innerHTML =
         statusPill(live) +
@@ -351,9 +360,9 @@ export function solarPageHtml() {
       $("kpis").innerHTML = [
         ["Bank now", fmt(live.batteryPct, "%"), "avg day "+fmt(st.bank?.dayAvgPct,"%")+" · roll "+fmt(st.bank?.rollingAvgPct,"%"), true],
         ["Gold mine", mineMult, mineHint, mineOnline],
-        ["Solar now", fmt(live.solarW, " W"), "morn ~"+fmt(st.solar?.morningAvgW," W")+" · day "+fmt(st.solar?.dayAvgW," W"), true],
-        ["Solar Wh", fmt(st.solar?.dayWh, " Wh"), "today · roll "+fmt(st.solar?.rollingWh," Wh"), false],
-        ["Load out", fmt(live.outW, " W"), "day avg "+fmt(st.load?.dayAvgOutW," W")+" · "+fmt(st.load?.dayOutWh," Wh"), false],
+        ["Solar input", fmt(live.solarW, " W"), "panel in · morn ~"+fmt(st.solar?.morningAvgW," W")+" · day avg "+fmt(st.solar?.dayAvgW," W"), true],
+        ["Energy today", fmtKwhFromWh(st.solar?.dayWh), "est. from minute watts · roll "+fmtKwhFromWh(st.solar?.rollingWh), false],
+        ["Load out", fmt(live.outW, " W"), "day avg "+fmt(st.load?.dayAvgOutW," W")+" · "+fmtKwhFromWh(st.load?.dayOutWh), false],
         ["CPU now", fmt(live.cpu, "%"), "1h "+fmt(st.cpu?.hourAvgPct,"%")+" · day "+fmt(st.cpu?.dayAvgPct,"%"), false],
         ["Weather", period.temp != null ? (period.temp+(period.unit||"F")) : "—", period.short || "", false],
       ].map(([k,v,h,lime]) =>
@@ -361,23 +370,26 @@ export function solarPageHtml() {
       ).join("");
 
       $("stats").innerHTML = [
-        ["Solar", [
+        ["Solar input (W)", [
           ["Current", fmt(st.solar?.currentW, " W")],
           ["Morning avg", st.solar?.morningAvgW != null ? "~"+fmt(st.solar.morningAvgW," W") : "—"],
           ["Day avg", fmt(st.solar?.dayAvgW, " W")],
           ["Rolling avg", fmt(st.solar?.rollingAvgW, " W")],
-          ["Day total", fmt(st.solar?.dayWh, " Wh")],
-          ["Rolling total", fmt(st.solar?.rollingWh, " Wh")],
           ["Morning note", st.solar?.morningNote || "—"],
+        ]],
+        ["Energy estimate", [
+          ["Today", fmtKwhFromWh(st.solar?.dayWh)],
+          ["Rolling window", fmtKwhFromWh(st.solar?.rollingWh)],
+          ["Load today", fmtKwhFromWh(st.load?.dayOutWh)],
+          ["Note", "Wh/kWh from minute watts — not labeled solar"],
         ]],
         ["Bank / load", [
           ["Bank now", fmt(st.bank?.currentPct, "%")],
-          ["Gold mine mult", mineOnline ? mineMult : "1.0× (offline)"],
+          ["Gold mine mult", mineOnline ? mineMult + " · 1+(SOC/100)" : "1.0× (offline)"],
           ["Bank day avg", fmt(st.bank?.dayAvgPct, "%")],
           ["Bank rolling", fmt(st.bank?.rollingAvgPct, "%")],
           ["Load now", fmt(st.load?.currentOutW, " W")],
           ["Load day avg", fmt(st.load?.dayAvgOutW, " W")],
-          ["Load day Wh", fmt(st.load?.dayOutWh, " Wh")],
           ["Mood", st.bank?.mood || "—"],
         ]],
         ["CPU / host", [
@@ -415,12 +427,12 @@ export function solarPageHtml() {
         { values: mins.map((m)=>m.ram), color:"#9ad0ff", fill:false },
       ], { times, yMax:100, unit:"%" });
 
-      $("solarMeta").textContent = "watts · on-circuit · "+(d.series?.ecoSamples??0)+" eco / "+(d.series?.hours||"?")+"h · day Wh "+fmt(st.solar?.dayWh);
+      $("solarMeta").textContent = "solar input watts · on-circuit · "+(d.series?.ecoSamples??0)+" eco / "+(d.series?.hours||"?")+"h · energy today "+fmtKwhFromWh(st.solar?.dayWh);
       $("cpuMeta").textContent = (live.hostname || live.hostKey || "workstation")+" · 1h "+fmt(st.cpu?.hourAvgPct,"%")+" · "+(d.series?.cpuSamples??0)+" CPU min";
 
       const devices = live.devices || [];
       $("devices").innerHTML = devices.length
-        ? '<div class="dev" style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em"><span>Device</span><span>Status</span><span>SOC</span><span>Solar</span><span>In</span><span>Out</span></div>' +
+        ? '<div class="dev" style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em"><span>Device</span><span>Status</span><span>SOC</span><span>Solar in</span><span>Pack in</span><span>Out</span></div>' +
           devices.map((dev) => {
             const cls = dev.disconnected || dev.status==="offline" ? "offline" : (dev.stale || dev.status==="stale" ? "stale" : "");
             const stLabel = dev.status === "off-circuit" ? "off-circuit" : (dev.status || (dev.ok ? "online" : "offline"));
@@ -460,9 +472,21 @@ export function solarPageHtml() {
     async function tick() {
       try {
         const res = await fetch("/api/solar?hours=8", { cache: "no-store" });
+        if (!res.ok) {
+          $("banner").innerHTML = '<span class="pill bad">HOST OFFLINE</span> <strong>API HTTP '+res.status+'</strong> <span class="muted">— if ava.rootmc.net/solar does not connect, the Root Server is offline.</span>';
+          $("age").textContent = "API HTTP "+res.status+" · host offline signal";
+          return;
+        }
         const d = await res.json();
-        if (d?.ok) render(d); else $("age").textContent = "API error";
-      } catch { $("age").textContent = "HTTP down"; }
+        if (d?.ok) render(d);
+        else {
+          $("banner").innerHTML = '<span class="pill bad">HOST OFFLINE</span> <strong>Solar API error</strong> <span class="muted">— if this page does not connect, the Root Server is offline.</span>';
+          $("age").textContent = "API error · host offline signal";
+        }
+      } catch {
+        $("banner").innerHTML = '<span class="pill bad">HOST OFFLINE</span> <strong>Cannot reach solar API</strong> <span class="muted">— if ava.rootmc.net/solar does not connect, the Root Server is offline.</span>';
+        $("age").textContent = "HTTP down · Root Server offline";
+      }
     }
     tick();
     setInterval(tick, 15000);

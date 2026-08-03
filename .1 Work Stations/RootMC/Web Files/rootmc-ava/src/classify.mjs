@@ -155,6 +155,13 @@ export function isSoftChat(question = "", rawContent = "") {
   ) {
     return true;
   }
+  // Chill / stop-spam from operator — soft voice, not dig-dark spam
+  if (
+    raw.length <= 120 &&
+    /\b(chill|calm\s+down|slow\s+down|stop\s+spam|tf\s+out|chill\s+tf)\b/i.test(q)
+  ) {
+    return true;
+  }
   if (
     /^(hey|hi|yo|sup|ava|ok|okay|thanks?|ty|thx|gn|night+|good\s*night|good\s*mornin[g']?|mornin[g']?|gm|lol+|lmao+|haha+|heh+|bet|noted|cool|nice|np|yw)[.!?]*$/i.test(
       raw,
@@ -236,6 +243,14 @@ export function softChatReply(question = "", rawContent = "") {
   }
   if (/\b(thanks?|ty|thx)\b/.test(q)) {
     return "anytime ❤";
+  }
+  // Operator chill / stop spamming — own it, don't go "mm?"
+  if (
+    /\b(chill|calm\s+down|slow\s+down|stop\s+spam|too\s+many|tf\s+out|chill\s+tf)\b/.test(
+      q,
+    )
+  ) {
+    return "yeah — my bad. dialing it back. queued digs stay quiet until the core's actually useful again.";
   }
   // Good morning — offer pulse/report (staffBriefing usually catches first)
   if (/\b(good\s*mornin[g']?|mornin[g']?|\bgm\b)\b/.test(q)) {
